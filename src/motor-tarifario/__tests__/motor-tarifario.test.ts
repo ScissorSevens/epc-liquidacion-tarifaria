@@ -137,4 +137,44 @@ describe('Motor Tarifario CRA', () => {
 
     expect(() => calcularLiquidacion(entrada)).toThrow('El precio por m3 debe ser mayor a cero');
   });
+
+  it('lanza error si precio excedente es negativo', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: -200, consumoBasico: 20 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El precio excedente debe ser mayor a cero');
+  });
+
+  it('lanza error si precio excedente es cero', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: 0, consumoBasico: 20 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El precio excedente debe ser mayor a cero');
+  });
+
+  it('lanza error si consumo basico es negativo', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: 1500, consumoBasico: -5 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El consumo basico debe ser mayor a cero');
+  });
+
+  it('lanza error si consumo basico es cero', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: 1500, consumoBasico: 0 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El consumo basico debe ser mayor a cero');
+  });
 });
