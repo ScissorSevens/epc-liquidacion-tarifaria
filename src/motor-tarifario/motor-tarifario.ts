@@ -1,10 +1,10 @@
 import { EntradaCalculo, ResultadoCalculo } from './types.js';
 
 /**
- * Motor de liquidación tarifaria CRA
- * Calcula el total a facturar a partir de lecturas y parámetros tarifarios
+ * Valida que los datos de entrada sean coherentes
+ * @throws Error si algún dato es inválido
  */
-export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
+function validarEntrada(entrada: EntradaCalculo): void {
   if (entrada.lecturaAnterior < 0 || entrada.lecturaActual < 0) {
     throw new Error('Las lecturas no pueden ser negativas');
   }
@@ -20,6 +20,14 @@ export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
   if (entrada.parametros.precioM3 <= 0) {
     throw new Error('El precio por m3 debe ser mayor a cero');
   }
+}
+
+/**
+ * Motor de liquidación tarifaria CRA
+ * Calcula el total a facturar a partir de lecturas y parámetros tarifarios
+ */
+export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
+  validarEntrada(entrada);
 
   const consumo = entrada.lecturaActual - entrada.lecturaAnterior;
   const cargoFijo = entrada.parametros.cargoFijo;
