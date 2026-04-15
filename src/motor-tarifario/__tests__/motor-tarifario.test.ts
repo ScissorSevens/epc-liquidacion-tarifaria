@@ -36,4 +36,14 @@ describe('Motor Tarifario CRA', () => {
     expect(resultado.cargoConsumo).toBe(0);
     expect(resultado.total).toBe(5000); // solo cargo fijo
   });
+
+  it('lanza error si lectura actual es menor que anterior', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 90,
+      parametros: parametrosBase,
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('Lectura actual no puede ser menor que la anterior');
+  });
 });
