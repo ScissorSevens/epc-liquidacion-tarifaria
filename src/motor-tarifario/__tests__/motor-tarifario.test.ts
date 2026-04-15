@@ -8,12 +8,18 @@ describe('Motor Tarifario CRA', () => {
     consumoBasico: 20,
   };
 
-  it('debería lanzar error hasta que sea implementado', () => {
+  it('calcula consumo y total con parámetros básicos', () => {
     const entrada: EntradaCalculo = {
       lecturaAnterior: 100,
       lecturaActual: 115,
       parametros: parametrosBase,
     };
-    expect(() => calcularLiquidacion(entrada)).toThrow('Not implemented');
+
+    const resultado = calcularLiquidacion(entrada);
+
+    expect(resultado.consumo).toBe(15);
+    expect(resultado.cargoFijo).toBe(5000);
+    expect(resultado.cargoConsumo).toBe(12000); // 15 * 800
+    expect(resultado.total).toBe(17000);         // 5000 + 12000
   });
 });
