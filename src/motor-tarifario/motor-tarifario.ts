@@ -20,6 +20,14 @@ function validarEntrada(entrada: EntradaCalculo): void {
   if (entrada.parametros.precioM3 <= 0) {
     throw new Error('El precio por m3 debe ser mayor a cero');
   }
+
+  if (entrada.parametros.precioM3Excedente <= 0) {
+    throw new Error('El precio excedente debe ser mayor a cero');
+  }
+
+  if (entrada.parametros.consumoBasico <= 0) {
+    throw new Error('El consumo basico debe ser mayor a cero');
+  }
 }
 
 /**
