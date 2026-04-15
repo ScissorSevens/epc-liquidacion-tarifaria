@@ -13,6 +13,14 @@ export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
     throw new Error('Lectura actual no puede ser menor que la anterior');
   }
 
+  if (entrada.parametros.cargoFijo < 0) {
+    throw new Error('El cargo fijo no puede ser negativo');
+  }
+
+  if (entrada.parametros.precioM3 <= 0) {
+    throw new Error('El precio por m3 debe ser mayor a cero');
+  }
+
   const consumo = entrada.lecturaActual - entrada.lecturaAnterior;
   const cargoFijo = entrada.parametros.cargoFijo;
   const cargoConsumo = consumo * entrada.parametros.precioM3;
