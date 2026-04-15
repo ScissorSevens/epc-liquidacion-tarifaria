@@ -1,4 +1,14 @@
-import { EntradaCalculo, ResultadoCalculo } from './types.js';
+import { EntradaCalculo, Estrato, ResultadoCalculo } from './types.js';
+
+/** Porcentajes de subsidio/contribución por estrato según CRA */
+const FACTOR_ESTRATO: Record<Estrato, number> = {
+  1: -0.70,   // subsidio 70%
+  2: -0.40,   // subsidio 40%
+  3: -0.15,   // subsidio 15%
+  4:  0,       // costo real
+  5:  0.50,    // contribución 50%
+  6:  0.60,    // contribución 60%
+};
 
 /**
  * Valida que los datos de entrada sean coherentes
@@ -45,7 +55,14 @@ export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
 
   const cargoConsumo = consumoBasico * precioM3;
   const cargoExcedente = consumoExcedente * precioM3Excedente;
-  const total = cargoFijo + cargoConsumo + cargoExcedente;
 
-  return { consumo, consumoBasico, consumoExcedente, cargoFijo, cargoConsumo, cargoExcedente, total };
+  // Subsidio/contribución por estrato (aplica sobre cargo de consumo total)
+  const factor = entrada.estrato ? FACTOR_ESTRATO[entrada.estrato] : 0;
+  const cargoConsumoTotal = cargoConsumo + cargoExcedente;
+  const subsidio = factor < 0 ? Math.abs(factor) * cargoConsumoTotal : 0;
+  const contribucion = factor > 0 ? factor * cargoConsumoTotal : 0;
+
+  const total = cargoFijo + cargoConsumoTotal - subsidio + contribucion;
+
+  return { consumo, consumoBasico, consumoExcedente, cargoFijo, cargoConsumo, cargoExcedente, subsidio, contribucion, total };
 }
