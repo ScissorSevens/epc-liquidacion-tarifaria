@@ -66,4 +66,34 @@ describe('Motor Tarifario CRA', () => {
 
     expect(() => calcularLiquidacion(entrada)).toThrow('Las lecturas no pueden ser negativas');
   });
+
+  it('lanza error si cargo fijo es negativo', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: -1000, precioM3: 800, consumoBasico: 20 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El cargo fijo no puede ser negativo');
+  });
+
+  it('lanza error si precio por m3 es negativo', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: 5000, precioM3: -500, consumoBasico: 20 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El precio por m3 debe ser mayor a cero');
+  });
+
+  it('lanza error si precio por m3 es cero', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 100,
+      lecturaActual: 115,
+      parametros: { cargoFijo: 5000, precioM3: 0, consumoBasico: 20 },
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('El precio por m3 debe ser mayor a cero');
+  });
 });
