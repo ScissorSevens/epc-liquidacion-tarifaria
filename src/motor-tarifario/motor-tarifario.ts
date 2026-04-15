@@ -30,9 +30,14 @@ export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
   validarEntrada(entrada);
 
   const consumo = entrada.lecturaActual - entrada.lecturaAnterior;
-  const cargoFijo = entrada.parametros.cargoFijo;
-  const cargoConsumo = consumo * entrada.parametros.precioM3;
-  const total = cargoFijo + cargoConsumo;
+  const { cargoFijo, precioM3, precioM3Excedente, consumoBasico: limiteBasico } = entrada.parametros;
 
-  return { consumo, cargoFijo, cargoConsumo, total };
+  const consumoBasico = Math.min(consumo, limiteBasico);
+  const consumoExcedente = Math.max(consumo - limiteBasico, 0);
+
+  const cargoConsumo = consumoBasico * precioM3;
+  const cargoExcedente = consumoExcedente * precioM3Excedente;
+  const total = cargoFijo + cargoConsumo + cargoExcedente;
+
+  return { consumo, consumoBasico, consumoExcedente, cargoFijo, cargoConsumo, cargoExcedente, total };
 }
