@@ -46,4 +46,24 @@ describe('Motor Tarifario CRA', () => {
 
     expect(() => calcularLiquidacion(entrada)).toThrow('Lectura actual no puede ser menor que la anterior');
   });
+
+  it('lanza error si lectura anterior es negativa', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: -5,
+      lecturaActual: 10,
+      parametros: parametrosBase,
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('Las lecturas no pueden ser negativas');
+  });
+
+  it('lanza error si lectura actual es negativa', () => {
+    const entrada: EntradaCalculo = {
+      lecturaAnterior: 10,
+      lecturaActual: -3,
+      parametros: parametrosBase,
+    };
+
+    expect(() => calcularLiquidacion(entrada)).toThrow('Las lecturas no pueden ser negativas');
+  });
 });
