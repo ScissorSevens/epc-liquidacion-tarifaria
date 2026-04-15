@@ -5,6 +5,10 @@ import { EntradaCalculo, ResultadoCalculo } from './types.js';
  * Calcula el total a facturar a partir de lecturas y parámetros tarifarios
  */
 export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
+  if (entrada.lecturaAnterior < 0 || entrada.lecturaActual < 0) {
+    throw new Error('Las lecturas no pueden ser negativas');
+  }
+
   if (entrada.lecturaActual < entrada.lecturaAnterior) {
     throw new Error('Lectura actual no puede ser menor que la anterior');
   }
