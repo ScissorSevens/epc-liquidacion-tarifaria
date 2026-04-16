@@ -1,4 +1,4 @@
-import { calcularLiquidacion } from '../motor-tarifario';
+import { calcularLiquidacion, calcularBatch } from '../motor-tarifario';
 import { EntradaCalculo } from '../types';
 
 describe('Motor Tarifario CRA', () => {
@@ -96,10 +96,69 @@ describe('Motor Tarifario CRA', () => {
       expect(resultado.cargoExcedente).toBe(120000);   // 80 * 1500
       expect(resultado.total).toBe(141000);            // 5000 + 16000 + 120000
     });
+
+    it('cargo fijo cero es valido (minimo vital Decreto 0776/2025)', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 110, // consumo = 10 m³
+        parametros: { cargoFijo: 0, precioM3: 800, precioM3Excedente: 1500, consumoBasico: 20 },
+        estrato: 1,
+      };
+
+      const resultado = calcularLiquidacion(entrada);
+
+      // cargoConsumo = 10 * 800 = 8000, subsidio 70% = 5600
+      expect(resultado.cargoFijo).toBe(0);
+      expect(resultado.cargoConsumo).toBe(8000);
+      expect(resultado.subsidio).toBe(5600);
+      expect(resultado.total).toBe(2400);              // 0 + 8000 - 5600
+    });
+
+    it('redondea a pesos enteros cuando tarifas tienen decimales', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 107, // consumo = 7 m³
+        parametros: {
+          cargoFijo: 4350.60,
+          precioM3: 823.45,
+          precioM3Excedente: 1547.80,
+          consumoBasico: 20,
+        },
+      };
+
+      const resultado = calcularLiquidacion(entrada);
+
+      // cargoConsumo = 7 * 823.45 = 5764.15
+      // total = 4350.60 + 5764.15 = 10114.75 → redondeado a 10115
+      expect(resultado.cargoConsumo).toBe(5764);       // Math.round(5764.15)
+      expect(resultado.cargoFijo).toBe(4351);          // Math.round(4350.60)
+      expect(resultado.total).toBe(10115);             // Math.round(total)
+    });
   });
 
   describe('subsidio y contribucion por estrato', () => {
-    it('estrato 1 aplica subsidio del 70% sobre cargo consumo', () => {
+    it('sin estrato se comporta como estrato 4 (costo real)', () => {
+      const conEstrato4: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 4,
+      };
+      const sinEstrato: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+      };
+
+      const resultado4 = calcularLiquidacion(conEstrato4);
+      const resultadoSin = calcularLiquidacion(sinEstrato);
+
+      expect(resultadoSin.subsidio).toBe(resultado4.subsidio);
+      expect(resultadoSin.contribucion).toBe(resultado4.contribucion);
+      expect(resultadoSin.total).toBe(resultado4.total);
+    });
+
+    it('estrato 1 aplica subsidio del 70% sobre cargo fijo y consumo basico', () => {
       const entrada: EntradaCalculo = {
         lecturaAnterior: 100,
         lecturaActual: 115,
@@ -109,12 +168,14 @@ describe('Motor Tarifario CRA', () => {
 
       const resultado = calcularLiquidacion(entrada);
 
-      expect(resultado.subsidio).toBe(8400);           // 12000 * 0.70
+      // Base subsidiable: cargoFijo + cargoConsumo = 5000 + 12000 = 17000
+      // Subsidio 70%: 17000 * 0.70 = 11900
+      expect(resultado.subsidio).toBe(11900);
       expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(8600);              // 5000 + 12000 - 8400
+      expect(resultado.total).toBe(5100);              // 5000 + 12000 - 11900
     });
 
-    it('estrato 2 aplica subsidio del 40% sobre cargo consumo', () => {
+    it('estrato 2 aplica subsidio del 40% sobre cargo fijo y consumo basico', () => {
       const entrada: EntradaCalculo = {
         lecturaAnterior: 100,
         lecturaActual: 115,
@@ -124,9 +185,11 @@ describe('Motor Tarifario CRA', () => {
 
       const resultado = calcularLiquidacion(entrada);
 
-      expect(resultado.subsidio).toBe(4800);           // 12000 * 0.40
+      // Base subsidiable: 5000 + 12000 = 17000
+      // Subsidio 40%: 17000 * 0.40 = 6800
+      expect(resultado.subsidio).toBe(6800);
       expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(12200);             // 5000 + 12000 - 4800
+      expect(resultado.total).toBe(10200);             // 5000 + 12000 - 6800
     });
 
     it('estrato 4 paga costo real sin subsidio ni contribucion', () => {
@@ -144,7 +207,7 @@ describe('Motor Tarifario CRA', () => {
       expect(resultado.total).toBe(17000);             // 5000 + 12000
     });
 
-    it('estrato 6 aplica contribucion del 60% sobre cargo consumo', () => {
+    it('estrato 6 aplica contribucion del 60% sobre cargo fijo y consumo total', () => {
       const entrada: EntradaCalculo = {
         lecturaAnterior: 100,
         lecturaActual: 115,
@@ -154,12 +217,14 @@ describe('Motor Tarifario CRA', () => {
 
       const resultado = calcularLiquidacion(entrada);
 
+      // Base contribucion: cargoFijo + cargoConsumoTotal = 5000 + 12000 = 17000
+      // Contribución 60%: 17000 * 0.60 = 10200
       expect(resultado.subsidio).toBe(0);
-      expect(resultado.contribucion).toBe(7200);       // 12000 * 0.60
-      expect(resultado.total).toBe(24200);             // 5000 + 12000 + 7200
+      expect(resultado.contribucion).toBe(10200);
+      expect(resultado.total).toBe(27200);             // 5000 + 12000 + 10200
     });
 
-    it('estrato 1 con consumo excedente aplica subsidio sobre basico y excedente', () => {
+    it('estrato 1 con consumo excedente aplica subsidio SOLO sobre fijo y basico', () => {
       const entrada: EntradaCalculo = {
         lecturaAnterior: 100,
         lecturaActual: 130,
@@ -169,16 +234,78 @@ describe('Motor Tarifario CRA', () => {
 
       const resultado = calcularLiquidacion(entrada);
 
-      // cargoConsumoTotal = (20 * 800) + (10 * 1500) = 31000
-      // Subsidio 70%: 31000 * 0.70 = 21700
+      // cargoFijo = 5000, cargoConsumo = 20 * 800 = 16000 (subsidiable)
+      // cargoExcedente = 10 * 1500 = 15000 (NO subsidiable)
+      // Subsidio 70% de (5000 + 16000) = 70% de 21000 = 14700
       expect(resultado.consumo).toBe(30);
       expect(resultado.consumoBasico).toBe(20);
       expect(resultado.consumoExcedente).toBe(10);
       expect(resultado.cargoConsumo).toBe(16000);
       expect(resultado.cargoExcedente).toBe(15000);
-      expect(resultado.subsidio).toBe(21700);
+      expect(resultado.subsidio).toBe(14700);
       expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(14300);             // 5000 + 31000 - 21700
+      expect(resultado.total).toBe(21300);             // 5000 + 16000 + 15000 - 14700
+    });
+  });
+
+  describe('periodo de facturacion', () => {
+    it('incluye periodo en el resultado cuando se proporciona en la entrada', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        periodo: { mes: 3, anio: 2025 },
+      };
+
+      const resultado = calcularLiquidacion(entrada);
+
+      expect(resultado.periodo).toEqual({ mes: 3, anio: 2025 });
+      expect(resultado.total).toBe(17000);
+    });
+
+    it('resultado sin periodo cuando no se proporciona (backwards compat)', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+      };
+
+      const resultado = calcularLiquidacion(entrada);
+
+      expect(resultado.periodo).toBeUndefined();
+    });
+
+    it('lanza error si mes es invalido (fuera de rango 1-12)', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        periodo: { mes: 13, anio: 2025 },
+      };
+
+      expect(() => calcularLiquidacion(entrada)).toThrow('Mes debe ser un valor entre 1 y 12');
+    });
+
+    it('lanza error si mes es cero', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        periodo: { mes: 0, anio: 2025 },
+      };
+
+      expect(() => calcularLiquidacion(entrada)).toThrow('Mes debe ser un valor entre 1 y 12');
+    });
+
+    it('lanza error si anio es menor a 2000', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        periodo: { mes: 6, anio: 1999 },
+      };
+
+      expect(() => calcularLiquidacion(entrada)).toThrow('Anio debe ser mayor o igual a 2000');
     });
   });
 
@@ -282,5 +409,92 @@ describe('Motor Tarifario CRA', () => {
 
       expect(() => calcularLiquidacion(entrada)).toThrow('El consumo basico debe ser mayor a cero');
     });
+
+    it('lanza error si estrato es invalido (fuera de rango 1-6)', () => {
+      const entrada = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 7 as any,
+      };
+
+      expect(() => calcularLiquidacion(entrada)).toThrow('Estrato debe ser un valor entre 1 y 6');
+    });
+
+    it('lanza error si estrato es cero', () => {
+      const entrada = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 0 as any,
+      };
+
+      expect(() => calcularLiquidacion(entrada)).toThrow('Estrato debe ser un valor entre 1 y 6');
+    });
+  });
+});
+
+describe('Liquidacion Batch', () => {
+  const parametrosBase: EntradaCalculo['parametros'] = {
+    cargoFijo: 5000,
+    precioM3: 800,
+    precioM3Excedente: 1500,
+    consumoBasico: 20,
+  };
+
+  it('liquida multiples suscriptores en una sola llamada', () => {
+    const entradas: EntradaCalculo[] = [
+      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase, estrato: 1 },
+      { lecturaAnterior: 200, lecturaActual: 210, parametros: parametrosBase, estrato: 4 },
+      { lecturaAnterior: 300, lecturaActual: 325, parametros: parametrosBase, estrato: 6 },
+    ];
+
+    const resultados = calcularBatch(entradas);
+
+    expect(resultados).toHaveLength(3);
+    // Estrato 1: subsidio 70% de (5000 + 12000) = 11900
+    expect(resultados[0].subsidio).toBe(11900);
+    expect(resultados[0].total).toBe(5100);
+    // Estrato 4: sin subsidio ni contribución, consumo 10
+    expect(resultados[1].subsidio).toBe(0);
+    expect(resultados[1].total).toBe(13000);           // 5000 + 8000
+    // Estrato 6: consumo 25 (20 basico + 5 excedente)
+    // contribución 60% de (5000 + 16000 + 7500) = 60% de 28500 = 17100
+    expect(resultados[2].contribucion).toBe(17100);
+    expect(resultados[2].total).toBe(45600);           // 5000 + 16000 + 7500 + 17100
+  });
+
+  it('retorna array vacio cuando no hay entradas', () => {
+    const resultados = calcularBatch([]);
+
+    expect(resultados).toEqual([]);
+  });
+
+  it('cada resultado es independiente del resto', () => {
+    const entradas: EntradaCalculo[] = [
+      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase },
+      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase },
+    ];
+
+    const resultados = calcularBatch(entradas);
+    const individual = calcularLiquidacion(entradas[0]);
+
+    expect(resultados[0]).toEqual(individual);
+    expect(resultados[1]).toEqual(individual);
+  });
+
+  it('un error en una entrada no afecta las demas', () => {
+    const entradas: EntradaCalculo[] = [
+      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase },
+      { lecturaAnterior: 200, lecturaActual: 190, parametros: parametrosBase }, // ERROR: actual < anterior
+      { lecturaAnterior: 300, lecturaActual: 310, parametros: parametrosBase },
+    ];
+
+    const resultados = calcularBatch(entradas);
+
+    expect(resultados).toHaveLength(3);
+    expect(resultados[0].total).toBe(17000);
+    expect(resultados[1]).toHaveProperty('error');
+    expect(resultados[2].total).toBe(13000);           // 5000 + 8000
   });
 });

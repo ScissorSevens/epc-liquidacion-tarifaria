@@ -12,11 +12,17 @@ export interface ParametrosTarifa {
 
 export type Estrato = 1 | 2 | 3 | 4 | 5 | 6;
 
+export interface PeriodoFacturacion {
+  mes: number;              // Mes de facturación (1-12)
+  anio: number;             // Año de facturación (ej: 2025)
+}
+
 export interface EntradaCalculo {
   lecturaAnterior: number;  // Lectura anterior del medidor en m³
   lecturaActual: number;    // Lectura actual del medidor en m³
   parametros: ParametrosTarifa;
   estrato?: Estrato;        // Estrato socioeconómico (1-6), opcional para backwards compat
+  periodo?: PeriodoFacturacion;  // Periodo de facturación, opcional para backwards compat
 }
 
 export interface ResultadoCalculo {
@@ -29,4 +35,6 @@ export interface ResultadoCalculo {
   subsidio: number;             // Monto subsidiado (estratos 1-3)
   contribucion: number;         // Monto contribución (estratos 5-6)
   total: number;                // Total a facturar
+  periodo?: PeriodoFacturacion; // Periodo de facturación (si fue proporcionado)
+  error?: string;               // Mensaje de error (solo en batch, cuando la entrada es inválida)
 }
