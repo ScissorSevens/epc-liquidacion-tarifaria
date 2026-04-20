@@ -1,4 +1,6 @@
 import { EntradaLectura, EvidenciaFoto, Lectura } from './types.js';
+import { calcularLiquidacion } from '../motor-tarifario/motor-tarifario';
+import { Estrato, ParametrosTarifa, ResultadoCalculo } from '../motor-tarifario/types';
 
 /** Regex para formato YYYYMM con mes válido (01-12) */
 const PERIODO_REGEX = /^\d{4}(0[1-9]|1[0-2])$/;
@@ -99,4 +101,31 @@ export function validarEvidencia(
   if (!lectura.evidencia) return false;
   if (opciones?.requiereHash && !lectura.evidencia.foto_hash) return false;
   return true;
+}
+
+/**
+ * Convierte id_periodo (YYYYMM) a objeto PeriodoFacturacion
+ */
+function parsePeriodo(idPeriodo: string): { mes: number; anio: number } {
+  const anio = parseInt(idPeriodo.substring(0, 4), 10);
+  const mes = parseInt(idPeriodo.substring(4, 6), 10);
+  return { mes, anio };
+}
+
+/**
+ * Liquida una lectura capturada usando el motor tarifario CRA
+ * Conecta el módulo de captura con el motor de liquidación
+ */
+export function liquidarLectura(
+  lectura: Lectura,
+  parametros: ParametrosTarifa,
+  estrato?: Estrato,
+): ResultadoCalculo {
+  return calcularLiquidacion({
+    lecturaAnterior: lectura.lectura_anterior,
+    lecturaActual: lectura.lectura_actual,
+    parametros,
+    estrato,
+    periodo: parsePeriodo(lectura.id_periodo),
+  });
 }

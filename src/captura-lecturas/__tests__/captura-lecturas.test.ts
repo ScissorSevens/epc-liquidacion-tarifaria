@@ -1,5 +1,6 @@
-import { registrarLectura, validarEvidencia } from '../captura-lecturas';
+import { registrarLectura, validarEvidencia, liquidarLectura } from '../captura-lecturas';
 import { EntradaLectura } from '../types';
+import { ParametrosTarifa, Estrato } from '../../motor-tarifario/types';
 
 describe('Captura de Lecturas', () => {
   const entradaBase: EntradaLectura = {
@@ -287,5 +288,103 @@ describe('Captura de Lecturas', () => {
       expect(validarEvidencia(lecturaSinHash, { requiereHash: true })).toBe(false);
       expect(validarEvidencia(lecturaConHash, { requiereHash: true })).toBe(true);
     });
+  });
+});
+
+describe('Integracion captura → motor tarifario', () => {
+  const parametrosBase: ParametrosTarifa = {
+    cargoFijo: 5000,
+    precioM3: 800,
+    precioM3Excedente: 1500,
+    consumoBasico: 20,
+  };
+
+  const entradaBase: EntradaLectura = {
+    id_medidor: 1,
+    id_periodo: '202504',
+    id_operario: 1,
+    lectura_actual: 150,
+    lectura_anterior: 130,
+  };
+
+  it('liquida una lectura capturada con parametros de tarifa', () => {
+    const lectura = registrarLectura(entradaBase);
+    const resultado = liquidarLectura(lectura, parametrosBase);
+
+    // consumo = 150 - 130 = 20 m³ (todo básico)
+    expect(resultado.consumo).toBe(20);
+    expect(resultado.cargoFijo).toBe(5000);
+    expect(resultado.cargoConsumo).toBe(16000);       // 20 * 800
+    expect(resultado.cargoExcedente).toBe(0);
+    expect(resultado.total).toBe(21000);               // 5000 + 16000
+  });
+
+  it('liquida lectura con estrato y aplica subsidio', () => {
+    const lectura = registrarLectura(entradaBase);
+    const estrato: Estrato = 1;
+    const resultado = liquidarLectura(lectura, parametrosBase, estrato);
+
+    // subsidio 70% de (5000 + 16000) = 14700
+    expect(resultado.subsidio).toBe(14700);
+    expect(resultado.total).toBe(6300);                // 5000 + 16000 - 14700
+  });
+
+  it('liquida lectura con consumo excedente', () => {
+    const entrada: EntradaLectura = {
+      ...entradaBase,
+      lectura_actual: 160,    // consumo = 30 (20 básico + 10 excedente)
+      lectura_anterior: 130,
+    };
+    const lectura = registrarLectura(entrada);
+    const resultado = liquidarLectura(lectura, parametrosBase);
+
+    expect(resultado.consumo).toBe(30);
+    expect(resultado.consumoBasico).toBe(20);
+    expect(resultado.consumoExcedente).toBe(10);
+    expect(resultado.cargoConsumo).toBe(16000);        // 20 * 800
+    expect(resultado.cargoExcedente).toBe(15000);      // 10 * 1500
+    expect(resultado.total).toBe(36000);               // 5000 + 16000 + 15000
+  });
+
+  it('liquida lectura con periodo y lo incluye en el resultado', () => {
+    const entrada: EntradaLectura = {
+      ...entradaBase,
+    };
+    const lectura = registrarLectura(entrada);
+    const resultado = liquidarLectura(lectura, parametrosBase);
+
+    // El periodo viene del id_periodo de la lectura (202504 → mes 4, año 2025)
+    expect(resultado.periodo).toEqual({ mes: 4, anio: 2025 });
+  });
+
+  it('liquida lectura con consumo cero', () => {
+    const entrada: EntradaLectura = {
+      ...entradaBase,
+      lectura_actual: 130,
+      lectura_anterior: 130,
+    };
+    const lectura = registrarLectura(entrada);
+    const resultado = liquidarLectura(lectura, parametrosBase);
+
+    expect(resultado.consumo).toBe(0);
+    expect(resultado.total).toBe(5000);                // solo cargo fijo
+  });
+
+  it('liquida lectura con lecturas decimales', () => {
+    const entrada: EntradaLectura = {
+      ...entradaBase,
+      lectura_actual: 150.750,
+      lectura_anterior: 130.250,
+    };
+    const lectura = registrarLectura(entrada);
+    const resultado = liquidarLectura(lectura, parametrosBase);
+
+    // consumo = 150.750 - 130.250 = 20.5 (20 básico + 0.5 excedente)
+    expect(resultado.consumo).toBe(20.5);
+    expect(resultado.consumoBasico).toBe(20);
+    expect(resultado.consumoExcedente).toBe(0.5);
+    expect(resultado.cargoConsumo).toBe(16000);        // 20 * 800
+    expect(resultado.cargoExcedente).toBe(750);        // 0.5 * 1500
+    expect(resultado.total).toBe(21750);               // 5000 + 16000 + 750
   });
 });
