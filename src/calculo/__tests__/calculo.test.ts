@@ -41,4 +41,47 @@ describe('crearLiquidacion', () => {
 
     expect(l1.id).not.toBe(l2.id);
   });
+
+  // Ciclo 20: Inmutabilidad runtime
+  describe('inmutabilidad runtime', () => {
+    it('debería estar congelada (Object.isFrozen) al nivel raíz', () => {
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(Object.isFrozen(liquidacion)).toBe(true);
+    });
+
+    it('debería congelar también el resultado anidado (deep freeze)', () => {
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(Object.isFrozen(liquidacion.resultado)).toBe(true);
+      expect(Object.isFrozen(liquidacion.resultado.periodo)).toBe(true);
+    });
+
+    it('debería lanzar error en strict mode al intentar modificar campos', () => {
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(() => {
+        (liquidacion as any).suscriptorId = 'HACKER-666';
+      }).toThrow(TypeError);
+
+      expect(() => {
+        (liquidacion.resultado as any).total = 999999;
+      }).toThrow(TypeError);
+    });
+
+    it('no debería verse afectada si el input original se muta después', () => {
+      const resultadoMutable: ResultadoCalculo = { ...resultadoMock };
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMutable });
+
+      const totalOriginal = liquidacion.resultado.total;
+      // Intentamos mutar el objeto original — la liquidación no debe cambiar
+      try {
+        (resultadoMutable as any).total = 0;
+      } catch {
+        // el freeze también lo bloquea, está OK
+      }
+
+      expect(liquidacion.resultado.total).toBe(totalOriginal);
+    });
+  });
 });
