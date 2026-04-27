@@ -38,6 +38,15 @@ export class ClienteHTTPSincronizacion implements ClienteSincronizacion {
       return { ok: false, conflicto: true, hashServer: body.hashServer };
     }
 
-    return { ok: false };
+    // 4xx/5xx no-409: intentar leer mensaje del server, fallback al status
+    let mensaje = `HTTP ${response.status}`;
+    try {
+      const body = (await response.json()) as { mensaje?: string };
+      if (body.mensaje) mensaje = body.mensaje;
+    } catch {
+      // body no es JSON parseable — usamos el fallback
+    }
+
+    return { ok: false, error: mensaje };
   }
 }
