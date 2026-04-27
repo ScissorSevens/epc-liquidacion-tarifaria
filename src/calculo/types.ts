@@ -5,11 +5,15 @@
 
 import type { ResultadoCalculo } from '../motor-tarifario';
 
+export type EstadoLiquidacion = 'ACTIVA' | 'ANULADA';
+
 export interface Liquidacion {
   readonly id: string;
   readonly suscriptorId: string;
   readonly fechaGeneracion: Date;
   readonly resultado: ResultadoCalculo;
+  readonly estado: EstadoLiquidacion;
+  readonly reemplazaA?: string; // ID de la liquidación que esta anula/reemplaza
   readonly hash: string;
 }
 
@@ -18,6 +22,8 @@ export interface ContenidoHasheable {
   suscriptorId: string;
   fechaGeneracion: Date;
   resultado: ResultadoCalculo;
+  estado: EstadoLiquidacion;
+  reemplazaA?: string;
 }
 
 export interface CrearLiquidacionInput {

@@ -36,6 +36,8 @@ export function calcularHash(contenido: ContenidoHasheable): string {
     suscriptorId: contenido.suscriptorId,
     fechaGeneracion: contenido.fechaGeneracion.toISOString(),
     resultado: contenido.resultado,
+    estado: contenido.estado,
+    reemplazaA: contenido.reemplazaA ?? null,
   });
 
   return createHash('sha256').update(payload).digest('hex');
@@ -46,12 +48,14 @@ export function crearLiquidacion(input: CrearLiquidacionInput): Liquidacion {
 
   const id = randomUUID();
   const fechaGeneracion = new Date();
+  const estado = 'ACTIVA' as const;
 
   const hash = calcularHash({
     id,
     suscriptorId: input.suscriptorId,
     fechaGeneracion,
     resultado: resultadoClonado,
+    estado,
   });
 
   const liquidacion: Liquidacion = {
@@ -59,6 +63,7 @@ export function crearLiquidacion(input: CrearLiquidacionInput): Liquidacion {
     suscriptorId: input.suscriptorId,
     fechaGeneracion,
     resultado: resultadoClonado,
+    estado,
     hash,
   };
 
@@ -76,6 +81,8 @@ export function verificarIntegridad(liquidacion: Liquidacion): boolean {
     suscriptorId: liquidacion.suscriptorId,
     fechaGeneracion: liquidacion.fechaGeneracion,
     resultado: liquidacion.resultado,
+    estado: liquidacion.estado,
+    reemplazaA: liquidacion.reemplazaA,
   });
 
   return hashEsperado === liquidacion.hash;
