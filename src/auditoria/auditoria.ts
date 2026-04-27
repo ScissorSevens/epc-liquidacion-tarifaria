@@ -7,6 +7,12 @@ import type {
   EventoAuditoria,
   RegistrarEventoInput,
   ContenidoHasheable,
+  RegistrarTipadoInput,
+  PayloadLiquidacionCreada,
+  PayloadLiquidacionAnulada,
+  PayloadLecturaCapturada,
+  PayloadEvidenciaRegistrada,
+  PayloadIntegridadViolada,
 } from './types';
 
 /**
@@ -70,9 +76,50 @@ export function registrarEvento(input: RegistrarEventoInput): EventoAuditoria {
     payload: payloadClonado,
     hashAnterior,
     hash,
-  };
+  } as EventoAuditoria;
 
   return deepFreeze(evento);
+}
+
+// Constructores tipados — type-safe por cada tipo de evento
+export function registrarLiquidacionCreada(
+  input: RegistrarTipadoInput<PayloadLiquidacionCreada>
+): EventoAuditoria & { tipo: 'LIQUIDACION_CREADA' } {
+  return registrarEvento({ ...input, tipo: 'LIQUIDACION_CREADA' }) as EventoAuditoria & {
+    tipo: 'LIQUIDACION_CREADA';
+  };
+}
+
+export function registrarLiquidacionAnulada(
+  input: RegistrarTipadoInput<PayloadLiquidacionAnulada>
+): EventoAuditoria & { tipo: 'LIQUIDACION_ANULADA' } {
+  return registrarEvento({ ...input, tipo: 'LIQUIDACION_ANULADA' }) as EventoAuditoria & {
+    tipo: 'LIQUIDACION_ANULADA';
+  };
+}
+
+export function registrarLecturaCapturada(
+  input: RegistrarTipadoInput<PayloadLecturaCapturada>
+): EventoAuditoria & { tipo: 'LECTURA_CAPTURADA' } {
+  return registrarEvento({ ...input, tipo: 'LECTURA_CAPTURADA' }) as EventoAuditoria & {
+    tipo: 'LECTURA_CAPTURADA';
+  };
+}
+
+export function registrarEvidenciaRegistrada(
+  input: RegistrarTipadoInput<PayloadEvidenciaRegistrada>
+): EventoAuditoria & { tipo: 'EVIDENCIA_REGISTRADA' } {
+  return registrarEvento({ ...input, tipo: 'EVIDENCIA_REGISTRADA' }) as EventoAuditoria & {
+    tipo: 'EVIDENCIA_REGISTRADA';
+  };
+}
+
+export function registrarIntegridadViolada(
+  input: RegistrarTipadoInput<PayloadIntegridadViolada>
+): EventoAuditoria & { tipo: 'INTEGRIDAD_VIOLADA' } {
+  return registrarEvento({ ...input, tipo: 'INTEGRIDAD_VIOLADA' }) as EventoAuditoria & {
+    tipo: 'INTEGRIDAD_VIOLADA';
+  };
 }
 
 export type RazonInvalidez =
