@@ -64,3 +64,19 @@ export function crearLiquidacion(input: CrearLiquidacionInput): Liquidacion {
 
   return deepFreeze(liquidacion);
 }
+
+/**
+ * Verifica la integridad de una Liquidación recalculando su hash
+ * y comparándolo con el hash almacenado.
+ * Retorna false si el contenido fue manipulado.
+ */
+export function verificarIntegridad(liquidacion: Liquidacion): boolean {
+  const hashEsperado = calcularHash({
+    id: liquidacion.id,
+    suscriptorId: liquidacion.suscriptorId,
+    fechaGeneracion: liquidacion.fechaGeneracion,
+    resultado: liquidacion.resultado,
+  });
+
+  return hashEsperado === liquidacion.hash;
+}
