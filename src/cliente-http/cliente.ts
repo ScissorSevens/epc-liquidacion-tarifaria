@@ -33,6 +33,11 @@ export class ClienteHTTPSincronizacion implements ClienteSincronizacion {
       return { ok: true };
     }
 
+    if (response.status === 409) {
+      const body = (await response.json()) as { hashServer?: string };
+      return { ok: false, conflicto: true, hashServer: body.hashServer };
+    }
+
     return { ok: false };
   }
 }
