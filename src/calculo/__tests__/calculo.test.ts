@@ -4,6 +4,7 @@
  */
 
 import { crearLiquidacion } from '../calculo';
+import type { Liquidacion } from '../types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
 describe('crearLiquidacion', () => {
   const resultadoMock: ResultadoCalculo = {
@@ -218,6 +219,32 @@ describe('crearLiquidacion', () => {
 
       expect(Object.isFrozen(anulada)).toBe(true);
       expect(Object.isFrozen(nueva)).toBe(true);
+    });
+  });
+
+  // Ciclo 25: Validaciones de reemplazo
+  describe('validaciones de anularYReemplazar', () => {
+    it('no debería permitir anular una liquidación que ya está ANULADA', () => {
+      const { anularYReemplazar } = require('../calculo');
+      const original = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      const { anulada } = anularYReemplazar(original, { ...resultadoMock, total: 18000 });
+
+      expect(() => {
+        anularYReemplazar(anulada, { ...resultadoMock, total: 19000 });
+      }).toThrow(/ya.*ANULADA|estado.*invalid/i);
+    });
+
+    it('no debería permitir anular una liquidación con integridad rota', () => {
+      const { anularYReemplazar } = require('../calculo');
+      const original = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      // Simulamos manipulación
+      const manipulada = { ...original, suscriptorId: 'HACKER' } as Liquidacion;
+
+      expect(() => {
+        anularYReemplazar(manipulada, resultadoMock);
+      }).toThrow(/integridad|tampering|hash/i);
     });
   });
 });
