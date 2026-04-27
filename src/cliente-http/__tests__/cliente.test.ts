@@ -176,4 +176,67 @@ describe('ClienteHTTPSincronizacion', () => {
       expect(opts.headers['Authorization']).toBeUndefined();
     });
   });
+
+  describe('C45: 2xx -> {ok: true}', () => {
+    it('200 OK retorna ok:true', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(true);
+      expect(resp.error).toBeUndefined();
+      expect(resp.conflicto).toBeUndefined();
+    });
+
+    it('201 Created retorna ok:true', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 201, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(true);
+    });
+
+    it('204 No Content retorna ok:true sin parsear body', async () => {
+      // 204 NO tiene body — si intentamos parsear, explota
+      const jsonMock = jest.fn();
+      fetchMock.mockResolvedValue({ ok: true, status: 204, json: jsonMock });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(true);
+      expect(jsonMock).not.toHaveBeenCalled();
+    });
+
+    it('status 4xx genérico retorna ok:false (NO devuelve true ciego)', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ mensaje: 'Bad Request' }),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(false);
+    });
+  });
 });
