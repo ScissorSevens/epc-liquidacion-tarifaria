@@ -297,4 +297,81 @@ describe('ClienteHTTPSincronizacion', () => {
       expect(resp.hashServer).toBeUndefined();
     });
   });
+
+  describe('C47: 4xx/5xx no-409 -> {ok:false, error}', () => {
+    it('400 con body {mensaje} propaga el mensaje del server', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ mensaje: 'payload inválido: medidor faltante' }),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(false);
+      expect(resp.conflicto).toBeUndefined();
+      expect(resp.error).toBe('payload inválido: medidor faltante');
+    });
+
+    it('500 con body {mensaje} propaga el mensaje del server', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({ mensaje: 'internal server error' }),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.error).toBe('internal server error');
+    });
+
+    it('401 sin body útil cae a mensaje genérico con el status', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({}),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(false);
+      expect(resp.error).toBe('HTTP 401');
+    });
+
+    it('body que no es JSON parseable cae a mensaje genérico', async () => {
+      // Si el server devuelve HTML/texto plano, .json() throwea
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new Error('Unexpected token < in JSON');
+        },
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(false);
+      expect(resp.error).toBe('HTTP 502');
+    });
+  });
 });
