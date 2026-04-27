@@ -302,3 +302,260 @@ describe('procesarCola - resiliencia entre items', () => {
     expect(r3?.estado).toBe('EXITOSO');
   });
 });
+
+// Ciclo 40: Detección de conflicto (server responde con hash distinto)
+describe('procesarCola - detección de conflicto', () => {
+  it('debería marcar item como CONFLICTO si server responde conflicto=true con hashServer distinto', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({
+        ok: false,
+        conflicto: true,
+        hashServer: 'hash-del-server-distinto',
+      }),
+    };
+
+    const item = agregarItemACola({
+      tipo: 'LIQUIDACION',
+      payload: { id: 'LIQ-001', total: 17000 },
+      hashLocal: 'hash-local-mio',
+    });
+    await cola.guardar(item);
+
+    await procesarCola(cola, cliente);
+
+    const actualizado = await cola.buscarPorId(item.id);
+    expect(actualizado?.estado).toBe('CONFLICTO');
+    expect(actualizado?.hashServer).toBe('hash-del-server-distinto');
+  });
+
+  it('NO debería incrementar intentos cuando hay CONFLICTO (no es un error de red)', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({
+        ok: false,
+        conflicto: true,
+        hashServer: 'otro-hash',
+      }),
+    };
+
+    const item = agregarItemACola({
+      tipo: 'LIQUIDACION',
+      payload: { id: 'LIQ-001' },
+      hashLocal: 'mio',
+    });
+    await cola.guardar(item);
+
+    await procesarCola(cola, cliente);
+
+    const actualizado = await cola.buscarPorId(item.id);
+    expect(actualizado?.intentos).toBe(0);
+  });
+
+  it('NO debería procesar items en estado CONFLICTO (esperan resolución manual)', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    const enConflicto = {
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      estado: 'CONFLICTO' as const,
+      hashServer: 'srv',
+    };
+    await cola.guardar(enConflicto);
+
+    await procesarCola(cola, cliente);
+
+    expect(cliente.enviar).not.toHaveBeenCalled();
+  });
+});
+
+// Ciclo 41: Resolución manual de conflicto
+describe('resolverConflicto', () => {
+  it('SOBRESCRIBIR_LOCAL debería forzar el envío del item local (vuelve a PENDIENTE)', async () => {
+    const { resolverConflicto } = require('../procesador');
+    const cola = new InMemoryColaSincronizacion();
+
+    const enConflicto = {
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: { v: 1 }, hashLocal: 'mio' }),
+      estado: 'CONFLICTO' as const,
+      hashServer: 'srv',
+      intentos: 0,
+    };
+    await cola.guardar(enConflicto);
+
+    await resolverConflicto(cola, enConflicto.id, 'SOBRESCRIBIR_LOCAL');
+
+    const actualizado = await cola.buscarPorId(enConflicto.id);
+    expect(actualizado?.estado).toBe('PENDIENTE');
+    expect(actualizado?.forzarSobrescribir).toBe(true);
+  });
+
+  it('DESCARTAR debería marcar el item como DESCARTADO (no se envía nunca más)', async () => {
+    const { resolverConflicto } = require('../procesador');
+    const cola = new InMemoryColaSincronizacion();
+
+    const enConflicto = {
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      estado: 'CONFLICTO' as const,
+      hashServer: 'srv',
+    };
+    await cola.guardar(enConflicto);
+
+    await resolverConflicto(cola, enConflicto.id, 'DESCARTAR');
+
+    const actualizado = await cola.buscarPorId(enConflicto.id);
+    expect(actualizado?.estado).toBe('DESCARTADO');
+  });
+
+  it('SOBRESCRIBIR_SERVER debería marcar como EXITOSO (acepto la versión del server)', async () => {
+    const { resolverConflicto } = require('../procesador');
+    const cola = new InMemoryColaSincronizacion();
+
+    const enConflicto = {
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      estado: 'CONFLICTO' as const,
+      hashServer: 'srv',
+    };
+    await cola.guardar(enConflicto);
+
+    await resolverConflicto(cola, enConflicto.id, 'SOBRESCRIBIR_SERVER');
+
+    const actualizado = await cola.buscarPorId(enConflicto.id);
+    expect(actualizado?.estado).toBe('EXITOSO');
+  });
+
+  it('debería tirar error si el item no existe', async () => {
+    const { resolverConflicto } = require('../procesador');
+    const cola = new InMemoryColaSincronizacion();
+
+    await expect(resolverConflicto(cola, 'no-existe', 'DESCARTAR')).rejects.toThrow();
+  });
+
+  it('debería tirar error si el item no está en CONFLICTO', async () => {
+    const { resolverConflicto } = require('../procesador');
+    const cola = new InMemoryColaSincronizacion();
+
+    const item = agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' });
+    await cola.guardar(item);
+
+    await expect(resolverConflicto(cola, item.id, 'DESCARTAR')).rejects.toThrow();
+  });
+
+  it('item con forzarSobrescribir=true debería enviarse al cliente y marcarse EXITOSO al volver a procesar', async () => {
+    const { resolverConflicto } = require('../procesador');
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    const enConflicto = {
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      estado: 'CONFLICTO' as const,
+      hashServer: 'srv',
+    };
+    await cola.guardar(enConflicto);
+    await resolverConflicto(cola, enConflicto.id, 'SOBRESCRIBIR_LOCAL');
+    await procesarCola(cola, cliente);
+
+    expect(cliente.enviar).toHaveBeenCalledTimes(1);
+    const actualizado = await cola.buscarPorId(enConflicto.id);
+    expect(actualizado?.estado).toBe('EXITOSO');
+  });
+});
+
+// Ciclo 42: Orden de dependencias
+describe('procesarCola - orden de dependencias (dependeDe)', () => {
+  it('item con dependeDe NO debería enviarse si su dependencia aún está PENDIENTE', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockImplementation((item) => {
+        // Falla la primera (la dependencia) — la segunda no debe enviarse
+        if (item.hashLocal === 'dep') return Promise.reject(new Error('boom'));
+        return Promise.resolve({ ok: true });
+      }),
+    };
+
+    const dependencia = agregarItemACola({
+      tipo: 'LIQUIDACION',
+      payload: { id: 'LIQ-001' },
+      hashLocal: 'dep',
+    });
+    const dependiente = agregarItemACola({
+      tipo: 'EVENTO_AUDITORIA',
+      payload: { tipo: 'LIQUIDACION_ANULADA', referenciaA: 'LIQ-001' },
+      hashLocal: 'anul',
+      dependeDe: [dependencia.id],
+    });
+
+    await cola.guardar(dependencia);
+    await cola.guardar(dependiente);
+
+    await procesarCola(cola, cliente);
+
+    // Solo se intentó enviar la dependencia (que falló)
+    expect(cliente.enviar).toHaveBeenCalledTimes(1);
+    expect(cliente.enviar).toHaveBeenCalledWith(expect.objectContaining({ hashLocal: 'dep' }));
+
+    const dep = await cola.buscarPorId(dependiente.id);
+    expect(dep?.estado).toBe('PENDIENTE');
+    expect(dep?.intentos).toBe(0); // no se intentó
+  });
+
+  it('item con dependeDe SÍ debería enviarse cuando su dependencia está EXITOSA', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    const dependencia = agregarItemACola({
+      tipo: 'LIQUIDACION',
+      payload: { id: 'LIQ-001' },
+      hashLocal: 'dep',
+    });
+    const dependiente = agregarItemACola({
+      tipo: 'EVENTO_AUDITORIA',
+      payload: { tipo: 'LIQUIDACION_ANULADA' },
+      hashLocal: 'anul',
+      dependeDe: [dependencia.id],
+    });
+
+    await cola.guardar(dependencia);
+    await cola.guardar(dependiente);
+
+    await procesarCola(cola, cliente);
+
+    expect(cliente.enviar).toHaveBeenCalledTimes(2);
+    const items = await cola.listar();
+    expect(items.every((i) => i.estado === 'EXITOSO')).toBe(true);
+  });
+
+  it('item NO debería enviarse si alguna dependencia está FALLIDA', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    const fallido = {
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'f' }),
+      estado: 'FALLIDO' as const,
+      intentos: 5,
+    };
+    const dependiente = agregarItemACola({
+      tipo: 'EVENTO_AUDITORIA',
+      payload: {},
+      hashLocal: 'anul',
+      dependeDe: [fallido.id],
+    });
+
+    await cola.guardar(fallido);
+    await cola.guardar(dependiente);
+
+    await procesarCola(cola, cliente);
+
+    expect(cliente.enviar).not.toHaveBeenCalled();
+    const dep = await cola.buscarPorId(dependiente.id);
+    expect(dep?.estado).toBe('PENDIENTE');
+  });
+});
