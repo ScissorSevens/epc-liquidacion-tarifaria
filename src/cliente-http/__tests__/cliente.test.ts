@@ -125,4 +125,55 @@ describe('ClienteHTTPSincronizacion', () => {
       expect(body.tipo).toBe('LIQUIDACION');
     });
   });
+
+  describe('C44: Authorization Bearer del TokenProvider', () => {
+    it('agrega header Authorization Bearer con el token del provider', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake('jwt-abc-123'),
+      });
+
+      await cliente.enviar(itemFake());
+
+      const opts = fetchMock.mock.calls[0][1];
+      expect(opts.headers['Authorization']).toBe('Bearer jwt-abc-123');
+    });
+
+    it('llama a obtenerToken() en cada envio (no cachea)', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const obtenerToken = jest
+        .fn<Promise<string | null>, []>()
+        .mockResolvedValueOnce('token-1')
+        .mockResolvedValueOnce('token-2');
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: { obtenerToken },
+      });
+
+      await cliente.enviar(itemFake());
+      await cliente.enviar(itemFake());
+
+      expect(obtenerToken).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][1].headers['Authorization']).toBe('Bearer token-1');
+      expect(fetchMock.mock.calls[1][1].headers['Authorization']).toBe('Bearer token-2');
+    });
+
+    it('omite el header Authorization si el token es null', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(null),
+      });
+
+      await cliente.enviar(itemFake());
+
+      const opts = fetchMock.mock.calls[0][1];
+      expect(opts.headers['Authorization']).toBeUndefined();
+    });
+  });
 });
