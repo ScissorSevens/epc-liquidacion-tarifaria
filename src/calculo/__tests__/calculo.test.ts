@@ -113,6 +113,8 @@ describe('crearLiquidacion', () => {
         suscriptorId: l1.suscriptorId,
         fechaGeneracion: l1.fechaGeneracion,
         resultado: l1.resultado,
+        estado: l1.estado,
+        reemplazaA: l1.reemplazaA,
       });
 
       expect(hashRecalculado).toBe(l1.hash);
@@ -148,6 +150,31 @@ describe('crearLiquidacion', () => {
       const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
 
       const manipulada = { ...liquidacion, suscriptorId: 'SUSC-HACKER' };
+
+      expect(verificarIntegridad(manipulada)).toBe(false);
+    });
+  });
+
+  // Ciclo 23: Estados ACTIVA / ANULADA
+  describe('estado de la liquidación', () => {
+    it('una Liquidación nueva debería estar en estado ACTIVA', () => {
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(liquidacion.estado).toBe('ACTIVA');
+    });
+
+    it('una Liquidación nueva no debería tener referencia a otra anulada', () => {
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(liquidacion.reemplazaA).toBeUndefined();
+    });
+
+    it('el estado debería formar parte del hash de integridad', () => {
+      const { verificarIntegridad } = require('../calculo');
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      // Si alguien cambia el estado por fuera, la integridad debe romperse
+      const manipulada = { ...liquidacion, estado: 'ANULADA' as const };
 
       expect(verificarIntegridad(manipulada)).toBe(false);
     });
