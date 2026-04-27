@@ -23,12 +23,16 @@ export class ClienteHTTPSincronizacion implements ClienteSincronizacion {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(item),
     });
 
-    return { ok: true };
+    if (response.ok) {
+      return { ok: true };
+    }
+
+    return { ok: false };
   }
 }
