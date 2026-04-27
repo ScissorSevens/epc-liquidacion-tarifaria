@@ -14,11 +14,18 @@ export class ClienteHTTPSincronizacion implements ClienteSincronizacion {
   async enviar(item: ItemCola): Promise<RespuestaCliente> {
     const url = `${this.config.baseUrl}${RUTAS_POR_TIPO[item.tipo]}`;
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    const token = await this.config.tokenProvider.obtenerToken();
+    if (token !== null) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(item),
     });
 
