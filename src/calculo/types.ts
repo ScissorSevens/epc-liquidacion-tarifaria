@@ -10,6 +10,14 @@ export interface Liquidacion {
   readonly suscriptorId: string;
   readonly fechaGeneracion: Date;
   readonly resultado: ResultadoCalculo;
+  readonly hash: string;
+}
+
+export interface ContenidoHasheable {
+  id: string;
+  suscriptorId: string;
+  fechaGeneracion: Date;
+  resultado: ResultadoCalculo;
 }
 
 export interface CrearLiquidacionInput {

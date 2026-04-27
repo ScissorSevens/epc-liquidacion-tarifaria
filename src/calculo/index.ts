@@ -1,2 +1,2 @@
-export { crearLiquidacion } from './calculo';
-export type { Liquidacion, CrearLiquidacionInput } from './types';
+export { crearLiquidacion, calcularHash } from './calculo';
+export type { Liquidacion, CrearLiquidacionInput, ContenidoHasheable } from './types';
