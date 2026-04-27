@@ -60,3 +60,50 @@ describe('registrarEvento - LIQUIDACION_CREADA', () => {
     expect(e1.hash).not.toBe(e2.hash);
   });
 });
+
+// Ciclo 27: Encadenamiento de eventos
+describe('encadenamiento de eventos', () => {
+  const actorMock = { id: 'USR-001', rol: 'OPERARIO' };
+
+  it('el segundo evento debería incluir el hash del primero como hashAnterior', () => {
+    const e1 = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001' },
+    });
+
+    const e2 = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-002' },
+      hashAnterior: e1.hash,
+    });
+
+    expect(e2.hashAnterior).toBe(e1.hash);
+  });
+
+  it('el hash del segundo evento debería depender del hashAnterior', () => {
+    const e1 = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001' },
+    });
+
+    // Si encadenamos a e1.hash vs a un hash distinto, los hashes finales deben diferir
+    const e2a = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-002' },
+      hashAnterior: e1.hash,
+    });
+
+    const e2b = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-002' },
+      hashAnterior: 'hash-diferente-falso',
+    });
+
+    expect(e2a.hash).not.toBe(e2b.hash);
+  });
+});
