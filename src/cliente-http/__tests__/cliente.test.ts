@@ -374,4 +374,32 @@ describe('ClienteHTTPSincronizacion', () => {
       expect(resp.error).toBe('HTTP 502');
     });
   });
+
+  describe('C48: fallo de red propaga excepción', () => {
+    it('si fetch lanza, el cliente propaga la excepción (no la traga)', async () => {
+      fetchMock.mockRejectedValue(new Error('Network request failed'));
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      await expect(cliente.enviar(itemFake())).rejects.toThrow('Network request failed');
+    });
+
+    it('si tokenProvider lanza, el cliente propaga la excepción', async () => {
+      // Caso defensivo: si AsyncStorage falla en RN, no lo tragamos silenciosamente
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: {
+          obtenerToken: async () => {
+            throw new Error('AsyncStorage unavailable');
+          },
+        },
+      });
+
+      await expect(cliente.enviar(itemFake())).rejects.toThrow('AsyncStorage unavailable');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });
