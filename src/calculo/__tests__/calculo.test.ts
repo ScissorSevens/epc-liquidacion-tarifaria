@@ -179,4 +179,45 @@ describe('crearLiquidacion', () => {
       expect(verificarIntegridad(manipulada)).toBe(false);
     });
   });
+
+  // Ciclo 24: Anular y reemplazar
+  describe('anularYReemplazar', () => {
+    it('debería retornar dos liquidaciones: la original ANULADA y la nueva ACTIVA', () => {
+      const { anularYReemplazar } = require('../calculo');
+      const original = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      const resultadoCorregido: ResultadoCalculo = { ...resultadoMock, total: 18000 };
+
+      const { anulada, nueva } = anularYReemplazar(original, resultadoCorregido);
+
+      expect(anulada.id).toBe(original.id);
+      expect(anulada.estado).toBe('ANULADA');
+
+      expect(nueva.id).not.toBe(original.id);
+      expect(nueva.estado).toBe('ACTIVA');
+      expect(nueva.suscriptorId).toBe(original.suscriptorId);
+      expect(nueva.resultado.total).toBe(18000);
+      expect(nueva.reemplazaA).toBe(original.id);
+    });
+
+    it('la liquidación anulada debería mantener su integridad (hash recalculado válido)', () => {
+      const { anularYReemplazar, verificarIntegridad } = require('../calculo');
+      const original = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      const { anulada, nueva } = anularYReemplazar(original, { ...resultadoMock, total: 18000 });
+
+      expect(verificarIntegridad(anulada)).toBe(true);
+      expect(verificarIntegridad(nueva)).toBe(true);
+    });
+
+    it('ambas liquidaciones (anulada y nueva) deberían estar congeladas', () => {
+      const { anularYReemplazar } = require('../calculo');
+      const original = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      const { anulada, nueva } = anularYReemplazar(original, { ...resultadoMock, total: 18000 });
+
+      expect(Object.isFrozen(anulada)).toBe(true);
+      expect(Object.isFrozen(nueva)).toBe(true);
+    });
+  });
 });
