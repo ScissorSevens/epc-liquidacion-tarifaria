@@ -58,11 +58,19 @@ export type EventoAuditoria =
 
 export type TipoEvento = EventoAuditoria['tipo'];
 
+// Union de todos los payloads posibles — tipado fuerte sin perder discriminacion
+export type PayloadEvento =
+  | PayloadLiquidacionCreada
+  | PayloadLiquidacionAnulada
+  | PayloadLecturaCapturada
+  | PayloadEvidenciaRegistrada
+  | PayloadIntegridadViolada;
+
 // Input genérico interno (lo usan los constructores específicos)
 export interface RegistrarEventoInput {
   tipo: TipoEvento;
   actor: Actor;
-  payload: Record<string, unknown>;
+  payload: PayloadEvento;
   hashAnterior?: string | null;
 }
 
@@ -71,7 +79,7 @@ export interface ContenidoHasheable {
   timestamp: Date;
   actor: Actor;
   tipo: TipoEvento;
-  payload: Record<string, unknown>;
+  payload: PayloadEvento;
   hashAnterior: string | null;
 }
 

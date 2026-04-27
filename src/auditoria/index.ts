@@ -16,6 +16,7 @@ export type {
   ContenidoHasheable,
   TipoEvento,
   Actor,
+  PayloadEvento,
   PayloadLiquidacionCreada,
   PayloadLiquidacionAnulada,
   PayloadLecturaCapturada,

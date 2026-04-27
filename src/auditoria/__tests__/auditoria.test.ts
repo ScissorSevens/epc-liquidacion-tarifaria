@@ -69,13 +69,13 @@ describe('encadenamiento de eventos', () => {
     const e1 = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-001' },
+      payload: { liquidacionId: 'LIQ-001', total: 17000 },
     });
 
     const e2 = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-002' },
+      payload: { liquidacionId: 'LIQ-002', total: 18000 },
       hashAnterior: e1.hash,
     });
 
@@ -86,21 +86,21 @@ describe('encadenamiento de eventos', () => {
     const e1 = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-001' },
+      payload: { liquidacionId: 'LIQ-001', total: 17000 },
     });
 
     // Si encadenamos a e1.hash vs a un hash distinto, los hashes finales deben diferir
     const e2a = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-002' },
+      payload: { liquidacionId: 'LIQ-002', total: 18000 },
       hashAnterior: e1.hash,
     });
 
     const e2b = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-002' },
+      payload: { liquidacionId: 'LIQ-002', total: 18000 },
       hashAnterior: 'hash-diferente-falso',
     });
 
@@ -116,7 +116,7 @@ describe('inmutabilidad runtime de eventos', () => {
     const evento = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-001' },
+      payload: { liquidacionId: 'LIQ-001', total: 17000 },
     });
 
     expect(Object.isFrozen(evento)).toBe(true);
@@ -124,21 +124,21 @@ describe('inmutabilidad runtime de eventos', () => {
 
   it('el actor y payload anidados también deberían estar congelados', () => {
     const evento = registrarEvento({
-      tipo: 'LIQUIDACION_CREADA',
+      tipo: 'EVIDENCIA_REGISTRADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-001', detalles: { total: 17000 } },
+      payload: { suscriptorId: 'SUSC-001', hashFoto: 'abc123', gps: { lat: 4.6, lng: -74.08 } },
     });
 
     expect(Object.isFrozen(evento.actor)).toBe(true);
     expect(Object.isFrozen(evento.payload)).toBe(true);
-    expect(Object.isFrozen((evento.payload as any).detalles)).toBe(true);
+    expect(Object.isFrozen((evento.payload as any).gps)).toBe(true);
   });
 
   it('debería lanzar TypeError al intentar modificar campos en strict mode', () => {
     const evento = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
-      payload: { liquidacionId: 'LIQ-001' },
+      payload: { liquidacionId: 'LIQ-001', total: 17000 },
     });
 
     expect(() => {
@@ -163,7 +163,7 @@ describe('verificarCadena', () => {
       const e = registrarEvento({
         tipo: 'LIQUIDACION_CREADA',
         actor: actorMock,
-        payload: { liquidacionId: `LIQ-${String(i).padStart(3, '0')}` },
+        payload: { liquidacionId: `LIQ-${String(i).padStart(3, '0')}`, total: 17000 },
         hashAnterior,
       });
       eventos.push(e);
