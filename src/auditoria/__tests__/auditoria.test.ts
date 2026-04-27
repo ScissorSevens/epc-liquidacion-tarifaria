@@ -150,3 +150,88 @@ describe('inmutabilidad runtime de eventos', () => {
     }).toThrow(TypeError);
   });
 });
+
+// Ciclos 29 y 30: verificarCadena
+describe('verificarCadena', () => {
+  const actorMock = { id: 'USR-001', rol: 'OPERARIO' };
+
+  function construirCadena(n: number) {
+    const eventos = [];
+    let hashAnterior: string | null = null;
+
+    for (let i = 0; i < n; i++) {
+      const e = registrarEvento({
+        tipo: 'LIQUIDACION_CREADA',
+        actor: actorMock,
+        payload: { liquidacionId: `LIQ-${String(i).padStart(3, '0')}` },
+        hashAnterior,
+      });
+      eventos.push(e);
+      hashAnterior = e.hash;
+    }
+
+    return eventos;
+  }
+
+  it('debería retornar { valida: true } para una cadena vacía', () => {
+    const { verificarCadena } = require('../auditoria');
+    const resultado = verificarCadena([]);
+
+    expect(resultado.valida).toBe(true);
+  });
+
+  it('debería retornar { valida: true } para una cadena correcta de 1 evento', () => {
+    const { verificarCadena } = require('../auditoria');
+    const cadena = construirCadena(1);
+
+    expect(verificarCadena(cadena).valida).toBe(true);
+  });
+
+  it('debería retornar { valida: true } para una cadena correcta de 5 eventos', () => {
+    const { verificarCadena } = require('../auditoria');
+    const cadena = construirCadena(5);
+
+    expect(verificarCadena(cadena).valida).toBe(true);
+  });
+
+  it('debería retornar { valida: false, razon: "PRIMER_EVENTO_HASH_ANTERIOR_NO_NULO" } si el primer evento tiene hashAnterior', () => {
+    const { verificarCadena } = require('../auditoria');
+    const cadena = construirCadena(2);
+    // Forzamos primer evento con hashAnterior no nulo (simulando manipulación)
+    const cadenaInvalida = [{ ...cadena[0], hashAnterior: 'falso' }, cadena[1]];
+
+    const resultado = verificarCadena(cadenaInvalida);
+    expect(resultado.valida).toBe(false);
+    expect(resultado.razon).toBe('PRIMER_EVENTO_HASH_ANTERIOR_NO_NULO');
+  });
+
+  it('debería detectar cuando se borró un evento del medio (cadena rota)', () => {
+    const { verificarCadena } = require('../auditoria');
+    const cadena = construirCadena(5);
+
+    // Eliminamos el evento del medio
+    const cadenaRota = [cadena[0], cadena[1], cadena[3], cadena[4]];
+
+    const resultado = verificarCadena(cadenaRota);
+    expect(resultado.valida).toBe(false);
+    expect(resultado.razon).toBe('CADENA_ROTA');
+    expect(resultado.indice).toBe(2); // el 3er evento (índice 2) tiene hashAnterior que no coincide
+  });
+
+  it('debería detectar cuando el contenido de un evento fue manipulado', () => {
+    const { verificarCadena } = require('../auditoria');
+    const cadena = construirCadena(3);
+
+    // Manipulamos el payload del evento del medio (sin recalcular hash)
+    const cadenaManipulada = [
+      cadena[0],
+      { ...cadena[1], payload: { liquidacionId: 'HACKED' } },
+      cadena[2],
+    ];
+
+    const resultado = verificarCadena(cadenaManipulada);
+    expect(resultado.valida).toBe(false);
+    expect(resultado.razon).toBe('HASH_INVALIDO');
+    expect(resultado.indice).toBe(1);
+  });
+});
