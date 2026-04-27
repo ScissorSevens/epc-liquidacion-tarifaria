@@ -84,4 +84,39 @@ describe('crearLiquidacion', () => {
       expect(liquidacion.resultado.total).toBe(totalOriginal);
     });
   });
+
+  // Ciclo 21: Hash SHA-256 del contenido
+  describe('hash de integridad', () => {
+    it('debería generar un hash SHA-256 al crear la liquidación', () => {
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(liquidacion.hash).toBeDefined();
+      expect(typeof liquidacion.hash).toBe('string');
+      expect(liquidacion.hash).toMatch(/^[a-f0-9]{64}$/); // SHA-256 = 64 chars hex
+    });
+
+    it('debería generar hashes distintos para liquidaciones distintas (por id/fecha)', () => {
+      const l1 = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+      const l2 = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(l1.hash).not.toBe(l2.hash);
+    });
+
+    it('el hash debería ser reproducible para el mismo contenido', () => {
+      // Si reconstruimos una liquidación con los mismos datos exactos (id+fecha+suscriptor+resultado),
+      // el hash debe ser idéntico — esto es lo que permite verificar tampering.
+      const l1 = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      // Re-calculamos el hash usando los mismos datos
+      const { calcularHash } = require('../calculo');
+      const hashRecalculado = calcularHash({
+        id: l1.id,
+        suscriptorId: l1.suscriptorId,
+        fechaGeneracion: l1.fechaGeneracion,
+        resultado: l1.resultado,
+      });
+
+      expect(hashRecalculado).toBe(l1.hash);
+    });
+  });
 });
