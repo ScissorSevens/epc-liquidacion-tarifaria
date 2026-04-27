@@ -235,3 +235,78 @@ describe('verificarCadena', () => {
     expect(resultado.indice).toBe(1);
   });
 });
+
+// Ciclos 31 y 32: Eventos tipados (discriminated union)
+describe('eventos tipados (discriminated union)', () => {
+  const actorMock = { id: 'USR-001', rol: 'OPERARIO' };
+
+  it('LIQUIDACION_CREADA debería exigir { liquidacionId, total }', () => {
+    const { registrarLiquidacionCreada } = require('../auditoria');
+    const evento = registrarLiquidacionCreada({
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001', total: 17000 },
+    });
+
+    expect(evento.tipo).toBe('LIQUIDACION_CREADA');
+    expect(evento.payload.liquidacionId).toBe('LIQ-001');
+    expect(evento.payload.total).toBe(17000);
+  });
+
+  it('LIQUIDACION_ANULADA debería exigir { liquidacionAnuladaId, liquidacionNuevaId, motivo }', () => {
+    const { registrarLiquidacionAnulada } = require('../auditoria');
+    const evento = registrarLiquidacionAnulada({
+      actor: actorMock,
+      payload: {
+        liquidacionAnuladaId: 'LIQ-001',
+        liquidacionNuevaId: 'LIQ-002',
+        motivo: 'Error en lectura',
+      },
+    });
+
+    expect(evento.tipo).toBe('LIQUIDACION_ANULADA');
+    expect(evento.payload.motivo).toBe('Error en lectura');
+  });
+
+  it('LECTURA_CAPTURADA debería exigir { suscriptorId, lecturaActual, fechaLectura }', () => {
+    const { registrarLecturaCapturada } = require('../auditoria');
+    const fecha = new Date('2026-04-27T10:00:00Z');
+    const evento = registrarLecturaCapturada({
+      actor: actorMock,
+      payload: { suscriptorId: 'SUSC-001', lecturaActual: 1234, fechaLectura: fecha },
+    });
+
+    expect(evento.tipo).toBe('LECTURA_CAPTURADA');
+    expect(evento.payload.lecturaActual).toBe(1234);
+  });
+
+  it('EVIDENCIA_REGISTRADA debería exigir { suscriptorId, hashFoto, gps? }', () => {
+    const { registrarEvidenciaRegistrada } = require('../auditoria');
+    const evento = registrarEvidenciaRegistrada({
+      actor: actorMock,
+      payload: {
+        suscriptorId: 'SUSC-001',
+        hashFoto: 'abc123',
+        gps: { lat: 4.6, lng: -74.08 },
+      },
+    });
+
+    expect(evento.tipo).toBe('EVIDENCIA_REGISTRADA');
+    expect(evento.payload.hashFoto).toBe('abc123');
+  });
+
+  it('INTEGRIDAD_VIOLADA debería exigir { entidadTipo, entidadId, hashEsperado, hashRecibido }', () => {
+    const { registrarIntegridadViolada } = require('../auditoria');
+    const evento = registrarIntegridadViolada({
+      actor: actorMock,
+      payload: {
+        entidadTipo: 'Liquidacion',
+        entidadId: 'LIQ-001',
+        hashEsperado: 'abc',
+        hashRecibido: 'xyz',
+      },
+    });
+
+    expect(evento.tipo).toBe('INTEGRIDAD_VIOLADA');
+    expect(evento.payload.entidadTipo).toBe('Liquidacion');
+  });
+});
