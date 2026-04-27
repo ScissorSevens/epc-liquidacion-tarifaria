@@ -5,7 +5,6 @@
 
 import { crearLiquidacion } from '../calculo';
 import type { ResultadoCalculo } from '../../motor-tarifario';
-
 describe('crearLiquidacion', () => {
   const resultadoMock: ResultadoCalculo = {
     consumo: 15,
@@ -117,6 +116,40 @@ describe('crearLiquidacion', () => {
       });
 
       expect(hashRecalculado).toBe(l1.hash);
+    });
+  });
+
+  // Ciclo 22: Verificación de tampering
+  describe('verificarIntegridad', () => {
+    it('debería retornar true para una Liquidación recién creada (no manipulada)', () => {
+      const { verificarIntegridad } = require('../calculo');
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      expect(verificarIntegridad(liquidacion)).toBe(true);
+    });
+
+    it('debería retornar false si se manipuló el contenido (hash no coincide)', () => {
+      const { verificarIntegridad } = require('../calculo');
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      // Simulamos manipulación: reconstruimos un objeto con el mismo hash pero datos modificados
+      // (como si alguien editara la base de datos directamente)
+      const liquidacionManipulada = {
+        ...liquidacion,
+        resultado: { ...liquidacion.resultado, total: 999999 },
+        // hash sigue siendo el mismo del original
+      };
+
+      expect(verificarIntegridad(liquidacionManipulada)).toBe(false);
+    });
+
+    it('debería detectar manipulación del suscriptorId', () => {
+      const { verificarIntegridad } = require('../calculo');
+      const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
+
+      const manipulada = { ...liquidacion, suscriptorId: 'SUSC-HACKER' };
+
+      expect(verificarIntegridad(manipulada)).toBe(false);
     });
   });
 });
