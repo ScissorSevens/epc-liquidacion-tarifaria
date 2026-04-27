@@ -1,7 +1,13 @@
 export { agregarItemACola } from './cola';
 export { InMemoryColaSincronizacion } from './cola-repository';
-export { procesarCola } from './procesador';
+export { procesarCola, resolverConflicto } from './procesador';
 export { calcularDelayReintento, listoParaReintentar, MAX_INTENTOS } from './reintentos';
 export type { ColaSincronizacion } from './cola-repository';
 export type { ClienteSincronizacion, RespuestaCliente } from './procesador';
-export type { ItemCola, AgregarItemInput, TipoItem, EstadoItem } from './types';
+export type {
+  ItemCola,
+  AgregarItemInput,
+  TipoItem,
+  EstadoItem,
+  DecisionConflicto,
+} from './types';
