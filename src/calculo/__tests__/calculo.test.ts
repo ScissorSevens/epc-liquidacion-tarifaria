@@ -1,6 +1,6 @@
 /**
  * Módulo CALCULO — Liquidación inmutable
- * Ciclo 19: Creación básica de Liquidación
+ * Creación básica de Liquidación
  */
 
 import { crearLiquidacion } from '../calculo';
@@ -42,7 +42,7 @@ describe('crearLiquidacion', () => {
     expect(l1.id).not.toBe(l2.id);
   });
 
-  // Ciclo 20: Inmutabilidad runtime
+  // Inmutabilidad runtime
   describe('inmutabilidad runtime', () => {
     it('debería estar congelada (Object.isFrozen) al nivel raíz', () => {
       const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
@@ -85,7 +85,7 @@ describe('crearLiquidacion', () => {
     });
   });
 
-  // Ciclo 21: Hash SHA-256 del contenido
+  //  Hash SHA-256 del contenido
   describe('hash de integridad', () => {
     it('debería generar un hash SHA-256 al crear la liquidación', () => {
       const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
@@ -122,7 +122,7 @@ describe('crearLiquidacion', () => {
     });
   });
 
-  // Ciclo 22: Verificación de tampering
+  //  Verificación de tampering
   describe('verificarIntegridad', () => {
     it('debería retornar true para una Liquidación recién creada (no manipulada)', () => {
       const { verificarIntegridad } = require('../calculo');
@@ -156,7 +156,7 @@ describe('crearLiquidacion', () => {
     });
   });
 
-  // Ciclo 23: Estados ACTIVA / ANULADA
+  // Estados ACTIVA / ANULADA
   describe('estado de la liquidación', () => {
     it('una Liquidación nueva debería estar en estado ACTIVA', () => {
       const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock });
@@ -181,7 +181,7 @@ describe('crearLiquidacion', () => {
     });
   });
 
-  // Ciclo 24: Anular y reemplazar
+  // Anular y reemplazar
   describe('anularYReemplazar', () => {
     it('debería retornar dos liquidaciones: la original ANULADA y la nueva ACTIVA', () => {
       const { anularYReemplazar } = require('../calculo');
@@ -222,7 +222,7 @@ describe('crearLiquidacion', () => {
     });
   });
 
-  // Ciclo 25: Validaciones de reemplazo
+  //  Validaciones de reemplazo
   describe('validaciones de anularYReemplazar', () => {
     it('no debería permitir anular una liquidación que ya está ANULADA', () => {
       const { anularYReemplazar } = require('../calculo');
