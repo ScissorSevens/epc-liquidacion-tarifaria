@@ -20,6 +20,7 @@ export interface ItemCola {
   readonly estado: EstadoItem;
   readonly intentos: number;
   readonly ultimoError: string | null;
+  readonly ultimoIntentoEn: Date | null;
   readonly creadoEn: Date;
   readonly dependeDe?: readonly string[];
 }

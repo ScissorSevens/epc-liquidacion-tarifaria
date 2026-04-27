@@ -15,6 +15,7 @@ export function agregarItemACola(input: AgregarItemInput): ItemCola {
     estado: 'PENDIENTE',
     intentos: 0,
     ultimoError: null,
+    ultimoIntentoEn: null,
     creadoEn: new Date(),
     dependeDe: input.dependeDe,
   };
