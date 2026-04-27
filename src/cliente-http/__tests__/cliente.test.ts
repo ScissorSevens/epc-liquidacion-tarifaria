@@ -1,0 +1,128 @@
+/**
+ * Tests del ClienteHTTPSincronizacion.
+ * Mockea fetch global para no hacer requests reales.
+ */
+
+import { ClienteHTTPSincronizacion } from '../cliente';
+import type { TokenProvider } from '../types';
+import type { ItemCola } from '../../sincronizacion/types';
+
+// Helper: arma un ItemCola mínimo
+function itemFake(overrides: Partial<ItemCola> = {}): ItemCola {
+  return {
+    id: 'item-1',
+    tipo: 'LIQUIDACION',
+    payload: { foo: 'bar' },
+    hashLocal: 'hash-abc',
+    estado: 'PENDIENTE',
+    intentos: 0,
+    ultimoError: null,
+    ultimoIntentoEn: null,
+    creadoEn: new Date('2026-01-01'),
+    ...overrides,
+  };
+}
+
+// TokenProvider mockeable
+function tokenProviderFake(token: string | null = 'token-fake'): TokenProvider {
+  return { obtenerToken: async () => token };
+}
+
+describe('ClienteHTTPSincronizacion', () => {
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('C43: POST al endpoint correcto con body JSON', () => {
+    it('postea LIQUIDACION a /api/liquidaciones', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      await cliente.enviar(itemFake({ tipo: 'LIQUIDACION' }));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, opts] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.epc.com/api/liquidaciones');
+      expect(opts.method).toBe('POST');
+      expect(opts.headers['Content-Type']).toBe('application/json');
+    });
+
+    it('postea LECTURA a /api/lecturas', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      await cliente.enviar(itemFake({ tipo: 'LECTURA' }));
+
+      expect(fetchMock.mock.calls[0][0]).toBe('https://api.epc.com/api/lecturas');
+    });
+
+    it('postea EVIDENCIA a /api/evidencias', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      await cliente.enviar(itemFake({ tipo: 'EVIDENCIA' }));
+
+      expect(fetchMock.mock.calls[0][0]).toBe('https://api.epc.com/api/evidencias');
+    });
+
+    it('postea EVENTO_AUDITORIA a /api/auditoria', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      await cliente.enviar(itemFake({ tipo: 'EVENTO_AUDITORIA' }));
+
+      expect(fetchMock.mock.calls[0][0]).toBe('https://api.epc.com/api/auditoria');
+    });
+
+    it('serializa el item completo en el body como JSON', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const item = itemFake({
+        id: 'item-xyz',
+        hashLocal: 'hash-123',
+        payload: { medidor: 'M-001', valor: 42 },
+      });
+
+      await cliente.enviar(item);
+
+      const opts = fetchMock.mock.calls[0][1];
+      const body = JSON.parse(opts.body);
+      expect(body.id).toBe('item-xyz');
+      expect(body.hashLocal).toBe('hash-123');
+      expect(body.payload).toEqual({ medidor: 'M-001', valor: 42 });
+      expect(body.tipo).toBe('LIQUIDACION');
+    });
+  });
+});
