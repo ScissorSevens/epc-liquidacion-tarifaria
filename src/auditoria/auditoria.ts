@@ -74,3 +74,58 @@ export function registrarEvento(input: RegistrarEventoInput): EventoAuditoria {
 
   return deepFreeze(evento);
 }
+
+export type RazonInvalidez =
+  | 'PRIMER_EVENTO_HASH_ANTERIOR_NO_NULO'
+  | 'CADENA_ROTA'
+  | 'HASH_INVALIDO';
+
+export type ResultadoVerificacion =
+  | { valida: true }
+  | { valida: false; razon: RazonInvalidez; indice: number };
+
+/**
+ * Verifica la integridad de una cadena de eventos:
+ * 1. El primer evento debe tener hashAnterior = null
+ * 2. Cada evento posterior debe tener hashAnterior === hash del evento previo
+ * 3. El hash de cada evento debe coincidir con el contenido recalculado
+ *
+ * Detecta: borrados, reordenamientos, manipulaciones de contenido.
+ */
+export function verificarCadena(eventos: EventoAuditoria[]): ResultadoVerificacion {
+  if (eventos.length === 0) {
+    return { valida: true };
+  }
+
+  for (let i = 0; i < eventos.length; i++) {
+    const evento = eventos[i];
+
+    // Validación de eslabón anterior
+    if (i === 0) {
+      if (evento.hashAnterior !== null) {
+        return { valida: false, razon: 'PRIMER_EVENTO_HASH_ANTERIOR_NO_NULO', indice: 0 };
+      }
+    } else {
+      const hashEsperado = eventos[i - 1].hash;
+      if (evento.hashAnterior !== hashEsperado) {
+        return { valida: false, razon: 'CADENA_ROTA', indice: i };
+      }
+    }
+
+    // Validación de hash propio (detecta manipulación de contenido)
+    const hashRecalculado = calcularHash({
+      id: evento.id,
+      timestamp: evento.timestamp,
+      actor: evento.actor,
+      tipo: evento.tipo,
+      payload: evento.payload,
+      hashAnterior: evento.hashAnterior,
+    });
+
+    if (hashRecalculado !== evento.hash) {
+      return { valida: false, razon: 'HASH_INVALIDO', indice: i };
+    }
+  }
+
+  return { valida: true };
+}
