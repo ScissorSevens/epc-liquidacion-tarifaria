@@ -107,3 +107,46 @@ describe('encadenamiento de eventos', () => {
     expect(e2a.hash).not.toBe(e2b.hash);
   });
 });
+
+// Ciclo 28: Inmutabilidad runtime
+describe('inmutabilidad runtime de eventos', () => {
+  const actorMock = { id: 'USR-001', rol: 'OPERARIO' };
+
+  it('el evento debería estar congelado al nivel raíz', () => {
+    const evento = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001' },
+    });
+
+    expect(Object.isFrozen(evento)).toBe(true);
+  });
+
+  it('el actor y payload anidados también deberían estar congelados', () => {
+    const evento = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001', detalles: { total: 17000 } },
+    });
+
+    expect(Object.isFrozen(evento.actor)).toBe(true);
+    expect(Object.isFrozen(evento.payload)).toBe(true);
+    expect(Object.isFrozen((evento.payload as any).detalles)).toBe(true);
+  });
+
+  it('debería lanzar TypeError al intentar modificar campos en strict mode', () => {
+    const evento = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001' },
+    });
+
+    expect(() => {
+      (evento as any).tipo = 'INTEGRIDAD_VIOLADA';
+    }).toThrow(TypeError);
+
+    expect(() => {
+      (evento.payload as any).liquidacionId = 'HACKED';
+    }).toThrow(TypeError);
+  });
+});
