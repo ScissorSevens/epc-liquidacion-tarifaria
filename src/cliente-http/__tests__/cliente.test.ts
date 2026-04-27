@@ -239,4 +239,62 @@ describe('ClienteHTTPSincronizacion', () => {
       expect(resp.ok).toBe(false);
     });
   });
+
+  describe('C46: 409 Conflict -> {ok:false, conflicto:true, hashServer}', () => {
+    it('mapea 409 a conflicto con el hashServer del body', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({ hashServer: 'hash-del-server-xyz' }),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(false);
+      expect(resp.conflicto).toBe(true);
+      expect(resp.hashServer).toBe('hash-del-server-xyz');
+    });
+
+    it('409 NO marca error (conflicto es estado, no error)', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({ hashServer: 'hash-xyz' }),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.error).toBeUndefined();
+    });
+
+    it('409 sin hashServer en el body retorna conflicto:true con hashServer undefined', async () => {
+      // Defensivo: si el server manda 409 mal formado, no debe romper
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({}),
+      });
+
+      const cliente = new ClienteHTTPSincronizacion({
+        baseUrl: 'https://api.epc.com',
+        tokenProvider: tokenProviderFake(),
+      });
+
+      const resp = await cliente.enviar(itemFake());
+
+      expect(resp.ok).toBe(false);
+      expect(resp.conflicto).toBe(true);
+      expect(resp.hashServer).toBeUndefined();
+    });
+  });
 });
