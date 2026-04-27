@@ -100,6 +100,20 @@ export function anularYReemplazar(
   original: Liquidacion,
   resultadoCorregido: ResultadoCalculo
 ): { anulada: Liquidacion; nueva: Liquidacion } {
+  // Validación 1: integridad — no operamos sobre datos corruptos
+  if (!verificarIntegridad(original)) {
+    throw new Error(
+      `No se puede anular: integridad rota en liquidación ${original.id} (hash no coincide, posible tampering)`
+    );
+  }
+
+  // Validación 2: estado — no se puede anular dos veces
+  if (original.estado === 'ANULADA') {
+    throw new Error(
+      `Estado inválido: la liquidación ${original.id} ya está ANULADA`
+    );
+  }
+
   // Construimos la versión ANULADA de la original (mismo contenido, estado cambiado, hash recalculado)
   const resultadoOriginalClonado = JSON.parse(JSON.stringify(original.resultado));
 
