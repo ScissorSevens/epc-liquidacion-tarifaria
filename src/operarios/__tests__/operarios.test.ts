@@ -54,3 +54,23 @@ describe('crearOperario — numero_cedula', () => {
     expect(resultado.numero_cedula).toBe('100000');
   });
 });
+
+describe('crearOperario — email', () => {
+  it('rechaza email sin arroba', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, email: 'carlos.epc.co' }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
+  });
+
+  it('rechaza email sin dominio', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, email: 'carlos@' }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
+  });
+
+  it('rechaza email con espacios', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, email: 'car los@epc.co' }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
+  });
+});
