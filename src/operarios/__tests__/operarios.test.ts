@@ -104,3 +104,42 @@ describe('crearOperario — password_hash y rol', () => {
     expect(resultado.rol).toBe('admin');
   });
 });
+
+describe('crearOperario — nombre, estado y dispositivo_id', () => {
+  it('rechaza nombre vacío', () => {
+    expect(() => crearOperario({ ...inputValido, nombre: '' })).toThrow(
+      MENSAJES_ERROR_OPERARIO.NOMBRE_VACIO,
+    );
+  });
+
+  it('rechaza nombre de 151 caracteres', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, nombre: 'a'.repeat(151) }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.NOMBRE_LARGO);
+  });
+
+  it('rechaza estado "suspendido"', () => {
+    expect(() =>
+      crearOperario({
+        ...inputValido,
+        estado: 'suspendido' as unknown as 'activo',
+      }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.ESTADO_INVALIDO);
+  });
+
+  it('acepta estado inactivo y lo preserva', () => {
+    const resultado = crearOperario({ ...inputValido, estado: 'inactivo' });
+    expect(resultado.estado).toBe('inactivo');
+  });
+
+  it('rechaza dispositivo_id de 101 caracteres', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, dispositivo_id: 'a'.repeat(101) }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.DISPOSITIVO_LARGO);
+  });
+
+  it('acepta dispositivo_id undefined', () => {
+    const resultado = crearOperario(inputValido);
+    expect(resultado.dispositivo_id).toBeUndefined();
+  });
+});
