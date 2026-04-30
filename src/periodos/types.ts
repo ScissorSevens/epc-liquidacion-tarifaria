@@ -54,4 +54,11 @@ export interface PeriodoRepository {
  */
 export const MENSAJES_ERROR_PERIODO = {
   ID_PERIODO_INVALIDO: 'id_periodo debe tener formato YYYYMM (año 2000-2099, mes 01-12)',
+  FECHA_INICIO_FORMATO: 'fecha_inicio debe ser ISO 8601 (YYYY-MM-DD)',
+  FECHA_FIN_FORMATO: 'fecha_fin debe ser ISO 8601 (YYYY-MM-DD)',
+  FECHA_FIN_ORDEN: 'fecha_fin debe ser posterior a fecha_inicio',
+  PAGO_SIN_RECARGO_FORMATO: 'fecha_pago_sin_recargo debe ser ISO 8601 (YYYY-MM-DD)',
+  PAGO_SIN_RECARGO_ORDEN: 'fecha_pago_sin_recargo debe ser igual o posterior a fecha_fin',
+  PAGO_CON_RECARGO_FORMATO: 'fecha_pago_con_recargo debe ser ISO 8601 (YYYY-MM-DD)',
+  PAGO_CON_RECARGO_ORDEN: 'fecha_pago_con_recargo debe ser posterior a fecha_pago_sin_recargo',
 } as const;

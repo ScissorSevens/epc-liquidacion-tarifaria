@@ -9,6 +9,7 @@ import { MENSAJES_ERROR_PERIODO, PERIODO_REGEX } from './types';
 
 const ANIO_MIN = 2000;
 const ANIO_MAX = 2099;
+const REGEX_FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 function esIdPeriodoValido(id: string): boolean {
   if (!PERIODO_REGEX.test(id)) return false;
@@ -19,6 +20,27 @@ function esIdPeriodoValido(id: string): boolean {
 function validarEntrada(input: CrearPeriodoInput): void {
   if (!esIdPeriodoValido(input.id_periodo)) {
     throw new Error(MENSAJES_ERROR_PERIODO.ID_PERIODO_INVALIDO);
+  }
+  if (!REGEX_FECHA_ISO.test(input.fecha_inicio)) {
+    throw new Error(MENSAJES_ERROR_PERIODO.FECHA_INICIO_FORMATO);
+  }
+  if (!REGEX_FECHA_ISO.test(input.fecha_fin)) {
+    throw new Error(MENSAJES_ERROR_PERIODO.FECHA_FIN_FORMATO);
+  }
+  if (input.fecha_fin <= input.fecha_inicio) {
+    throw new Error(MENSAJES_ERROR_PERIODO.FECHA_FIN_ORDEN);
+  }
+  if (!REGEX_FECHA_ISO.test(input.fecha_pago_sin_recargo)) {
+    throw new Error(MENSAJES_ERROR_PERIODO.PAGO_SIN_RECARGO_FORMATO);
+  }
+  if (input.fecha_pago_sin_recargo < input.fecha_fin) {
+    throw new Error(MENSAJES_ERROR_PERIODO.PAGO_SIN_RECARGO_ORDEN);
+  }
+  if (!REGEX_FECHA_ISO.test(input.fecha_pago_con_recargo)) {
+    throw new Error(MENSAJES_ERROR_PERIODO.PAGO_CON_RECARGO_FORMATO);
+  }
+  if (input.fecha_pago_con_recargo <= input.fecha_pago_sin_recargo) {
+    throw new Error(MENSAJES_ERROR_PERIODO.PAGO_CON_RECARGO_ORDEN);
   }
 }
 
