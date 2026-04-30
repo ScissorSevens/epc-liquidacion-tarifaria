@@ -2,7 +2,18 @@
  * Tests del módulo PERIODOS — aggregate del período de facturación mensual.
  */
 
-import { PERIODO_REGEX } from '../types';
+import { crearPeriodo } from '../periodos';
+import type { CrearPeriodoInput } from '../types';
+import { MENSAJES_ERROR_PERIODO, PERIODO_REGEX } from '../types';
+
+const inputValido: CrearPeriodoInput = {
+  id_periodo: '202503',
+  nombre: 'Marzo 2025',
+  fecha_inicio: '2025-03-01',
+  fecha_fin: '2025-03-31',
+  fecha_pago_sin_recargo: '2025-04-15',
+  fecha_pago_con_recargo: '2025-04-25',
+};
 
 describe('PERIODO_REGEX', () => {
   it('acepta 202503', () => {
@@ -19,5 +30,61 @@ describe('PERIODO_REGEX', () => {
 
   it('rechaza mes 13', () => {
     expect(PERIODO_REGEX.test('202513')).toBe(false);
+  });
+});
+
+describe('crearPeriodo — factory y validacion de id_periodo', () => {
+  it('crea periodo válido con estado abierto por default', () => {
+    const resultado = crearPeriodo(inputValido);
+    expect(resultado.estado).toBe('abierto');
+    expect(resultado.id_periodo).toBe('202503');
+  });
+
+  it('rechaza id_periodo con guión', () => {
+    expect(() => crearPeriodo({ ...inputValido, id_periodo: '2025-03' })).toThrow(
+      MENSAJES_ERROR_PERIODO.ID_PERIODO_INVALIDO,
+    );
+  });
+
+  it('rechaza año 1999', () => {
+    expect(() => crearPeriodo({ ...inputValido, id_periodo: '199912' })).toThrow(
+      MENSAJES_ERROR_PERIODO.ID_PERIODO_INVALIDO,
+    );
+  });
+
+  it('rechaza mes 00', () => {
+    expect(() => crearPeriodo({ ...inputValido, id_periodo: '202500' })).toThrow(
+      MENSAJES_ERROR_PERIODO.ID_PERIODO_INVALIDO,
+    );
+  });
+
+  it('rechaza mes 13', () => {
+    expect(() => crearPeriodo({ ...inputValido, id_periodo: '202513' })).toThrow(
+      MENSAJES_ERROR_PERIODO.ID_PERIODO_INVALIDO,
+    );
+  });
+
+  it('acepta límite inferior 200001', () => {
+    const resultado = crearPeriodo({
+      ...inputValido,
+      id_periodo: '200001',
+      fecha_inicio: '2000-01-01',
+      fecha_fin: '2000-01-31',
+      fecha_pago_sin_recargo: '2000-02-15',
+      fecha_pago_con_recargo: '2000-02-25',
+    });
+    expect(resultado.id_periodo).toBe('200001');
+  });
+
+  it('acepta límite superior 209912', () => {
+    const resultado = crearPeriodo({
+      ...inputValido,
+      id_periodo: '209912',
+      fecha_inicio: '2099-12-01',
+      fecha_fin: '2099-12-31',
+      fecha_pago_sin_recargo: '2100-01-15',
+      fecha_pago_con_recargo: '2100-01-25',
+    });
+    expect(resultado.id_periodo).toBe('209912');
   });
 });
