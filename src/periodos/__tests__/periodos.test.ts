@@ -88,3 +88,61 @@ describe('crearPeriodo — factory y validacion de id_periodo', () => {
     expect(resultado.id_periodo).toBe('209912');
   });
 });
+
+describe('crearPeriodo — coherencia de fechas', () => {
+  it('rechaza fecha_inicio con formato no ISO', () => {
+    expect(() => crearPeriodo({ ...inputValido, fecha_inicio: '01/03/2025' })).toThrow(
+      MENSAJES_ERROR_PERIODO.FECHA_INICIO_FORMATO,
+    );
+  });
+
+  it('rechaza fecha_fin igual a fecha_inicio', () => {
+    expect(() =>
+      crearPeriodo({
+        ...inputValido,
+        fecha_inicio: '2025-03-01',
+        fecha_fin: '2025-03-01',
+      }),
+    ).toThrow(MENSAJES_ERROR_PERIODO.FECHA_FIN_ORDEN);
+  });
+
+  it('rechaza fecha_fin anterior a fecha_inicio', () => {
+    expect(() =>
+      crearPeriodo({
+        ...inputValido,
+        fecha_inicio: '2025-03-31',
+        fecha_fin: '2025-03-01',
+      }),
+    ).toThrow(MENSAJES_ERROR_PERIODO.FECHA_FIN_ORDEN);
+  });
+
+  it('rechaza fecha_pago_sin_recargo anterior a fecha_fin', () => {
+    expect(() =>
+      crearPeriodo({
+        ...inputValido,
+        fecha_fin: '2025-03-31',
+        fecha_pago_sin_recargo: '2025-03-30',
+      }),
+    ).toThrow(MENSAJES_ERROR_PERIODO.PAGO_SIN_RECARGO_ORDEN);
+  });
+
+  it('acepta fecha_pago_sin_recargo igual a fecha_fin', () => {
+    const resultado = crearPeriodo({
+      ...inputValido,
+      fecha_fin: '2025-03-31',
+      fecha_pago_sin_recargo: '2025-03-31',
+      fecha_pago_con_recargo: '2025-04-25',
+    });
+    expect(resultado.fecha_pago_sin_recargo).toBe('2025-03-31');
+  });
+
+  it('rechaza fecha_pago_con_recargo igual a fecha_pago_sin_recargo', () => {
+    expect(() =>
+      crearPeriodo({
+        ...inputValido,
+        fecha_pago_sin_recargo: '2025-04-15',
+        fecha_pago_con_recargo: '2025-04-15',
+      }),
+    ).toThrow(MENSAJES_ERROR_PERIODO.PAGO_CON_RECARGO_ORDEN);
+  });
+});
