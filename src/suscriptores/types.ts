@@ -35,4 +35,8 @@ export const MENSAJES_ERROR_SUSCRIPTOR = {
   NOMBRE_LARGO: 'nombre_apellidos no puede superar 150 caracteres',
   DIRECCION_VACIA: 'direccion no puede estar vacía',
   DIRECCION_LARGA: 'direccion no puede superar 200 caracteres',
+  ESTRATO_FUERA_RANGO: 'estrato debe ser un entero entre 1 y 6',
+  MATRICULA_LARGA: 'matricula_inmobiliaria no puede superar 50 caracteres',
+  CATASTRAL_LARGA: 'numero_catastral no puede superar 50 caracteres',
+  ESTADO_INVALIDO: "estado debe ser 'activo', 'inactivo' o 'suspendido'",
 } as const;
