@@ -146,3 +146,48 @@ describe('crearPeriodo — coherencia de fechas', () => {
     ).toThrow(MENSAJES_ERROR_PERIODO.PAGO_CON_RECARGO_ORDEN);
   });
 });
+
+describe('crearPeriodo — nombre, dias_consumo y estado', () => {
+  it('rechaza nombre vacío', () => {
+    expect(() => crearPeriodo({ ...inputValido, nombre: '' })).toThrow(
+      MENSAJES_ERROR_PERIODO.NOMBRE_VACIO,
+    );
+  });
+
+  it('rechaza nombre de 21 caracteres', () => {
+    expect(() => crearPeriodo({ ...inputValido, nombre: 'a'.repeat(21) })).toThrow(
+      MENSAJES_ERROR_PERIODO.NOMBRE_LARGO,
+    );
+  });
+
+  it('rechaza dias_consumo cero', () => {
+    expect(() => crearPeriodo({ ...inputValido, dias_consumo: 0 })).toThrow(
+      MENSAJES_ERROR_PERIODO.DIAS_CONSUMO_INVALIDO,
+    );
+  });
+
+  it('rechaza dias_consumo no entero (30.5)', () => {
+    expect(() => crearPeriodo({ ...inputValido, dias_consumo: 30.5 })).toThrow(
+      MENSAJES_ERROR_PERIODO.DIAS_CONSUMO_INVALIDO,
+    );
+  });
+
+  it('acepta dias_consumo undefined', () => {
+    const resultado = crearPeriodo(inputValido);
+    expect(resultado.dias_consumo).toBeUndefined();
+  });
+
+  it('rechaza estado "anulado"', () => {
+    expect(() =>
+      crearPeriodo({
+        ...inputValido,
+        estado: 'anulado' as unknown as 'abierto',
+      }),
+    ).toThrow(MENSAJES_ERROR_PERIODO.ESTADO_INVALIDO);
+  });
+
+  it('acepta estado facturado y lo preserva', () => {
+    const resultado = crearPeriodo({ ...inputValido, estado: 'facturado' });
+    expect(resultado.estado).toBe('facturado');
+  });
+});
