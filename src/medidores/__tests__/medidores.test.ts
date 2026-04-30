@@ -46,3 +46,56 @@ describe('crearMedidor — numero_medidor', () => {
     ).toThrow(MENSAJES_ERROR_MEDIDOR.NUMERO_INVALIDO);
   });
 });
+
+describe('crearMedidor — id_suscriptor', () => {
+  it('rechaza id_suscriptor cero', () => {
+    expect(() => crearMedidor({ ...inputValido, id_suscriptor: 0 })).toThrow(
+      MENSAJES_ERROR_MEDIDOR.ID_SUSCRIPTOR_INVALIDO,
+    );
+  });
+
+  it('rechaza id_suscriptor negativo', () => {
+    expect(() => crearMedidor({ ...inputValido, id_suscriptor: -5 })).toThrow(
+      MENSAJES_ERROR_MEDIDOR.ID_SUSCRIPTOR_INVALIDO,
+    );
+  });
+
+  it('rechaza id_suscriptor no entero', () => {
+    expect(() => crearMedidor({ ...inputValido, id_suscriptor: 1.5 })).toThrow(
+      MENSAJES_ERROR_MEDIDOR.ID_SUSCRIPTOR_INVALIDO,
+    );
+  });
+});
+
+describe('crearMedidor — fecha_instalacion', () => {
+  it('rechaza fecha_instalacion con formato no ISO', () => {
+    expect(() =>
+      crearMedidor({ ...inputValido, fecha_instalacion: '15/03/2025' }),
+    ).toThrow(MENSAJES_ERROR_MEDIDOR.FECHA_FORMATO);
+  });
+
+  it('rechaza fecha_instalacion futura usando deps.now', () => {
+    expect(() =>
+      crearMedidor(
+        { ...inputValido, fecha_instalacion: '2099-12-31' },
+        { now: () => new Date('2025-03-15T00:00:00Z') },
+      ),
+    ).toThrow(MENSAJES_ERROR_MEDIDOR.FECHA_FUTURA);
+  });
+
+  it('acepta fecha_instalacion igual a hoy (con deps.now)', () => {
+    const resultado = crearMedidor(
+      { ...inputValido, fecha_instalacion: '2025-03-15' },
+      { now: () => new Date('2025-03-15T12:00:00Z') },
+    );
+    expect(resultado.fecha_instalacion).toBe('2025-03-15');
+  });
+
+  it('acepta fecha_instalacion pasada (con deps.now)', () => {
+    const resultado = crearMedidor(
+      { ...inputValido, fecha_instalacion: '2024-01-01' },
+      { now: () => new Date('2025-03-15T00:00:00Z') },
+    );
+    expect(resultado.fecha_instalacion).toBe('2024-01-01');
+  });
+});
