@@ -48,3 +48,29 @@ describe('crearSuscriptor — codigo', () => {
     );
   });
 });
+
+describe('crearSuscriptor — nombre_apellidos y direccion', () => {
+  it('rechaza nombre_apellidos vacío', () => {
+    expect(() => crearSuscriptor({ ...inputValido, nombre_apellidos: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_VACIO,
+    );
+  });
+
+  it('rechaza nombre_apellidos de 151 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, nombre_apellidos: 'a'.repeat(151) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_LARGO);
+  });
+
+  it('rechaza direccion vacía', () => {
+    expect(() => crearSuscriptor({ ...inputValido, direccion: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_VACIA,
+    );
+  });
+
+  it('rechaza direccion de 201 caracteres', () => {
+    expect(() => crearSuscriptor({ ...inputValido, direccion: 'a'.repeat(201) })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_LARGA,
+    );
+  });
+});
