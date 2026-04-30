@@ -51,4 +51,8 @@ export const MENSAJES_ERROR_OPERARIO = {
   EMAIL_INVALIDO: 'email tiene formato inválido',
   PASSWORD_HASH_VACIO: 'password_hash no puede estar vacío',
   ROL_INVALIDO: "rol debe ser 'operario', 'supervisor' o 'admin'",
+  NOMBRE_VACIO: 'nombre no puede estar vacío',
+  NOMBRE_LARGO: 'nombre no puede superar 150 caracteres',
+  ESTADO_INVALIDO: "estado debe ser 'activo' o 'inactivo'",
+  DISPOSITIVO_LARGO: 'dispositivo_id no puede superar 100 caracteres',
 } as const;
