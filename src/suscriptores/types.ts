@@ -25,6 +25,22 @@ export type CrearSuscriptorInput = Omit<
   estado?: EstadoSuscriptor;
 };
 
+export type ActualizarSuscriptorInput = Partial<
+  Pick<Suscriptor, 'nombre_apellidos' | 'direccion' | 'estrato' | 'matricula_inmobiliaria' | 'numero_catastral' | 'estado'>
+>;
+
+/**
+ * Puerto del repositorio. Contrato de tipos — implementación SQLite en Iter 7.
+ */
+export interface SuscriptorRepository {
+  crear(data: SuscriptorBorrador): Promise<Suscriptor>;
+  buscarPorId(id: number): Promise<Suscriptor | null>;
+  buscarPorCodigo(codigo: string): Promise<Suscriptor | null>;
+  listar(): Promise<Suscriptor[]>;
+  actualizar(id: number, cambios: ActualizarSuscriptorInput): Promise<Suscriptor>;
+  eliminar(id: number): Promise<void>;
+}
+
 /**
  * Catálogo de mensajes de error del módulo. Tests y código importan de la misma fuente
  * para impedir mistypes. Se agregan claves en cada ciclo TDD.

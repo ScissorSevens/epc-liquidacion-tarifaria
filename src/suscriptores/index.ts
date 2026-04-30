@@ -4,5 +4,7 @@ export type {
   SuscriptorBorrador,
   EstadoSuscriptor,
   CrearSuscriptorInput,
+  ActualizarSuscriptorInput,
+  SuscriptorRepository,
 } from './types';
 export { MENSAJES_ERROR_SUSCRIPTOR } from './types';
