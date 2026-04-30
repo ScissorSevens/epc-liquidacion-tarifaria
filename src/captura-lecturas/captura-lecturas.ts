@@ -1,9 +1,7 @@
 import { EntradaLectura, EvidenciaFoto, Lectura } from './types.js';
 import { calcularLiquidacion } from '../motor-tarifario/motor-tarifario';
 import { Estrato, ParametrosTarifa, ResultadoCalculo } from '../motor-tarifario/types';
-
-/** Regex para formato YYYYMM con mes válido (01-12) */
-const PERIODO_REGEX = /^\d{4}(0[1-9]|1[0-2])$/;
+import { PERIODO_REGEX } from '../periodos/types';
 
 /** Extensiones de imagen válidas para evidencia */
 const EXTENSIONES_IMAGEN = /\.(jpg|jpeg|png|heic)$/i;
