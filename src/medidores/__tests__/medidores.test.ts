@@ -99,3 +99,30 @@ describe('crearMedidor — fecha_instalacion', () => {
     expect(resultado.fecha_instalacion).toBe('2024-01-01');
   });
 });
+
+describe('crearMedidor — estado y observaciones', () => {
+  it('rechaza estado "roto"', () => {
+    expect(() =>
+      crearMedidor({
+        ...inputValido,
+        estado: 'roto' as unknown as 'activo',
+      }),
+    ).toThrow(MENSAJES_ERROR_MEDIDOR.ESTADO_INVALIDO);
+  });
+
+  it('acepta estado reemplazado y lo preserva', () => {
+    const resultado = crearMedidor({ ...inputValido, estado: 'reemplazado' });
+    expect(resultado.estado).toBe('reemplazado');
+  });
+
+  it('rechaza observaciones de 501 caracteres', () => {
+    expect(() =>
+      crearMedidor({ ...inputValido, observaciones: 'a'.repeat(501) }),
+    ).toThrow(MENSAJES_ERROR_MEDIDOR.OBSERVACIONES_LARGA);
+  });
+
+  it('acepta observaciones undefined (omitidas)', () => {
+    const resultado = crearMedidor(inputValido);
+    expect(resultado.observaciones).toBeUndefined();
+  });
+});
