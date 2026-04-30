@@ -31,4 +31,8 @@ export type CrearSuscriptorInput = Omit<
  */
 export const MENSAJES_ERROR_SUSCRIPTOR = {
   CODIGO_INVALIDO: 'codigo debe tener entre 1 y 10 dígitos',
+  NOMBRE_VACIO: 'nombre_apellidos no puede estar vacío',
+  NOMBRE_LARGO: 'nombre_apellidos no puede superar 150 caracteres',
+  DIRECCION_VACIA: 'direccion no puede estar vacía',
+  DIRECCION_LARGA: 'direccion no puede superar 200 caracteres',
 } as const;

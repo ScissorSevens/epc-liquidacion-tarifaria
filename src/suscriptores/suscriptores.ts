@@ -13,6 +13,18 @@ function validarEntrada(input: CrearSuscriptorInput): void {
   if (!REGEX_CODIGO.test(input.codigo)) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.CODIGO_INVALIDO);
   }
+  if (input.nombre_apellidos.length === 0) {
+    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_VACIO);
+  }
+  if (input.nombre_apellidos.length > 150) {
+    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_LARGO);
+  }
+  if (input.direccion.length === 0) {
+    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_VACIA);
+  }
+  if (input.direccion.length > 200) {
+    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_LARGA);
+  }
 }
 
 export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador {
