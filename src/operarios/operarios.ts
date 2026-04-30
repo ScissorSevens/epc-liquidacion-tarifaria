@@ -1,0 +1,31 @@
+/**
+ * Módulo OPERARIOS — aggregate del personal del sistema.
+ *
+ * Funciones puras. Errores como `throw new Error(MENSAJES_ERROR_OPERARIO.X)`.
+ * El dominio NO hashea passwords: recibe `password_hash` ya calculado.
+ */
+
+import type { CrearOperarioInput, OperarioBorrador } from './types';
+import { MENSAJES_ERROR_OPERARIO } from './types';
+
+const REGEX_CEDULA = /^\d{6,12}$/;
+
+function validarEntrada(input: CrearOperarioInput): void {
+  if (!REGEX_CEDULA.test(input.numero_cedula)) {
+    throw new Error(MENSAJES_ERROR_OPERARIO.CEDULA_INVALIDA);
+  }
+}
+
+export function crearOperario(input: CrearOperarioInput): OperarioBorrador {
+  validarEntrada(input);
+
+  return {
+    numero_cedula: input.numero_cedula,
+    nombre: input.nombre,
+    email: input.email,
+    password_hash: input.password_hash,
+    rol: input.rol ?? 'operario',
+    estado: input.estado ?? 'activo',
+    dispositivo_id: input.dispositivo_id,
+  };
+}
