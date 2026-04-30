@@ -9,10 +9,14 @@ import type { CrearOperarioInput, OperarioBorrador } from './types';
 import { MENSAJES_ERROR_OPERARIO } from './types';
 
 const REGEX_CEDULA = /^\d{6,12}$/;
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validarEntrada(input: CrearOperarioInput): void {
   if (!REGEX_CEDULA.test(input.numero_cedula)) {
     throw new Error(MENSAJES_ERROR_OPERARIO.CEDULA_INVALIDA);
+  }
+  if (!REGEX_EMAIL.test(input.email)) {
+    throw new Error(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
   }
 }
 

@@ -48,4 +48,5 @@ export interface OperarioRepository {
  */
 export const MENSAJES_ERROR_OPERARIO = {
   CEDULA_INVALIDA: 'numero_cedula debe tener entre 6 y 12 dígitos',
+  EMAIL_INVALIDO: 'email tiene formato inválido',
 } as const;
