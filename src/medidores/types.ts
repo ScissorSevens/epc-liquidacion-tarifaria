@@ -45,4 +45,6 @@ export const MENSAJES_ERROR_MEDIDOR = {
   ID_SUSCRIPTOR_INVALIDO: 'id_suscriptor debe ser un entero positivo',
   FECHA_FORMATO: 'fecha_instalacion debe ser ISO 8601 (YYYY-MM-DD)',
   FECHA_FUTURA: 'fecha_instalacion no puede ser futura',
+  ESTADO_INVALIDO: "estado debe ser 'activo', 'inactivo' o 'reemplazado'",
+  OBSERVACIONES_LARGA: 'observaciones no puede superar 500 caracteres',
 } as const;
