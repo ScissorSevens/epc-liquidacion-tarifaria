@@ -74,3 +74,33 @@ describe('crearOperario — email', () => {
     ).toThrow(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
   });
 });
+
+describe('crearOperario — password_hash y rol', () => {
+  it('rechaza password_hash vacío', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, password_hash: '' }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.PASSWORD_HASH_VACIO);
+  });
+
+  it('almacena password_hash verbatim sin transformaciones', () => {
+    const resultado = crearOperario({
+      ...inputValido,
+      password_hash: '$2b$10$XYZ.exact.value',
+    });
+    expect(resultado.password_hash).toBe('$2b$10$XYZ.exact.value');
+  });
+
+  it('rechaza rol "root"', () => {
+    expect(() =>
+      crearOperario({
+        ...inputValido,
+        rol: 'root' as unknown as 'operario',
+      }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.ROL_INVALIDO);
+  });
+
+  it('acepta rol admin y lo preserva', () => {
+    const resultado = crearOperario({ ...inputValido, rol: 'admin' });
+    expect(resultado.rol).toBe('admin');
+  });
+});
