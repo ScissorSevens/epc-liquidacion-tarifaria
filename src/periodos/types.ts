@@ -52,4 +52,6 @@ export interface PeriodoRepository {
 /**
  * Catálogo de mensajes de error del módulo. Se completa por ciclo TDD.
  */
-export const MENSAJES_ERROR_PERIODO = {} as const;
+export const MENSAJES_ERROR_PERIODO = {
+  ID_PERIODO_INVALIDO: 'id_periodo debe tener formato YYYYMM (año 2000-2099, mes 01-12)',
+} as const;
