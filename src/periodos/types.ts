@@ -61,4 +61,8 @@ export const MENSAJES_ERROR_PERIODO = {
   PAGO_SIN_RECARGO_ORDEN: 'fecha_pago_sin_recargo debe ser igual o posterior a fecha_fin',
   PAGO_CON_RECARGO_FORMATO: 'fecha_pago_con_recargo debe ser ISO 8601 (YYYY-MM-DD)',
   PAGO_CON_RECARGO_ORDEN: 'fecha_pago_con_recargo debe ser posterior a fecha_pago_sin_recargo',
+  NOMBRE_VACIO: 'nombre no puede estar vacío',
+  NOMBRE_LARGO: 'nombre no puede superar 20 caracteres',
+  DIAS_CONSUMO_INVALIDO: 'dias_consumo debe ser un entero positivo',
+  ESTADO_INVALIDO: "estado debe ser 'abierto', 'cerrado' o 'facturado'",
 } as const;
