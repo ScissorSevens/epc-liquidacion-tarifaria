@@ -74,3 +74,59 @@ describe('crearSuscriptor — nombre_apellidos y direccion', () => {
     );
   });
 });
+
+describe('crearSuscriptor — estrato, opcionales y estado', () => {
+  it('rechaza estrato 0', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, estrato: 0 as unknown as 1 }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.ESTRATO_FUERA_RANGO);
+  });
+
+  it('rechaza estrato 7', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, estrato: 7 as unknown as 1 }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.ESTRATO_FUERA_RANGO);
+  });
+
+  it('rechaza estrato 3.5 no entero', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, estrato: 3.5 as unknown as 3 }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.ESTRATO_FUERA_RANGO);
+  });
+
+  it('acepta estrato límite inferior 1', () => {
+    const resultado = crearSuscriptor({ ...inputValido, estrato: 1 });
+    expect(resultado.estrato).toBe(1);
+  });
+
+  it('acepta estrato límite superior 6', () => {
+    const resultado = crearSuscriptor({ ...inputValido, estrato: 6 });
+    expect(resultado.estrato).toBe(6);
+  });
+
+  it('rechaza matricula_inmobiliaria de 51 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, matricula_inmobiliaria: 'a'.repeat(51) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.MATRICULA_LARGA);
+  });
+
+  it('rechaza numero_catastral de 51 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, numero_catastral: 'a'.repeat(51) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.CATASTRAL_LARGA);
+  });
+
+  it('rechaza estado "borrado"', () => {
+    expect(() =>
+      crearSuscriptor({
+        ...inputValido,
+        estado: 'borrado' as unknown as 'activo',
+      }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.ESTADO_INVALIDO);
+  });
+
+  it('acepta estado suspendido y lo preserva', () => {
+    const resultado = crearSuscriptor({ ...inputValido, estado: 'suspendido' });
+    expect(resultado.estado).toBe('suspendido');
+  });
+});
