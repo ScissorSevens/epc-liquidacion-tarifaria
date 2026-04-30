@@ -29,4 +29,6 @@ export type CrearSuscriptorInput = Omit<
  * Catálogo de mensajes de error del módulo. Tests y código importan de la misma fuente
  * para impedir mistypes. Se agregan claves en cada ciclo TDD.
  */
-export const MENSAJES_ERROR_SUSCRIPTOR = {} as const;
+export const MENSAJES_ERROR_SUSCRIPTOR = {
+  CODIGO_INVALIDO: 'codigo debe tener entre 1 y 10 dígitos',
+} as const;
