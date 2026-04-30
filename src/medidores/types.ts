@@ -42,4 +42,7 @@ export interface MedidorRepository {
  */
 export const MENSAJES_ERROR_MEDIDOR = {
   NUMERO_INVALIDO: 'numero_medidor solo admite letras, dígitos y guiones (1-50 caracteres)',
+  ID_SUSCRIPTOR_INVALIDO: 'id_suscriptor debe ser un entero positivo',
+  FECHA_FORMATO: 'fecha_instalacion debe ser ISO 8601 (YYYY-MM-DD)',
+  FECHA_FUTURA: 'fecha_instalacion no puede ser futura',
 } as const;
