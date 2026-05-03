@@ -80,10 +80,38 @@ export async function anularFacturaConRepo(
 }
 
 export async function corregirFacturaConRepo(
-  _input: Parameters<typeof corregirFactura>[0],
-  _repo: FacturaRepository,
+  input: Parameters<typeof corregirFactura>[0],
+  repo: FacturaRepository,
 ): Promise<{ facturaAnulada: Factura; nuevoBorrador: Factura }> {
-  throw new Error('not implemented');
+  // 1. Validar que facturaOriginal existe en repo (consistencia con el estado persistido).
+  const existente = await repo.buscarPorId(input.facturaOriginal.id);
+  if (!existente) {
+    throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
+  }
+
+  // 2. Invocar corregirFactura puro. Valida coherencia liquidacionAnulada vs original
+  // y produce { facturaAnulada, nuevoBorrador } con id='' en el borrador.
+  const { facturaAnulada, nuevoBorrador } = corregirFactura(input);
+
+  // 3. Persistir UPDATE de la original (port limita a {estado, motivo_anulacion} —
+  // misma limitacion que anularFacturaConRepo, fecha_anulacion no persiste).
+  await repo.actualizar(input.facturaOriginal.id, {
+    estado: 'ANULADA',
+    motivo_anulacion: facturaAnulada.motivo_anulacion,
+  });
+
+  // 4. Asignar id UUID al nuevoBorrador y CREATE.
+  const borradorConId: Factura = Object.freeze({
+    ...nuevoBorrador,
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+  });
+  const borradorPersistido = await repo.crear(borradorConId);
+
+  // 5. Retornar pareja: facturaAnulada se compone con la version persistida
+  // (que tiene los campos efectivamente guardados, sin fecha_anulacion).
+  const anuladaPersistida = (await repo.buscarPorId(input.facturaOriginal.id))!;
+  return { facturaAnulada: anuladaPersistida, nuevoBorrador: borradorPersistido };
 }
 
 void MENSAJES_ERROR_FACTURA;
