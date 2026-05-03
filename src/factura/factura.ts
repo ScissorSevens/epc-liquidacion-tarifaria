@@ -66,6 +66,9 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   if (input.suscriptor.estado !== 'activo') {
     throw new Error(MENSAJES_ERROR_FACTURA.SUSCRIPTOR_NO_ACTIVO);
   }
+  if (input.medidor.id_suscriptor !== input.suscriptor.id_suscriptor) {
+    throw new Error(MENSAJES_ERROR_FACTURA.MEDIDOR_NO_PERTENECE_A_SUSCRIPTOR);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
