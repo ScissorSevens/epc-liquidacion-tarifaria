@@ -135,4 +135,11 @@ describe('emitirFactura — happy path', () => {
     });
     expect(Object.isFrozen(factura.snapshot.suscriptor)).toBe(true);
   });
+
+  it('snapshotea medidor (numero_medidor) y lo congela', () => {
+    const medidor: Medidor = { ...medidorBase(), numero_medidor: 'MED-9999' };
+    const factura = emitirFactura({ ...inputBase(), medidor });
+    expect(factura.snapshot.medidor).toEqual({ numero_medidor: 'MED-9999' });
+    expect(Object.isFrozen(factura.snapshot.medidor)).toBe(true);
+  });
 });
