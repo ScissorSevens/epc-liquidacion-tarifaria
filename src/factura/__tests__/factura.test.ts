@@ -322,4 +322,15 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.OPERARIO_SIN_DISPOSITIVO,
     );
   });
+
+  it('rechaza si consumosHistoricos.length > 6 (CONSUMO_HISTORICO_INVALIDO)', () => {
+    const consumosHistoricos: ConsumoHistorico[] = Array.from({ length: 7 }, (_, i) => ({
+      id_periodo: `20260${i + 1}`,
+      consumo_m3: 10 + i,
+      total_facturado: 1000 * (i + 1),
+    }));
+    expect(() => emitirFactura({ ...inputBase(), consumosHistoricos })).toThrow(
+      MENSAJES_ERROR_FACTURA.CONSUMO_HISTORICO_INVALIDO,
+    );
+  });
 });
