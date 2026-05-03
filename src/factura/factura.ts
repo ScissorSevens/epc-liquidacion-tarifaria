@@ -56,6 +56,11 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     nombre: input.operario.nombre,
     dispositivo_id: input.operario.dispositivo_id ?? '',
   });
+  const liquidacionSnapshot = deepFreeze({
+    id: input.liquidacion.id,
+    hash: input.liquidacion.hash,
+    resultado: { ...input.liquidacion.resultado },
+  });
   return {
     id: '',
     numero_factura,
@@ -66,21 +71,7 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
       medidor: medidorSnapshot,
       periodo: periodoSnapshot,
       operario: operarioSnapshot,
-      liquidacion: {
-        id: '',
-        hash: '',
-        resultado: {
-          consumo: 0,
-          consumoBasico: 0,
-          consumoExcedente: 0,
-          cargoFijo: 0,
-          cargoConsumo: 0,
-          cargoExcedente: 0,
-          subsidio: 0,
-          contribucion: 0,
-          total: 0,
-        },
-      },
+      liquidacion: liquidacionSnapshot,
       consumosHistoricos: [],
     },
     hash: '',
