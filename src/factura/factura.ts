@@ -201,8 +201,28 @@ export function corregirFactura(input: {
   fechaEmision: string;
   observaciones?: string;
 }): { facturaAnulada: Factura; nuevoBorrador: Factura } {
-  return {
-    facturaAnulada: input.facturaOriginal,
-    nuevoBorrador: input.facturaOriginal,
-  };
+  const facturaAnulada = deepFreeze({
+    ...input.facturaOriginal,
+    estado: 'ANULADA' as const,
+    motivo_anulacion: 'Liquidación reemplazada',
+    fecha_anulacion: input.fechaEmision,
+  });
+  const nuevoBorrador = deepFreeze({
+    ...input.facturaOriginal,
+    id: '',
+    numero_factura: String(input.consecutivoNuevo),
+    estado: 'BORRADOR' as const,
+    fecha_emision: input.fechaEmision,
+    snapshot: {
+      ...input.facturaOriginal.snapshot,
+      liquidacion: {
+        id: input.liquidacionNueva.id,
+        hash: input.liquidacionNueva.hash,
+        resultado: { ...input.liquidacionNueva.resultado },
+      },
+    },
+    reemplaza_a: input.facturaOriginal.id,
+    created_at: '',
+  });
+  return { facturaAnulada, nuevoBorrador };
 }
