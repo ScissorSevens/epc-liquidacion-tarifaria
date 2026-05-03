@@ -117,7 +117,24 @@ describe('emitirFacturaConRepo — happy path', () => {
   });
 });
 
+describe('emitirFacturaConRepo — unicidad de numero_factura por periodo', () => {
+  it('lanza NUMERO_FACTURA_DUPLICADO_EN_PERIODO si ya existe factura con mismo numero en el periodo', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    // Primera emision: consecutivo 1 → numero_factura "MZ-001-1" en periodo 202601.
+    await emitirFacturaConRepo(inputBase(), repo);
+
+    // Segunda emision con MISMO consecutivo y MISMO periodo → mismo numero_factura.
+    // Cambiamos liquidacion para no chocar con LIQUIDACION_YA_FACTURADA primero.
+    const inputDuplicado = inputBase({
+      liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+    });
+
+    await expect(emitirFacturaConRepo(inputDuplicado, repo)).rejects.toThrow(
+      MENSAJES_ERROR_FACTURA.NUMERO_FACTURA_DUPLICADO_EN_PERIODO,
+    );
+  });
+});
+
 // Marca usados para tsc — evitan unused warnings hasta que cycles posteriores los usen.
 void anularFacturaConRepo;
 void corregirFacturaConRepo;
-void MENSAJES_ERROR_FACTURA;
