@@ -361,4 +361,18 @@ describe('anularFactura — funcion pura', () => {
     expect(anulada.id).toBe(original.id);
     expect(anulada.numero_factura).toBe(original.numero_factura);
   });
+
+  it('rechaza si factura no esta en EMITIDA (BORRADOR lanza FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL)', () => {
+    const borrador = emitirFactura(inputBase()); // estado BORRADOR
+    expect(() => anularFactura(borrador, 'motivo', '2026-02-10')).toThrow(
+      MENSAJES_ERROR_FACTURA.FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL,
+    );
+  });
+
+  it('rechaza si factura ya esta ANULADA (FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL)', () => {
+    const yaAnulada = facturaEmitidaBase({ estado: 'ANULADA' });
+    expect(() => anularFactura(yaAnulada, 'motivo', '2026-02-10')).toThrow(
+      MENSAJES_ERROR_FACTURA.FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL,
+    );
+  });
 });
