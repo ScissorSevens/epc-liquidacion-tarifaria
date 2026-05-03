@@ -213,23 +213,27 @@ export function corregirFactura(input: {
     motivo_anulacion: 'Liquidación reemplazada',
     fecha_anulacion: input.fechaEmision,
   });
+  const nuevoNumeroFactura = formatearNumeroFactura(
+    input.facturaOriginal.snapshot.operario.dispositivo_id,
+    input.consecutivoNuevo,
+  );
+  const nuevoSnapshot: FacturaSnapshot = {
+    ...input.facturaOriginal.snapshot,
+    liquidacion: {
+      id: input.liquidacionNueva.id,
+      hash: input.liquidacionNueva.hash,
+      resultado: { ...input.liquidacionNueva.resultado },
+    },
+  };
+  const nuevoHash = calcularHashFactura(nuevoSnapshot, nuevoNumeroFactura, input.fechaEmision);
   const nuevoBorrador = deepFreeze({
     ...input.facturaOriginal,
     id: '',
-    numero_factura: formatearNumeroFactura(
-      input.facturaOriginal.snapshot.operario.dispositivo_id,
-      input.consecutivoNuevo,
-    ),
+    numero_factura: nuevoNumeroFactura,
     estado: 'BORRADOR' as const,
     fecha_emision: input.fechaEmision,
-    snapshot: {
-      ...input.facturaOriginal.snapshot,
-      liquidacion: {
-        id: input.liquidacionNueva.id,
-        hash: input.liquidacionNueva.hash,
-        resultado: { ...input.liquidacionNueva.resultado },
-      },
-    },
+    snapshot: nuevoSnapshot,
+    hash: nuevoHash,
     reemplaza_a: input.facturaOriginal.id,
     created_at: '',
   });
