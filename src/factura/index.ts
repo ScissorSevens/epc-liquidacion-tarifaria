@@ -1,4 +1,9 @@
 export { emitirFactura, anularFactura, esVencida, corregirFactura } from './factura';
+export {
+  emitirFacturaConRepo,
+  anularFacturaConRepo,
+  corregirFacturaConRepo,
+} from './factura-con-repo';
 export type {
   EstadoFactura,
   NumeroFactura,
