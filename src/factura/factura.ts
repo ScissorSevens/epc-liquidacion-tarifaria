@@ -61,6 +61,13 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     hash: input.liquidacion.hash,
     resultado: { ...input.liquidacion.resultado },
   });
+  const consumosHistoricosSnapshot = deepFreeze(
+    input.consumosHistoricos.map((c) => ({
+      id_periodo: c.id_periodo,
+      consumo_m3: c.consumo_m3,
+      total_facturado: c.total_facturado,
+    })),
+  );
   return {
     id: '',
     numero_factura,
@@ -72,7 +79,7 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
       periodo: periodoSnapshot,
       operario: operarioSnapshot,
       liquidacion: liquidacionSnapshot,
-      consumosHistoricos: [],
+      consumosHistoricos: consumosHistoricosSnapshot,
     },
     hash: '',
     created_at: '',
