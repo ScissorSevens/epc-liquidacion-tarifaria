@@ -10,6 +10,7 @@
 import { crearFacturaRepositoryInMemory } from './factura-repository-in-memory';
 import { emitirFactura } from '../factura';
 import type { EmitirFacturaInput } from '../types';
+import { MENSAJES_ERROR_FACTURA } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
 import type { Suscriptor } from '../../suscriptores/types';
@@ -229,5 +230,14 @@ describe('FacturaRepositoryInMemory — actualizar (happy path)', () => {
 
     const recuperada = await repo.buscarPorId('uuid-1');
     expect(recuperada).toEqual(actualizada);
+  });
+});
+
+describe('FacturaRepositoryInMemory — actualizar (no encontrada)', () => {
+  it('lanza FACTURA_NO_ENCONTRADA si el id no existe', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    await expect(
+      repo.actualizar('uuid-inexistente', { estado: 'ANULADA' }),
+    ).rejects.toThrow(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
   });
 });
