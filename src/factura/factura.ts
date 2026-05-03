@@ -102,7 +102,7 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     consumosHistoricos: consumosHistoricosSnapshot,
   };
   const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision);
-  return {
+  return deepFreeze({
     id: '',
     numero_factura,
     estado: 'BORRADOR',
@@ -110,5 +110,5 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     snapshot,
     hash,
     created_at: '',
-  };
+  });
 }
