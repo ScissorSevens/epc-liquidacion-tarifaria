@@ -134,6 +134,7 @@ describe('eventos de factura encadenados al hash chain', () => {
 
     const resultado = verificarCadena(cadenaManipulada);
     expect(resultado.valida).toBe(false);
+    if (resultado.valida) throw new Error('Esperaba cadena invalida');
     expect(resultado.razon).toBe('HASH_INVALIDO');
     expect(resultado.indice).toBe(1);
   });
