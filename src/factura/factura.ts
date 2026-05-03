@@ -81,6 +81,9 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   if (input.operario.estado !== 'activo') {
     throw new Error(MENSAJES_ERROR_FACTURA.OPERARIO_NO_ACTIVO);
   }
+  if (!input.operario.dispositivo_id) {
+    throw new Error(MENSAJES_ERROR_FACTURA.OPERARIO_SIN_DISPOSITIVO);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
