@@ -77,3 +77,64 @@ describe('evento FACTURA_ANULADA', () => {
     expect(evento.payload.motivo).toBe('Liquidación reemplazada');
   });
 });
+
+describe('eventos de factura encadenados al hash chain', () => {
+  it('FACTURA_EMITIDA y FACTURA_ANULADA encadenan correctamente y verificarCadena queda verde', () => {
+    const { registrarFacturaEmitida, registrarFacturaAnulada } = require('../auditoria');
+
+    const e1 = registrarFacturaEmitida({
+      actor: actorMock,
+      payload: {
+        facturaId: 'FAC-100',
+        numeroFactura: 'MZ-001-100',
+        suscriptorId: 9,
+        total: 50000,
+      },
+    });
+
+    const e2 = registrarFacturaAnulada({
+      actor: actorMock,
+      payload: {
+        facturaAnuladaId: 'FAC-100',
+        motivo: 'Error de digitación',
+      },
+      hashAnterior: e1.hash,
+    });
+
+    expect(e2.hashAnterior).toBe(e1.hash);
+
+    const resultado = verificarCadena([e1, e2]);
+    expect(resultado.valida).toBe(true);
+  });
+
+  it('verificarCadena detecta tampering del motivo en un evento FACTURA_ANULADA', () => {
+    const { registrarFacturaEmitida, registrarFacturaAnulada } = require('../auditoria');
+
+    const e1 = registrarFacturaEmitida({
+      actor: actorMock,
+      payload: {
+        facturaId: 'FAC-200',
+        numeroFactura: 'MZ-001-200',
+        suscriptorId: 4,
+        total: 22000,
+      },
+    });
+
+    const e2 = registrarFacturaAnulada({
+      actor: actorMock,
+      payload: {
+        facturaAnuladaId: 'FAC-200',
+        motivo: 'Original',
+      },
+      hashAnterior: e1.hash,
+    });
+
+    // Tampering: cambiamos motivo sin recalcular hash
+    const cadenaManipulada = [e1, { ...e2, payload: { ...e2.payload, motivo: 'HACKED' } }];
+
+    const resultado = verificarCadena(cadenaManipulada);
+    expect(resultado.valida).toBe(false);
+    expect(resultado.razon).toBe('HASH_INVALIDO');
+    expect(resultado.indice).toBe(1);
+  });
+});
