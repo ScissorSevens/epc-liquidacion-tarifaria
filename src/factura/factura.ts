@@ -210,7 +210,10 @@ export function corregirFactura(input: {
   const nuevoBorrador = deepFreeze({
     ...input.facturaOriginal,
     id: '',
-    numero_factura: String(input.consecutivoNuevo),
+    numero_factura: formatearNumeroFactura(
+      input.facturaOriginal.snapshot.operario.dispositivo_id,
+      input.consecutivoNuevo,
+    ),
     estado: 'BORRADOR' as const,
     fecha_emision: input.fechaEmision,
     snapshot: {
