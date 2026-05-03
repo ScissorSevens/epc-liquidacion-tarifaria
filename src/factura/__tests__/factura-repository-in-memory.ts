@@ -23,8 +23,10 @@ export function crearFacturaRepositoryInMemory(): FacturaRepository {
     async buscarPorId(id: string): Promise<Factura | null> {
       return store.get(id) ?? null;
     },
-    async buscarPorPeriodo(_idPeriodo: string): Promise<readonly Factura[]> {
-      throw new Error('not implemented');
+    async buscarPorPeriodo(idPeriodo: string): Promise<readonly Factura[]> {
+      return Array.from(store.values()).filter(
+        (f) => f.snapshot.periodo.id_periodo === idPeriodo,
+      );
     },
     async buscarPorSuscriptor(_idSuscriptor: number): Promise<readonly Factura[]> {
       throw new Error('not implemented');
