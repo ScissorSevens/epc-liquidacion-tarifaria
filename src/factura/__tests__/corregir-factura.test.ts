@@ -15,7 +15,7 @@
  * ya validado de la factura original.
  */
 
-import { corregirFactura, emitirFactura } from '../factura';
+import { corregirFactura, emitirFactura, calcularHashFactura } from '../factura';
 import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type Factura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
@@ -232,5 +232,45 @@ describe('corregirFactura — orquestador puro', () => {
         fechaEmision: '2026-02-15',
       }),
     ).toThrow(MENSAJES_ERROR_FACTURA.CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE);
+  });
+
+  it('el nuevoBorrador tiene hash recalculado coherente con su snapshot modificado', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const { nuevoBorrador } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 42,
+      fechaEmision: '2026-02-15',
+    });
+
+    const hashEsperado = calcularHashFactura(
+      nuevoBorrador.snapshot,
+      nuevoBorrador.numero_factura,
+      nuevoBorrador.fecha_emision,
+    );
+    expect(nuevoBorrador.hash).toBe(hashEsperado);
+    // y NO debe ser el hash del original (snapshot cambió)
+    expect(nuevoBorrador.hash).not.toBe(facturaOriginal.hash);
+  });
+
+  it('la facturaAnulada conserva el hash original (su snapshot no cambia)', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const { facturaAnulada } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 2,
+      fechaEmision: '2026-02-15',
+    });
+
+    // Anulación es metadata fuera del snapshot — hash del snapshot no cambia.
+    expect(facturaAnulada.hash).toBe(facturaOriginal.hash);
   });
 });
