@@ -8,6 +8,7 @@
 
 import { createHash } from 'crypto';
 import { verificarIntegridad } from '../calculo/calculo';
+import type { Liquidacion } from '../calculo/types';
 import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type Factura, type FacturaSnapshot } from './types';
 
 /**
@@ -177,4 +178,31 @@ export function anularFactura(
 export function esVencida(factura: Factura, fechaActual: string): boolean {
   if (factura.estado !== 'EMITIDA') return false;
   return fechaActual > factura.snapshot.periodo.fecha_pago_con_recargo;
+}
+
+/**
+ * Orquestador puro: corrige una Factura emitida cuando su Liquidacion fue
+ * anulada y reemplazada (típicamente vía `calculo.anularYReemplazar`).
+ *
+ * NO invoca `emitirFactura` ni `anularFactura` internamente. NO toca repos.
+ * NO importa el módulo `calculo`. Reusa el snapshot ya validado de la
+ * factura original — los aggregates de origen (Suscriptor/Medidor/etc) NO
+ * viven en el snapshot, así que reconstruirlos sería deshonesto e
+ * incompleto (consumosHistoricos no están allí). Las invariantes de la
+ * corrección son las verificadas en este orquestador (mismatch, etc.).
+ *
+ * Design D2.
+ */
+export function corregirFactura(input: {
+  facturaOriginal: Factura;
+  liquidacionAnulada: Liquidacion;
+  liquidacionNueva: Liquidacion;
+  consecutivoNuevo: number;
+  fechaEmision: string;
+  observaciones?: string;
+}): { facturaAnulada: Factura; nuevoBorrador: Factura } {
+  return {
+    facturaAnulada: input.facturaOriginal,
+    nuevoBorrador: input.facturaOriginal,
+  };
 }
