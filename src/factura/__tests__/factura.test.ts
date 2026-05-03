@@ -142,4 +142,26 @@ describe('emitirFactura — happy path', () => {
     expect(factura.snapshot.medidor).toEqual({ numero_medidor: 'MED-9999' });
     expect(Object.isFrozen(factura.snapshot.medidor)).toBe(true);
   });
+
+  it('snapshotea periodo (id, fechas, dias_consumo) y lo congela', () => {
+    const periodo: Periodo = {
+      ...periodoBase(),
+      id_periodo: '202603',
+      fecha_inicio: '2026-03-01',
+      fecha_fin: '2026-03-31',
+      fecha_pago_sin_recargo: '2026-04-15',
+      fecha_pago_con_recargo: '2026-04-30',
+      dias_consumo: 30,
+    };
+    const factura = emitirFactura({ ...inputBase(), periodo });
+    expect(factura.snapshot.periodo).toEqual({
+      id_periodo: '202603',
+      fecha_inicio: '2026-03-01',
+      fecha_fin: '2026-03-31',
+      fecha_pago_sin_recargo: '2026-04-15',
+      fecha_pago_con_recargo: '2026-04-30',
+      dias_consumo: 30,
+    });
+    expect(Object.isFrozen(factura.snapshot.periodo)).toBe(true);
+  });
 });
