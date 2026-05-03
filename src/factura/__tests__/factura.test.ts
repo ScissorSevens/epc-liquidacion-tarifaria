@@ -300,4 +300,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.PERIODO_NO_FACTURABLE,
     );
   });
+
+  it('rechaza si fechaEmision < periodo.fecha_fin (FECHA_EMISION_ANTES_FIN_PERIODO)', () => {
+    // periodoBase: fecha_fin = '2026-01-31' → emitir el 2026-01-15 es prematuro
+    expect(() => emitirFactura({ ...inputBase(), fechaEmision: '2026-01-15' })).toThrow(
+      MENSAJES_ERROR_FACTURA.FECHA_EMISION_ANTES_FIN_PERIODO,
+    );
+  });
 });
