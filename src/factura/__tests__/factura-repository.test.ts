@@ -192,3 +192,21 @@ describe('FacturaRepositoryInMemory — buscarPorSuscriptor', () => {
     expect(inexistente).toEqual([]);
   });
 });
+
+describe('FacturaRepositoryInMemory — listar', () => {
+  it('retorna todas las facturas persistidas en orden de insercion', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    expect(await repo.listar()).toEqual([]);
+
+    const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+    const f2 = {
+      ...emitirFactura(inputBase({ consecutivo: 2 })),
+      id: 'uuid-2',
+    };
+    await repo.crear(f1);
+    await repo.crear(f2);
+
+    const todas = await repo.listar();
+    expect(todas.map((f) => f.id)).toEqual(['uuid-1', 'uuid-2']);
+  });
+});
