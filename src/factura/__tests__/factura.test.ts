@@ -263,4 +263,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA,
     );
   });
+
+  it('rechaza si hash de liquidacion no coincide con recalculo (LIQUIDACION_INTEGRIDAD_ROTA)', () => {
+    const liquidacion: Liquidacion = { ...liquidacionBase(), hash: 'hash-manipulado-1234' };
+    expect(() => emitirFactura({ ...inputBase(), liquidacion })).toThrow(
+      MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA,
+    );
+  });
 });
