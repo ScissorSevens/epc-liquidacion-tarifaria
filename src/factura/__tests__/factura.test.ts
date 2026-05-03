@@ -255,3 +255,12 @@ describe('emitirFactura — happy path', () => {
     expect(factura.snapshot.observaciones).toBeUndefined();
   });
 });
+
+describe('emitirFactura — validaciones de invariantes', () => {
+  it('rechaza si liquidacion.estado !== ACTIVA (LIQUIDACION_NO_ACTIVA)', () => {
+    const liquidacion: Liquidacion = { ...liquidacionBase(), estado: 'ANULADA' };
+    expect(() => emitirFactura({ ...inputBase(), liquidacion })).toThrow(
+      MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA,
+    );
+  });
+});
