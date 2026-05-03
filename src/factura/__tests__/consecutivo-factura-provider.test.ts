@@ -12,3 +12,13 @@ describe('ConsecutivoFacturaProviderInMemory — primer call por dispositivo', (
     expect(consecutivo).toBe(1);
   });
 });
+
+describe('ConsecutivoFacturaProviderInMemory — calls consecutivos por dispositivo', () => {
+  it('incrementa monotonicamente: 1, 2, 3 en calls sucesivos al mismo dispositivo', async () => {
+    const provider = crearConsecutivoFacturaProviderInMemory();
+    const a = await provider.proximo('MZ-001');
+    const b = await provider.proximo('MZ-001');
+    const c = await provider.proximo('MZ-001');
+    expect([a, b, c]).toEqual([1, 2, 3]);
+  });
+});
