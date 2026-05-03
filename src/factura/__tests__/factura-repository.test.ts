@@ -158,3 +158,37 @@ describe('FacturaRepositoryInMemory — buscarPorPeriodo', () => {
     expect(inexistente).toEqual([]);
   });
 });
+
+describe('FacturaRepositoryInMemory — buscarPorSuscriptor', () => {
+  it('retorna solo las facturas cuyo snapshot.suscriptor.codigo coincide con String(idSuscriptor)', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    // Discrepancia conocida puerto vs snapshot: puerto pide id_suscriptor:number
+    // pero snapshot guarda codigo:string. Helper in-memory matchea por
+    // codigo === String(idSuscriptor) — los suscriptores de prueba usan ese contrato.
+    const suscriptor1: Suscriptor = { ...suscriptorBase(), id_suscriptor: 1, codigo: '1' };
+    const suscriptor2: Suscriptor = {
+      ...suscriptorBase(),
+      id_suscriptor: 2,
+      codigo: '2',
+      nombre_apellidos: 'Juan Pérez',
+    };
+    const f1 = { ...emitirFactura(inputBase({ suscriptor: suscriptor1 })), id: 'uuid-1' };
+    const medidor2: Medidor = { ...medidorBase(), id_suscriptor: 2 };
+    const f2 = {
+      ...emitirFactura(
+        inputBase({ suscriptor: suscriptor2, medidor: medidor2, consecutivo: 2 }),
+      ),
+      id: 'uuid-2',
+    };
+    await repo.crear(f1);
+    await repo.crear(f2);
+
+    const delUno = await repo.buscarPorSuscriptor(1);
+    const delDos = await repo.buscarPorSuscriptor(2);
+    const inexistente = await repo.buscarPorSuscriptor(999);
+
+    expect(delUno.map((f) => f.id)).toEqual(['uuid-1']);
+    expect(delDos.map((f) => f.id)).toEqual(['uuid-2']);
+    expect(inexistente).toEqual([]);
+  });
+});
