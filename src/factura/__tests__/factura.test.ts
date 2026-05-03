@@ -164,4 +164,20 @@ describe('emitirFactura — happy path', () => {
     });
     expect(Object.isFrozen(factura.snapshot.periodo)).toBe(true);
   });
+
+  it('snapshotea operario (id, nombre, dispositivo_id) y lo congela', () => {
+    const operario: Operario = {
+      ...operarioBase(),
+      id_operario: 42,
+      nombre: 'Pedro Sánchez',
+      dispositivo_id: 'MZ-007',
+    };
+    const factura = emitirFactura({ ...inputBase(), operario });
+    expect(factura.snapshot.operario).toEqual({
+      id_operario: 42,
+      nombre: 'Pedro Sánchez',
+      dispositivo_id: 'MZ-007',
+    });
+    expect(Object.isFrozen(factura.snapshot.operario)).toBe(true);
+  });
 });
