@@ -6,7 +6,8 @@
  * inmutabilidad recursiva.
  */
 
-import type { EmitirFacturaInput, Factura } from './types';
+import { createHash } from 'crypto';
+import type { EmitirFacturaInput, Factura, FacturaSnapshot } from './types';
 
 /**
  * Congela recursivamente. Replicado de calculo.ts (3er duplicado pendiente
@@ -27,6 +28,30 @@ function deepFreeze<T>(obj: T): T {
 
 function formatearNumeroFactura(dispositivoId: string, consecutivo: number): string {
   return `${dispositivoId}-${consecutivo}`;
+}
+
+/**
+ * Hash SHA-256 reproducible sobre snapshot canónico + numero_factura + fecha_emision.
+ * Serialización determinística — orden de claves explícito (D1).
+ */
+function calcularHashFactura(
+  snapshot: FacturaSnapshot,
+  numeroFactura: string,
+  fechaEmision: string,
+): string {
+  const payload = JSON.stringify({
+    numero_factura: numeroFactura,
+    fecha_emision: fechaEmision,
+    snapshot: {
+      suscriptor: snapshot.suscriptor,
+      medidor: snapshot.medidor,
+      periodo: snapshot.periodo,
+      operario: snapshot.operario,
+      liquidacion: snapshot.liquidacion,
+      consumosHistoricos: snapshot.consumosHistoricos,
+    },
+  });
+  return createHash('sha256').update(payload).digest('hex');
 }
 
 export function emitirFactura(input: EmitirFacturaInput): Factura {
@@ -68,20 +93,22 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
       total_facturado: c.total_facturado,
     })),
   );
+  const snapshot: FacturaSnapshot = {
+    suscriptor: suscriptorSnapshot,
+    medidor: medidorSnapshot,
+    periodo: periodoSnapshot,
+    operario: operarioSnapshot,
+    liquidacion: liquidacionSnapshot,
+    consumosHistoricos: consumosHistoricosSnapshot,
+  };
+  const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision);
   return {
     id: '',
     numero_factura,
     estado: 'BORRADOR',
-    fecha_emision: '',
-    snapshot: {
-      suscriptor: suscriptorSnapshot,
-      medidor: medidorSnapshot,
-      periodo: periodoSnapshot,
-      operario: operarioSnapshot,
-      liquidacion: liquidacionSnapshot,
-      consumosHistoricos: consumosHistoricosSnapshot,
-    },
-    hash: '',
+    fecha_emision: input.fechaEmision,
+    snapshot,
+    hash,
     created_at: '',
   };
 }
