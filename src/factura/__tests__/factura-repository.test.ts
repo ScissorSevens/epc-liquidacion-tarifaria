@@ -210,3 +210,24 @@ describe('FacturaRepositoryInMemory — listar', () => {
     expect(todas.map((f) => f.id)).toEqual(['uuid-1', 'uuid-2']);
   });
 });
+
+describe('FacturaRepositoryInMemory — actualizar (happy path)', () => {
+  it('aplica cambios parciales y retorna la factura actualizada persistida', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+    await repo.crear(f1);
+
+    const actualizada = await repo.actualizar('uuid-1', {
+      estado: 'ANULADA',
+      motivo_anulacion: 'liquidacion corregida',
+    });
+
+    expect(actualizada.estado).toBe('ANULADA');
+    expect(actualizada.motivo_anulacion).toBe('liquidacion corregida');
+    expect(actualizada.id).toBe('uuid-1');
+    expect(actualizada.numero_factura).toBe(f1.numero_factura);
+
+    const recuperada = await repo.buscarPorId('uuid-1');
+    expect(recuperada).toEqual(actualizada);
+  });
+});
