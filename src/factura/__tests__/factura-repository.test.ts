@@ -126,3 +126,35 @@ describe('FacturaRepositoryInMemory — crear + buscarPorId', () => {
     expect(recuperada).toBeNull();
   });
 });
+
+describe('FacturaRepositoryInMemory — buscarPorPeriodo', () => {
+  it('retorna solo las facturas cuyo snapshot.periodo.id_periodo coincide', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+    const periodoFebrero: Periodo = {
+      ...periodoBase(),
+      id_periodo: '202602',
+      nombre: 'Febrero 2026',
+      fecha_inicio: '2026-02-01',
+      fecha_fin: '2026-02-28',
+    };
+    const f2 = {
+      ...emitirFactura(
+        inputBase({ periodo: periodoFebrero, consecutivo: 2, fechaEmision: '2026-03-01' }),
+      ),
+      id: 'uuid-2',
+    };
+    const f3 = { ...emitirFactura(inputBase({ consecutivo: 3 })), id: 'uuid-3' };
+    await repo.crear(f1);
+    await repo.crear(f2);
+    await repo.crear(f3);
+
+    const enero = await repo.buscarPorPeriodo('202601');
+    const febrero = await repo.buscarPorPeriodo('202602');
+    const inexistente = await repo.buscarPorPeriodo('209912');
+
+    expect(enero.map((f) => f.id).sort()).toEqual(['uuid-1', 'uuid-3']);
+    expect(febrero.map((f) => f.id)).toEqual(['uuid-2']);
+    expect(inexistente).toEqual([]);
+  });
+});
