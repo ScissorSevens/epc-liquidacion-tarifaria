@@ -116,3 +116,53 @@ describe('FACTURA conflicto por hash mismatch', () => {
     expect(facActualizada?.intentos).toBe(0); // conflicto no incrementa intentos
   });
 });
+
+describe('DecisionConflicto sobre FACTURA', () => {
+  async function ponerFacturaEnConflicto() {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({
+        ok: false,
+        conflicto: true,
+        hashServer: 'remoto',
+      }),
+    };
+    const item = agregarItemACola({
+      tipo: 'FACTURA',
+      payload: { id: 'FAC-300', numeroFactura: 'MZ-001-3000' },
+      hashLocal: 'local',
+    });
+    await cola.guardar(item);
+    await procesarCola(cola, cliente);
+    return { cola, item };
+  }
+
+  it('SOBRESCRIBIR_LOCAL reencola FACTURA como PENDIENTE con forzarSobrescribir', async () => {
+    const { cola, item } = await ponerFacturaEnConflicto();
+
+    await resolverConflicto(cola, item.id, 'SOBRESCRIBIR_LOCAL');
+
+    const resuelto = await cola.buscarPorId(item.id);
+    expect(resuelto?.estado).toBe('PENDIENTE');
+    expect(resuelto?.forzarSobrescribir).toBe(true);
+    expect(resuelto?.intentos).toBe(0);
+  });
+
+  it('SOBRESCRIBIR_SERVER marca FACTURA como EXITOSO', async () => {
+    const { cola, item } = await ponerFacturaEnConflicto();
+
+    await resolverConflicto(cola, item.id, 'SOBRESCRIBIR_SERVER');
+
+    const resuelto = await cola.buscarPorId(item.id);
+    expect(resuelto?.estado).toBe('EXITOSO');
+  });
+
+  it('DESCARTAR marca FACTURA como DESCARTADO', async () => {
+    const { cola, item } = await ponerFacturaEnConflicto();
+
+    await resolverConflicto(cola, item.id, 'DESCARTAR');
+
+    const resuelto = await cola.buscarPorId(item.id);
+    expect(resuelto?.estado).toBe('DESCARTADO');
+  });
+});
