@@ -135,6 +135,22 @@ describe('emitirFacturaConRepo — unicidad de numero_factura por periodo', () =
   });
 });
 
+describe('emitirFacturaConRepo — unicidad de liquidacion', () => {
+  it('lanza LIQUIDACION_YA_FACTURADA si ya existe factura con la misma liquidacion', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    // Primera emision con liquidacion AAA, consecutivo 1.
+    await emitirFacturaConRepo(inputBase(), repo);
+
+    // Segunda emision con MISMA liquidacion pero consecutivo 2 (numero_factura distinto).
+    // Debe rechazar por LIQUIDACION_YA_FACTURADA, no por numero duplicado.
+    const inputMismaLiq = inputBase({ consecutivo: 2 });
+
+    await expect(emitirFacturaConRepo(inputMismaLiq, repo)).rejects.toThrow(
+      MENSAJES_ERROR_FACTURA.LIQUIDACION_YA_FACTURADA,
+    );
+  });
+});
+
 // Marca usados para tsc — evitan unused warnings hasta que cycles posteriores los usen.
 void anularFacturaConRepo;
 void corregirFacturaConRepo;
