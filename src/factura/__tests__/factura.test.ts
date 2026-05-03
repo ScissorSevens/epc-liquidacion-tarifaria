@@ -234,4 +234,13 @@ describe('emitirFactura — happy path', () => {
     const b = emitirFactura({ ...inputBase(), consecutivo: 2 });
     expect(a.hash).not.toBe(b.hash);
   });
+
+  it('factura entera está congelada (mutación lanza en strict)', () => {
+    const factura = emitirFactura(inputBase());
+    expect(Object.isFrozen(factura)).toBe(true);
+    expect(Object.isFrozen(factura.snapshot)).toBe(true);
+    expect(() => {
+      (factura as { estado: string }).estado = 'EMITIDA';
+    }).toThrow(TypeError);
+  });
 });
