@@ -8,6 +8,23 @@
 
 import type { EmitirFacturaInput, Factura } from './types';
 
+/**
+ * Congela recursivamente. Replicado de calculo.ts (3er duplicado pendiente
+ * para extracción a shared — YAGNI hasta entonces).
+ */
+function deepFreeze<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object' || Object.isFrozen(obj)) {
+    return obj;
+  }
+  for (const key of Object.keys(obj)) {
+    const value = (obj as Record<string, unknown>)[key];
+    if (value !== null && typeof value === 'object') {
+      deepFreeze(value);
+    }
+  }
+  return Object.freeze(obj);
+}
+
 function formatearNumeroFactura(dispositivoId: string, consecutivo: number): string {
   return `${dispositivoId}-${consecutivo}`;
 }
@@ -17,13 +34,19 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
   );
+  const suscriptorSnapshot = deepFreeze({
+    codigo: input.suscriptor.codigo,
+    nombre_apellidos: input.suscriptor.nombre_apellidos,
+    direccion: input.suscriptor.direccion,
+    estrato: input.suscriptor.estrato,
+  });
   return {
     id: '',
     numero_factura,
     estado: 'BORRADOR',
     fecha_emision: '',
     snapshot: {
-      suscriptor: { codigo: '', nombre_apellidos: '', direccion: '', estrato: 1 },
+      suscriptor: suscriptorSnapshot,
       medidor: { numero_medidor: '' },
       periodo: {
         id_periodo: '',
