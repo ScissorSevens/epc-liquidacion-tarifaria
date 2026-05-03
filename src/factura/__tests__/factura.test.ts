@@ -117,4 +117,22 @@ describe('emitirFactura — happy path', () => {
     const factura = emitirFactura({ ...input, operario, consecutivo: 2981 });
     expect(factura.numero_factura).toBe('MZ-001-2981');
   });
+
+  it('snapshotea suscriptor (codigo, nombre, direccion, estrato) y lo congela', () => {
+    const suscriptor: Suscriptor = {
+      ...suscriptorBase(),
+      codigo: '00042',
+      nombre_apellidos: 'Carlos Ruiz',
+      direccion: 'Carrera 7 #14-30',
+      estrato: 3,
+    };
+    const factura = emitirFactura({ ...inputBase(), suscriptor });
+    expect(factura.snapshot.suscriptor).toEqual({
+      codigo: '00042',
+      nombre_apellidos: 'Carlos Ruiz',
+      direccion: 'Carrera 7 #14-30',
+      estrato: 3,
+    });
+    expect(Object.isFrozen(factura.snapshot.suscriptor)).toBe(true);
+  });
 });
