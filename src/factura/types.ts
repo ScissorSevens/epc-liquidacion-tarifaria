@@ -152,6 +152,7 @@ export const MENSAJES_ERROR_FACTURA = {
     'ya existe una Factura con ese numero_factura en el periodo',
   LIQUIDACION_YA_FACTURADA:
     'ya existe una Factura EMITIDA para esta Liquidacion (1:1)',
+  FACTURA_NO_ENCONTRADA: 'factura no encontrada en el repositorio',
   CONSUMO_HISTORICO_INVALIDO:
     'consumos_historicos no puede tener más de 6 elementos',
   FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL:
