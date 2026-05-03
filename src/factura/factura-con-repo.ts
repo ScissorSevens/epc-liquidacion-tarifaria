@@ -58,11 +58,25 @@ export async function emitirFacturaConRepo(
 }
 
 export async function anularFacturaConRepo(
-  _facturaId: string,
-  _motivo: string,
-  _repo: FacturaRepository,
+  facturaId: string,
+  motivo: string,
+  repo: FacturaRepository,
 ): Promise<Factura> {
-  throw new Error('not implemented');
+  const existente = await repo.buscarPorId(facturaId);
+  if (!existente) {
+    throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
+  }
+  const anulada = anularFactura(existente, motivo, new Date().toISOString());
+  // El puerto FacturaRepository.actualizar SOLO acepta { estado, motivo_anulacion }.
+  // No incluye fecha_anulacion — limitacion conocida del contrato (follow-up
+  // para sdd-verify: ¿extender el port o aceptar perdida de fecha_anulacion
+  // en persistencia?). Hasta entonces, fecha_anulacion solo vive en memoria
+  // del objeto retornado — la version persistida no la incluye.
+  void anulada.fecha_anulacion;
+  return repo.actualizar(facturaId, {
+    estado: 'ANULADA',
+    motivo_anulacion: anulada.motivo_anulacion,
+  });
 }
 
 export async function corregirFacturaConRepo(
@@ -72,5 +86,4 @@ export async function corregirFacturaConRepo(
   throw new Error('not implemented');
 }
 
-void anularFactura;
 void MENSAJES_ERROR_FACTURA;
