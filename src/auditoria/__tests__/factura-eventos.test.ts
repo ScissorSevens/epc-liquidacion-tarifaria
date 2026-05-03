@@ -44,3 +44,36 @@ describe('evento FACTURA_EMITIDA', () => {
     expect(evento.hashAnterior).toBeNull();
   });
 });
+
+describe('evento FACTURA_ANULADA', () => {
+  it('debería registrar FACTURA_ANULADA simple sin facturaNuevaId', () => {
+    const { registrarFacturaAnulada } = require('../auditoria');
+    const evento = registrarFacturaAnulada({
+      actor: actorMock,
+      payload: {
+        facturaAnuladaId: 'FAC-001',
+        motivo: 'Error de digitación',
+      },
+    });
+
+    expect(evento.tipo).toBe('FACTURA_ANULADA');
+    expect(evento.payload.facturaAnuladaId).toBe('FAC-001');
+    expect(evento.payload.motivo).toBe('Error de digitación');
+    expect(evento.payload.facturaNuevaId).toBeUndefined();
+  });
+
+  it('debería registrar FACTURA_ANULADA con reemplazo (facturaNuevaId)', () => {
+    const { registrarFacturaAnulada } = require('../auditoria');
+    const evento = registrarFacturaAnulada({
+      actor: actorMock,
+      payload: {
+        facturaAnuladaId: 'FAC-001',
+        facturaNuevaId: 'FAC-002',
+        motivo: 'Liquidación reemplazada',
+      },
+    });
+
+    expect(evento.payload.facturaNuevaId).toBe('FAC-002');
+    expect(evento.payload.motivo).toBe('Liquidación reemplazada');
+  });
+});
