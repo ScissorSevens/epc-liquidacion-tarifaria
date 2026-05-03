@@ -307,4 +307,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.FECHA_EMISION_ANTES_FIN_PERIODO,
     );
   });
+
+  it('rechaza si operario.estado !== activo (OPERARIO_NO_ACTIVO)', () => {
+    const operario: Operario = { ...operarioBase(), estado: 'inactivo' };
+    expect(() => emitirFactura({ ...inputBase(), operario })).toThrow(
+      MENSAJES_ERROR_FACTURA.OPERARIO_NO_ACTIVO,
+    );
+  });
 });
