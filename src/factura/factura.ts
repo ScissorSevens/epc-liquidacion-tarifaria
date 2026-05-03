@@ -7,7 +7,7 @@
  */
 
 import { createHash } from 'crypto';
-import type { EmitirFacturaInput, Factura, FacturaSnapshot } from './types';
+import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type Factura, type FacturaSnapshot } from './types';
 
 /**
  * Congela recursivamente. Replicado de calculo.ts (3er duplicado pendiente
@@ -56,6 +56,9 @@ function calcularHashFactura(
 }
 
 export function emitirFactura(input: EmitirFacturaInput): Factura {
+  if (input.liquidacion.estado !== 'ACTIVA') {
+    throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
