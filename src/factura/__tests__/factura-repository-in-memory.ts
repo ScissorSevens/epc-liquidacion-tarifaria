@@ -10,7 +10,7 @@
  * (sin classes, alineado con convención del proyecto).
  */
 
-import type { Factura, FacturaRepository } from '../types';
+import { MENSAJES_ERROR_FACTURA, type Factura, type FacturaRepository } from '../types';
 
 export function crearFacturaRepositoryInMemory(): FacturaRepository {
   const store = new Map<string, Factura>();
@@ -36,8 +36,14 @@ export function crearFacturaRepositoryInMemory(): FacturaRepository {
         (f) => f.snapshot.suscriptor.codigo === String(idSuscriptor),
       );
     },
-    async actualizar(_id, _cambios): Promise<Factura> {
-      throw new Error('not implemented');
+    async actualizar(id, cambios): Promise<Factura> {
+      const existente = store.get(id);
+      if (!existente) {
+        throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
+      }
+      const actualizada = Object.freeze({ ...existente, ...cambios }) as Factura;
+      store.set(id, actualizada);
+      return actualizada;
     },
     async listar(): Promise<readonly Factura[]> {
       return Array.from(store.values());
