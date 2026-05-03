@@ -89,3 +89,30 @@ describe('FACTURA con dependeDe LIQUIDACION', () => {
     expect(facActualizada?.estado).toBe('PENDIENTE');
   });
 });
+
+describe('FACTURA conflicto por hash mismatch', () => {
+  it('item FACTURA cuyo backend responde conflicto pasa a CONFLICTO con hashServer', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({
+        ok: false,
+        conflicto: true,
+        hashServer: 'hashRemotoDistinto',
+      }),
+    };
+
+    const itemFac = agregarItemACola({
+      tipo: 'FACTURA',
+      payload: { id: 'FAC-100', numeroFactura: 'MZ-001-2999' },
+      hashLocal: 'hashLocal',
+    });
+    await cola.guardar(itemFac);
+
+    await procesarCola(cola, cliente);
+
+    const facActualizada = await cola.buscarPorId(itemFac.id);
+    expect(facActualizada?.estado).toBe('CONFLICTO');
+    expect(facActualizada?.hashServer).toBe('hashRemotoDistinto');
+    expect(facActualizada?.intentos).toBe(0); // conflicto no incrementa intentos
+  });
+});
