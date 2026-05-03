@@ -18,6 +18,7 @@
  * sobre errores de unicidad cuando ambos aplicarian.
  */
 
+import { randomUUID } from 'crypto';
 import { emitirFactura, anularFactura, corregirFactura } from './factura';
 import {
   MENSAJES_ERROR_FACTURA,
@@ -27,10 +28,16 @@ import {
 } from './types';
 
 export async function emitirFacturaConRepo(
-  _input: EmitirFacturaInput,
-  _repo: FacturaRepository,
+  input: EmitirFacturaInput,
+  repo: FacturaRepository,
 ): Promise<Factura> {
-  throw new Error('not implemented');
+  const facturaPura = emitirFactura(input);
+  const facturaConId: Factura = Object.freeze({
+    ...facturaPura,
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+  });
+  return repo.crear(facturaConId);
 }
 
 export async function anularFacturaConRepo(
@@ -48,7 +55,5 @@ export async function corregirFacturaConRepo(
   throw new Error('not implemented');
 }
 
-// Marca como usados a la importacion para que tsc no se queje del skeleton.
-void emitirFactura;
 void anularFactura;
 void MENSAJES_ERROR_FACTURA;
