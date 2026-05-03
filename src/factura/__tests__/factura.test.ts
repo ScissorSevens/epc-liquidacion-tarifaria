@@ -384,4 +384,14 @@ describe('esVencida — funcion pura', () => {
     const factura = facturaEmitidaBase();
     expect(esVencida(factura, '2026-03-01')).toBe(true);
   });
+
+  it('es false cuando fechaActual === fecha_pago_con_recargo (no estricto >)', () => {
+    const factura = facturaEmitidaBase();
+    expect(esVencida(factura, '2026-02-28')).toBe(false);
+  });
+
+  it('es false cuando fechaActual < fecha_pago_con_recargo', () => {
+    const factura = facturaEmitidaBase();
+    expect(esVencida(factura, '2026-02-15')).toBe(false);
+  });
 });
