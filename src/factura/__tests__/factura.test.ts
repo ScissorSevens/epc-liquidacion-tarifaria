@@ -286,4 +286,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.MEDIDOR_NO_PERTENECE_A_SUSCRIPTOR,
     );
   });
+
+  it('rechaza si medidor.estado !== activo (MEDIDOR_NO_ACTIVO)', () => {
+    const medidor: Medidor = { ...medidorBase(), estado: 'reemplazado' };
+    expect(() => emitirFactura({ ...inputBase(), medidor })).toThrow(
+      MENSAJES_ERROR_FACTURA.MEDIDOR_NO_ACTIVO,
+    );
+  });
 });
