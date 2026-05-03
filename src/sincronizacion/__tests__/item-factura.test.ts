@@ -26,3 +26,66 @@ describe('TipoItem extendido con FACTURA', () => {
     expect(t).toBe('FACTURA');
   });
 });
+
+describe('FACTURA con dependeDe LIQUIDACION', () => {
+  it('item FACTURA con dependeDe a LIQUIDACION pendiente NO se envía hasta que la dependencia sea EXITOSO', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    const itemLiq = agregarItemACola({
+      tipo: 'LIQUIDACION',
+      payload: { id: 'LIQ-001', total: 17000 },
+      hashLocal: 'hashLiq',
+    });
+    await cola.guardar(itemLiq);
+
+    const itemFac = agregarItemACola({
+      tipo: 'FACTURA',
+      payload: { id: 'FAC-001', numeroFactura: 'MZ-001-2981' },
+      hashLocal: 'hashFac',
+      dependeDe: [itemLiq.id],
+    });
+    await cola.guardar(itemFac);
+
+    await procesarCola(cola, cliente);
+
+    // Liquidacion enviada y exitosa, factura tambien (porque dep se resuelve en el mismo run)
+    expect(cliente.enviar).toHaveBeenCalledTimes(2);
+    const facActualizada = await cola.buscarPorId(itemFac.id);
+    expect(facActualizada?.estado).toBe('EXITOSO');
+  });
+
+  it('item FACTURA queda PENDIENTE si su dependencia LIQUIDACION está FALLIDA', async () => {
+    const cola = new InMemoryColaSincronizacion();
+    const cliente: ClienteSincronizacion = {
+      enviar: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    const itemLiqFallido = {
+      ...agregarItemACola({
+        tipo: 'LIQUIDACION',
+        payload: { id: 'LIQ-002', total: 18000 },
+        hashLocal: 'hashLiq2',
+      }),
+      estado: 'FALLIDO' as const,
+    };
+    await cola.guardar(itemLiqFallido);
+
+    const itemFac = agregarItemACola({
+      tipo: 'FACTURA',
+      payload: { id: 'FAC-002', numeroFactura: 'MZ-001-2982' },
+      hashLocal: 'hashFac2',
+      dependeDe: [itemLiqFallido.id],
+    });
+    await cola.guardar(itemFac);
+
+    await procesarCola(cola, cliente);
+
+    // FACTURA no se envia porque su dependencia no esta EXITOSO
+    expect(cliente.enviar).not.toHaveBeenCalled();
+    const facActualizada = await cola.buscarPorId(itemFac.id);
+    expect(facActualizada?.estado).toBe('PENDIENTE');
+  });
+});
