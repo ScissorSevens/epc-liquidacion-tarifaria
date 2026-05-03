@@ -5,7 +5,7 @@
  * Inputs construidos inline por test desde una base mínima válida.
  */
 
-import { emitirFactura, anularFactura } from '../factura';
+import { emitirFactura, anularFactura, esVencida } from '../factura';
 import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput, type Factura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
@@ -374,5 +374,14 @@ describe('anularFactura — funcion pura', () => {
     expect(() => anularFactura(yaAnulada, 'motivo', '2026-02-10')).toThrow(
       MENSAJES_ERROR_FACTURA.FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL,
     );
+  });
+});
+
+
+describe('esVencida — funcion pura', () => {
+  it('es true cuando estado EMITIDA y fechaActual > fecha_pago_con_recargo', () => {
+    // periodoBase fecha_pago_con_recargo = '2026-02-28'
+    const factura = facturaEmitidaBase();
+    expect(esVencida(factura, '2026-03-01')).toBe(true);
   });
 });
