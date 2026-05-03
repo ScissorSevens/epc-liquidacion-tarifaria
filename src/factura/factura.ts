@@ -168,3 +168,13 @@ export function anularFactura(
     fecha_anulacion: fechaAnulacion,
   });
 }
+
+/**
+ * Predicado puro: factura está vencida cuando estado === 'EMITIDA' y
+ * `fechaActual > snapshot.periodo.fecha_pago_con_recargo`. PAGADA y demás
+ * estados nunca vencen. No muta, no persiste.
+ */
+export function esVencida(factura: Factura, fechaActual: string): boolean {
+  if (factura.estado !== 'EMITIDA') return false;
+  return fechaActual > factura.snapshot.periodo.fecha_pago_con_recargo;
+}
