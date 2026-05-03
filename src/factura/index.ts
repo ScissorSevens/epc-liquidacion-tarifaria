@@ -1,4 +1,4 @@
-export { emitirFactura, anularFactura, esVencida } from './factura';
+export { emitirFactura, anularFactura, esVencida, corregirFactura } from './factura';
 export type {
   EstadoFactura,
   NumeroFactura,
