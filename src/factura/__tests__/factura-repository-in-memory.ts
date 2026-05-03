@@ -40,7 +40,7 @@ export function crearFacturaRepositoryInMemory(): FacturaRepository {
       throw new Error('not implemented');
     },
     async listar(): Promise<readonly Factura[]> {
-      throw new Error('not implemented');
+      return Array.from(store.values());
     },
   };
 }
