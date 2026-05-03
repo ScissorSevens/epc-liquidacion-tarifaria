@@ -75,6 +75,9 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   if (input.periodo.estado !== 'cerrado' && input.periodo.estado !== 'facturado') {
     throw new Error(MENSAJES_ERROR_FACTURA.PERIODO_NO_FACTURABLE);
   }
+  if (input.fechaEmision < input.periodo.fecha_fin) {
+    throw new Error(MENSAJES_ERROR_FACTURA.FECHA_EMISION_ANTES_FIN_PERIODO);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,

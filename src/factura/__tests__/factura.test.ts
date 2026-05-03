@@ -154,7 +154,7 @@ describe('emitirFactura — happy path', () => {
       fecha_pago_con_recargo: '2026-04-30',
       dias_consumo: 30,
     };
-    const factura = emitirFactura({ ...inputBase(), periodo });
+    const factura = emitirFactura({ ...inputBase(), periodo, fechaEmision: '2026-04-01' });
     expect(factura.snapshot.periodo).toEqual({
       id_periodo: '202603',
       fecha_inicio: '2026-03-01',
