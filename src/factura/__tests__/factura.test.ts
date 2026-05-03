@@ -194,16 +194,16 @@ describe('emitirFactura — happy path', () => {
       contribucion: 4250,
       total: 46750,
     };
-    const liquidacion: Liquidacion = {
+    const base = {
       ...liquidacionBase(),
       id: '99999999-9999-9999-9999-999999999999',
-      hash: 'abc123def456',
       resultado,
     };
+    const liquidacion: Liquidacion = { ...base, hash: calcularHash(base) };
     const factura = emitirFactura({ ...inputBase(), liquidacion });
     expect(factura.snapshot.liquidacion).toEqual({
       id: '99999999-9999-9999-9999-999999999999',
-      hash: 'abc123def456',
+      hash: liquidacion.hash,
       resultado,
     });
     expect(Object.isFrozen(factura.snapshot.liquidacion)).toBe(true);
@@ -258,7 +258,9 @@ describe('emitirFactura — happy path', () => {
 
 describe('emitirFactura — validaciones de invariantes', () => {
   it('rechaza si liquidacion.estado !== ACTIVA (LIQUIDACION_NO_ACTIVA)', () => {
-    const liquidacion: Liquidacion = { ...liquidacionBase(), estado: 'ANULADA' };
+    const base = liquidacionBase();
+    const anulada = { ...base, estado: 'ANULADA' as const };
+    const liquidacion: Liquidacion = { ...anulada, hash: calcularHash(anulada) };
     expect(() => emitirFactura({ ...inputBase(), liquidacion })).toThrow(
       MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA,
     );

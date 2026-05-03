@@ -7,6 +7,7 @@
  */
 
 import { createHash } from 'crypto';
+import { verificarIntegridad } from '../calculo/calculo';
 import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type Factura, type FacturaSnapshot } from './types';
 
 /**
@@ -56,6 +57,9 @@ function calcularHashFactura(
 }
 
 export function emitirFactura(input: EmitirFacturaInput): Factura {
+  if (!verificarIntegridad(input.liquidacion)) {
+    throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
+  }
   if (input.liquidacion.estado !== 'ACTIVA') {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA);
   }
