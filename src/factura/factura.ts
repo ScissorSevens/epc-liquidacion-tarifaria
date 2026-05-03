@@ -78,6 +78,9 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   if (input.fechaEmision < input.periodo.fecha_fin) {
     throw new Error(MENSAJES_ERROR_FACTURA.FECHA_EMISION_ANTES_FIN_PERIODO);
   }
+  if (input.operario.estado !== 'activo') {
+    throw new Error(MENSAJES_ERROR_FACTURA.OPERARIO_NO_ACTIVO);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
