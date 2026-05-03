@@ -220,4 +220,18 @@ describe('emitirFactura — happy path', () => {
     expect(Object.isFrozen(factura.snapshot.consumosHistoricos)).toBe(true);
     expect(Object.isFrozen(factura.snapshot.consumosHistoricos[0])).toBe(true);
   });
+
+  it('calcula hash SHA-256 reproducible y determinístico sobre snapshot+numero+fechaEmision', () => {
+    const input = inputBase();
+    const a = emitirFactura(input);
+    const b = emitirFactura(input);
+    expect(a.hash).toBe(b.hash);
+    expect(a.hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('hash cambia si cambia cualquier campo del snapshot', () => {
+    const a = emitirFactura(inputBase());
+    const b = emitirFactura({ ...inputBase(), consecutivo: 2 });
+    expect(a.hash).not.toBe(b.hash);
+  });
 });
