@@ -49,6 +49,7 @@ function calcularHashFactura(
       operario: snapshot.operario,
       liquidacion: snapshot.liquidacion,
       consumosHistoricos: snapshot.consumosHistoricos,
+      observaciones: snapshot.observaciones ?? null,
     },
   });
   return createHash('sha256').update(payload).digest('hex');
@@ -100,6 +101,7 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     operario: operarioSnapshot,
     liquidacion: liquidacionSnapshot,
     consumosHistoricos: consumosHistoricosSnapshot,
+    ...(input.observaciones !== undefined && { observaciones: input.observaciones }),
   };
   const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision);
   return deepFreeze({
