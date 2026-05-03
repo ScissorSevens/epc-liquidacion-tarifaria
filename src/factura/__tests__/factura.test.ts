@@ -293,4 +293,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.MEDIDOR_NO_ACTIVO,
     );
   });
+
+  it('rechaza si periodo.estado === abierto (PERIODO_NO_FACTURABLE)', () => {
+    const periodo: Periodo = { ...periodoBase(), estado: 'abierto' };
+    expect(() => emitirFactura({ ...inputBase(), periodo })).toThrow(
+      MENSAJES_ERROR_FACTURA.PERIODO_NO_FACTURABLE,
+    );
+  });
 });
