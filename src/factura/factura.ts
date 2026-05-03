@@ -8,10 +8,18 @@
 
 import type { EmitirFacturaInput, Factura } from './types';
 
-export function emitirFactura(_input: EmitirFacturaInput): Factura {
+function formatearNumeroFactura(dispositivoId: string, consecutivo: number): string {
+  return `${dispositivoId}-${consecutivo}`;
+}
+
+export function emitirFactura(input: EmitirFacturaInput): Factura {
+  const numero_factura = formatearNumeroFactura(
+    input.operario.dispositivo_id ?? '',
+    input.consecutivo,
+  );
   return {
     id: '',
-    numero_factura: '',
+    numero_factura,
     estado: 'BORRADOR',
     fecha_emision: '',
     snapshot: {
