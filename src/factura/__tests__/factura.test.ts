@@ -6,7 +6,7 @@
  */
 
 import { emitirFactura } from '../factura';
-import type { EmitirFacturaInput } from '../types';
+import type { ConsumoHistorico, EmitirFacturaInput } from '../types';
 import type { Liquidacion } from '../../calculo/types';
 import type { Suscriptor } from '../../suscriptores/types';
 import type { Medidor } from '../../medidores/types';
@@ -179,5 +179,45 @@ describe('emitirFactura — happy path', () => {
       dispositivo_id: 'MZ-007',
     });
     expect(Object.isFrozen(factura.snapshot.operario)).toBe(true);
+  });
+
+  it('snapshotea liquidacion (id, hash, resultado completo) y la congela', () => {
+    const resultado: ResultadoCalculo = {
+      consumo: 22,
+      consumoBasico: 20,
+      consumoExcedente: 2,
+      cargoFijo: 5500,
+      cargoConsumo: 30000,
+      cargoExcedente: 7000,
+      subsidio: 0,
+      contribucion: 4250,
+      total: 46750,
+    };
+    const liquidacion: Liquidacion = {
+      ...liquidacionBase(),
+      id: '99999999-9999-9999-9999-999999999999',
+      hash: 'abc123def456',
+      resultado,
+    };
+    const factura = emitirFactura({ ...inputBase(), liquidacion });
+    expect(factura.snapshot.liquidacion).toEqual({
+      id: '99999999-9999-9999-9999-999999999999',
+      hash: 'abc123def456',
+      resultado,
+    });
+    expect(Object.isFrozen(factura.snapshot.liquidacion)).toBe(true);
+    expect(Object.isFrozen(factura.snapshot.liquidacion.resultado)).toBe(true);
+  });
+
+  it('snapshotea consumosHistoricos (array de ConsumoHistorico) y los congela', () => {
+    const consumosHistoricos: ConsumoHistorico[] = [
+      { id_periodo: '202601', consumo_m3: 18, total_facturado: 38000 },
+      { id_periodo: '202602', consumo_m3: 21, total_facturado: 42500 },
+      { id_periodo: '202603', consumo_m3: 19, total_facturado: 39250 },
+    ];
+    const factura = emitirFactura({ ...inputBase(), consumosHistoricos });
+    expect(factura.snapshot.consumosHistoricos).toEqual(consumosHistoricos);
+    expect(Object.isFrozen(factura.snapshot.consumosHistoricos)).toBe(true);
+    expect(Object.isFrozen(factura.snapshot.consumosHistoricos[0])).toBe(true);
   });
 });
