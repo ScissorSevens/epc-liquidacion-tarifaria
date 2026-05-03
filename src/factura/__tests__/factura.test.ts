@@ -243,4 +243,14 @@ describe('emitirFactura — happy path', () => {
       (factura as { estado: string }).estado = 'EMITIDA';
     }).toThrow(TypeError);
   });
+
+  it('snapshotea observaciones cuando se proveen', () => {
+    const factura = emitirFactura({ ...inputBase(), observaciones: 'Lectura tomada con cliente presente' });
+    expect(factura.snapshot.observaciones).toBe('Lectura tomada con cliente presente');
+  });
+
+  it('omite observaciones del snapshot cuando no se proveen', () => {
+    const factura = emitirFactura(inputBase());
+    expect(factura.snapshot.observaciones).toBeUndefined();
+  });
 });
