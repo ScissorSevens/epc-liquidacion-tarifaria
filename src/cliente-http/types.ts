@@ -29,4 +29,5 @@ export const RUTAS_POR_TIPO: Record<TipoItem, string> = {
   LECTURA: '/api/lecturas',
   EVIDENCIA: '/api/evidencias',
   EVENTO_AUDITORIA: '/api/auditoria',
+  FACTURA: '/api/facturas',
 };
