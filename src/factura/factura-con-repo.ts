@@ -32,6 +32,15 @@ export async function emitirFacturaConRepo(
   repo: FacturaRepository,
 ): Promise<Factura> {
   const facturaPura = emitirFactura(input);
+
+  // Validacion de unicidad: numero_factura por periodo.
+  // Usamos buscarPorPeriodo + some en lugar de un metodo dedicado del port
+  // (existePorNumeroEnPeriodo NO existe en el contrato real).
+  const enPeriodo = await repo.buscarPorPeriodo(input.periodo.id_periodo);
+  if (enPeriodo.some((f) => f.numero_factura === facturaPura.numero_factura)) {
+    throw new Error(MENSAJES_ERROR_FACTURA.NUMERO_FACTURA_DUPLICADO_EN_PERIODO);
+  }
+
   const facturaConId: Factura = Object.freeze({
     ...facturaPura,
     id: randomUUID(),
