@@ -5,8 +5,8 @@
  * Inputs construidos inline por test desde una base mínima válida.
  */
 
-import { emitirFactura } from '../factura';
-import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput } from '../types';
+import { emitirFactura, anularFactura } from '../factura';
+import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput, type Factura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
 import type { Suscriptor } from '../../suscriptores/types';
@@ -104,6 +104,21 @@ function inputBase(): EmitirFacturaInput {
     fechaEmision: '2026-02-01',
     consecutivo: 1,
   };
+}
+
+/**
+ * Construye una Factura en estado EMITIDA a partir del happy path.
+ * `emitirFactura` siempre retorna BORRADOR, y la transición a EMITIDA
+ * vive en `repo.actualizar` (Phase 6). Para los tests puros de Phase 4
+ * armamos manualmente el equivalente a "ya emitida" — sin tocar el repo.
+ */
+function facturaEmitidaBase(overrides: Partial<Factura> = {}): Factura {
+  const borrador = emitirFactura(inputBase());
+  return Object.freeze({
+    ...borrador,
+    estado: 'EMITIDA' as const,
+    ...overrides,
+  });
 }
 
 describe('emitirFactura — happy path', () => {
@@ -332,5 +347,18 @@ describe('emitirFactura — validaciones de invariantes', () => {
     expect(() => emitirFactura({ ...inputBase(), consumosHistoricos })).toThrow(
       MENSAJES_ERROR_FACTURA.CONSUMO_HISTORICO_INVALIDO,
     );
+  });
+});
+
+
+describe('anularFactura — funcion pura', () => {
+  it('desde EMITIDA devuelve nueva Factura con estado ANULADA, motivo y fecha_anulacion', () => {
+    const original = facturaEmitidaBase();
+    const anulada = anularFactura(original, 'Lectura mal tomada en campo', '2026-02-10');
+    expect(anulada.estado).toBe('ANULADA');
+    expect(anulada.motivo_anulacion).toBe('Lectura mal tomada en campo');
+    expect(anulada.fecha_anulacion).toBe('2026-02-10');
+    expect(anulada.id).toBe(original.id);
+    expect(anulada.numero_factura).toBe(original.numero_factura);
   });
 });
