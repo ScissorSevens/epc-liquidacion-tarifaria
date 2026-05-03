@@ -314,4 +314,12 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.OPERARIO_NO_ACTIVO,
     );
   });
+
+  it('rechaza si operario no tiene dispositivo_id (OPERARIO_SIN_DISPOSITIVO)', () => {
+    const { dispositivo_id: _omit, ...rest } = operarioBase();
+    const operario = rest as Operario;
+    expect(() => emitirFactura({ ...inputBase(), operario })).toThrow(
+      MENSAJES_ERROR_FACTURA.OPERARIO_SIN_DISPOSITIVO,
+    );
+  });
 });
