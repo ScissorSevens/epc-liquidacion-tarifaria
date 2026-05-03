@@ -12,14 +12,14 @@
 import type { ConsecutivoFacturaProvider } from '../types';
 
 export function crearConsecutivoFacturaProviderInMemory(): ConsecutivoFacturaProvider {
-  // counters: declarado pero no usado aun — los cycles 7.1-7.3 lo poblaran.
-  // Anotacion `_unused` para evitar warning de variable sin uso.
-  const _counters = new Map<string, number>();
-  void _counters;
+  const counters = new Map<string, number>();
 
   return {
-    async proximo(_dispositivoId: string): Promise<number> {
-      throw new Error('not implemented');
+    async proximo(dispositivoId: string): Promise<number> {
+      const actual = counters.get(dispositivoId) ?? 0;
+      const siguiente = actual + 1;
+      counters.set(dispositivoId, siguiente);
+      return siguiente;
     },
   };
 }
