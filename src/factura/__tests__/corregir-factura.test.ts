@@ -1,0 +1,141 @@
+/**
+ * Tests del orquestador puro `corregirFactura`.
+ *
+ * `corregirFactura` es una función pura (design D2): no invoca
+ * `emitirFactura` ni `anularFactura` internamente, no toca repos, no
+ * importa el módulo `calculo`. Recibe la facturaOriginal + el par
+ * { liquidacionAnulada, liquidacionNueva } ya producido por el caller
+ * (típicamente vía `calculo.anularYReemplazar`) y arma:
+ *   - facturaAnulada: clon de facturaOriginal con estado ANULADA + motivo + fecha
+ *   - nuevoBorrador: clon del snapshot de facturaOriginal reemplazando solo
+ *     liquidacion = liquidacionNueva, numero_factura = consecutivoNuevo,
+ *     fecha_emision = fechaEmision, estado = 'BORRADOR'
+ *
+ * NO re-emite (no reconstruye aggregates fakeados) — reusa el snapshot
+ * ya validado de la factura original.
+ */
+
+import { corregirFactura, emitirFactura } from '../factura';
+import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type Factura } from '../types';
+import { calcularHash } from '../../calculo/calculo';
+import type { Liquidacion } from '../../calculo/types';
+import type { Suscriptor } from '../../suscriptores/types';
+import type { Medidor } from '../../medidores/types';
+import type { Periodo } from '../../periodos/types';
+import type { Operario } from '../../operarios/types';
+import type { ResultadoCalculo } from '../../motor-tarifario';
+
+function suscriptorBase(): Suscriptor {
+  return {
+    id_suscriptor: 1,
+    codigo: '00001',
+    nombre_apellidos: 'María López',
+    direccion: 'Calle 5 #2-10',
+    estrato: 2,
+    estado: 'activo',
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function medidorBase(): Medidor {
+  return {
+    id_medidor: 10,
+    numero_medidor: 'MED-0001',
+    id_suscriptor: 1,
+    fecha_instalacion: '2024-01-15',
+    estado: 'activo',
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function periodoBase(): Periodo {
+  return {
+    id_periodo: '202601',
+    nombre: 'Enero 2026',
+    fecha_inicio: '2026-01-01',
+    fecha_fin: '2026-01-31',
+    fecha_pago_sin_recargo: '2026-02-15',
+    fecha_pago_con_recargo: '2026-02-28',
+    dias_consumo: 31,
+    estado: 'cerrado',
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function operarioBase(): Operario {
+  return {
+    id_operario: 7,
+    numero_cedula: '1234567890',
+    nombre: 'Ana Gómez',
+    email: 'ana@epc.co',
+    password_hash: 'argon2id$v=19$m=...',
+    rol: 'operario',
+    estado: 'activo',
+    dispositivo_id: 'MZ-001',
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function resultadoBase(): ResultadoCalculo {
+  return {
+    consumo: 12,
+    consumoBasico: 12,
+    consumoExcedente: 0,
+    cargoFijo: 5000,
+    cargoConsumo: 18000,
+    cargoExcedente: 0,
+    subsidio: 4600,
+    contribucion: 0,
+    total: 18400,
+  };
+}
+
+/** Liquidacion con id explícito y resultado configurable. */
+function liquidacionConId(id: string, resultado: ResultadoCalculo = resultadoBase()): Liquidacion {
+  const base = {
+    id,
+    suscriptorId: '1',
+    fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
+    resultado,
+    estado: 'ACTIVA' as const,
+  };
+  return { ...base, hash: calcularHash(base) };
+}
+
+function inputBaseConLiquidacion(liquidacion: Liquidacion): EmitirFacturaInput {
+  return {
+    suscriptor: suscriptorBase(),
+    medidor: medidorBase(),
+    periodo: periodoBase(),
+    operario: operarioBase(),
+    liquidacion,
+    consumosHistoricos: [],
+    fechaEmision: '2026-02-01',
+    consecutivo: 1,
+  };
+}
+
+/** Factura "ya emitida" (BORRADOR forzado a EMITIDA, mismo patrón que factura.test.ts). */
+function facturaOriginalConLiquidacion(liquidacion: Liquidacion): Factura {
+  const borrador = emitirFactura(inputBaseConLiquidacion(liquidacion));
+  return Object.freeze({ ...borrador, estado: 'EMITIDA' as const });
+}
+
+describe('corregirFactura — orquestador puro', () => {
+  it('retorna objeto con llaves facturaAnulada y nuevoBorrador', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const resultado = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 2,
+      fechaEmision: '2026-02-15',
+    });
+
+    expect(resultado).toHaveProperty('facturaAnulada');
+    expect(resultado).toHaveProperty('nuevoBorrador');
+  });
+});
