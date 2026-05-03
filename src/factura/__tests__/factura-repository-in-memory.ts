@@ -13,12 +13,15 @@
 import type { Factura, FacturaRepository } from '../types';
 
 export function crearFacturaRepositoryInMemory(): FacturaRepository {
+  const store = new Map<string, Factura>();
+
   return {
-    async crear(_factura: Factura): Promise<Factura> {
-      throw new Error('not implemented');
+    async crear(factura: Factura): Promise<Factura> {
+      store.set(factura.id, factura);
+      return factura;
     },
-    async buscarPorId(_id: string): Promise<Factura | null> {
-      throw new Error('not implemented');
+    async buscarPorId(id: string): Promise<Factura | null> {
+      return store.get(id) ?? null;
     },
     async buscarPorPeriodo(_idPeriodo: string): Promise<readonly Factura[]> {
       throw new Error('not implemented');
