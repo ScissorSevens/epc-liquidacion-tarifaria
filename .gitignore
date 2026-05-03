@@ -2,3 +2,7 @@ node_modules/
 dist/
 coverage/
 *.js.map
+
+# SDD artifacts (local-only, no van a GitHub)
+.atl/
+openspec/
