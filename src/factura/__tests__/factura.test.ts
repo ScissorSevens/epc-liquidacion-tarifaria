@@ -110,4 +110,11 @@ describe('emitirFactura — happy path', () => {
     const factura = emitirFactura(inputBase());
     expect(factura.estado).toBe('BORRADOR');
   });
+
+  it('formatea numero_factura como {dispositivo_id}-{consecutivo} con padding', () => {
+    const input = inputBase();
+    const operario = { ...operarioBase(), dispositivo_id: 'MZ-001' };
+    const factura = emitirFactura({ ...input, operario, consecutivo: 2981 });
+    expect(factura.numero_factura).toBe('MZ-001-2981');
+  });
 });
