@@ -33,6 +33,14 @@ export async function emitirFacturaConRepo(
 ): Promise<Factura> {
   const facturaPura = emitirFactura(input);
 
+  // Validacion de unicidad: liquidacion no puede estar facturada dos veces.
+  // Usamos repo.listar + some en lugar de un metodo dedicado del port
+  // (existePorLiquidacion NO existe en el contrato real).
+  const todas = await repo.listar();
+  if (todas.some((f) => f.snapshot.liquidacion.id === input.liquidacion.id)) {
+    throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_YA_FACTURADA);
+  }
+
   // Validacion de unicidad: numero_factura por periodo.
   // Usamos buscarPorPeriodo + some en lugar de un metodo dedicado del port
   // (existePorNumeroEnPeriodo NO existe en el contrato real).
