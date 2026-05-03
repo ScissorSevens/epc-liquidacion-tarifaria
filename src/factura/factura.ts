@@ -43,6 +43,14 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   const medidorSnapshot = deepFreeze({
     numero_medidor: input.medidor.numero_medidor,
   });
+  const periodoSnapshot = deepFreeze({
+    id_periodo: input.periodo.id_periodo,
+    fecha_inicio: input.periodo.fecha_inicio,
+    fecha_fin: input.periodo.fecha_fin,
+    fecha_pago_sin_recargo: input.periodo.fecha_pago_sin_recargo,
+    fecha_pago_con_recargo: input.periodo.fecha_pago_con_recargo,
+    dias_consumo: input.periodo.dias_consumo ?? 0,
+  });
   return {
     id: '',
     numero_factura,
@@ -51,14 +59,7 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     snapshot: {
       suscriptor: suscriptorSnapshot,
       medidor: medidorSnapshot,
-      periodo: {
-        id_periodo: '',
-        fecha_inicio: '',
-        fecha_fin: '',
-        fecha_pago_sin_recargo: '',
-        fecha_pago_con_recargo: '',
-        dias_consumo: 0,
-      },
+      periodo: periodoSnapshot,
       operario: { id_operario: 0, nombre: '', dispositivo_id: '' },
       liquidacion: {
         id: '',
