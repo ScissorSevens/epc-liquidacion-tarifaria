@@ -151,6 +151,29 @@ describe('emitirFacturaConRepo — unicidad de liquidacion', () => {
   });
 });
 
+describe('anularFacturaConRepo — happy path', () => {
+  it('recupera factura, llama anularFactura puro y persiste cambios via repo.actualizar', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const factura = await emitirFacturaConRepo(inputBase(), repo);
+    // Transicion a EMITIDA via repo.actualizar (anularFactura puro solo
+    // permite anular desde EMITIDA, no desde BORRADOR).
+    await repo.actualizar(factura.id, { estado: 'EMITIDA' });
+
+    const anulada = await anularFacturaConRepo(
+      factura.id,
+      'liquidacion corregida tras revision',
+      repo,
+    );
+
+    expect(anulada.estado).toBe('ANULADA');
+    expect(anulada.motivo_anulacion).toBe('liquidacion corregida tras revision');
+    expect(anulada.id).toBe(factura.id);
+    expect(anulada.numero_factura).toBe(factura.numero_factura);
+
+    const recuperada = await repo.buscarPorId(factura.id);
+    expect(recuperada).toEqual(anulada);
+  });
+});
+
 // Marca usados para tsc — evitan unused warnings hasta que cycles posteriores los usen.
-void anularFacturaConRepo;
 void corregirFacturaConRepo;
