@@ -279,4 +279,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.SUSCRIPTOR_NO_ACTIVO,
     );
   });
+
+  it('rechaza si medidor.id_suscriptor !== suscriptor.id_suscriptor (MEDIDOR_NO_PERTENECE_A_SUSCRIPTOR)', () => {
+    const medidor: Medidor = { ...medidorBase(), id_suscriptor: 999 };
+    expect(() => emitirFactura({ ...inputBase(), medidor })).toThrow(
+      MENSAJES_ERROR_FACTURA.MEDIDOR_NO_PERTENECE_A_SUSCRIPTOR,
+    );
+  });
 });
