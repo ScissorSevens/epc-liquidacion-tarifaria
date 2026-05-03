@@ -35,8 +35,11 @@ function formatearNumeroFactura(dispositivoId: string, consecutivo: number): str
 /**
  * Hash SHA-256 reproducible sobre snapshot canónico + numero_factura + fecha_emision.
  * Serialización determinística — orden de claves explícito (D1).
+ *
+ * Exportado para que callers verifiquen integridad post-corrección
+ * (ej: `verificarIntegridad(factura)` o tests de coherencia).
  */
-function calcularHashFactura(
+export function calcularHashFactura(
   snapshot: FacturaSnapshot,
   numeroFactura: string,
   fechaEmision: string,
