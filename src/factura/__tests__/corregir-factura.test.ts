@@ -216,4 +216,21 @@ describe('corregirFactura — orquestador puro', () => {
     expect(nuevoBorrador.numero_factura).toContain('42');
     expect(nuevoBorrador.numero_factura).not.toBe(numeroOriginal);
   });
+
+  it('lanza CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE cuando liquidacionAnulada.id no es la de facturaOriginal', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqOtra = liquidacionConId('cccccccc-cccc-cccc-cccc-cccccccccccc'); // mismatch
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    expect(() =>
+      corregirFactura({
+        facturaOriginal,
+        liquidacionAnulada: { ...liqOtra, estado: 'ANULADA' },
+        liquidacionNueva: liqNueva,
+        consecutivoNuevo: 2,
+        fechaEmision: '2026-02-15',
+      }),
+    ).toThrow(MENSAJES_ERROR_FACTURA.CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE);
+  });
 });
