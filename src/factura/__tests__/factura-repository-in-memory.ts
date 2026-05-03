@@ -28,8 +28,13 @@ export function crearFacturaRepositoryInMemory(): FacturaRepository {
         (f) => f.snapshot.periodo.id_periodo === idPeriodo,
       );
     },
-    async buscarPorSuscriptor(_idSuscriptor: number): Promise<readonly Factura[]> {
-      throw new Error('not implemented');
+    async buscarPorSuscriptor(idSuscriptor: number): Promise<readonly Factura[]> {
+      // Discrepancia puerto vs snapshot: puerto pide id_suscriptor:number,
+      // snapshot guarda codigo:string. Match por codigo serializado —
+      // contrato del helper, productivo (SQLite Iter 7) podra usar id real.
+      return Array.from(store.values()).filter(
+        (f) => f.snapshot.suscriptor.codigo === String(idSuscriptor),
+      );
     },
     async actualizar(_id, _cambios): Promise<Factura> {
       throw new Error('not implemented');
