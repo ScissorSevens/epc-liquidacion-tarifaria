@@ -63,6 +63,9 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   if (input.liquidacion.estado !== 'ACTIVA') {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA);
   }
+  if (input.suscriptor.estado !== 'activo') {
+    throw new Error(MENSAJES_ERROR_FACTURA.SUSCRIPTOR_NO_ACTIVO);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
