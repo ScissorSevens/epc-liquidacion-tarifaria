@@ -272,4 +272,11 @@ describe('emitirFactura — validaciones de invariantes', () => {
       MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA,
     );
   });
+
+  it('rechaza si suscriptor.estado !== activo (SUSCRIPTOR_NO_ACTIVO)', () => {
+    const suscriptor: Suscriptor = { ...suscriptorBase(), estado: 'suspendido' };
+    expect(() => emitirFactura({ ...inputBase(), suscriptor })).toThrow(
+      MENSAJES_ERROR_FACTURA.SUSCRIPTOR_NO_ACTIVO,
+    );
+  });
 });
