@@ -159,4 +159,22 @@ describe('corregirFactura — orquestador puro', () => {
     // ambos deben ser objetos distintos (no el mismo facturaOriginal devuelto dos veces)
     expect(facturaAnulada).not.toBe(nuevoBorrador);
   });
+
+  it('facturaAnulada conserva el numero_factura original (no usa el consecutivoNuevo)', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+    const numeroOriginal = facturaOriginal.numero_factura; // 'MZ-001-1'
+
+    const { facturaAnulada } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 99,
+      fechaEmision: '2026-02-15',
+    });
+
+    expect(facturaAnulada.numero_factura).toBe(numeroOriginal);
+    expect(facturaAnulada.estado).toBe('ANULADA');
+  });
 });
