@@ -175,5 +175,45 @@ describe('anularFacturaConRepo — happy path', () => {
   });
 });
 
-// Marca usados para tsc — evitan unused warnings hasta que cycles posteriores los usen.
-void corregirFacturaConRepo;
+describe('corregirFacturaConRepo — happy path', () => {
+  it('valida facturaOriginal en repo, corrige puro, persiste UPDATE+CREATE y retorna pareja', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    // Setup: persistir factura original (con liquidacion AAA), transicionar a EMITIDA.
+    const original = await emitirFacturaConRepo(inputBase(), repo);
+    await repo.actualizar(original.id, { estado: 'EMITIDA' });
+    const originalEmitida = (await repo.buscarPorId(original.id))!;
+
+    // Liquidaciones: anulada (mismo id que la original) y nueva (id distinto).
+    const liquidacionAnulada = liquidacionConId(originalEmitida.snapshot.liquidacion.id);
+    const liquidacionNueva = liquidacionConId('cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+    const { facturaAnulada, nuevoBorrador } = await corregirFacturaConRepo(
+      {
+        facturaOriginal: originalEmitida,
+        liquidacionAnulada,
+        liquidacionNueva,
+        consecutivoNuevo: 2,
+        fechaEmision: '2026-02-15',
+      },
+      repo,
+    );
+
+    // Aserciones del puro propagadas + persistencia.
+    expect(facturaAnulada.estado).toBe('ANULADA');
+    expect(facturaAnulada.id).toBe(originalEmitida.id);
+
+    expect(nuevoBorrador.estado).toBe('BORRADOR');
+    expect(nuevoBorrador.id).not.toBe('');
+    expect(nuevoBorrador.id).not.toBe(originalEmitida.id);
+    expect(nuevoBorrador.numero_factura).toBe('MZ-001-2');
+    expect(nuevoBorrador.snapshot.liquidacion.id).toBe(liquidacionNueva.id);
+    expect(nuevoBorrador.reemplaza_a).toBe(originalEmitida.id);
+
+    // Persistencia: original ahora ANULADA en repo, nuevoBorrador recuperable.
+    const recuperadaAnulada = await repo.buscarPorId(originalEmitida.id);
+    expect(recuperadaAnulada?.estado).toBe('ANULADA');
+
+    const recuperadoBorrador = await repo.buscarPorId(nuevoBorrador.id);
+    expect(recuperadoBorrador).toEqual(nuevoBorrador);
+  });
+});
