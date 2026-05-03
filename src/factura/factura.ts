@@ -84,6 +84,9 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
   if (!input.operario.dispositivo_id) {
     throw new Error(MENSAJES_ERROR_FACTURA.OPERARIO_SIN_DISPOSITIVO);
   }
+  if (input.consumosHistoricos.length > 6) {
+    throw new Error(MENSAJES_ERROR_FACTURA.CONSUMO_HISTORICO_INVALIDO);
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
