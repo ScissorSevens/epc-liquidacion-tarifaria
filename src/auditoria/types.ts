@@ -39,6 +39,19 @@ export interface PayloadIntegridadViolada {
   hashRecibido: string;
 }
 
+export interface PayloadFacturaEmitida {
+  facturaId: string;
+  numeroFactura: string;
+  suscriptorId: number;
+  total: number;
+}
+
+export interface PayloadFacturaAnulada {
+  facturaAnuladaId: string;
+  facturaNuevaId?: string;
+  motivo: string;
+}
+
 // Base común a todos los eventos — campos de infraestructura
 interface EventoBase {
   readonly id: string;
@@ -54,7 +67,9 @@ export type EventoAuditoria =
   | (EventoBase & { readonly tipo: 'LIQUIDACION_ANULADA'; readonly payload: PayloadLiquidacionAnulada })
   | (EventoBase & { readonly tipo: 'LECTURA_CAPTURADA'; readonly payload: PayloadLecturaCapturada })
   | (EventoBase & { readonly tipo: 'EVIDENCIA_REGISTRADA'; readonly payload: PayloadEvidenciaRegistrada })
-  | (EventoBase & { readonly tipo: 'INTEGRIDAD_VIOLADA'; readonly payload: PayloadIntegridadViolada });
+  | (EventoBase & { readonly tipo: 'INTEGRIDAD_VIOLADA'; readonly payload: PayloadIntegridadViolada })
+  | (EventoBase & { readonly tipo: 'FACTURA_EMITIDA'; readonly payload: PayloadFacturaEmitida })
+  | (EventoBase & { readonly tipo: 'FACTURA_ANULADA'; readonly payload: PayloadFacturaAnulada });
 
 export type TipoEvento = EventoAuditoria['tipo'];
 
@@ -64,7 +79,9 @@ export type PayloadEvento =
   | PayloadLiquidacionAnulada
   | PayloadLecturaCapturada
   | PayloadEvidenciaRegistrada
-  | PayloadIntegridadViolada;
+  | PayloadIntegridadViolada
+  | PayloadFacturaEmitida
+  | PayloadFacturaAnulada;
 
 // Input genérico interno (lo usan los constructores específicos)
 export interface RegistrarEventoInput {

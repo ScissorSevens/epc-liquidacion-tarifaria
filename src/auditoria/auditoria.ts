@@ -13,6 +13,8 @@ import type {
   PayloadLecturaCapturada,
   PayloadEvidenciaRegistrada,
   PayloadIntegridadViolada,
+  PayloadFacturaEmitida,
+  PayloadFacturaAnulada,
 } from './types';
 
 /**
@@ -119,6 +121,22 @@ export function registrarIntegridadViolada(
 ): EventoAuditoria & { tipo: 'INTEGRIDAD_VIOLADA' } {
   return registrarEvento({ ...input, tipo: 'INTEGRIDAD_VIOLADA' }) as EventoAuditoria & {
     tipo: 'INTEGRIDAD_VIOLADA';
+  };
+}
+
+export function registrarFacturaEmitida(
+  input: RegistrarTipadoInput<PayloadFacturaEmitida>
+): EventoAuditoria & { tipo: 'FACTURA_EMITIDA' } {
+  return registrarEvento({ ...input, tipo: 'FACTURA_EMITIDA' }) as EventoAuditoria & {
+    tipo: 'FACTURA_EMITIDA';
+  };
+}
+
+export function registrarFacturaAnulada(
+  input: RegistrarTipadoInput<PayloadFacturaAnulada>
+): EventoAuditoria & { tipo: 'FACTURA_ANULADA' } {
+  return registrarEvento({ ...input, tipo: 'FACTURA_ANULADA' }) as EventoAuditoria & {
+    tipo: 'FACTURA_ANULADA';
   };
 }
 
