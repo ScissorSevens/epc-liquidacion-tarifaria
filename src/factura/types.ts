@@ -156,4 +156,6 @@ export const MENSAJES_ERROR_FACTURA = {
     'consumos_historicos no puede tener más de 6 elementos',
   FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL:
     'factura solo puede anularse desde estado EMITIDA',
+  CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE:
+    'liquidacionAnulada.id no coincide con la liquidacion de la facturaOriginal',
 } as const;

@@ -201,6 +201,9 @@ export function corregirFactura(input: {
   fechaEmision: string;
   observaciones?: string;
 }): { facturaAnulada: Factura; nuevoBorrador: Factura } {
+  if (input.liquidacionAnulada.id !== input.facturaOriginal.snapshot.liquidacion.id) {
+    throw new Error(MENSAJES_ERROR_FACTURA.CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE);
+  }
   const facturaAnulada = deepFreeze({
     ...input.facturaOriginal,
     estado: 'ANULADA' as const,
