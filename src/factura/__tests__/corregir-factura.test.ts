@@ -198,4 +198,22 @@ describe('corregirFactura — orquestador puro', () => {
     expect(nuevoBorrador.snapshot.suscriptor).toEqual(facturaOriginal.snapshot.suscriptor);
     expect(nuevoBorrador.snapshot.periodo).toEqual(facturaOriginal.snapshot.periodo);
   });
+
+  it('nuevoBorrador.numero_factura refleja el consecutivoNuevo (no copia el original)', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+    const numeroOriginal = facturaOriginal.numero_factura;
+
+    const { nuevoBorrador } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 42,
+      fechaEmision: '2026-02-15',
+    });
+
+    expect(nuevoBorrador.numero_factura).toContain('42');
+    expect(nuevoBorrador.numero_factura).not.toBe(numeroOriginal);
+  });
 });
