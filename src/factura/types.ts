@@ -82,6 +82,7 @@ export interface Factura {
   readonly snapshot: FacturaSnapshot;
   readonly hash: string; // SHA-256 sobre snapshot + numero_factura + fecha_emision
   readonly motivo_anulacion?: string;
+  readonly fecha_anulacion?: string; // ISO 8601 (YYYY-MM-DD), set por anularFactura
   readonly reemplaza_a?: string; // id de factura anulada que esta reemplaza
   readonly created_at: string;
 }
@@ -153,4 +154,6 @@ export const MENSAJES_ERROR_FACTURA = {
     'ya existe una Factura EMITIDA para esta Liquidacion (1:1)',
   CONSUMO_HISTORICO_INVALIDO:
     'consumos_historicos no puede tener más de 6 elementos',
+  FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL:
+    'factura solo puede anularse desde estado EMITIDA',
 } as const;

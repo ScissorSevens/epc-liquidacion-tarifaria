@@ -145,3 +145,26 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     created_at: '',
   });
 }
+
+/**
+ * Anula una Factura EMITIDA. Función pura — devuelve copia congelada con
+ * estado ANULADA, motivo y fecha de anulación. Mismo id y numero_factura.
+ *
+ * El tercer arg `fechaAnulacion` es ISO 8601 (YYYY-MM-DD).
+ * Validar transición: solo desde EMITIDA (BORRADOR/PAGADA/ANULADA rechazan).
+ */
+export function anularFactura(
+  factura: Factura,
+  motivo: string,
+  fechaAnulacion: string,
+): Factura {
+  if (factura.estado !== 'EMITIDA') {
+    throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL);
+  }
+  return deepFreeze({
+    ...factura,
+    estado: 'ANULADA',
+    motivo_anulacion: motivo,
+    fecha_anulacion: fechaAnulacion,
+  });
+}
