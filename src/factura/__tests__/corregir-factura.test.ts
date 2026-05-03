@@ -138,4 +138,25 @@ describe('corregirFactura — orquestador puro', () => {
     expect(resultado).toHaveProperty('facturaAnulada');
     expect(resultado).toHaveProperty('nuevoBorrador');
   });
+
+  it('retorna facturaAnulada y nuevoBorrador deepFrozen', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const { facturaAnulada, nuevoBorrador } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 2,
+      fechaEmision: '2026-02-15',
+    });
+
+    expect(Object.isFrozen(facturaAnulada)).toBe(true);
+    expect(Object.isFrozen(facturaAnulada.snapshot)).toBe(true);
+    expect(Object.isFrozen(nuevoBorrador)).toBe(true);
+    expect(Object.isFrozen(nuevoBorrador.snapshot)).toBe(true);
+    // ambos deben ser objetos distintos (no el mismo facturaOriginal devuelto dos veces)
+    expect(facturaAnulada).not.toBe(nuevoBorrador);
+  });
 });
