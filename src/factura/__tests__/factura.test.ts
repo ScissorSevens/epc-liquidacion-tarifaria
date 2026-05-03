@@ -6,7 +6,8 @@
  */
 
 import { emitirFactura } from '../factura';
-import type { ConsumoHistorico, EmitirFacturaInput } from '../types';
+import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput } from '../types';
+import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
 import type { Suscriptor } from '../../suscriptores/types';
 import type { Medidor } from '../../medidores/types';
@@ -82,14 +83,14 @@ function resultadoCalculoBase(): ResultadoCalculo {
 }
 
 function liquidacionBase(): Liquidacion {
-  return {
+  const base = {
     id: '11111111-1111-1111-1111-111111111111',
     suscriptorId: '1',
     fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
     resultado: resultadoCalculoBase(),
-    estado: 'ACTIVA',
-    hash: 'hash-fake-no-validado-en-phase-2',
+    estado: 'ACTIVA' as const,
   };
+  return { ...base, hash: calcularHash(base) };
 }
 
 function inputBase(): EmitirFacturaInput {
