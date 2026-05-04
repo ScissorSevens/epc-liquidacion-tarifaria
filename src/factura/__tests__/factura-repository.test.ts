@@ -264,3 +264,30 @@ describe('FacturaRepositoryInMemory — actualizar persiste fecha_anulacion (W1)
     expect(recuperada?.estado).toBe('ANULADA');
   });
 });
+
+describe('FacturaRepositoryInMemory — actualizar valida transiciones legales (4.4)', () => {
+  it('lanza TRANSICION_ILEGAL al intentar ANULADA → EMITIDA con cause estructurada', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const anulada = {
+      ...emitirFactura(inputBase()),
+      id: 'uuid-anulada',
+      estado: 'ANULADA' as const,
+    };
+    await repo.crear(anulada);
+
+    let capturado: Error | null = null;
+    try {
+      await repo.actualizar('uuid-anulada', { estado: 'EMITIDA' });
+    } catch (e) {
+      capturado = e as Error;
+    }
+
+    expect(capturado).not.toBeNull();
+    expect(capturado!.message).toBe(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL);
+    expect((capturado as Error & { cause?: unknown }).cause).toEqual({
+      codigo: 'TRANSICION_ILEGAL',
+      actual: 'ANULADA',
+      intentada: 'EMITIDA',
+    });
+  });
+});
