@@ -18,4 +18,33 @@ describe('migration 001_factura — schema básico', () => {
       db.close();
     }
   });
+
+  it('declara las columnas básicas (id, numero_factura, estado, fecha_emision, snapshot, hash, liquidacion_id, id_periodo, id_suscriptor, created_at)', () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+
+      const cols = db.prepare("PRAGMA table_info('factura')").all() as Array<{
+        name: string;
+      }>;
+      const nombres = cols.map((c) => c.name).sort();
+
+      expect(nombres).toEqual(
+        [
+          'created_at',
+          'estado',
+          'fecha_emision',
+          'hash',
+          'id',
+          'id_periodo',
+          'id_suscriptor',
+          'liquidacion_id',
+          'numero_factura',
+          'snapshot',
+        ].sort(),
+      );
+    } finally {
+      db.close();
+    }
+  });
 });
