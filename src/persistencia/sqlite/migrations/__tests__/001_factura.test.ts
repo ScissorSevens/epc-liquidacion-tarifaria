@@ -109,4 +109,25 @@ describe('migration 001_factura — schema básico', () => {
       db.close();
     }
   });
+
+  it('declara id como PRIMARY KEY (rechaza inserts con id duplicado)', () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+
+      const insertar = db.prepare(
+        `INSERT INTO factura (id, numero_factura, estado, fecha_emision, snapshot, hash, liquidacion_id, id_periodo, id_suscriptor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+
+      insertar.run('id-PK', 'F-1', 'EMITIDA', '2026-01-15', '{}', 'h1', 'liq-A', '202601', 1, '2026-01-15');
+
+      // Mismo id pero distinta liquidacion → debe fallar por PRIMARY KEY.
+      expect(() =>
+        insertar.run('id-PK', 'F-2', 'EMITIDA', '2026-01-15', '{}', 'h2', 'liq-B', '202601', 1, '2026-01-15'),
+      ).toThrow(/PRIMARY KEY|UNIQUE/i);
+    } finally {
+      db.close();
+    }
+  });
 });
