@@ -45,13 +45,16 @@ export function crearFacturaRepositoryInMemory(): FacturaRepository {
       // Validar transiciones SOLO si el estado efectivamente cambia.
       if (cambios.estado !== existente.estado) {
         if (!esTransicionLegal(existente.estado, cambios.estado)) {
-          throw new Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL, {
-            cause: {
-              codigo: 'TRANSICION_ILEGAL',
-              actual: existente.estado,
-              intentada: cambios.estado,
-            },
-          });
+          // Asignamos `cause` post-construccion: `new Error(msg, { cause })` requiere
+          // ES2022 lib y este proyecto usa ES2020. El field es nativo en runtime
+          // (Node >=16.9), solo el tipo no esta disponible en lib ES2020.
+          const err = new Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL);
+          (err as Error & { cause: unknown }).cause = {
+            codigo: 'TRANSICION_ILEGAL',
+            actual: existente.estado,
+            intentada: cambios.estado,
+          };
+          throw err;
         }
       }
       const actualizada = Object.freeze({ ...existente, ...cambios }) as Factura;
