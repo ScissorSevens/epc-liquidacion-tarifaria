@@ -141,11 +141,25 @@ describe('FacturaRepositoryInMemory — buscarPorPeriodo', () => {
     };
     const f2 = {
       ...emitirFactura(
-        inputBase({ periodo: periodoFebrero, consecutivo: 2, fechaEmision: '2026-03-01' }),
+        inputBase({
+          periodo: periodoFebrero,
+          consecutivo: 2,
+          fechaEmision: '2026-03-01',
+          // liquidacion distinta — emulamos UNIQUE parcial D7 sobre liquidacion_id.
+          liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+        }),
       ),
       id: 'uuid-2',
     };
-    const f3 = { ...emitirFactura(inputBase({ consecutivo: 3 })), id: 'uuid-3' };
+    const f3 = {
+      ...emitirFactura(
+        inputBase({
+          consecutivo: 3,
+          liquidacion: liquidacionConId('cccccccc-cccc-cccc-cccc-cccccccccccc'),
+        }),
+      ),
+      id: 'uuid-3',
+    };
     await repo.crear(f1);
     await repo.crear(f2);
     await repo.crear(f3);
@@ -177,7 +191,13 @@ describe('FacturaRepositoryInMemory — buscarPorSuscriptor', () => {
     const medidor2: Medidor = { ...medidorBase(), id_suscriptor: 2 };
     const f2 = {
       ...emitirFactura(
-        inputBase({ suscriptor: suscriptor2, medidor: medidor2, consecutivo: 2 }),
+        inputBase({
+          suscriptor: suscriptor2,
+          medidor: medidor2,
+          consecutivo: 2,
+          // liquidacion distinta — emulamos UNIQUE parcial D7.
+          liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+        }),
       ),
       id: 'uuid-2',
     };
@@ -201,7 +221,13 @@ describe('FacturaRepositoryInMemory — listar', () => {
 
     const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
     const f2 = {
-      ...emitirFactura(inputBase({ consecutivo: 2 })),
+      ...emitirFactura(
+        inputBase({
+          consecutivo: 2,
+          // liquidacion distinta — emulamos UNIQUE parcial D7.
+          liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+        }),
+      ),
       id: 'uuid-2',
     };
     await repo.crear(f1);
