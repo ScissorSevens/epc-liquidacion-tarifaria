@@ -20,3 +20,8 @@ export type {
   ConsecutivoFacturaProvider,
 } from './types';
 export { MENSAJES_ERROR_FACTURA } from './types';
+export { crearBootstrapFacturaSqlite } from './bootstrap';
+export type {
+  BootstrapFacturaSqlite,
+  BootstrapFacturaSqliteOpciones,
+} from './bootstrap';
