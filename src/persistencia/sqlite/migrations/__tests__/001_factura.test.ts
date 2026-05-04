@@ -166,4 +166,38 @@ describe('migration 001_factura — schema básico', () => {
       db.close();
     }
   });
+
+  it('declara NOT NULL en columnas criticas (numero_factura, estado, fecha_emision, snapshot, hash, liquidacion_id, id_periodo, id_suscriptor, created_at)', () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+      const cols = db.prepare("PRAGMA table_info('factura')").all() as Array<{
+        name: string;
+        notnull: number;
+      }>;
+      const byName = new Map(cols.map((c) => [c.name, c.notnull === 1]));
+
+      const criticas = [
+        'numero_factura',
+        'estado',
+        'fecha_emision',
+        'snapshot',
+        'hash',
+        'liquidacion_id',
+        'id_periodo',
+        'id_suscriptor',
+        'created_at',
+      ];
+      criticas.forEach((col) => {
+        expect(byName.get(col)).toBe(true);
+      });
+
+      // Las opcionales deben permitir NULL.
+      ['motivo_anulacion', 'fecha_anulacion', 'reemplaza_a'].forEach((col) => {
+        expect(byName.get(col)).toBe(false);
+      });
+    } finally {
+      db.close();
+    }
+  });
 });
