@@ -6,7 +6,7 @@
 CREATE TABLE factura (
   id              TEXT,
   numero_factura  TEXT,
-  estado          TEXT,
+  estado          TEXT CHECK (estado IN ('BORRADOR','EMITIDA','PAGADA','ANULADA')),
   fecha_emision   TEXT,
   snapshot        TEXT,
   hash            TEXT,
