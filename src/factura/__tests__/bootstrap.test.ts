@@ -91,4 +91,21 @@ describe('crearBootstrapFacturaSqlite', () => {
       segundo.cerrar();
     }
   });
+
+  it('cerrar() libera la conexion: operaciones posteriores fallan', async () => {
+    const dbPath = join(tmpDir, 'factura.db');
+    const bootstrap = crearBootstrapFacturaSqlite({ dbPath });
+
+    // Listar funciona ANTES de cerrar (conexion abierta)
+    await expect(bootstrap.repository.listar()).resolves.toEqual([]);
+
+    bootstrap.cerrar();
+
+    // Listar DESPUES de cerrar debe fallar: better-sqlite3 lanza
+    // "The database connection is not open" al usar statements preparados
+    // sobre una db cerrada.
+    await expect(bootstrap.repository.listar()).rejects.toThrow(
+      /database connection is not open/i,
+    );
+  });
 });
