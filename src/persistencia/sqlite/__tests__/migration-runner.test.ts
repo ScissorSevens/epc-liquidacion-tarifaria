@@ -48,4 +48,36 @@ describe('ejecutarMigrations (runner)', () => {
       db.close();
     }
   });
+
+  it('si una migration falla, hace rollback y user_version queda en valor previo', () => {
+    const db = crearConexion();
+    try {
+      // pre-aplicar v1 OK
+      ejecutarMigrations(db, [
+        { version: 1, nombre: '001_ok', sql: 'CREATE TABLE t1 (a INTEGER)' },
+      ]);
+      expect(db.pragma('user_version', { simple: true })).toBe(1);
+
+      // intentar v2 con SQL inválido
+      const migrationsConFallo: Migration[] = [
+        { version: 2, nombre: '002_invalida', sql: 'CREATE TABLE t2 (a INTEGER); SELECT * FROM tabla_inexistente;' },
+      ];
+
+      expect(() => ejecutarMigrations(db, migrationsConFallo)).toThrow();
+
+      // user_version no debe haber avanzado
+      expect(db.pragma('user_version', { simple: true })).toBe(1);
+
+      // t2 no debe existir (rollback)
+      const t2 = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='t2'")
+        .get();
+      expect(t2).toBeUndefined();
+
+      // DB no debe quedar con transacción abierta
+      expect(db.inTransaction).toBe(false);
+    } finally {
+      db.close();
+    }
+  });
 });
