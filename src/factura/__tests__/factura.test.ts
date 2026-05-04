@@ -5,7 +5,7 @@
  * Inputs construidos inline por test desde una base mínima válida.
  */
 
-import { emitirFactura, anularFactura, esVencida } from '../factura';
+import { emitirFactura, anularFactura, esVencida, esTransicionLegal } from '../factura';
 import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput, type Factura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
@@ -398,5 +398,11 @@ describe('esVencida — funcion pura', () => {
   it('es false cuando estado === PAGADA aunque fecha actual supere recargo', () => {
     const facturaPagada = facturaEmitidaBase({ estado: 'PAGADA' });
     expect(esVencida(facturaPagada, '2026-12-31')).toBe(false);
+  });
+});
+
+describe('esTransicionLegal — transiciones permitidas desde BORRADOR', () => {
+  it('BORRADOR → EMITIDA es legal', () => {
+    expect(esTransicionLegal('BORRADOR', 'EMITIDA')).toBe(true);
   });
 });
