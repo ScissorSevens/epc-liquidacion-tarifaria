@@ -54,4 +54,75 @@ describe('mapearErrorSqlite', () => {
       db.close();
     }
   });
+
+  it('NOT NULL constraint → cause.codigo CAMPO_REQUERIDO', () => {
+    const db = crearConexion();
+    try {
+      db.exec('CREATE TABLE _nn (a INTEGER NOT NULL)');
+
+      let errorNativo: unknown;
+      try {
+        db.prepare('INSERT INTO _nn (a) VALUES (?)').run(null);
+      } catch (e) {
+        errorNativo = e;
+      }
+      expect((errorNativo as { code: string }).code).toBe('SQLITE_CONSTRAINT_NOTNULL');
+
+      const mapeado = mapearErrorSqlite(errorNativo);
+      expect(mapeado.cause.codigo).toBe('CAMPO_REQUERIDO');
+      expect(mapeado.cause.sqliteCode).toBe('SQLITE_CONSTRAINT_NOTNULL');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('otro CONSTRAINT (FK) → cause.codigo RESTRICCION_INTEGRIDAD (catch-all de constraints)', () => {
+    const db = crearConexion();
+    try {
+      db.exec('CREATE TABLE padre (id INTEGER PRIMARY KEY)');
+      db.exec('CREATE TABLE hijo (id INTEGER, padre_id INTEGER REFERENCES padre(id))');
+
+      let errorNativo: unknown;
+      try {
+        db.prepare('INSERT INTO hijo (id, padre_id) VALUES (?, ?)').run(1, 999);
+      } catch (e) {
+        errorNativo = e;
+      }
+      expect((errorNativo as { code: string }).code).toBe('SQLITE_CONSTRAINT_FOREIGNKEY');
+
+      const mapeado = mapearErrorSqlite(errorNativo);
+      expect(mapeado.cause.codigo).toBe('RESTRICCION_INTEGRIDAD');
+      expect(mapeado.cause.sqliteCode).toBe('SQLITE_CONSTRAINT_FOREIGNKEY');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('CHECK constraint que NO es sobre estado/factura → RESTRICCION_INTEGRIDAD (no TRANSICION_ILEGAL)', () => {
+    const db = crearConexion();
+    try {
+      db.exec('CREATE TABLE _c (n INTEGER CHECK (n > 0))');
+
+      let errorNativo: unknown;
+      try {
+        db.prepare('INSERT INTO _c (n) VALUES (?)').run(-1);
+      } catch (e) {
+        errorNativo = e;
+      }
+      expect((errorNativo as { code: string }).code).toBe('SQLITE_CONSTRAINT_CHECK');
+
+      // sin ctx.tabla=factura → debe caer en RESTRICCION_INTEGRIDAD
+      const mapeado = mapearErrorSqlite(errorNativo);
+      expect(mapeado.cause.codigo).toBe('RESTRICCION_INTEGRIDAD');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('error no-SQLite (no tiene .code) → cause.codigo ERROR_PERSISTENCIA con sqliteCode UNKNOWN', () => {
+    const errorRaro = new Error('algo se rompió en otro lado');
+    const mapeado = mapearErrorSqlite(errorRaro);
+    expect(mapeado.cause.codigo).toBe('ERROR_PERSISTENCIA');
+    expect(mapeado.cause.sqliteCode).toBe('UNKNOWN');
+  });
 });
