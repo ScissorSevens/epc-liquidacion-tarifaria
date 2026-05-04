@@ -19,6 +19,7 @@
 
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { esTransicionLegal } from './factura';
+import { mapearErrorSqlite } from '../persistencia/sqlite/errores';
 import {
   MENSAJES_ERROR_FACTURA,
   type EstadoFactura,
@@ -130,6 +131,39 @@ function lanzarTransicionIlegal(actual: EstadoFactura, intentada: EstadoFactura)
   throw err;
 }
 
+/**
+ * Traduce errores SQLite del adapter a errores de dominio.
+ *
+ * El mapper de infra (`mapearErrorSqlite`) habla CODIGOS. El adapter es
+ * quien conoce el catalogo `MENSAJES_ERROR_FACTURA` y construye el Error
+ * con cause estructurada que el orquestador `*ConRepo` puede inspeccionar.
+ *
+ * - `RESTRICCION_UNICIDAD` → mensaje generico de unicidad. La traduccion
+ *   especifica a `LIQUIDACION_YA_FACTURADA` la hace el orquestador
+ *   (cierre hexagonal Pre-Batch 4.7-bis Opcion A).
+ * - `TRANSICION_ILEGAL` (CHECK SQL en factura.estado) → defense-in-depth.
+ *   Si el guard de codigo se escapa, el CHECK SQL rebota y mapeamos al
+ *   mismo mensaje de dominio.
+ */
+function traducirErrorAdapter(err: unknown, ctx: { liquidacion_id?: string }): Error {
+  const mapeado = mapearErrorSqlite(err, { tabla: 'factura' });
+  const codigo = mapeado.cause.codigo;
+  if (codigo === 'RESTRICCION_UNICIDAD') {
+    const e = new Error(MENSAJES_ERROR_FACTURA.RESTRICCION_UNICIDAD);
+    (e as Error & { cause: unknown }).cause = {
+      codigo: 'RESTRICCION_UNICIDAD',
+      ctx: { liquidacion_id: ctx.liquidacion_id },
+    };
+    return e;
+  }
+  if (codigo === 'TRANSICION_ILEGAL') {
+    const e = new Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL);
+    (e as Error & { cause: unknown }).cause = { codigo: 'TRANSICION_ILEGAL' };
+    return e;
+  }
+  return mapeado;
+}
+
 export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositorySqlite {
   const stmtInsert = db.prepare(SQL_INSERT);
   const stmtSelectById = db.prepare(SQL_SELECT_BY_ID);
@@ -140,7 +174,13 @@ export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositor
 
   return {
     async crear(factura: Factura): Promise<Factura> {
-      stmtInsert.run(toRow(factura));
+      try {
+        stmtInsert.run(toRow(factura));
+      } catch (e) {
+        throw traducirErrorAdapter(e, {
+          liquidacion_id: factura.snapshot.liquidacion.id,
+        });
+      }
       const row = stmtSelectById.get(factura.id) as FacturaRow | undefined;
       if (!row) {
         throw new Error('crear: factura no fue persistida (estado inesperado)');
@@ -174,12 +214,18 @@ export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositor
       }
       const motivo = cambios.motivo_anulacion ?? existente.motivo_anulacion ?? null;
       const fecha = cambios.fecha_anulacion ?? existente.fecha_anulacion ?? null;
-      stmtUpdate.run({
-        id,
-        estado: cambios.estado,
-        motivo_anulacion: motivo,
-        fecha_anulacion: fecha,
-      });
+      try {
+        stmtUpdate.run({
+          id,
+          estado: cambios.estado,
+          motivo_anulacion: motivo,
+          fecha_anulacion: fecha,
+        });
+      } catch (e) {
+        throw traducirErrorAdapter(e, {
+          liquidacion_id: existente.snapshot.liquidacion.id,
+        });
+      }
       const row = stmtSelectById.get(id) as FacturaRow | undefined;
       if (!row) {
         throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
