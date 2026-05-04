@@ -30,4 +30,28 @@ describe('mapearErrorSqlite', () => {
       db.close();
     }
   });
+
+  it('UNIQUE constraint → cause.codigo RESTRICCION_UNICIDAD preservando sqliteCode', () => {
+    const db = crearConexion();
+    try {
+      db.exec('CREATE TABLE _u (k TEXT UNIQUE)');
+      db.prepare('INSERT INTO _u (k) VALUES (?)').run('x');
+
+      let errorNativo: unknown;
+      try {
+        db.prepare('INSERT INTO _u (k) VALUES (?)').run('x');
+      } catch (e) {
+        errorNativo = e;
+      }
+
+      expect((errorNativo as { code: string }).code).toBe('SQLITE_CONSTRAINT_UNIQUE');
+
+      const mapeado = mapearErrorSqlite(errorNativo, { tabla: 'factura' });
+      expect(mapeado.cause.codigo).toBe('RESTRICCION_UNICIDAD');
+      expect(mapeado.cause.sqliteCode).toBe('SQLITE_CONSTRAINT_UNIQUE');
+      expect(mapeado.cause.ctx).toEqual({ tabla: 'factura' });
+    } finally {
+      db.close();
+    }
+  });
 });
