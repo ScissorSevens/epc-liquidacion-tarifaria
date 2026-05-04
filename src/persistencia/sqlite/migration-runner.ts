@@ -26,7 +26,10 @@ export interface Migration {
  */
 export function ejecutarMigrations(db: DatabaseType, migrations: readonly Migration[]): void {
   const versionActual = db.pragma('user_version', { simple: true }) as number;
-  const pendientes = migrations.filter((m) => m.version > versionActual);
+  const pendientes = migrations
+    .filter((m) => m.version > versionActual)
+    .slice()
+    .sort((a, b) => a.version - b.version);
   for (const m of pendientes) {
     transaccion(db, () => {
       db.exec(m.sql);
