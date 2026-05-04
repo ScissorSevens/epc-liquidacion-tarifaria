@@ -201,7 +201,8 @@ export function esTransicionLegal(
   actual: EstadoFactura,
   nueva: EstadoFactura,
 ): boolean {
-  return actual === 'BORRADOR' && nueva === 'EMITIDA';
+  if (actual === 'BORRADOR') return nueva === 'EMITIDA' || nueva === 'ANULADA';
+  return false;
 }
 
 /**
