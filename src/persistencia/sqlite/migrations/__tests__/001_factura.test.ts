@@ -1,6 +1,7 @@
 import { crearConexion } from '../../db';
 import { ejecutarMigrations } from '../../migration-runner';
 import { migrations } from '../index';
+import { crearDBTest } from '../../__fixtures__/crear-db-test';
 
 describe('migration 001_factura — schema básico', () => {
   it('crea la tabla factura tras aplicar la migration y deja user_version=1', () => {
@@ -196,6 +197,35 @@ describe('migration 001_factura — schema básico', () => {
       ['motivo_anulacion', 'fecha_anulacion', 'reemplaza_a'].forEach((col) => {
         expect(byName.get(col)).toBe(false);
       });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('es idempotente: re-ejecutar la migration no rompe ni cambia user_version', () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+      expect(db.pragma('user_version', { simple: true })).toBe(1);
+
+      // Segunda corrida debe ser no-op (cubierto por runner.idempotente,
+      // este test garantiza que el SQL real lo respeta y no choca con
+      // "table already exists" / "index already exists").
+      expect(() => ejecutarMigrations(db, migrations)).not.toThrow();
+      expect(db.pragma('user_version', { simple: true })).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('crearDBTest devuelve una DB con la tabla factura ya migrada (sanity check del fixture)', () => {
+    const db = crearDBTest();
+    try {
+      expect(db.pragma('user_version', { simple: true })).toBe(1);
+      const tabla = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='factura'")
+        .get();
+      expect(tabla).toBeDefined();
     } finally {
       db.close();
     }
