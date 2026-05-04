@@ -18,3 +18,10 @@ CREATE TABLE factura (
   fecha_anulacion  TEXT,
   reemplaza_a      TEXT
 );
+
+-- D7: UNIQUE parcial. Garantiza 1:1 entre Factura no-anulada y Liquidacion.
+-- Una Liquidacion puede aparecer en N filas ANULADA (historial) pero solo en
+-- UNA fila con estado en {BORRADOR, EMITIDA, PAGADA}.
+CREATE UNIQUE INDEX idx_factura_liquidacion_no_anulada
+  ON factura (liquidacion_id)
+  WHERE estado != 'ANULADA';
