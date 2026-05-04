@@ -315,4 +315,18 @@ describe('FacturaRepositoryInMemory — actualizar valida transiciones legales (
       intentada: 'EMITIDA',
     });
   });
+
+  it('idempotente: NO lanza cuando estado nuevo === estado actual (PAGADA → PAGADA)', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const pagada = {
+      ...emitirFactura(inputBase()),
+      id: 'uuid-idem',
+      estado: 'PAGADA' as const,
+    };
+    await repo.crear(pagada);
+
+    const resultado = await repo.actualizar('uuid-idem', { estado: 'PAGADA' });
+    expect(resultado.estado).toBe('PAGADA');
+    expect(resultado.id).toBe('uuid-idem');
+  });
 });
