@@ -30,7 +30,7 @@
 -- `INSERT ... ON CONFLICT(id) DO UPDATE` para mantener esa semantica.
 
 CREATE TABLE cola_sincronizacion (
-  id                   TEXT PRIMARY KEY,
+  id                   TEXT    PRIMARY KEY NOT NULL,
   tipo                 TEXT    NOT NULL CHECK (tipo IN ('LIQUIDACION','LECTURA','EVIDENCIA','EVENTO_AUDITORIA','FACTURA')),
   payload              TEXT    NOT NULL,
   hash_local           TEXT    NOT NULL,
