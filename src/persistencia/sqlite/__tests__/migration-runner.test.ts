@@ -80,4 +80,35 @@ describe('ejecutarMigrations (runner)', () => {
       db.close();
     }
   });
+
+  it('aplica migrations en orden ascendente por version aunque la lista venga desordenada', () => {
+    const db = crearConexion();
+    try {
+      // v2 depende de v1: v2 hace ALTER de la tabla creada en v1.
+      // Si se aplica fuera de orden, ALTER falla porque la tabla aún no existe.
+      const migrations: Migration[] = [
+        {
+          version: 2,
+          nombre: '002_alter',
+          sql: 'ALTER TABLE marcador ADD COLUMN extra TEXT',
+        },
+        {
+          version: 1,
+          nombre: '001_create',
+          sql: 'CREATE TABLE marcador (valor INTEGER NOT NULL)',
+        },
+      ];
+
+      expect(() => ejecutarMigrations(db, migrations)).not.toThrow();
+      expect(db.pragma('user_version', { simple: true })).toBe(2);
+
+      // verificar que ambas columnas existen
+      const cols = db.prepare("PRAGMA table_info('marcador')").all() as Array<{ name: string }>;
+      const nombres = cols.map((c) => c.name);
+      expect(nombres).toContain('valor');
+      expect(nombres).toContain('extra');
+    } finally {
+      db.close();
+    }
+  });
 });
