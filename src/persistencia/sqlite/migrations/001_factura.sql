@@ -4,7 +4,7 @@
 -- en cycles 5.1–5.7. Ver design.md D7 (UNIQUE parcial sobre liquidacion_id).
 
 CREATE TABLE factura (
-  id              TEXT,
+  id              TEXT PRIMARY KEY,
   numero_factura  TEXT,
   estado          TEXT CHECK (estado IN ('BORRADOR','EMITIDA','PAGADA','ANULADA')),
   fecha_emision   TEXT,
