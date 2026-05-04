@@ -76,6 +76,16 @@ export function mapearErrorSqlite(
     return error;
   }
 
+  // UNIQUE constraint (incluye índice UNIQUE parcial) → RESTRICCION_UNICIDAD
+  if (code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    const error = new Error('violación de unicidad en SQLite') as ErrorPersistencia;
+    Object.defineProperty(error, 'cause', {
+      value: { codigo: 'RESTRICCION_UNICIDAD', sqliteCode: code, ctx },
+      enumerable: true,
+    });
+    return error;
+  }
+
   // fallback temporal — se completa en 2.4.2 / 2.4.3
   const error = new Error('error de persistencia') as ErrorPersistencia;
   Object.defineProperty(error, 'cause', {
