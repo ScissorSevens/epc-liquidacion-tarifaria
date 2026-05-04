@@ -102,10 +102,16 @@ const SQL_INSERT = `
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM factura WHERE id = ?`;
+const SQL_SELECT_BY_PERIODO = `SELECT * FROM factura WHERE id_periodo = ? ORDER BY rowid`;
+const SQL_SELECT_BY_SUSCRIPTOR = `SELECT * FROM factura WHERE id_suscriptor = ? ORDER BY rowid`;
+const SQL_SELECT_ALL = `SELECT * FROM factura ORDER BY rowid`;
 
 export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositorySqlite {
   const stmtInsert = db.prepare(SQL_INSERT);
   const stmtSelectById = db.prepare(SQL_SELECT_BY_ID);
+  const stmtSelectByPeriodo = db.prepare(SQL_SELECT_BY_PERIODO);
+  const stmtSelectBySuscriptor = db.prepare(SQL_SELECT_BY_SUSCRIPTOR);
+  const stmtSelectAll = db.prepare(SQL_SELECT_ALL);
 
   return {
     async crear(factura: Factura): Promise<Factura> {
@@ -120,17 +126,20 @@ export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositor
       const row = stmtSelectById.get(id) as FacturaRow | undefined;
       return row ? fromRow(row) : null;
     },
-    async buscarPorPeriodo(_idPeriodo: string): Promise<readonly Factura[]> {
-      throw new Error('buscarPorPeriodo: pendiente de implementacion');
+    async buscarPorPeriodo(idPeriodo: string): Promise<readonly Factura[]> {
+      const rows = stmtSelectByPeriodo.all(idPeriodo) as FacturaRow[];
+      return rows.map(fromRow);
     },
-    async buscarPorSuscriptor(_idSuscriptor: number): Promise<readonly Factura[]> {
-      throw new Error('buscarPorSuscriptor: pendiente de implementacion');
+    async buscarPorSuscriptor(idSuscriptor: number): Promise<readonly Factura[]> {
+      const rows = stmtSelectBySuscriptor.all(idSuscriptor) as FacturaRow[];
+      return rows.map(fromRow);
     },
     async actualizar(): Promise<Factura> {
       throw new Error('actualizar: pendiente de implementacion');
     },
     async listar(): Promise<readonly Factura[]> {
-      throw new Error('listar: pendiente de implementacion');
+      const rows = stmtSelectAll.all() as FacturaRow[];
+      return rows.map(fromRow);
     },
     cerrar(): void {
       db.close();
