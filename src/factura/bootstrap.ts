@@ -31,11 +31,34 @@ export interface BootstrapFacturaSqlite {
  *
  * Lifecycle: el caller es responsable de invocar `cerrar()` cuando
  * termina (típicamente al apagar el proceso).
+ *
+ * Errores: si `dbPath` no se puede abrir (directorio padre inexistente,
+ * permisos, etc.), lanza un `Error` con mensaje de dominio en español
+ * y `cause.codigo = 'ERROR_PERSISTENCIA'` para que el caller pueda
+ * distinguirlo de errores genéricos. El error original queda en
+ * `cause.original` para diagnóstico.
  */
 export function crearBootstrapFacturaSqlite(
   opciones: BootstrapFacturaSqliteOpciones,
 ): BootstrapFacturaSqlite {
-  const db = crearConexion(opciones.dbPath);
+  let db;
+  try {
+    db = crearConexion(opciones.dbPath);
+  } catch (e) {
+    const original = e instanceof Error ? e.message : String(e);
+    const err = new Error(
+      `no se pudo abrir la base de datos en '${opciones.dbPath}': ${original}`,
+    );
+    Object.defineProperty(err, 'cause', {
+      value: {
+        codigo: 'ERROR_PERSISTENCIA',
+        dbPath: opciones.dbPath,
+        original: e,
+      },
+      enumerable: true,
+    });
+    throw err;
+  }
   ejecutarMigrations(db, migrations);
   const repository = crearFacturaRepositorySqlite(db);
   return {
