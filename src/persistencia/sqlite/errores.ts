@@ -51,13 +51,8 @@ export function mapearErrorSqlite(
   ctx?: { readonly tabla?: string },
 ): ErrorPersistencia {
   if (!esSqliteErrorLike(err)) {
-    // no es un SqliteError → wrapper genérico
-    const error = new Error('error de persistencia desconocido') as ErrorPersistencia;
-    Object.defineProperty(error, 'cause', {
-      value: { codigo: 'ERROR_PERSISTENCIA', sqliteCode: 'UNKNOWN', ctx },
-      enumerable: true,
-    });
-    return error;
+    // no es un SqliteError (sin .code) → wrapper genérico
+    return construirError('error de persistencia desconocido', 'ERROR_PERSISTENCIA', 'UNKNOWN', ctx);
   }
 
   const { code, message } = err;
@@ -68,28 +63,47 @@ export function mapearErrorSqlite(
     ctx?.tabla === 'factura' &&
     /\bestado\b/i.test(message)
   ) {
-    const error = new Error('violación de constraint en SQLite (CHECK)') as ErrorPersistencia;
-    Object.defineProperty(error, 'cause', {
-      value: { codigo: 'TRANSICION_ILEGAL', sqliteCode: code, ctx },
-      enumerable: true,
-    });
-    return error;
+    return construirError(
+      'violación de constraint en SQLite (CHECK)',
+      'TRANSICION_ILEGAL',
+      code,
+      ctx,
+    );
   }
 
-  // UNIQUE constraint (incluye índice UNIQUE parcial) → RESTRICCION_UNICIDAD
+  // NOT NULL → CAMPO_REQUERIDO
+  if (code === 'SQLITE_CONSTRAINT_NOTNULL') {
+    return construirError('campo requerido sin valor', 'CAMPO_REQUERIDO', code, ctx);
+  }
+
+  // UNIQUE (incluye índices UNIQUE parciales) → RESTRICCION_UNICIDAD
   if (code === 'SQLITE_CONSTRAINT_UNIQUE') {
-    const error = new Error('violación de unicidad en SQLite') as ErrorPersistencia;
-    Object.defineProperty(error, 'cause', {
-      value: { codigo: 'RESTRICCION_UNICIDAD', sqliteCode: code, ctx },
-      enumerable: true,
-    });
-    return error;
+    return construirError('violación de unicidad en SQLite', 'RESTRICCION_UNICIDAD', code, ctx);
   }
 
-  // fallback temporal — se completa en 2.4.2 / 2.4.3
-  const error = new Error('error de persistencia') as ErrorPersistencia;
+  // catch-all de constraints (FK, PRIMARYKEY, CHECK no reconocido, etc.)
+  if (code.startsWith('SQLITE_CONSTRAINT')) {
+    return construirError(
+      'violación de integridad en SQLite',
+      'RESTRICCION_INTEGRIDAD',
+      code,
+      ctx,
+    );
+  }
+
+  // resto (BUSY, LOCKED, IOERR, …) → wrapper genérico
+  return construirError('error de persistencia', 'ERROR_PERSISTENCIA', code, ctx);
+}
+
+function construirError(
+  mensaje: string,
+  codigo: CodigoErrorPersistencia,
+  sqliteCode: string,
+  ctx?: { readonly tabla?: string },
+): ErrorPersistencia {
+  const error = new Error(mensaje) as ErrorPersistencia;
   Object.defineProperty(error, 'cause', {
-    value: { codigo: 'ERROR_PERSISTENCIA', sqliteCode: code, ctx },
+    value: { codigo, sqliteCode, ctx },
     enumerable: true,
   });
   return error;
