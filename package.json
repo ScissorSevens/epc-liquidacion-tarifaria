@@ -9,14 +9,24 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
-  "keywords": ["epc", "liquidacion", "tarifaria", "agua", "rural"],
+  "keywords": [
+    "epc",
+    "liquidacion",
+    "tarifaria",
+    "agua",
+    "rural"
+  ],
   "author": "FelipeBernal",
   "license": "MIT",
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.4.9",
     "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
   }
 }
