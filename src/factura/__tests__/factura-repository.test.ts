@@ -408,4 +408,28 @@ describe('FacturaRepositoryInMemory — crear valida unicidad por liquidacion_id
     const recuperada = await repo.buscarPorId('uuid-nueva');
     expect(recuperada?.id).toBe('uuid-nueva');
   });
+
+  it('actualizar a ANULADA libera el liquidacion_id para que un crear posterior funcione', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const liqId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const f1 = {
+      ...emitirFactura(inputBase()),
+      id: 'uuid-1',
+      estado: 'EMITIDA' as const,
+    };
+    await repo.crear(f1);
+
+    // Anulamos f1 vía actualizar — el set de liquidacionesActivas debe liberar liqId.
+    await repo.actualizar('uuid-1', { estado: 'ANULADA', motivo_anulacion: 'corrige', fecha_anulacion: '2026-03-01' });
+
+    // Ahora un nuevo crear con la misma liquidacion debe pasar.
+    const f2 = {
+      ...emitirFactura(inputBase({ consecutivo: 2 })),
+      id: 'uuid-2',
+    };
+    expect(f2.snapshot.liquidacion.id).toBe(liqId);
+
+    const creada = await repo.crear(f2);
+    expect(creada.id).toBe('uuid-2');
+  });
 });
