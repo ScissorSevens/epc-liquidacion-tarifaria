@@ -18,7 +18,9 @@ describe('migration 002_lectura — schema completo', () => {
     try {
       ejecutarMigrations(db, migrations);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(2);
+      // user_version es global del registry; con 003_cola_sync sumada queda en 3.
+      // Lo critico aca es que la 002 creo la tabla `lectura`.
+      expect(db.pragma('user_version', { simple: true })).toBe(3);
 
       const tabla = db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lectura'")
@@ -197,10 +199,10 @@ describe('migration 002_lectura — schema completo', () => {
     const db = crearConexion();
     try {
       ejecutarMigrations(db, migrations);
-      expect(db.pragma('user_version', { simple: true })).toBe(2);
+      expect(db.pragma('user_version', { simple: true })).toBe(3);
 
       expect(() => ejecutarMigrations(db, migrations)).not.toThrow();
-      expect(db.pragma('user_version', { simple: true })).toBe(2);
+      expect(db.pragma('user_version', { simple: true })).toBe(3);
     } finally {
       db.close();
     }
@@ -209,7 +211,7 @@ describe('migration 002_lectura — schema completo', () => {
   it('crearDBTest devuelve una DB con la tabla lectura ya migrada (sanity check del fixture)', () => {
     const db = crearDBTest();
     try {
-      expect(db.pragma('user_version', { simple: true })).toBe(2);
+      expect(db.pragma('user_version', { simple: true })).toBe(3);
       const tabla = db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lectura'")
         .get();
