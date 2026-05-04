@@ -108,4 +108,19 @@ describe('crearBootstrapFacturaSqlite', () => {
       /database connection is not open/i,
     );
   });
+
+  it('lanza error de dominio claro en espanol cuando dbPath es invalido', () => {
+    // Path con directorio padre inexistente → SQLite no puede abrir el archivo
+    const dbPathInvalido = join(tmpDir, 'subdir-inexistente', 'no', 'factura.db');
+
+    expect(() => crearBootstrapFacturaSqlite({ dbPath: dbPathInvalido })).toThrow(
+      expect.objectContaining({
+        message: expect.stringMatching(/no se pudo abrir la base de datos/i),
+        cause: expect.objectContaining({
+          codigo: 'ERROR_PERSISTENCIA',
+          dbPath: dbPathInvalido,
+        }),
+      }),
+    );
+  });
 });
