@@ -13,5 +13,8 @@ CREATE TABLE factura (
   liquidacion_id  TEXT,
   id_periodo      TEXT,
   id_suscriptor   INTEGER,
-  created_at      TEXT
+  created_at      TEXT,
+  motivo_anulacion TEXT,
+  fecha_anulacion  TEXT,
+  reemplaza_a      TEXT
 );
