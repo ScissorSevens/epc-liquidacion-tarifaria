@@ -10,6 +10,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import Database from 'better-sqlite3';
 import { crearBootstrapFacturaSqlite } from '../bootstrap';
+import { emitirFactura } from '../factura';
+import { calcularHash } from '../../calculo/calculo';
+import type { Liquidacion } from '../../calculo/types';
+import type { EmitirFacturaInput } from '../types';
 
 function crearDirTmp(): string {
   return mkdtempSync(join(tmpdir(), 'epc-bootstrap-'));
@@ -123,4 +127,100 @@ describe('crearBootstrapFacturaSqlite', () => {
       }),
     );
   });
+
+  it('end-to-end: repository del bootstrap guarda y recupera facturas sobre archivo real', async () => {
+    const dbPath = join(tmpDir, 'factura-e2e.db');
+    const bootstrap = crearBootstrapFacturaSqlite({ dbPath });
+    try {
+      const factura = emitirFactura(inputE2E());
+
+      // crear → la factura se persiste y el round-trip preserva campos
+      const creada = await bootstrap.repository.crear(factura);
+      expect(creada).toEqual(factura);
+
+      // buscarPorId → la recuperamos por id
+      const recuperada = await bootstrap.repository.buscarPorId(factura.id);
+      expect(recuperada).toEqual(factura);
+
+      // listar → aparece en el resultado
+      const todas = await bootstrap.repository.listar();
+      expect(todas).toHaveLength(1);
+      expect(todas[0]).toEqual(factura);
+    } finally {
+      bootstrap.cerrar();
+    }
+  });
 });
+
+// ---------- Builders mínimos para el e2e ----------
+// Reutilizan el mismo input shape que el contract harness.
+// No importamos del contract.ts porque ahí los builders son `function` privadas.
+
+function inputE2E(): EmitirFacturaInput {
+  const liquidacionBase = {
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    suscriptorId: '1',
+    fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
+    resultado: {
+      consumo: 12,
+      consumoBasico: 12,
+      consumoExcedente: 0,
+      cargoFijo: 5000,
+      cargoConsumo: 18000,
+      cargoExcedente: 0,
+      subsidio: 4600,
+      contribucion: 0,
+      total: 18400,
+    },
+    estado: 'ACTIVA' as const,
+  };
+  const liquidacion: Liquidacion = {
+    ...liquidacionBase,
+    hash: calcularHash(liquidacionBase),
+  };
+  return {
+    suscriptor: {
+      id_suscriptor: 1,
+      codigo: '00001',
+      nombre_apellidos: 'María López',
+      direccion: 'Calle 5 #2-10',
+      estrato: 2,
+      estado: 'activo',
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+    medidor: {
+      id_medidor: 10,
+      numero_medidor: 'MED-0001',
+      id_suscriptor: 1,
+      fecha_instalacion: '2024-01-15',
+      estado: 'activo',
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+    periodo: {
+      id_periodo: '202601',
+      nombre: 'Enero 2026',
+      fecha_inicio: '2026-01-01',
+      fecha_fin: '2026-01-31',
+      fecha_pago_sin_recargo: '2026-02-15',
+      fecha_pago_con_recargo: '2026-02-28',
+      dias_consumo: 31,
+      estado: 'cerrado',
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+    operario: {
+      id_operario: 7,
+      numero_cedula: '1234567890',
+      nombre: 'Ana Gómez',
+      email: 'ana@epc.co',
+      password_hash: 'argon2id$v=19$m=...',
+      rol: 'operario',
+      estado: 'activo',
+      dispositivo_id: 'MZ-001',
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+    liquidacion,
+    consumosHistoricos: [],
+    fechaEmision: '2026-02-01',
+    consecutivo: 1,
+  };
+}
