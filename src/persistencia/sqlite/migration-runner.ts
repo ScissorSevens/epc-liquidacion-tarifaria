@@ -1,4 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
+import { transaccion } from './transaccion';
 
 /**
  * Una migration SQLite versionada.
@@ -27,10 +28,9 @@ export function ejecutarMigrations(db: DatabaseType, migrations: readonly Migrat
   const versionActual = db.pragma('user_version', { simple: true }) as number;
   const pendientes = migrations.filter((m) => m.version > versionActual);
   for (const m of pendientes) {
-    db.exec(m.sql);
-  }
-  if (pendientes.length > 0) {
-    const maxVersion = pendientes.reduce((acc, m) => (m.version > acc ? m.version : acc), 0);
-    db.pragma(`user_version = ${maxVersion}`);
+    transaccion(db, () => {
+      db.exec(m.sql);
+      db.pragma(`user_version = ${m.version}`);
+    });
   }
 }
