@@ -159,4 +159,6 @@ export const MENSAJES_ERROR_FACTURA = {
     'factura solo puede anularse desde estado EMITIDA',
   CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE:
     'liquidacionAnulada.id no coincide con la liquidacion de la facturaOriginal',
+  TRANSICION_ILEGAL:
+    'transición de estado no permitida para esta factura',
 } as const;
