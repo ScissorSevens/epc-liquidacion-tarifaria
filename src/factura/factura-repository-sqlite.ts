@@ -18,7 +18,14 @@
  */
 
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { Factura, FacturaRepository, FacturaSnapshot } from './types';
+import { esTransicionLegal } from './factura';
+import {
+  MENSAJES_ERROR_FACTURA,
+  type EstadoFactura,
+  type Factura,
+  type FacturaRepository,
+  type FacturaSnapshot,
+} from './types';
 
 export interface FacturaRepositorySqlite extends FacturaRepository {
   cerrar(): void;
@@ -105,6 +112,23 @@ const SQL_SELECT_BY_ID = `SELECT * FROM factura WHERE id = ?`;
 const SQL_SELECT_BY_PERIODO = `SELECT * FROM factura WHERE id_periodo = ? ORDER BY rowid`;
 const SQL_SELECT_BY_SUSCRIPTOR = `SELECT * FROM factura WHERE id_suscriptor = ? ORDER BY rowid`;
 const SQL_SELECT_ALL = `SELECT * FROM factura ORDER BY rowid`;
+const SQL_UPDATE = `
+  UPDATE factura SET
+    estado = @estado,
+    motivo_anulacion = @motivo_anulacion,
+    fecha_anulacion = @fecha_anulacion
+  WHERE id = @id
+`;
+
+function lanzarTransicionIlegal(actual: EstadoFactura, intentada: EstadoFactura): never {
+  const err = new Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL);
+  (err as Error & { cause: unknown }).cause = {
+    codigo: 'TRANSICION_ILEGAL',
+    actual,
+    intentada,
+  };
+  throw err;
+}
 
 export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositorySqlite {
   const stmtInsert = db.prepare(SQL_INSERT);
@@ -112,6 +136,7 @@ export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositor
   const stmtSelectByPeriodo = db.prepare(SQL_SELECT_BY_PERIODO);
   const stmtSelectBySuscriptor = db.prepare(SQL_SELECT_BY_SUSCRIPTOR);
   const stmtSelectAll = db.prepare(SQL_SELECT_ALL);
+  const stmtUpdate = db.prepare(SQL_UPDATE);
 
   return {
     async crear(factura: Factura): Promise<Factura> {
@@ -134,8 +159,32 @@ export function crearFacturaRepositorySqlite(db: DatabaseType): FacturaRepositor
       const rows = stmtSelectBySuscriptor.all(idSuscriptor) as FacturaRow[];
       return rows.map(fromRow);
     },
-    async actualizar(): Promise<Factura> {
-      throw new Error('actualizar: pendiente de implementacion');
+    async actualizar(id, cambios): Promise<Factura> {
+      const existenteRow = stmtSelectById.get(id) as FacturaRow | undefined;
+      if (!existenteRow) {
+        throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
+      }
+      const existente = fromRow(existenteRow);
+      // Defense-in-depth a nivel codigo (W2): validar transicion ANTES de
+      // tocar SQLite. Solo cuando el estado efectivamente cambia.
+      if (cambios.estado !== existente.estado) {
+        if (!esTransicionLegal(existente.estado, cambios.estado)) {
+          lanzarTransicionIlegal(existente.estado, cambios.estado);
+        }
+      }
+      const motivo = cambios.motivo_anulacion ?? existente.motivo_anulacion ?? null;
+      const fecha = cambios.fecha_anulacion ?? existente.fecha_anulacion ?? null;
+      stmtUpdate.run({
+        id,
+        estado: cambios.estado,
+        motivo_anulacion: motivo,
+        fecha_anulacion: fecha,
+      });
+      const row = stmtSelectById.get(id) as FacturaRow | undefined;
+      if (!row) {
+        throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
+      }
+      return fromRow(row);
     },
     async listar(): Promise<readonly Factura[]> {
       const rows = stmtSelectAll.all() as FacturaRow[];
