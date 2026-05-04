@@ -241,3 +241,26 @@ describe('FacturaRepositoryInMemory — actualizar (no encontrada)', () => {
     ).rejects.toThrow(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
   });
 });
+
+describe('FacturaRepositoryInMemory — actualizar persiste fecha_anulacion (W1)', () => {
+  it('al anular con fecha_anulacion, buscarPorId la devuelve íntegra', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const emitida = {
+      ...emitirFactura(inputBase()),
+      id: 'uuid-w1',
+      estado: 'EMITIDA' as const,
+    };
+    await repo.crear(emitida);
+
+    await repo.actualizar('uuid-w1', {
+      estado: 'ANULADA',
+      motivo_anulacion: 'liquidacion corregida',
+      fecha_anulacion: '2026-03-15',
+    });
+
+    const recuperada = await repo.buscarPorId('uuid-w1');
+    expect(recuperada?.fecha_anulacion).toBe('2026-03-15');
+    expect(recuperada?.motivo_anulacion).toBe('liquidacion corregida');
+    expect(recuperada?.estado).toBe('ANULADA');
+  });
+});
