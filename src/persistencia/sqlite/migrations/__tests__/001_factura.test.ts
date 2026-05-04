@@ -130,4 +130,40 @@ describe('migration 001_factura — schema básico', () => {
       db.close();
     }
   });
+
+  it("declara UNIQUE PARCIAL sobre liquidacion_id WHERE estado != 'ANULADA' (D7)", () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+
+      const insertar = db.prepare(
+        `INSERT INTO factura (id, numero_factura, estado, fecha_emision, snapshot, hash, liquidacion_id, id_periodo, id_suscriptor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+
+      // f1 EMITIDA con liq-X — OK.
+      insertar.run('id-1', 'F-1', 'EMITIDA', '2026-01-15', '{}', 'h1', 'liq-X', '202601', 1, '2026-01-15');
+
+      // f2 EMITIDA con la misma liq-X — debe fallar por UNIQUE parcial.
+      expect(() =>
+        insertar.run('id-2', 'F-2', 'EMITIDA', '2026-01-15', '{}', 'h2', 'liq-X', '202601', 1, '2026-01-15'),
+      ).toThrow(/UNIQUE/i);
+
+      // Anulamos f1 — el liq-X queda libre.
+      db.prepare("UPDATE factura SET estado='ANULADA', fecha_anulacion='2026-02-01', motivo_anulacion='corrige' WHERE id='id-1'").run();
+
+      // Ahora f2 con liq-X debe pasar (la única no-anulada con liq-X soy yo).
+      expect(() =>
+        insertar.run('id-2', 'F-2', 'EMITIDA', '2026-01-15', '{}', 'h2', 'liq-X', '202601', 1, '2026-01-15'),
+      ).not.toThrow();
+
+      // Y dos ANULADAS con la misma liq son admisibles (UNIQUE no aplica a anuladas).
+      insertar.run('id-3', 'F-3', 'ANULADA', '2026-01-15', '{}', 'h3', 'liq-Y', '202601', 1, '2026-01-15');
+      expect(() =>
+        insertar.run('id-4', 'F-4', 'ANULADA', '2026-01-15', '{}', 'h4', 'liq-Y', '202601', 1, '2026-01-15'),
+      ).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
 });
