@@ -6,7 +6,7 @@
  */
 
 import { emitirFactura, anularFactura, esVencida, esTransicionLegal } from '../factura';
-import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput, type Factura } from '../types';
+import { MENSAJES_ERROR_FACTURA, type ConsumoHistorico, type EmitirFacturaInput, type EstadoFactura, type Factura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
 import type { Suscriptor } from '../../suscriptores/types';
@@ -429,5 +429,28 @@ describe('MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL', () => {
 
   it('menciona la palabra "transición" (ES) para que el operario entienda', () => {
     expect(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL).toMatch(/transici[oó]n/i);
+  });
+});
+
+describe('esTransicionLegal — transiciones ilegales (estados terminales y retrocesos)', () => {
+  // Spec persistencia-sqlite/factura/ADDED-R1: PAGADA y ANULADA son terminales,
+  // y nadie puede volver a BORRADOR desde ningún estado.
+  const ilegales: ReadonlyArray<[EstadoFactura, EstadoFactura]> = [
+    ['ANULADA', 'ANULADA'],
+    ['ANULADA', 'EMITIDA'],
+    ['ANULADA', 'PAGADA'],
+    ['PAGADA', 'ANULADA'],
+    ['PAGADA', 'EMITIDA'],
+    ['PAGADA', 'PAGADA'],
+    ['EMITIDA', 'BORRADOR'],
+    ['EMITIDA', 'EMITIDA'],
+    ['PAGADA', 'BORRADOR'],
+    ['ANULADA', 'BORRADOR'],
+    ['BORRADOR', 'BORRADOR'],
+    ['BORRADOR', 'PAGADA'],
+  ];
+
+  it.each(ilegales)('%s → %s es ilegal', (actual, nueva) => {
+    expect(esTransicionLegal(actual, nueva)).toBe(false);
   });
 });
