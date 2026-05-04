@@ -24,11 +24,13 @@ export interface Migration {
  * - 2.3.4 ordenamiento por `version` asc
  */
 export function ejecutarMigrations(db: DatabaseType, migrations: readonly Migration[]): void {
-  for (const m of migrations) {
+  const versionActual = db.pragma('user_version', { simple: true }) as number;
+  const pendientes = migrations.filter((m) => m.version > versionActual);
+  for (const m of pendientes) {
     db.exec(m.sql);
   }
-  if (migrations.length > 0) {
-    const maxVersion = migrations.reduce((acc, m) => (m.version > acc ? m.version : acc), 0);
+  if (pendientes.length > 0) {
+    const maxVersion = pendientes.reduce((acc, m) => (m.version > acc ? m.version : acc), 0);
     db.pragma(`user_version = ${maxVersion}`);
   }
 }
