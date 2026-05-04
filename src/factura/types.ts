@@ -169,4 +169,6 @@ export const MENSAJES_ERROR_FACTURA = {
     'liquidacionAnulada.id no coincide con la liquidacion de la facturaOriginal',
   TRANSICION_ILEGAL:
     'transición de estado no permitida para esta factura',
+  RESTRICCION_UNICIDAD:
+    'violación de unicidad en el repositorio de facturas',
 } as const;
