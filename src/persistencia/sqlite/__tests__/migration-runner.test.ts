@@ -26,4 +26,26 @@ describe('ejecutarMigrations (runner)', () => {
       db.close();
     }
   });
+
+  it('re-ejecutar la misma lista de migrations es no-op (idempotente)', () => {
+    const db = crearConexion();
+    try {
+      const migrations: Migration[] = [
+        {
+          version: 1,
+          nombre: '001_marcador',
+          sql: 'CREATE TABLE marcador (valor INTEGER NOT NULL)',
+        },
+      ];
+
+      ejecutarMigrations(db, migrations);
+      // segunda corrida — si no hay idempotencia, "CREATE TABLE" lanza "table already exists"
+      expect(() => ejecutarMigrations(db, migrations)).not.toThrow();
+
+      const userVersion = db.pragma('user_version', { simple: true });
+      expect(userVersion).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
 });
