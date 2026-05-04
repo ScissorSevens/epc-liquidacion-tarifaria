@@ -65,4 +65,48 @@ describe('migration 001_factura — schema básico', () => {
       db.close();
     }
   });
+
+  it("rechaza INSERT con estado fuera de {BORRADOR, EMITIDA, PAGADA, ANULADA} via CHECK", () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+
+      // Insertar con estado invalido — debe fallar por CHECK constraint.
+      const insertarConEstadoInvalido = () =>
+        db
+          .prepare(
+            `INSERT INTO factura (id, numero_factura, estado, fecha_emision, snapshot, hash, liquidacion_id, id_periodo, id_suscriptor, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run('id-1', 'F-001', 'INVALIDO', '2026-01-15', '{}', 'h', 'liq-1', '202601', 1, '2026-01-15');
+
+      expect(insertarConEstadoInvalido).toThrow(/CHECK/i);
+
+      // Y todos los estados validos deben pasar.
+      const estadosValidos = ['BORRADOR', 'EMITIDA', 'PAGADA', 'ANULADA'] as const;
+      estadosValidos.forEach((estado, i) => {
+        expect(() =>
+          db
+            .prepare(
+              `INSERT INTO factura (id, numero_factura, estado, fecha_emision, snapshot, hash, liquidacion_id, id_periodo, id_suscriptor, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .run(
+              `id-ok-${i}`,
+              `F-OK-${i}`,
+              estado,
+              '2026-01-15',
+              '{}',
+              'h',
+              `liq-ok-${i}`,
+              '202601',
+              1,
+              '2026-01-15',
+            ),
+        ).not.toThrow();
+      });
+    } finally {
+      db.close();
+    }
+  });
 });
