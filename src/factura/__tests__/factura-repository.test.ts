@@ -330,3 +330,30 @@ describe('FacturaRepositoryInMemory — actualizar valida transiciones legales (
     expect(resultado.id).toBe('uuid-idem');
   });
 });
+
+describe('FacturaRepositoryInMemory — crear valida unicidad por liquidacion_id (D7)', () => {
+  it('lanza RESTRICCION_UNICIDAD si ya existe factura no-anulada con la misma liquidacion_id', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const liqId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+    await repo.crear(f1);
+
+    const f2 = { ...emitirFactura(inputBase({ consecutivo: 2 })), id: 'uuid-2' };
+    // Mismo liquidacion_id (inputBase usa siempre el mismo id 'aaaa...').
+    expect(f2.snapshot.liquidacion.id).toBe(liqId);
+
+    let capturado: Error | null = null;
+    try {
+      await repo.crear(f2);
+    } catch (e) {
+      capturado = e as Error;
+    }
+
+    expect(capturado).not.toBeNull();
+    expect(capturado!.message).toBe(MENSAJES_ERROR_FACTURA.RESTRICCION_UNICIDAD);
+    expect((capturado as Error & { cause?: unknown }).cause).toEqual({
+      codigo: 'RESTRICCION_UNICIDAD',
+      ctx: { liquidacion_id: liqId },
+    });
+  });
+});
