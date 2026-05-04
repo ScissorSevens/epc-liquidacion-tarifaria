@@ -382,4 +382,30 @@ describe('FacturaRepositoryInMemory — crear valida unicidad por liquidacion_id
       ctx: { liquidacion_id: liqId },
     });
   });
+
+  it('permite crear nueva factura si la única existente con ese liquidacion_id está ANULADA', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const liqId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    // f1 se persiste directamente con estado ANULADA — modela el caso
+    // "anular y recrear": el liquidacion_id queda libre.
+    const f1 = {
+      ...emitirFactura(inputBase()),
+      id: 'uuid-anulada',
+      estado: 'ANULADA' as const,
+    };
+    await repo.crear(f1);
+
+    const f2 = {
+      ...emitirFactura(inputBase({ consecutivo: 2 })),
+      id: 'uuid-nueva',
+    };
+    expect(f2.snapshot.liquidacion.id).toBe(liqId);
+
+    // Debe pasar — la única existente con liqId es ANULADA, no cuenta para UNIQUE parcial.
+    const creada = await repo.crear(f2);
+    expect(creada.id).toBe('uuid-nueva');
+
+    const recuperada = await repo.buscarPorId('uuid-nueva');
+    expect(recuperada?.id).toBe('uuid-nueva');
+  });
 });
