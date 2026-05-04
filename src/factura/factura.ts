@@ -9,7 +9,7 @@
 import { createHash } from 'crypto';
 import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
-import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type Factura, type FacturaSnapshot } from './types';
+import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type EstadoFactura, type Factura, type FacturaSnapshot } from './types';
 
 /**
  * Congela recursivamente. Replicado de calculo.ts (3er duplicado pendiente
@@ -181,6 +181,27 @@ export function anularFactura(
 export function esVencida(factura: Factura, fechaActual: string): boolean {
   if (factura.estado !== 'EMITIDA') return false;
   return fechaActual > factura.snapshot.periodo.fecha_pago_con_recargo;
+}
+
+/**
+ * Predicado puro: ¿es legal la transición de estado `actual → nueva`?
+ *
+ * Matriz de transiciones (spec persistencia-sqlite/factura/ADDED-R1):
+ *   BORRADOR → { EMITIDA, ANULADA }
+ *   EMITIDA  → { PAGADA, ANULADA }
+ *   PAGADA   → { } (terminal)
+ *   ANULADA  → { } (terminal)
+ *
+ * Toda implementación de `FacturaRepository.actualizar` MUST invocar este
+ * predicado antes de persistir. Si retorna `false`, lanzar
+ * `Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL)` con
+ * `cause = { codigo, actual, intentada }`.
+ */
+export function esTransicionLegal(
+  actual: EstadoFactura,
+  nueva: EstadoFactura,
+): boolean {
+  return actual === 'BORRADOR' && nueva === 'EMITIDA';
 }
 
 /**
