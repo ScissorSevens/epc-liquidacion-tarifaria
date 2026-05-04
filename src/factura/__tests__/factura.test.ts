@@ -415,4 +415,8 @@ describe('esTransicionLegal — transiciones permitidas desde EMITIDA', () => {
   it('EMITIDA → PAGADA es legal', () => {
     expect(esTransicionLegal('EMITIDA', 'PAGADA')).toBe(true);
   });
+
+  it('EMITIDA → ANULADA es legal', () => {
+    expect(esTransicionLegal('EMITIDA', 'ANULADA')).toBe(true);
+  });
 });
