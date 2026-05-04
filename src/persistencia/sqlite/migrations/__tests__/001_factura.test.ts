@@ -9,7 +9,10 @@ describe('migration 001_factura — schema básico', () => {
     try {
       ejecutarMigrations(db, migrations);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(1);
+      // user_version refleja la ULTIMA migration aplicada del registry global.
+      // Al sumarse 002_lectura, el baseline pasa de 1 a 2. Lo que importa
+      // aca es que la tabla `factura` quedo creada por la 001.
+      expect(db.pragma('user_version', { simple: true })).toBe(2);
 
       const tabla = db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='factura'")
@@ -206,13 +209,13 @@ describe('migration 001_factura — schema básico', () => {
     const db = crearConexion();
     try {
       ejecutarMigrations(db, migrations);
-      expect(db.pragma('user_version', { simple: true })).toBe(1);
+      expect(db.pragma('user_version', { simple: true })).toBe(2);
 
       // Segunda corrida debe ser no-op (cubierto por runner.idempotente,
       // este test garantiza que el SQL real lo respeta y no choca con
       // "table already exists" / "index already exists").
       expect(() => ejecutarMigrations(db, migrations)).not.toThrow();
-      expect(db.pragma('user_version', { simple: true })).toBe(1);
+      expect(db.pragma('user_version', { simple: true })).toBe(2);
     } finally {
       db.close();
     }
@@ -221,7 +224,7 @@ describe('migration 001_factura — schema básico', () => {
   it('crearDBTest devuelve una DB con la tabla factura ya migrada (sanity check del fixture)', () => {
     const db = crearDBTest();
     try {
-      expect(db.pragma('user_version', { simple: true })).toBe(1);
+      expect(db.pragma('user_version', { simple: true })).toBe(2);
       const tabla = db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='factura'")
         .get();
