@@ -290,4 +290,29 @@ describe('FacturaRepositoryInMemory — actualizar valida transiciones legales (
       intentada: 'EMITIDA',
     });
   });
+
+  it('triangulación: rechaza PAGADA → EMITIDA con cause estructurada', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const pagada = {
+      ...emitirFactura(inputBase()),
+      id: 'uuid-pagada',
+      estado: 'PAGADA' as const,
+    };
+    await repo.crear(pagada);
+
+    let capturado: Error | null = null;
+    try {
+      await repo.actualizar('uuid-pagada', { estado: 'EMITIDA' });
+    } catch (e) {
+      capturado = e as Error;
+    }
+
+    expect(capturado).not.toBeNull();
+    expect(capturado!.message).toBe(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL);
+    expect((capturado as Error & { cause?: unknown }).cause).toEqual({
+      codigo: 'TRANSICION_ILEGAL',
+      actual: 'PAGADA',
+      intentada: 'EMITIDA',
+    });
+  });
 });
