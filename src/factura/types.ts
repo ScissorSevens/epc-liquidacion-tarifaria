@@ -103,8 +103,15 @@ export interface EmitirFacturaInput {
  * Puerto del repositorio. Contrato de tipos — implementación SQLite en Iter 7.
  * Validaciones de unicidad (NUMERO_FACTURA_DUPLICADO_EN_PERIODO,
  * LIQUIDACION_YA_FACTURADA) son responsabilidad de `crear`.
- * `actualizar` valida transiciones legales: BORRADOR→EMITIDA, EMITIDA→ANULADA,
- * EMITIDA→PAGADA.
+ *
+ * `actualizar` MUST:
+ *  - Persistir TODOS los campos mutables presentes en `cambios` (incluido
+ *    `fecha_anulacion` y `motivo_anulacion`).
+ *  - Validar transiciones legales invocando `esTransicionLegal(actual, nueva)`
+ *    SOLO cuando `cambios.estado` difiera del estado actual. Si la transición
+ *    es ilegal, lanzar `Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL)`
+ *    con `cause = { codigo: 'TRANSICION_ILEGAL', actual, intentada }`.
+ *  - Devolver la factura íntegra ya persistida.
  */
 export interface FacturaRepository {
   crear(factura: Factura): Promise<Factura>;
@@ -116,6 +123,7 @@ export interface FacturaRepository {
     cambios: {
       estado: 'EMITIDA' | 'ANULADA' | 'PAGADA';
       motivo_anulacion?: string;
+      fecha_anulacion?: string;
     },
   ): Promise<Factura>;
   listar(): Promise<readonly Factura[]>;
