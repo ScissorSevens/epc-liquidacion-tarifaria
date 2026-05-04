@@ -54,4 +54,41 @@ describe('crearBootstrapFacturaSqlite', () => {
       bootstrap.cerrar();
     }
   });
+
+  it('re-abrir el mismo dbPath NO re-ejecuta migraciones (idempotencia)', () => {
+    const dbPath = join(tmpDir, 'factura.db');
+
+    // Primer bootstrap: aplica migraciones desde cero
+    const primero = crearBootstrapFacturaSqlite({ dbPath });
+    let versionPrimero: number;
+    try {
+      const inspector = new Database(dbPath, { readonly: true });
+      try {
+        versionPrimero = inspector.pragma('user_version', { simple: true }) as number;
+      } finally {
+        inspector.close();
+      }
+      expect(versionPrimero).toBeGreaterThanOrEqual(1);
+    } finally {
+      primero.cerrar();
+    }
+
+    // Segundo bootstrap sobre el MISMO archivo: si re-ejecutara las
+    // migraciones, `CREATE TABLE factura` lanzaría "table factura already
+    // exists". El runner debe filtrar por `user_version` y no lanzar.
+    const segundo = crearBootstrapFacturaSqlite({ dbPath });
+    try {
+      const inspector = new Database(dbPath, { readonly: true });
+      try {
+        const versionSegundo = inspector.pragma('user_version', { simple: true }) as number;
+        // user_version se mantiene → no se aplicaron migraciones nuevas
+        expect(versionSegundo).toBe(versionPrimero);
+      } finally {
+        inspector.close();
+      }
+      expect(typeof segundo.repository.crear).toBe('function');
+    } finally {
+      segundo.cerrar();
+    }
+  });
 });
