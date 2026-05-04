@@ -27,22 +27,40 @@ describe('migration 001_factura — schema básico', () => {
       const cols = db.prepare("PRAGMA table_info('factura')").all() as Array<{
         name: string;
       }>;
-      const nombres = cols.map((c) => c.name).sort();
+      const nombres = cols.map((c) => c.name);
 
       expect(nombres).toEqual(
-        [
-          'created_at',
+        expect.arrayContaining([
+          'id',
+          'numero_factura',
           'estado',
           'fecha_emision',
+          'snapshot',
           'hash',
-          'id',
+          'liquidacion_id',
           'id_periodo',
           'id_suscriptor',
-          'liquidacion_id',
-          'numero_factura',
-          'snapshot',
-        ].sort(),
+          'created_at',
+        ]),
       );
+    } finally {
+      db.close();
+    }
+  });
+
+  it('declara las columnas opcionales de anulacion y reemplazo (motivo_anulacion, fecha_anulacion, reemplaza_a)', () => {
+    const db = crearConexion();
+    try {
+      ejecutarMigrations(db, migrations);
+
+      const cols = db.prepare("PRAGMA table_info('factura')").all() as Array<{
+        name: string;
+      }>;
+      const nombres = new Set(cols.map((c) => c.name));
+
+      expect(nombres.has('motivo_anulacion')).toBe(true);
+      expect(nombres.has('fecha_anulacion')).toBe(true);
+      expect(nombres.has('reemplaza_a')).toBe(true);
     } finally {
       db.close();
     }
