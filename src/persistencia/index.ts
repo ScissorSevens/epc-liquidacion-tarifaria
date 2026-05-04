@@ -7,3 +7,10 @@ export type {
   BootstrapLecturaSqlite,
   BootstrapLecturaSqliteOpciones,
 } from './sqlite/bootstrap-lectura';
+export { crearColaSincronizacionSqlite } from './sqlite/cola-repository-sqlite';
+export type { ColaRepositorySqlite } from './sqlite/cola-repository-sqlite';
+export { crearBootstrapColaSqlite } from './sqlite/bootstrap-cola';
+export type {
+  BootstrapColaSqlite,
+  BootstrapColaSqliteOpciones,
+} from './sqlite/bootstrap-cola';
