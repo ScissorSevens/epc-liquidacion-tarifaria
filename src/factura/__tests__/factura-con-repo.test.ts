@@ -175,6 +175,21 @@ describe('anularFacturaConRepo — happy path', () => {
   });
 });
 
+describe('anularFacturaConRepo — persiste fecha_anulacion (W1)', () => {
+  it('la factura recuperada del repo tiene fecha_anulacion no vacia', async () => {
+    const repo = crearFacturaRepositoryInMemory();
+    const factura = await emitirFacturaConRepo(inputBase(), repo);
+    await repo.actualizar(factura.id, { estado: 'EMITIDA' });
+
+    await anularFacturaConRepo(factura.id, 'liquidacion corregida', repo);
+
+    const recuperada = await repo.buscarPorId(factura.id);
+    expect(recuperada?.fecha_anulacion).toBeTruthy();
+    // ISO 8601 — orquestador usa new Date().toISOString()
+    expect(recuperada?.fecha_anulacion).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
 describe('corregirFacturaConRepo — happy path', () => {
   it('valida facturaOriginal en repo, corrige puro, persiste UPDATE+CREATE y retorna pareja', async () => {
     const repo = crearFacturaRepositoryInMemory();
