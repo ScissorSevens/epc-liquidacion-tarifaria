@@ -410,3 +410,9 @@ describe('esTransicionLegal — transiciones permitidas desde BORRADOR', () => {
     expect(esTransicionLegal('BORRADOR', 'ANULADA')).toBe(true);
   });
 });
+
+describe('esTransicionLegal — transiciones permitidas desde EMITIDA', () => {
+  it('EMITIDA → PAGADA es legal', () => {
+    expect(esTransicionLegal('EMITIDA', 'PAGADA')).toBe(true);
+  });
+});
