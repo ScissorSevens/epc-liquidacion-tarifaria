@@ -11,6 +11,7 @@
  */
 
 import { MENSAJES_ERROR_FACTURA, type Factura, type FacturaRepository } from '../types';
+import { esTransicionLegal } from '../factura';
 
 export function crearFacturaRepositoryInMemory(): FacturaRepository {
   const store = new Map<string, Factura>();
@@ -40,6 +41,18 @@ export function crearFacturaRepositoryInMemory(): FacturaRepository {
       const existente = store.get(id);
       if (!existente) {
         throw new Error(MENSAJES_ERROR_FACTURA.FACTURA_NO_ENCONTRADA);
+      }
+      // Validar transiciones SOLO si el estado efectivamente cambia.
+      if (cambios.estado !== existente.estado) {
+        if (!esTransicionLegal(existente.estado, cambios.estado)) {
+          throw new Error(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL, {
+            cause: {
+              codigo: 'TRANSICION_ILEGAL',
+              actual: existente.estado,
+              intentada: cambios.estado,
+            },
+          });
+        }
       }
       const actualizada = Object.freeze({ ...existente, ...cambios }) as Factura;
       store.set(id, actualizada);
