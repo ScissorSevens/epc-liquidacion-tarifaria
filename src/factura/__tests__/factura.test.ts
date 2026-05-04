@@ -420,3 +420,14 @@ describe('esTransicionLegal — transiciones permitidas desde EMITIDA', () => {
     expect(esTransicionLegal('EMITIDA', 'ANULADA')).toBe(true);
   });
 });
+
+describe('MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL', () => {
+  it('está definido como string no vacío en el catálogo', () => {
+    expect(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL).toBeTruthy();
+    expect(typeof MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL).toBe('string');
+  });
+
+  it('menciona la palabra "transición" (ES) para que el operario entienda', () => {
+    expect(MENSAJES_ERROR_FACTURA.TRANSICION_ILEGAL).toMatch(/transici[oó]n/i);
+  });
+});
