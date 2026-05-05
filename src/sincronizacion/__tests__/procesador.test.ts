@@ -6,6 +6,12 @@ import { agregarItemACola } from '../cola';
 import { InMemoryColaSincronizacion } from '../cola-repository';
 import { procesarCola } from '../procesador';
 import type { ClienteSincronizacion } from '../procesador';
+import type { IdGenerator } from '../../shared/ports';
+
+// IdGenerator fake estable: counter monotónico → ids únicos pero predecibles.
+let _seq = 0;
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seq).padStart(4, '0')}` };
+beforeEach(() => { _seq = 0; });
 
 // Helper: crea un cliente mock con respuestas configurables
 function clienteMockExitoso(): ClienteSincronizacion {
@@ -23,7 +29,7 @@ describe('procesarCola - flujo exitoso', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001', total: 17000 },
       hashLocal: 'abc',
-    });
+    }, idGen);
     await cola.guardar(item);
 
     await procesarCola(cola, cliente);
@@ -40,7 +46,7 @@ describe('procesarCola - flujo exitoso', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001', total: 17000 },
       hashLocal: 'abc',
-    });
+    }, idGen);
     await cola.guardar(item);
 
     await procesarCola(cola, cliente);
@@ -58,7 +64,7 @@ describe('procesarCola - flujo exitoso', () => {
         tipo: 'LIQUIDACION',
         payload: { id: 'LIQ-001' },
         hashLocal: 'abc',
-      }),
+      }, idGen),
       estado: 'EXITOSO' as const,
     };
     await cola.guardar(itemExitoso);
@@ -78,7 +84,7 @@ describe('procesarCola - flujo exitoso', () => {
           tipo: 'LECTURA',
           payload: { v: i },
           hashLocal: `h${i}`,
-        })
+        }, idGen)
       );
     }
 
@@ -102,7 +108,7 @@ describe('procesarCola - manejo de error', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001', total: 17000 },
       hashLocal: 'abc',
-    });
+    }, idGen);
     await cola.guardar(item);
 
     await procesarCola(cola, cliente);
@@ -123,7 +129,7 @@ describe('procesarCola - manejo de error', () => {
       tipo: 'LECTURA',
       payload: { v: 1 },
       hashLocal: 'a',
-    });
+    }, idGen);
     await cola.guardar(item);
 
     await procesarCola(cola, cliente);
@@ -177,7 +183,7 @@ describe('procesarCola - respeto de delay entre reintentos', () => {
 
     // Item ya intentado 1 vez hace 100ms — el delay para intento 1 es 1000ms
     const itemReciente = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       intentos: 1,
       ultimoError: 'Network down',
       ultimoIntentoEn: new Date(Date.now() - 100),
@@ -197,7 +203,7 @@ describe('procesarCola - respeto de delay entre reintentos', () => {
 
     // Item intentado hace 2 segundos, delay para intento 1 es 1s — debe reintentarse
     const itemListo = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       intentos: 1,
       ultimoError: 'Network down',
       ultimoIntentoEn: new Date(Date.now() - 2000),
@@ -220,7 +226,7 @@ describe('procesarCola - límite de reintentos', () => {
 
     // Item con 4 intentos previos, listo para reintentarse
     const item = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       intentos: 4,
       ultimoError: 'Network down',
       ultimoIntentoEn: new Date(Date.now() - 60000),
@@ -241,7 +247,7 @@ describe('procesarCola - límite de reintentos', () => {
     };
 
     const fallido = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       estado: 'FALLIDO' as const,
       intentos: 5,
     };
@@ -262,17 +268,17 @@ describe('procesarCola - resiliencia entre items', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'OK' },
       hashLocal: 'ok',
-    });
+    }, idGen);
     const itemMalo = agregarItemACola({
       tipo: 'EVIDENCIA',
       payload: { id: 'FAIL' },
       hashLocal: 'fail',
-    });
+    }, idGen);
     const itemBueno2 = agregarItemACola({
       tipo: 'LECTURA',
       payload: { id: 'OK2' },
       hashLocal: 'ok2',
-    });
+    }, idGen);
 
     await cola.guardar(itemBueno);
     await cola.guardar(itemMalo);
@@ -319,7 +325,7 @@ describe('procesarCola - detección de conflicto', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001', total: 17000 },
       hashLocal: 'hash-local-mio',
-    });
+    }, idGen);
     await cola.guardar(item);
 
     await procesarCola(cola, cliente);
@@ -343,7 +349,7 @@ describe('procesarCola - detección de conflicto', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001' },
       hashLocal: 'mio',
-    });
+    }, idGen);
     await cola.guardar(item);
 
     await procesarCola(cola, cliente);
@@ -359,7 +365,7 @@ describe('procesarCola - detección de conflicto', () => {
     };
 
     const enConflicto = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       estado: 'CONFLICTO' as const,
       hashServer: 'srv',
     };
@@ -378,7 +384,7 @@ describe('resolverConflicto', () => {
     const cola = new InMemoryColaSincronizacion();
 
     const enConflicto = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: { v: 1 }, hashLocal: 'mio' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: { v: 1 }, hashLocal: 'mio' }, idGen),
       estado: 'CONFLICTO' as const,
       hashServer: 'srv',
       intentos: 0,
@@ -397,7 +403,7 @@ describe('resolverConflicto', () => {
     const cola = new InMemoryColaSincronizacion();
 
     const enConflicto = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       estado: 'CONFLICTO' as const,
       hashServer: 'srv',
     };
@@ -414,7 +420,7 @@ describe('resolverConflicto', () => {
     const cola = new InMemoryColaSincronizacion();
 
     const enConflicto = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       estado: 'CONFLICTO' as const,
       hashServer: 'srv',
     };
@@ -437,7 +443,7 @@ describe('resolverConflicto', () => {
     const { resolverConflicto } = require('../procesador');
     const cola = new InMemoryColaSincronizacion();
 
-    const item = agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' });
+    const item = agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen);
     await cola.guardar(item);
 
     await expect(resolverConflicto(cola, item.id, 'DESCARTAR')).rejects.toThrow();
@@ -451,7 +457,7 @@ describe('resolverConflicto', () => {
     };
 
     const enConflicto = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'a' }, idGen),
       estado: 'CONFLICTO' as const,
       hashServer: 'srv',
     };
@@ -481,13 +487,13 @@ describe('procesarCola - orden de dependencias (dependeDe)', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001' },
       hashLocal: 'dep',
-    });
+    }, idGen);
     const dependiente = agregarItemACola({
       tipo: 'EVENTO_AUDITORIA',
       payload: { tipo: 'LIQUIDACION_ANULADA', referenciaA: 'LIQ-001' },
       hashLocal: 'anul',
       dependeDe: [dependencia.id],
-    });
+    }, idGen);
 
     await cola.guardar(dependencia);
     await cola.guardar(dependiente);
@@ -513,13 +519,13 @@ describe('procesarCola - orden de dependencias (dependeDe)', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001' },
       hashLocal: 'dep',
-    });
+    }, idGen);
     const dependiente = agregarItemACola({
       tipo: 'EVENTO_AUDITORIA',
       payload: { tipo: 'LIQUIDACION_ANULADA' },
       hashLocal: 'anul',
       dependeDe: [dependencia.id],
-    });
+    }, idGen);
 
     await cola.guardar(dependencia);
     await cola.guardar(dependiente);
@@ -538,7 +544,7 @@ describe('procesarCola - orden de dependencias (dependeDe)', () => {
     };
 
     const fallido = {
-      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'f' }),
+      ...agregarItemACola({ tipo: 'LIQUIDACION', payload: {}, hashLocal: 'f' }, idGen),
       estado: 'FALLIDO' as const,
       intentos: 5,
     };
@@ -547,7 +553,7 @@ describe('procesarCola - orden de dependencias (dependeDe)', () => {
       payload: {},
       hashLocal: 'anul',
       dependeDe: [fallido.id],
-    });
+    }, idGen);
 
     await cola.guardar(fallido);
     await cola.guardar(dependiente);

@@ -31,6 +31,10 @@
 import { agregarItemACola } from '../cola';
 import type { ColaSincronizacion } from '../cola-repository';
 import type { ItemCola } from '../types';
+import type { IdGenerator } from '../../shared/ports';
+
+let _seq = 0;
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seq).padStart(4, '0')}` };
 
 // ---------- Builders compartidos ----------
 
@@ -41,7 +45,7 @@ export function itemBase(overrides: Partial<ItemCola> = {}): ItemCola {
     tipo: 'LIQUIDACION',
     payload: { id: 'LIQ-001' },
     hashLocal: 'h-base',
-  });
+  }, idGen);
   return Object.freeze({ ...base, ...overrides });
 }
 

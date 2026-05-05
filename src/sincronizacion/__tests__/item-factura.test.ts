@@ -8,6 +8,11 @@ import { InMemoryColaSincronizacion } from '../cola-repository';
 import { procesarCola, resolverConflicto } from '../procesador';
 import type { ClienteSincronizacion } from '../procesador';
 import type { TipoItem } from '../types';
+import type { IdGenerator } from '../../shared/ports';
+
+let _seq = 0;
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seq).padStart(4, '0')}` };
+beforeEach(() => { _seq = 0; });
 
 describe('TipoItem extendido con FACTURA', () => {
   it('debería aceptar tipo "FACTURA" al armar un item de cola', () => {
@@ -15,7 +20,7 @@ describe('TipoItem extendido con FACTURA', () => {
       tipo: 'FACTURA',
       payload: { id: 'FAC-001', numeroFactura: 'MZ-001-2981' },
       hashLocal: 'hashFactura',
-    });
+    }, idGen);
 
     expect(item.tipo).toBe('FACTURA');
     expect(item.estado).toBe('PENDIENTE');
@@ -38,7 +43,7 @@ describe('FACTURA con dependeDe LIQUIDACION', () => {
       tipo: 'LIQUIDACION',
       payload: { id: 'LIQ-001', total: 17000 },
       hashLocal: 'hashLiq',
-    });
+    }, idGen);
     await cola.guardar(itemLiq);
 
     const itemFac = agregarItemACola({
@@ -46,7 +51,7 @@ describe('FACTURA con dependeDe LIQUIDACION', () => {
       payload: { id: 'FAC-001', numeroFactura: 'MZ-001-2981' },
       hashLocal: 'hashFac',
       dependeDe: [itemLiq.id],
-    });
+    }, idGen);
     await cola.guardar(itemFac);
 
     await procesarCola(cola, cliente);
@@ -68,7 +73,7 @@ describe('FACTURA con dependeDe LIQUIDACION', () => {
         tipo: 'LIQUIDACION',
         payload: { id: 'LIQ-002', total: 18000 },
         hashLocal: 'hashLiq2',
-      }),
+      }, idGen),
       estado: 'FALLIDO' as const,
     };
     await cola.guardar(itemLiqFallido);
@@ -78,7 +83,7 @@ describe('FACTURA con dependeDe LIQUIDACION', () => {
       payload: { id: 'FAC-002', numeroFactura: 'MZ-001-2982' },
       hashLocal: 'hashFac2',
       dependeDe: [itemLiqFallido.id],
-    });
+    }, idGen);
     await cola.guardar(itemFac);
 
     await procesarCola(cola, cliente);
@@ -105,7 +110,7 @@ describe('FACTURA conflicto por hash mismatch', () => {
       tipo: 'FACTURA',
       payload: { id: 'FAC-100', numeroFactura: 'MZ-001-2999' },
       hashLocal: 'hashLocal',
-    });
+    }, idGen);
     await cola.guardar(itemFac);
 
     await procesarCola(cola, cliente);
@@ -131,7 +136,7 @@ describe('DecisionConflicto sobre FACTURA', () => {
       tipo: 'FACTURA',
       payload: { id: 'FAC-300', numeroFactura: 'MZ-001-3000' },
       hashLocal: 'local',
-    });
+    }, idGen);
     await cola.guardar(item);
     await procesarCola(cola, cliente);
     return { cola, item };

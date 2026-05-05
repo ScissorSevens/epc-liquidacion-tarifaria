@@ -28,6 +28,11 @@ import {
 } from '../sincronizacion';
 import { ClienteHTTPSincronizacion } from '../cliente-http';
 import type { ParametrosTarifa } from '../motor-tarifario/types';
+import type { IdGenerator } from '../shared/ports';
+
+let _seq = 0;
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seq).padStart(4, '0')}` };
+beforeEach(() => { _seq = 0; });
 
 // Tarifas de referencia (CRA Res. 688/2014, valores estilizados)
 const PARAMETROS: ParametrosTarifa = {
@@ -110,27 +115,27 @@ describe('E2E: integración del núcleo TS', () => {
         tipo: 'LECTURA',
         payload: lectura,
         hashLocal: 'hash-lectura-1001',
-      });
+      }, idGen);
 
       const itemLiquidacion = agregarItemACola({
         tipo: 'LIQUIDACION',
         payload: liquidacion,
         hashLocal: liquidacion.hash,
         dependeDe: [itemLectura.id],
-      });
+      }, idGen);
 
       const itemAuditLectura = agregarItemACola({
         tipo: 'EVENTO_AUDITORIA',
         payload: eventoLectura,
         hashLocal: eventoLectura.hash,
-      });
+      }, idGen);
 
       const itemAuditLiquidacion = agregarItemACola({
         tipo: 'EVENTO_AUDITORIA',
         payload: eventoLiquidacion,
         hashLocal: eventoLiquidacion.hash,
         dependeDe: [itemAuditLectura.id],
-      });
+      }, idGen);
 
       await cola.guardar(itemLectura);
       await cola.guardar(itemLiquidacion);
@@ -215,7 +220,7 @@ describe('E2E: integración del núcleo TS', () => {
         tipo: 'LIQUIDACION',
         payload: liquidacion,
         hashLocal: liquidacion.hash,
-      });
+      }, idGen);
       await cola.guardar(item);
 
       const cliente = new ClienteHTTPSincronizacion({
