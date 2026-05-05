@@ -52,3 +52,40 @@ export interface ResultadoParseo {
   readonly filas: ReadonlyArray<FilaCSV>;
   readonly errores: ReadonlyArray<ErrorParseo>;
 }
+
+/**
+ * Motivo por el que una fila (o parte de ella) NO fue persistida pero
+ * tampoco constituye un error: simplemente la entidad ya existia.
+ *
+ *  - 'suscriptor_duplicado': la fila trae `codigo` que ya existe en BD.
+ *    El suscriptor no se crea pero el medidor SI se intenta (asociado
+ *    al suscriptor existente — caso real: cliente registrado al que se
+ *    le instala un medidor adicional).
+ *  - 'medidor_duplicado': la fila trae `numero_medidor` que ya existe.
+ *    El medidor no se crea (el suscriptor SI se crea si era nuevo).
+ */
+export type MotivoSalto = 'suscriptor_duplicado' | 'medidor_duplicado';
+
+export interface ItemSaltado {
+  readonly linea: number;
+  readonly motivo: MotivoSalto;
+  readonly codigo?: string;
+  readonly numero_medidor?: string;
+}
+
+/**
+ * Error ocurrido durante la persistencia de una fila (FK invalida,
+ * CHECK constraint, etc.). NO aborta el lote: la siguiente fila se
+ * procesa igual.
+ */
+export interface ErrorImportacion {
+  readonly linea: number;
+  readonly mensaje: string;
+}
+
+export interface ResultadoImportacion {
+  readonly suscriptoresCreados: number;
+  readonly medidoresCreados: number;
+  readonly saltados: ReadonlyArray<ItemSaltado>;
+  readonly errores: ReadonlyArray<ErrorImportacion>;
+}
