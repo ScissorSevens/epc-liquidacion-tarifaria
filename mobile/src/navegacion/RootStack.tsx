@@ -11,11 +11,13 @@ import type {
 } from '@dominio/motor-tarifario/types';
 
 import AltaSuscriptor from '../pantallas/AltaSuscriptor';
+import CapturarLectura from '../pantallas/CapturarLectura';
 import DetalleSuscriptor from '../pantallas/DetalleSuscriptor';
 import HolaMediApp from '../pantallas/HolaMediApp';
 import Home from '../pantallas/Home';
 import ImportarCsv from '../pantallas/ImportarCsv';
 import ListaSuscriptores from '../pantallas/ListaSuscriptores';
+import ResultadoCalculo from '../pantallas/ResultadoCalculo';
 
 /**
  * Mapa de rutas del stack raíz.
@@ -64,6 +66,8 @@ export default function RootStack() {
       <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
       <Stack.Screen name="HolaMediApp" component={HolaMediApp} />
       <Stack.Screen name="DetalleSuscriptor" component={DetalleSuscriptor} />
+      <Stack.Screen name="CapturarLectura" component={CapturarLectura} />
+      <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
     </Stack.Navigator>
   );
 }
