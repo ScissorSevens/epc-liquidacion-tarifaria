@@ -18,6 +18,13 @@ import type { Medidor } from '../../medidores/types';
 import type { Periodo } from '../../periodos/types';
 import type { Operario } from '../../operarios/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
+import type { Hasher, IdGenerator } from '../../shared/ports';
+
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${input.length}` };
+let __uuidContador = 0;
+const idGen: IdGenerator = {
+  uuid: () => `uuid-fake-${String(++__uuidContador).padStart(8, '0')}`,
+};
 
 function suscriptorBase(): Suscriptor {
   return {
@@ -106,7 +113,7 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
 describe('emitirFacturaConRepo — happy path', () => {
   it('invoca emitirFactura puro, asigna id UUID y persiste via repo', async () => {
     const repo = crearFacturaRepositoryInMemory();
-    const factura = await emitirFacturaConRepo(inputBase(), repo);
+    const factura = await emitirFacturaConRepo(inputBase(), repo, hasher, idGen);
 
     expect(factura.estado).toBe('BORRADOR');
     expect(factura.id).not.toBe('');
@@ -121,7 +128,7 @@ describe('emitirFacturaConRepo — unicidad de numero_factura por periodo', () =
   it('lanza NUMERO_FACTURA_DUPLICADO_EN_PERIODO si ya existe factura con mismo numero en el periodo', async () => {
     const repo = crearFacturaRepositoryInMemory();
     // Primera emision: consecutivo 1 → numero_factura "MZ-001-1" en periodo 202601.
-    await emitirFacturaConRepo(inputBase(), repo);
+    await emitirFacturaConRepo(inputBase(), repo, hasher, idGen);
 
     // Segunda emision con MISMO consecutivo y MISMO periodo → mismo numero_factura.
     // Cambiamos liquidacion para no chocar con LIQUIDACION_YA_FACTURADA primero.
@@ -129,7 +136,7 @@ describe('emitirFacturaConRepo — unicidad de numero_factura por periodo', () =
       liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
     });
 
-    await expect(emitirFacturaConRepo(inputDuplicado, repo)).rejects.toThrow(
+    await expect(emitirFacturaConRepo(inputDuplicado, repo, hasher, idGen)).rejects.toThrow(
       MENSAJES_ERROR_FACTURA.NUMERO_FACTURA_DUPLICADO_EN_PERIODO,
     );
   });
@@ -139,13 +146,13 @@ describe('emitirFacturaConRepo — unicidad de liquidacion', () => {
   it('lanza LIQUIDACION_YA_FACTURADA si ya existe factura con la misma liquidacion', async () => {
     const repo = crearFacturaRepositoryInMemory();
     // Primera emision con liquidacion AAA, consecutivo 1.
-    await emitirFacturaConRepo(inputBase(), repo);
+    await emitirFacturaConRepo(inputBase(), repo, hasher, idGen);
 
     // Segunda emision con MISMA liquidacion pero consecutivo 2 (numero_factura distinto).
     // Debe rechazar por LIQUIDACION_YA_FACTURADA, no por numero duplicado.
     const inputMismaLiq = inputBase({ consecutivo: 2 });
 
-    await expect(emitirFacturaConRepo(inputMismaLiq, repo)).rejects.toThrow(
+    await expect(emitirFacturaConRepo(inputMismaLiq, repo, hasher, idGen)).rejects.toThrow(
       MENSAJES_ERROR_FACTURA.LIQUIDACION_YA_FACTURADA,
     );
   });
@@ -154,7 +161,7 @@ describe('emitirFacturaConRepo — unicidad de liquidacion', () => {
 describe('anularFacturaConRepo — happy path', () => {
   it('recupera factura, llama anularFactura puro y persiste cambios via repo.actualizar', async () => {
     const repo = crearFacturaRepositoryInMemory();
-    const factura = await emitirFacturaConRepo(inputBase(), repo);
+    const factura = await emitirFacturaConRepo(inputBase(), repo, hasher, idGen);
     // Transicion a EMITIDA via repo.actualizar (anularFactura puro solo
     // permite anular desde EMITIDA, no desde BORRADOR).
     await repo.actualizar(factura.id, { estado: 'EMITIDA' });
@@ -178,7 +185,7 @@ describe('anularFacturaConRepo — happy path', () => {
 describe('anularFacturaConRepo — persiste fecha_anulacion (W1)', () => {
   it('la factura recuperada del repo tiene fecha_anulacion no vacia', async () => {
     const repo = crearFacturaRepositoryInMemory();
-    const factura = await emitirFacturaConRepo(inputBase(), repo);
+    const factura = await emitirFacturaConRepo(inputBase(), repo, hasher, idGen);
     await repo.actualizar(factura.id, { estado: 'EMITIDA' });
 
     await anularFacturaConRepo(factura.id, 'liquidacion corregida', repo);
@@ -194,7 +201,7 @@ describe('corregirFacturaConRepo — happy path', () => {
   it('valida facturaOriginal en repo, corrige puro, persiste UPDATE+CREATE y retorna pareja', async () => {
     const repo = crearFacturaRepositoryInMemory();
     // Setup: persistir factura original (con liquidacion AAA), transicionar a EMITIDA.
-    const original = await emitirFacturaConRepo(inputBase(), repo);
+    const original = await emitirFacturaConRepo(inputBase(), repo, hasher, idGen);
     await repo.actualizar(original.id, { estado: 'EMITIDA' });
     const originalEmitida = (await repo.buscarPorId(original.id))!;
 
@@ -210,7 +217,7 @@ describe('corregirFacturaConRepo — happy path', () => {
         consecutivoNuevo: 2,
         fechaEmision: '2026-02-15',
       },
-      repo,
+      repo, hasher, idGen
     );
 
     // Aserciones del puro propagadas + persistencia.

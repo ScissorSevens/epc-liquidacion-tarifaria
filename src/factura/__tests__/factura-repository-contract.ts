@@ -37,6 +37,9 @@ import type { Medidor } from '../../medidores/types';
 import type { Periodo } from '../../periodos/types';
 import type { Operario } from '../../operarios/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
+import type { Hasher } from '../../shared/ports';
+
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${input.length}` };
 
 // ---------- Builders compartidos ----------
 
@@ -156,7 +159,7 @@ export function runFacturaRepositoryContract(
 
   describe(`${nombre} — crear + buscarPorId`, () => {
     it('crear persiste la factura y buscarPorId la recupera por id', async () => {
-      const factura = emitirFactura(inputBase());
+      const factura = emitirFactura(inputBase(), hasher);
       const creada = await repo.crear(factura);
       const recuperada = await repo.buscarPorId(factura.id);
       expect(creada).toEqual(factura);
@@ -171,7 +174,7 @@ export function runFacturaRepositoryContract(
 
   describe(`${nombre} — buscarPorPeriodo`, () => {
     it('retorna solo las facturas cuyo snapshot.periodo.id_periodo coincide', async () => {
-      const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+      const f1 = { ...emitirFactura(inputBase(), hasher), id: 'uuid-1' };
       const periodoFebrero: Periodo = {
         ...periodoBase(),
         id_periodo: '202602',
@@ -186,7 +189,7 @@ export function runFacturaRepositoryContract(
             consecutivo: 2,
             fechaEmision: '2026-03-01',
             liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
-          }),
+          }), hasher
         ),
         id: 'uuid-2',
       };
@@ -195,7 +198,7 @@ export function runFacturaRepositoryContract(
           inputBase({
             consecutivo: 3,
             liquidacion: liquidacionConId('cccccccc-cccc-cccc-cccc-cccccccccccc'),
-          }),
+          }), hasher
         ),
         id: 'uuid-3',
       };
@@ -222,7 +225,7 @@ export function runFacturaRepositoryContract(
         codigo: '2',
         nombre_apellidos: 'Juan Pérez',
       };
-      const f1 = { ...emitirFactura(inputBase({ suscriptor: suscriptor1 })), id: 'uuid-1' };
+      const f1 = { ...emitirFactura(inputBase({ suscriptor: suscriptor1 }), hasher), id: 'uuid-1' };
       const medidor2: Medidor = { ...medidorBase(), id_suscriptor: 2 };
       const f2 = {
         ...emitirFactura(
@@ -231,7 +234,7 @@ export function runFacturaRepositoryContract(
             medidor: medidor2,
             consecutivo: 2,
             liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
-          }),
+          }), hasher
         ),
         id: 'uuid-2',
       };
@@ -252,13 +255,13 @@ export function runFacturaRepositoryContract(
     it('retorna todas las facturas persistidas en orden de insercion', async () => {
       expect(await repo.listar()).toEqual([]);
 
-      const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+      const f1 = { ...emitirFactura(inputBase(), hasher), id: 'uuid-1' };
       const f2 = {
         ...emitirFactura(
           inputBase({
             consecutivo: 2,
             liquidacion: liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
-          }),
+          }), hasher
         ),
         id: 'uuid-2',
       };
@@ -272,7 +275,7 @@ export function runFacturaRepositoryContract(
 
   describe(`${nombre} — actualizar (happy path)`, () => {
     it('aplica cambios parciales y retorna la factura actualizada persistida', async () => {
-      const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+      const f1 = { ...emitirFactura(inputBase(), hasher), id: 'uuid-1' };
       await repo.crear(f1);
 
       const actualizada = await repo.actualizar('uuid-1', {
@@ -301,7 +304,7 @@ export function runFacturaRepositoryContract(
   describe(`${nombre} — actualizar persiste fecha_anulacion (W1)`, () => {
     it('al anular con fecha_anulacion, buscarPorId la devuelve íntegra', async () => {
       const emitida = {
-        ...emitirFactura(inputBase()),
+        ...emitirFactura(inputBase(), hasher),
         id: 'uuid-w1',
         estado: 'EMITIDA' as const,
       };
@@ -323,7 +326,7 @@ export function runFacturaRepositoryContract(
   describe(`${nombre} — actualizar valida transiciones legales (4.4)`, () => {
     it('lanza TRANSICION_ILEGAL al intentar ANULADA → EMITIDA con cause estructurada', async () => {
       const anulada = {
-        ...emitirFactura(inputBase()),
+        ...emitirFactura(inputBase(), hasher),
         id: 'uuid-anulada',
         estado: 'ANULADA' as const,
       };
@@ -347,7 +350,7 @@ export function runFacturaRepositoryContract(
 
     it('triangulación: rechaza PAGADA → EMITIDA con cause estructurada', async () => {
       const pagada = {
-        ...emitirFactura(inputBase()),
+        ...emitirFactura(inputBase(), hasher),
         id: 'uuid-pagada',
         estado: 'PAGADA' as const,
       };
@@ -371,7 +374,7 @@ export function runFacturaRepositoryContract(
 
     it('idempotente: NO lanza cuando estado nuevo === estado actual (PAGADA → PAGADA)', async () => {
       const pagada = {
-        ...emitirFactura(inputBase()),
+        ...emitirFactura(inputBase(), hasher),
         id: 'uuid-idem',
         estado: 'PAGADA' as const,
       };
@@ -386,10 +389,10 @@ export function runFacturaRepositoryContract(
   describe(`${nombre} — crear valida unicidad por liquidacion_id (D7)`, () => {
     it('lanza RESTRICCION_UNICIDAD si ya existe factura no-anulada con la misma liquidacion_id', async () => {
       const liqId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-      const f1 = { ...emitirFactura(inputBase()), id: 'uuid-1' };
+      const f1 = { ...emitirFactura(inputBase(), hasher), id: 'uuid-1' };
       await repo.crear(f1);
 
-      const f2 = { ...emitirFactura(inputBase({ consecutivo: 2 })), id: 'uuid-2' };
+      const f2 = { ...emitirFactura(inputBase({ consecutivo: 2 }), hasher), id: 'uuid-2' };
       expect(f2.snapshot.liquidacion.id).toBe(liqId);
 
       let capturado: Error | null = null;
@@ -410,14 +413,14 @@ export function runFacturaRepositoryContract(
     it('permite crear nueva factura si la única existente con ese liquidacion_id está ANULADA', async () => {
       const liqId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
       const f1 = {
-        ...emitirFactura(inputBase()),
+        ...emitirFactura(inputBase(), hasher),
         id: 'uuid-anulada',
         estado: 'ANULADA' as const,
       };
       await repo.crear(f1);
 
       const f2 = {
-        ...emitirFactura(inputBase({ consecutivo: 2 })),
+        ...emitirFactura(inputBase({ consecutivo: 2 }), hasher),
         id: 'uuid-nueva',
       };
       expect(f2.snapshot.liquidacion.id).toBe(liqId);
@@ -432,7 +435,7 @@ export function runFacturaRepositoryContract(
     it('actualizar a ANULADA libera el liquidacion_id para que un crear posterior funcione', async () => {
       const liqId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
       const f1 = {
-        ...emitirFactura(inputBase()),
+        ...emitirFactura(inputBase(), hasher),
         id: 'uuid-1',
         estado: 'EMITIDA' as const,
       };
@@ -445,7 +448,7 @@ export function runFacturaRepositoryContract(
       });
 
       const f2 = {
-        ...emitirFactura(inputBase({ consecutivo: 2 })),
+        ...emitirFactura(inputBase({ consecutivo: 2 }), hasher),
         id: 'uuid-2',
       };
       expect(f2.snapshot.liquidacion.id).toBe(liqId);

@@ -14,6 +14,9 @@ import { emitirFactura } from '../factura';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
 import type { EmitirFacturaInput } from '../types';
+import type { Hasher } from '../../shared/ports';
+
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${input.length}` };
 
 function crearDirTmp(): string {
   return mkdtempSync(join(tmpdir(), 'epc-bootstrap-'));
@@ -132,7 +135,7 @@ describe('crearBootstrapFacturaSqlite', () => {
     const dbPath = join(tmpDir, 'factura-e2e.db');
     const bootstrap = crearBootstrapFacturaSqlite({ dbPath });
     try {
-      const factura = emitirFactura(inputE2E());
+      const factura = emitirFactura(inputE2E(), hasher);
 
       // crear → la factura se persiste y el round-trip preserva campos
       const creada = await bootstrap.repository.crear(factura);

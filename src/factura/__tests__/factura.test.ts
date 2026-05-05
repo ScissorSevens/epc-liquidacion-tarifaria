@@ -14,6 +14,15 @@ import type { Medidor } from '../../medidores/types';
 import type { Periodo } from '../../periodos/types';
 import type { Operario } from '../../operarios/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
+import type { Hasher } from '../../shared/ports';
+
+// Fake hasher determinista por contenido (mismo input → mismo output, sin crypto real).
+function fakeChecksum(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${fakeChecksum(input)}` };
 
 // Helpers locales: construyen aggregates mínimos válidos para tests.
 // NO son shared builders: cada test compone su input adaptándolos inline.
@@ -113,7 +122,7 @@ function inputBase(): EmitirFacturaInput {
  * armamos manualmente el equivalente a "ya emitida" — sin tocar el repo.
  */
 function facturaEmitidaBase(overrides: Partial<Factura> = {}): Factura {
-  const borrador = emitirFactura(inputBase());
+  const borrador = emitirFactura(inputBase(), hasher);
   return Object.freeze({
     ...borrador,
     estado: 'EMITIDA' as const,
@@ -123,14 +132,14 @@ function facturaEmitidaBase(overrides: Partial<Factura> = {}): Factura {
 
 describe('emitirFactura — happy path', () => {
   it('devuelve Factura con estado BORRADOR', () => {
-    const factura = emitirFactura(inputBase());
+    const factura = emitirFactura(inputBase(), hasher);
     expect(factura.estado).toBe('BORRADOR');
   });
 
   it('formatea numero_factura como {dispositivo_id}-{consecutivo} con padding', () => {
     const input = inputBase();
     const operario = { ...operarioBase(), dispositivo_id: 'MZ-001' };
-    const factura = emitirFactura({ ...input, operario, consecutivo: 2981 });
+    const factura = emitirFactura({ ...input, operario, consecutivo: 2981 }, hasher);
     expect(factura.numero_factura).toBe('MZ-001-2981');
   });
 
@@ -142,7 +151,7 @@ describe('emitirFactura — happy path', () => {
       direccion: 'Carrera 7 #14-30',
       estrato: 3,
     };
-    const factura = emitirFactura({ ...inputBase(), suscriptor });
+    const factura = emitirFactura({ ...inputBase(), suscriptor }, hasher);
     expect(factura.snapshot.suscriptor).toEqual({
       codigo: '00042',
       nombre_apellidos: 'Carlos Ruiz',
@@ -154,7 +163,7 @@ describe('emitirFactura — happy path', () => {
 
   it('snapshotea medidor (numero_medidor) y lo congela', () => {
     const medidor: Medidor = { ...medidorBase(), numero_medidor: 'MED-9999' };
-    const factura = emitirFactura({ ...inputBase(), medidor });
+    const factura = emitirFactura({ ...inputBase(), medidor }, hasher);
     expect(factura.snapshot.medidor).toEqual({ numero_medidor: 'MED-9999' });
     expect(Object.isFrozen(factura.snapshot.medidor)).toBe(true);
   });
@@ -169,7 +178,7 @@ describe('emitirFactura — happy path', () => {
       fecha_pago_con_recargo: '2026-04-30',
       dias_consumo: 30,
     };
-    const factura = emitirFactura({ ...inputBase(), periodo, fechaEmision: '2026-04-01' });
+    const factura = emitirFactura({ ...inputBase(), periodo, fechaEmision: '2026-04-01' }, hasher);
     expect(factura.snapshot.periodo).toEqual({
       id_periodo: '202603',
       fecha_inicio: '2026-03-01',
@@ -188,7 +197,7 @@ describe('emitirFactura — happy path', () => {
       nombre: 'Pedro Sánchez',
       dispositivo_id: 'MZ-007',
     };
-    const factura = emitirFactura({ ...inputBase(), operario });
+    const factura = emitirFactura({ ...inputBase(), operario }, hasher);
     expect(factura.snapshot.operario).toEqual({
       id_operario: 42,
       nombre: 'Pedro Sánchez',
@@ -215,7 +224,7 @@ describe('emitirFactura — happy path', () => {
       resultado,
     };
     const liquidacion: Liquidacion = { ...base, hash: calcularHash(base) };
-    const factura = emitirFactura({ ...inputBase(), liquidacion });
+    const factura = emitirFactura({ ...inputBase(), liquidacion }, hasher);
     expect(factura.snapshot.liquidacion).toEqual({
       id: '99999999-9999-9999-9999-999999999999',
       hash: liquidacion.hash,
@@ -231,28 +240,31 @@ describe('emitirFactura — happy path', () => {
       { id_periodo: '202602', consumo_m3: 21, total_facturado: 42500 },
       { id_periodo: '202603', consumo_m3: 19, total_facturado: 39250 },
     ];
-    const factura = emitirFactura({ ...inputBase(), consumosHistoricos });
+    const factura = emitirFactura({ ...inputBase(), consumosHistoricos }, hasher);
     expect(factura.snapshot.consumosHistoricos).toEqual(consumosHistoricos);
     expect(Object.isFrozen(factura.snapshot.consumosHistoricos)).toBe(true);
     expect(Object.isFrozen(factura.snapshot.consumosHistoricos[0])).toBe(true);
   });
 
-  it('calcula hash SHA-256 reproducible y determinístico sobre snapshot+numero+fechaEmision', () => {
+  it('calcula hash reproducible y determinístico sobre snapshot+numero+fechaEmision usando el Hasher inyectado', () => {
     const input = inputBase();
-    const a = emitirFactura(input);
-    const b = emitirFactura(input);
+    const a = emitirFactura(input, hasher);
+    const b = emitirFactura(input, hasher);
     expect(a.hash).toBe(b.hash);
-    expect(a.hash).toMatch(/^[a-f0-9]{64}$/);
+    // El formato SHA-256 (hex 64 chars) es responsabilidad del adapter Hasher,
+    // testeado en src/shared/adapters/__tests__/hasher-js.test.ts.
+    // Acá solo validamos que factura usa el Hasher inyectado y produce hash no vacío.
+    expect(a.hash).toMatch(/^hash-fake-/);
   });
 
   it('hash cambia si cambia cualquier campo del snapshot', () => {
-    const a = emitirFactura(inputBase());
-    const b = emitirFactura({ ...inputBase(), consecutivo: 2 });
+    const a = emitirFactura(inputBase(), hasher);
+    const b = emitirFactura({ ...inputBase(), consecutivo: 2 }, hasher);
     expect(a.hash).not.toBe(b.hash);
   });
 
   it('factura entera está congelada (mutación lanza en strict)', () => {
-    const factura = emitirFactura(inputBase());
+    const factura = emitirFactura(inputBase(), hasher);
     expect(Object.isFrozen(factura)).toBe(true);
     expect(Object.isFrozen(factura.snapshot)).toBe(true);
     expect(() => {
@@ -261,12 +273,12 @@ describe('emitirFactura — happy path', () => {
   });
 
   it('snapshotea observaciones cuando se proveen', () => {
-    const factura = emitirFactura({ ...inputBase(), observaciones: 'Lectura tomada con cliente presente' });
+    const factura = emitirFactura({ ...inputBase(), observaciones: 'Lectura tomada con cliente presente' }, hasher);
     expect(factura.snapshot.observaciones).toBe('Lectura tomada con cliente presente');
   });
 
   it('omite observaciones del snapshot cuando no se proveen', () => {
-    const factura = emitirFactura(inputBase());
+    const factura = emitirFactura(inputBase(), hasher);
     expect(factura.snapshot.observaciones).toBeUndefined();
   });
 });
@@ -276,56 +288,56 @@ describe('emitirFactura — validaciones de invariantes', () => {
     const base = liquidacionBase();
     const anulada = { ...base, estado: 'ANULADA' as const };
     const liquidacion: Liquidacion = { ...anulada, hash: calcularHash(anulada) };
-    expect(() => emitirFactura({ ...inputBase(), liquidacion })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), liquidacion }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.LIQUIDACION_NO_ACTIVA,
     );
   });
 
   it('rechaza si hash de liquidacion no coincide con recalculo (LIQUIDACION_INTEGRIDAD_ROTA)', () => {
     const liquidacion: Liquidacion = { ...liquidacionBase(), hash: 'hash-manipulado-1234' };
-    expect(() => emitirFactura({ ...inputBase(), liquidacion })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), liquidacion }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA,
     );
   });
 
   it('rechaza si suscriptor.estado !== activo (SUSCRIPTOR_NO_ACTIVO)', () => {
     const suscriptor: Suscriptor = { ...suscriptorBase(), estado: 'suspendido' };
-    expect(() => emitirFactura({ ...inputBase(), suscriptor })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), suscriptor }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.SUSCRIPTOR_NO_ACTIVO,
     );
   });
 
   it('rechaza si medidor.id_suscriptor !== suscriptor.id_suscriptor (MEDIDOR_NO_PERTENECE_A_SUSCRIPTOR)', () => {
     const medidor: Medidor = { ...medidorBase(), id_suscriptor: 999 };
-    expect(() => emitirFactura({ ...inputBase(), medidor })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), medidor }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.MEDIDOR_NO_PERTENECE_A_SUSCRIPTOR,
     );
   });
 
   it('rechaza si medidor.estado !== activo (MEDIDOR_NO_ACTIVO)', () => {
     const medidor: Medidor = { ...medidorBase(), estado: 'reemplazado' };
-    expect(() => emitirFactura({ ...inputBase(), medidor })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), medidor }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.MEDIDOR_NO_ACTIVO,
     );
   });
 
   it('rechaza si periodo.estado === abierto (PERIODO_NO_FACTURABLE)', () => {
     const periodo: Periodo = { ...periodoBase(), estado: 'abierto' };
-    expect(() => emitirFactura({ ...inputBase(), periodo })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), periodo }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.PERIODO_NO_FACTURABLE,
     );
   });
 
   it('rechaza si fechaEmision < periodo.fecha_fin (FECHA_EMISION_ANTES_FIN_PERIODO)', () => {
     // periodoBase: fecha_fin = '2026-01-31' → emitir el 2026-01-15 es prematuro
-    expect(() => emitirFactura({ ...inputBase(), fechaEmision: '2026-01-15' })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), fechaEmision: '2026-01-15' }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.FECHA_EMISION_ANTES_FIN_PERIODO,
     );
   });
 
   it('rechaza si operario.estado !== activo (OPERARIO_NO_ACTIVO)', () => {
     const operario: Operario = { ...operarioBase(), estado: 'inactivo' };
-    expect(() => emitirFactura({ ...inputBase(), operario })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), operario }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.OPERARIO_NO_ACTIVO,
     );
   });
@@ -333,7 +345,7 @@ describe('emitirFactura — validaciones de invariantes', () => {
   it('rechaza si operario no tiene dispositivo_id (OPERARIO_SIN_DISPOSITIVO)', () => {
     const { dispositivo_id: _omit, ...rest } = operarioBase();
     const operario = rest as Operario;
-    expect(() => emitirFactura({ ...inputBase(), operario })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), operario }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.OPERARIO_SIN_DISPOSITIVO,
     );
   });
@@ -344,7 +356,7 @@ describe('emitirFactura — validaciones de invariantes', () => {
       consumo_m3: 10 + i,
       total_facturado: 1000 * (i + 1),
     }));
-    expect(() => emitirFactura({ ...inputBase(), consumosHistoricos })).toThrow(
+    expect(() => emitirFactura({ ...inputBase(), consumosHistoricos }, hasher)).toThrow(
       MENSAJES_ERROR_FACTURA.CONSUMO_HISTORICO_INVALIDO,
     );
   });
@@ -363,7 +375,7 @@ describe('anularFactura — funcion pura', () => {
   });
 
   it('rechaza si factura no esta en EMITIDA (BORRADOR lanza FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL)', () => {
-    const borrador = emitirFactura(inputBase()); // estado BORRADOR
+    const borrador = emitirFactura(inputBase(), hasher); // estado BORRADOR
     expect(() => anularFactura(borrador, 'motivo', '2026-02-10')).toThrow(
       MENSAJES_ERROR_FACTURA.FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL,
     );

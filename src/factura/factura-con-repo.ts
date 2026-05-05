@@ -24,7 +24,7 @@
  *      a LIQUIDACION_YA_FACTURADA.
  */
 
-import { randomUUID } from 'crypto';
+import type { Hasher, IdGenerator } from '../shared/ports';
 import { emitirFactura, anularFactura, corregirFactura } from './factura';
 import {
   MENSAJES_ERROR_FACTURA,
@@ -43,8 +43,10 @@ function esRestriccionUnicidad(err: unknown): boolean {
 export async function emitirFacturaConRepo(
   input: EmitirFacturaInput,
   repo: FacturaRepository,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): Promise<Factura> {
-  const facturaPura = emitirFactura(input);
+  const facturaPura = emitirFactura(input, hasher);
 
   // Validacion de unicidad: numero_factura por periodo (sigue en orquestador
   // hasta que se modele constraint SQL UNIQUE (id_periodo, numero_factura)
@@ -56,7 +58,7 @@ export async function emitirFacturaConRepo(
 
   const facturaConId: Factura = Object.freeze({
     ...facturaPura,
-    id: randomUUID(),
+    id: idGen.uuid(),
     created_at: new Date().toISOString(),
   });
 
@@ -92,6 +94,8 @@ export async function anularFacturaConRepo(
 export async function corregirFacturaConRepo(
   input: Parameters<typeof corregirFactura>[0],
   repo: FacturaRepository,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): Promise<{ facturaAnulada: Factura; nuevoBorrador: Factura }> {
   // 1. Validar que facturaOriginal existe en repo (consistencia con el estado persistido).
   const existente = await repo.buscarPorId(input.facturaOriginal.id);
@@ -101,7 +105,7 @@ export async function corregirFacturaConRepo(
 
   // 2. Invocar corregirFactura puro. Valida coherencia liquidacionAnulada vs original
   // y produce { facturaAnulada, nuevoBorrador } con id='' en el borrador.
-  const { facturaAnulada, nuevoBorrador } = corregirFactura(input);
+  const { facturaAnulada, nuevoBorrador } = corregirFactura(input, hasher);
 
   // 3. Persistir UPDATE de la original con fecha_anulacion incluida (port
   // extendido en cycle 4.1 acepta el campo opcional).
@@ -114,7 +118,7 @@ export async function corregirFacturaConRepo(
   // 4. Asignar id UUID al nuevoBorrador y CREATE.
   const borradorConId: Factura = Object.freeze({
     ...nuevoBorrador,
-    id: randomUUID(),
+    id: idGen.uuid(),
     created_at: new Date().toISOString(),
   });
   const borradorPersistido = await repo.crear(borradorConId);

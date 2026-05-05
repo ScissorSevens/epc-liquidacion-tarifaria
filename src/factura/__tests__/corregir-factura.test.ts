@@ -24,6 +24,14 @@ import type { Medidor } from '../../medidores/types';
 import type { Periodo } from '../../periodos/types';
 import type { Operario } from '../../operarios/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
+import type { Hasher } from '../../shared/ports';
+
+function fakeChecksum(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${fakeChecksum(input)}` };
 
 function suscriptorBase(): Suscriptor {
   return {
@@ -117,7 +125,7 @@ function inputBaseConLiquidacion(liquidacion: Liquidacion): EmitirFacturaInput {
 
 /** Factura "ya emitida" (BORRADOR forzado a EMITIDA, mismo patrón que factura.test.ts). */
 function facturaOriginalConLiquidacion(liquidacion: Liquidacion): Factura {
-  const borrador = emitirFactura(inputBaseConLiquidacion(liquidacion));
+  const borrador = emitirFactura(inputBaseConLiquidacion(liquidacion), hasher);
   return Object.freeze({ ...borrador, estado: 'EMITIDA' as const });
 }
 
@@ -133,7 +141,7 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 2,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     expect(resultado).toHaveProperty('facturaAnulada');
     expect(resultado).toHaveProperty('nuevoBorrador');
@@ -150,7 +158,7 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 2,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     expect(Object.isFrozen(facturaAnulada)).toBe(true);
     expect(Object.isFrozen(facturaAnulada.snapshot)).toBe(true);
@@ -172,7 +180,7 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 99,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     expect(facturaAnulada.numero_factura).toBe(numeroOriginal);
     expect(facturaAnulada.estado).toBe('ANULADA');
@@ -189,7 +197,7 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 2,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     expect(nuevoBorrador.snapshot.liquidacion.id).toBe(liqNueva.id);
     expect(nuevoBorrador.snapshot.liquidacion.hash).toBe(liqNueva.hash);
@@ -211,7 +219,7 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 42,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     expect(nuevoBorrador.numero_factura).toContain('42');
     expect(nuevoBorrador.numero_factura).not.toBe(numeroOriginal);
@@ -230,7 +238,7 @@ describe('corregirFactura — orquestador puro', () => {
         liquidacionNueva: liqNueva,
         consecutivoNuevo: 2,
         fechaEmision: '2026-02-15',
-      }),
+      }, hasher),
     ).toThrow(MENSAJES_ERROR_FACTURA.CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE);
   });
 
@@ -245,12 +253,13 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 42,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     const hashEsperado = calcularHashFactura(
       nuevoBorrador.snapshot,
       nuevoBorrador.numero_factura,
       nuevoBorrador.fecha_emision,
+      hasher,
     );
     expect(nuevoBorrador.hash).toBe(hashEsperado);
     // y NO debe ser el hash del original (snapshot cambió)
@@ -268,7 +277,7 @@ describe('corregirFactura — orquestador puro', () => {
       liquidacionNueva: liqNueva,
       consecutivoNuevo: 2,
       fechaEmision: '2026-02-15',
-    });
+    }, hasher);
 
     // Anulación es metadata fuera del snapshot — hash del snapshot no cambia.
     expect(facturaAnulada.hash).toBe(facturaOriginal.hash);

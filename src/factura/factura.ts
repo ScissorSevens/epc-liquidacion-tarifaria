@@ -6,7 +6,7 @@
  * inmutabilidad recursiva.
  */
 
-import { createHash } from 'crypto';
+import type { Hasher } from '../shared/ports';
 import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
 import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type EstadoFactura, type Factura, type FacturaSnapshot } from './types';
@@ -43,6 +43,7 @@ export function calcularHashFactura(
   snapshot: FacturaSnapshot,
   numeroFactura: string,
   fechaEmision: string,
+  hasher: Hasher,
 ): string {
   const payload = JSON.stringify({
     numero_factura: numeroFactura,
@@ -57,10 +58,10 @@ export function calcularHashFactura(
       observaciones: snapshot.observaciones ?? null,
     },
   });
-  return createHash('sha256').update(payload).digest('hex');
+  return hasher.sha256(payload);
 }
 
-export function emitirFactura(input: EmitirFacturaInput): Factura {
+export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factura {
   if (!verificarIntegridad(input.liquidacion)) {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
   }
@@ -138,7 +139,7 @@ export function emitirFactura(input: EmitirFacturaInput): Factura {
     consumosHistoricos: consumosHistoricosSnapshot,
     ...(input.observaciones !== undefined && { observaciones: input.observaciones }),
   };
-  const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision);
+  const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision, hasher);
   return deepFreeze({
     id: '',
     numero_factura,
@@ -226,7 +227,7 @@ export function corregirFactura(input: {
   consecutivoNuevo: number;
   fechaEmision: string;
   observaciones?: string;
-}): { facturaAnulada: Factura; nuevoBorrador: Factura } {
+}, hasher: Hasher): { facturaAnulada: Factura; nuevoBorrador: Factura } {
   if (input.liquidacionAnulada.id !== input.facturaOriginal.snapshot.liquidacion.id) {
     throw new Error(MENSAJES_ERROR_FACTURA.CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE);
   }
@@ -248,7 +249,7 @@ export function corregirFactura(input: {
       resultado: { ...input.liquidacionNueva.resultado },
     },
   };
-  const nuevoHash = calcularHashFactura(nuevoSnapshot, nuevoNumeroFactura, input.fechaEmision);
+  const nuevoHash = calcularHashFactura(nuevoSnapshot, nuevoNumeroFactura, input.fechaEmision, hasher);
   const nuevoBorrador = deepFreeze({
     ...input.facturaOriginal,
     id: '',
