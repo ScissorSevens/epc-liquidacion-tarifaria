@@ -76,6 +76,10 @@ const SQL_INSERT = `
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
 const SQL_SELECT_BY_CODIGO = `SELECT * FROM suscriptor WHERE codigo = ?`;
 const SQL_EXISTE_POR_CODIGO = `SELECT 1 FROM suscriptor WHERE codigo = ? LIMIT 1`;
+// Listar ordenado por codigo ASC: es el orden natural de presentacion
+// para listas de clientes (catalogo). El usuario reconoce el codigo
+// EPC mas rapido que el id interno autoincremental.
+const SQL_LISTAR = `SELECT * FROM suscriptor ORDER BY codigo ASC`;
 
 function traducirErrorAdapter(err: unknown, ctx: { codigo?: string }): Error {
   const mapeado = mapearErrorSqlite(err, { tabla: 'suscriptor' });
@@ -97,6 +101,7 @@ export function crearSuscriptorRepositorySqlite(
   const stmtSelectById = db.prepare(SQL_SELECT_BY_ID);
   const stmtSelectByCodigo = db.prepare(SQL_SELECT_BY_CODIGO);
   const stmtExistePorCodigo = db.prepare(SQL_EXISTE_POR_CODIGO);
+  const stmtListar = db.prepare(SQL_LISTAR);
 
   function toInsertParams(s: SuscriptorBorrador): Record<string, unknown> {
     return {
@@ -142,15 +147,20 @@ export function crearSuscriptorRepositorySqlite(
     },
 
     async listar(): Promise<Suscriptor[]> {
-      throw new Error('listar: no implementado');
+      const rows = stmtListar.all() as SuscriptorRow[];
+      return rows.map(fromRow);
     },
 
     async actualizar(_id: number, _cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
-      throw new Error('actualizar: no implementado');
+      throw new Error(
+        'actualizar: no implementado todavia — fuera de scope MVP, ver post-entrega',
+      );
     },
 
     async eliminar(_id: number): Promise<void> {
-      throw new Error('eliminar: no implementado');
+      throw new Error(
+        'eliminar: no implementado todavia — fuera de scope MVP, ver post-entrega',
+      );
     },
 
     cerrar(): void {
