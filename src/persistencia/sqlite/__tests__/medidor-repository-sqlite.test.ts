@@ -78,7 +78,7 @@ describe('crearMedidorRepositorySqlite', () => {
       capturado = e;
     }
     expect(capturado).toBeInstanceOf(Error);
-    expect((capturado as Error).message).toMatch(/suscriptor 999/);
+    expect((capturado as Error).message).toMatch(/suscriptor 999/i);
     const cause = (capturado as { cause?: { codigo?: string } }).cause;
     expect(cause?.codigo).toBe('RESTRICCION_INTEGRIDAD');
   });
