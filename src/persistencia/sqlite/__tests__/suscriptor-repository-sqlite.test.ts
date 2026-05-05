@@ -79,4 +79,33 @@ describe('crearSuscriptorRepositorySqlite', () => {
     const repo = crearSuscriptorRepositorySqlite(db);
     expect(await repo.existePorCodigo('9999')).toBe(false);
   });
+
+  it('crear() lanza error con codigo RESTRICCION_UNICIDAD si codigo duplicado', async () => {
+    const repo = crearSuscriptorRepositorySqlite(db);
+    await repo.crear(suscriptorBase({ codigo: '0099' }));
+    let capturado: unknown;
+    try {
+      await repo.crear(suscriptorBase({ codigo: '0099', nombre_apellidos: 'Otro' }));
+    } catch (e) {
+      capturado = e;
+    }
+    expect(capturado).toBeInstanceOf(Error);
+    expect((capturado as Error).message).toMatch(/codigo '0099'/);
+    const cause = (capturado as { cause?: { codigo?: string } }).cause;
+    expect(cause?.codigo).toBe('RESTRICCION_UNICIDAD');
+  });
+
+  it('listar() devuelve [] cuando no hay suscriptores', async () => {
+    const repo = crearSuscriptorRepositorySqlite(db);
+    expect(await repo.listar()).toEqual([]);
+  });
+
+  it('listar() devuelve los suscriptores ordenados por codigo ascendente', async () => {
+    const repo = crearSuscriptorRepositorySqlite(db);
+    await repo.crear(suscriptorBase({ codigo: '0030' }));
+    await repo.crear(suscriptorBase({ codigo: '0010' }));
+    await repo.crear(suscriptorBase({ codigo: '0020' }));
+    const lista = await repo.listar();
+    expect(lista.map((s) => s.codigo)).toEqual(['0010', '0020', '0030']);
+  });
 });
