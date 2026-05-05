@@ -179,7 +179,7 @@ function inputE2E(): EmitirFacturaInput {
   };
   const liquidacion: Liquidacion = {
     ...liquidacionBase,
-    hash: calcularHash(liquidacionBase),
+    hash: calcularHash(liquidacionBase, hasher),
   };
   return {
     suscriptor: {

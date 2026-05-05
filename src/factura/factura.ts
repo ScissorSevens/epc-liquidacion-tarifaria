@@ -62,7 +62,7 @@ export function calcularHashFactura(
 }
 
 export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factura {
-  if (!verificarIntegridad(input.liquidacion)) {
+  if (!verificarIntegridad(input.liquidacion, hasher)) {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
   }
   if (input.liquidacion.estado !== 'ACTIVA') {

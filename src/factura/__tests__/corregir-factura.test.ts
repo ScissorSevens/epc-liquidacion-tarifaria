@@ -107,7 +107,7 @@ function liquidacionConId(id: string, resultado: ResultadoCalculo = resultadoBas
     resultado,
     estado: 'ACTIVA' as const,
   };
-  return { ...base, hash: calcularHash(base) };
+  return { ...base, hash: calcularHash(base, hasher) };
 }
 
 function inputBaseConLiquidacion(liquidacion: Liquidacion): EmitirFacturaInput {

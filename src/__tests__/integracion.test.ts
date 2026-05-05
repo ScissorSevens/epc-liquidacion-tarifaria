@@ -87,9 +87,9 @@ describe('E2E: integración del núcleo TS', () => {
       const liquidacion = crearLiquidacion({
         suscriptorId: 'med-1001',
         resultado,
-      });
+      }, hasher, idGen);
       expect(liquidacion.estado).toBe('ACTIVA');
-      expect(liquidacion.hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(liquidacion.hash).toMatch(/^hash-fake-/);
 
       // 4. Encadenamos eventos de auditoría
       const eventoLectura = registrarLecturaCapturada({
@@ -219,7 +219,7 @@ describe('E2E: integración del núcleo TS', () => {
       const liquidacion = crearLiquidacion({
         suscriptorId: 'med-2002',
         resultado,
-      });
+      }, hasher, idGen);
 
       const cola = new InMemoryColaSincronizacion();
       const item = agregarItemACola({

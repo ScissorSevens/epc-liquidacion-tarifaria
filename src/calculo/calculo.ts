@@ -1,10 +1,15 @@
 /**
  * Módulo CALCULO — Liquidaciones inmutables
+ *
+ * Hexagonal: el dominio NO depende del módulo `crypto` de Node. Recibe
+ * `Hasher` e `IdGenerator` por inyección para que el bundle Metro de
+ * React Native pueda resolverlos vía adapters universales (`js-sha256`,
+ * `uuid` con polyfill `react-native-get-random-values`).
  */
 
-import { randomUUID, createHash } from 'crypto';
 import type { Liquidacion, CrearLiquidacionInput, ContenidoHasheable } from './types';
 import type { ResultadoCalculo } from '../motor-tarifario';
+import type { Hasher, IdGenerator } from '../shared/ports';
 
 /**
  * Congela recursivamente un objeto y todos sus objetos anidados.
@@ -27,10 +32,10 @@ function deepFreeze<T>(obj: T): T {
 
 /**
  * Calcula el hash SHA-256 del contenido de una liquidación.
- * Reproducible: mismo contenido → mismo hash.
+ * Reproducible: mismo contenido + mismo Hasher → mismo hash.
  * Permite detectar manipulación de datos en la base de datos.
  */
-export function calcularHash(contenido: ContenidoHasheable): string {
+export function calcularHash(contenido: ContenidoHasheable, hasher: Hasher): string {
   // Serialización determinística — el orden de las claves importa para reproducibilidad
   const payload = JSON.stringify({
     id: contenido.id,
@@ -41,13 +46,17 @@ export function calcularHash(contenido: ContenidoHasheable): string {
     reemplazaA: contenido.reemplazaA ?? null,
   });
 
-  return createHash('sha256').update(payload).digest('hex');
+  return hasher.sha256(payload);
 }
 
-export function crearLiquidacion(input: CrearLiquidacionInput): Liquidacion {
+export function crearLiquidacion(
+  input: CrearLiquidacionInput,
+  hasher: Hasher,
+  idGenerator: IdGenerator,
+): Liquidacion {
   const resultadoClonado = JSON.parse(JSON.stringify(input.resultado));
 
-  const id = randomUUID();
+  const id = idGenerator.uuid();
   const fechaGeneracion = new Date();
   const estado = 'ACTIVA' as const;
 
@@ -57,7 +66,7 @@ export function crearLiquidacion(input: CrearLiquidacionInput): Liquidacion {
     fechaGeneracion,
     resultado: resultadoClonado,
     estado,
-  });
+  }, hasher);
 
   const liquidacion: Liquidacion = {
     id,
@@ -76,7 +85,7 @@ export function crearLiquidacion(input: CrearLiquidacionInput): Liquidacion {
  * y comparándolo con el hash almacenado.
  * Retorna false si el contenido fue manipulado.
  */
-export function verificarIntegridad(liquidacion: Liquidacion): boolean {
+export function verificarIntegridad(liquidacion: Liquidacion, hasher: Hasher): boolean {
   const hashEsperado = calcularHash({
     id: liquidacion.id,
     suscriptorId: liquidacion.suscriptorId,
@@ -84,7 +93,7 @@ export function verificarIntegridad(liquidacion: Liquidacion): boolean {
     resultado: liquidacion.resultado,
     estado: liquidacion.estado,
     reemplazaA: liquidacion.reemplazaA,
-  });
+  }, hasher);
 
   return hashEsperado === liquidacion.hash;
 }
@@ -98,10 +107,12 @@ export function verificarIntegridad(liquidacion: Liquidacion): boolean {
  */
 export function anularYReemplazar(
   original: Liquidacion,
-  resultadoCorregido: ResultadoCalculo
+  resultadoCorregido: ResultadoCalculo,
+  hasher: Hasher,
+  idGenerator: IdGenerator,
 ): { anulada: Liquidacion; nueva: Liquidacion } {
   // Validación 1: integridad — no operamos sobre datos corruptos
-  if (!verificarIntegridad(original)) {
+  if (!verificarIntegridad(original, hasher)) {
     throw new Error(
       `No se puede anular: integridad rota en liquidación ${original.id} (hash no coincide, posible tampering)`
     );
@@ -124,7 +135,7 @@ export function anularYReemplazar(
     resultado: resultadoOriginalClonado,
     estado: 'ANULADA',
     reemplazaA: original.reemplazaA,
-  });
+  }, hasher);
 
   const anulada: Liquidacion = deepFreeze({
     id: original.id,
@@ -138,7 +149,7 @@ export function anularYReemplazar(
 
   // Creamos la nueva liquidación que reemplaza a la original
   const resultadoNuevoClonado = JSON.parse(JSON.stringify(resultadoCorregido));
-  const idNuevo = randomUUID();
+  const idNuevo = idGenerator.uuid();
   const fechaNueva = new Date();
 
   const hashNueva = calcularHash({
@@ -148,7 +159,7 @@ export function anularYReemplazar(
     resultado: resultadoNuevoClonado,
     estado: 'ACTIVA',
     reemplazaA: original.id,
-  });
+  }, hasher);
 
   const nueva: Liquidacion = deepFreeze({
     id: idNuevo,

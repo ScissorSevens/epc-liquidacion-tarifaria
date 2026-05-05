@@ -116,7 +116,7 @@ function liquidacionConId(id: string): Liquidacion {
     resultado: resultadoBase(),
     estado: 'ACTIVA' as const,
   };
-  return { ...base, hash: calcularHash(base) };
+  return { ...base, hash: calcularHash(base, hasher) };
 }
 
 function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaInput {
