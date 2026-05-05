@@ -27,6 +27,14 @@ import {
   crearColaRepositoryExpoSqlite,
   type ColaRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/cola-repository-expo-sqlite';
+import {
+  crearSuscriptorRepositoryExpoSqlite,
+  type SuscriptorRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/suscriptor-repository-expo-sqlite';
+import {
+  crearMedidorRepositoryExpoSqlite,
+  type MedidorRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/medidor-repository-expo-sqlite';
 import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
 import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
 import type { Hasher, IdGenerator } from '@dominio/shared/ports';
@@ -39,6 +47,10 @@ export interface BootstrapApp {
   readonly facturaRepo: FacturaRepositoryExpoSqlite;
   readonly lecturaRepo: LecturaRepositoryExpoSqlite;
   readonly colaRepo: ColaRepositoryExpoSqlite;
+  // Catalogo de suscriptores y sus medidores. Nombres en linea con
+  // `bootstrap-completo.ts` del root para coherencia entre Node y mobile.
+  readonly suscriptorRepo: SuscriptorRepositoryExpoSqlite;
+  readonly medidorRepo: MedidorRepositoryExpoSqlite;
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
   readonly smoke: ResultadoSmokeDominio;
@@ -61,6 +73,8 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const facturaRepo = crearFacturaRepositoryExpoSqlite(db);
   const lecturaRepo = crearLecturaRepositoryExpoSqlite(db);
   const colaRepo = crearColaRepositoryExpoSqlite(db);
+  const suscriptorRepo = crearSuscriptorRepositoryExpoSqlite(db);
+  const medidorRepo = crearMedidorRepositoryExpoSqlite(db);
 
   // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
   // de crypto.getRandomValues importado al tope del archivo). Cualquier
@@ -71,5 +85,15 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
 
   const smoke = smokeDominio();
 
-  return { db, facturaRepo, lecturaRepo, colaRepo, hasher, idGenerator, smoke };
+  return {
+    db,
+    facturaRepo,
+    lecturaRepo,
+    colaRepo,
+    suscriptorRepo,
+    medidorRepo,
+    hasher,
+    idGenerator,
+    smoke,
+  };
 }
