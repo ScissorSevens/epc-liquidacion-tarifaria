@@ -89,10 +89,51 @@ CREATE INDEX IF NOT EXISTS idx_cola_estado ON cola_sincronizacion (estado);
 CREATE INDEX IF NOT EXISTS idx_cola_creado_en ON cola_sincronizacion (creado_en);
 `;
 
+// Espejo verbatim de src/persistencia/sqlite/migrations/004_suscriptor.sql
+const MIGRACION_004_SUSCRIPTOR = `
+CREATE TABLE IF NOT EXISTS suscriptor (
+    id_suscriptor          INTEGER   PRIMARY KEY AUTOINCREMENT,
+    codigo                 TEXT      NOT NULL,
+    nombre_apellidos       TEXT      NOT NULL,
+    direccion              TEXT      NOT NULL,
+    estrato                INTEGER   NOT NULL CHECK (estrato BETWEEN 1 AND 6),
+    matricula_inmobiliaria TEXT      NULL,
+    numero_catastral       TEXT      NULL,
+    estado                 TEXT      NOT NULL DEFAULT 'activo'
+                                     CHECK (estado IN ('activo','inactivo','suspendido')),
+    created_at             TEXT      NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    CONSTRAINT uk_suscriptor_codigo UNIQUE (codigo)
+);
+CREATE INDEX IF NOT EXISTS ix_suscriptor_estrato ON suscriptor (estrato);
+`;
+
+// Espejo verbatim de src/persistencia/sqlite/migrations/005_medidor.sql
+// FK a suscriptor con ON DELETE RESTRICT. expo-sqlite respeta
+// foreign_keys solo si esta habilitado por sesion; lo activamos en
+// `aplicarMigracionesAsync` antes de aplicar migraciones.
+const MIGRACION_005_MEDIDOR = `
+CREATE TABLE IF NOT EXISTS medidor (
+    id_medidor        INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_medidor    TEXT    NOT NULL,
+    id_suscriptor     INTEGER NOT NULL,
+    fecha_instalacion TEXT    NOT NULL,
+    estado            TEXT    NOT NULL DEFAULT 'activo'
+                              CHECK (estado IN ('activo','inactivo','reemplazado')),
+    observaciones     TEXT    NULL,
+    created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    CONSTRAINT uk_medidor_numero UNIQUE (numero_medidor),
+    CONSTRAINT fk_medidor_suscriptor FOREIGN KEY (id_suscriptor)
+        REFERENCES suscriptor (id_suscriptor) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS ix_medidor_suscriptor ON medidor (id_suscriptor);
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
   { version: 3, nombre: '003_cola_sync', sql: MIGRACION_003_COLA_SYNC },
+  { version: 4, nombre: '004_suscriptor', sql: MIGRACION_004_SUSCRIPTOR },
+  { version: 5, nombre: '005_medidor', sql: MIGRACION_005_MEDIDOR },
 ];
 
 const SQL_TABLA_CONTROL = `
