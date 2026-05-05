@@ -135,6 +135,19 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                         m.observaciones !== '' && (
                           <Campo label="Observaciones" valor={m.observaciones} />
                         )}
+                      <Button
+                        mode="contained-tonal"
+                        icon="gauge"
+                        onPress={() =>
+                          navigation.navigate('CapturarLectura', {
+                            id_medidor: m.id_medidor,
+                            id_suscriptor,
+                          })
+                        }
+                        style={styles.medidorAccion}
+                      >
+                        Capturar lectura
+                      </Button>
                     </View>
                   </View>
                 ))
@@ -176,5 +189,6 @@ const styles = StyleSheet.create({
   campoValor: {},
   medidor: { paddingVertical: 4 },
   medidorDivider: { marginVertical: 8 },
+  medidorAccion: { marginTop: 8 },
   fab: { position: 'absolute', right: 16, bottom: 16 },
 });
