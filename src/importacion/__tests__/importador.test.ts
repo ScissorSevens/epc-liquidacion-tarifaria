@@ -167,6 +167,38 @@ describe('importarSuscriptoresYMedidores', () => {
     expect(r.errores).toEqual([]);
   });
 
+  it('rechaza fila con codigo no numerico y la registra en errores', async () => {
+    // El importador debe pasar la fila por la factory `crearSuscriptor` del
+    // dominio antes de persistir. La factory valida `codigo` con regex
+    // /^\d{1,10}$/ y tira si no matchea. Sin esta validacion previa, el
+    // adapter SQLite acepta 'abc' (no hay CHECK constraint) y se cuela
+    // basura a la DB — bug reportado desde mobile.
+    const filaInvalida: FilaCSV = {
+      linea: 2,
+      codigo: 'abc',
+      nombre_apellidos: 'Invalido',
+      direccion: 'Calle 1',
+      estrato: 3,
+      numero_medidor: 'M-1',
+      fecha_instalacion: '2024-01-15',
+    };
+
+    const r = await importarSuscriptoresYMedidores(
+      [filaInvalida],
+      sis.suscriptorRepo,
+      sis.medidorRepo,
+    );
+
+    expect(r.suscriptoresCreados).toBe(0);
+    expect(r.medidoresCreados).toBe(0);
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0]?.linea).toBe(2);
+    expect(r.errores[0]?.mensaje).toMatch(/codigo|invalido/i);
+
+    const sus = await sis.suscriptorRepo.buscarPorCodigo('abc');
+    expect(sus).toBeNull();
+  });
+
   it('error de persistencia en una fila no aborta la siguiente', async () => {
     // Fila 2: estrato 9 -> CHECK constraint en DB lo rechaza
     // Fila 3: valida
