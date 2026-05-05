@@ -4,6 +4,7 @@ import {
 } from '@react-navigation/native-stack';
 
 import AltaSuscriptor from '../pantallas/AltaSuscriptor';
+import DetalleSuscriptor from '../pantallas/DetalleSuscriptor';
 import HolaMediApp from '../pantallas/HolaMediApp';
 import Home from '../pantallas/Home';
 import ImportarCsv from '../pantallas/ImportarCsv';
@@ -11,9 +12,8 @@ import ListaSuscriptores from '../pantallas/ListaSuscriptores';
 
 /**
  * Mapa de rutas del stack raíz.
- * Por ahora ninguna ruta recibe params, por eso `undefined`.
- * Cuando alguna pantalla necesite params (ej. detalle de suscriptor),
- * cambiá `undefined` por el tipo del objeto de params.
+ * `DetalleSuscriptor` recibe `id_suscriptor: number` (PK autoincremental
+ * de la tabla suscriptores — ver `src/suscriptores/types.ts`).
  */
 export type RootStackParamList = {
   Home: undefined;
@@ -21,6 +21,7 @@ export type RootStackParamList = {
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
   HolaMediApp: undefined;
+  DetalleSuscriptor: { id_suscriptor: number };
 };
 
 /**
@@ -40,6 +41,7 @@ export default function RootStack() {
       <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />
       <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
       <Stack.Screen name="HolaMediApp" component={HolaMediApp} />
+      <Stack.Screen name="DetalleSuscriptor" component={DetalleSuscriptor} />
     </Stack.Navigator>
   );
 }
