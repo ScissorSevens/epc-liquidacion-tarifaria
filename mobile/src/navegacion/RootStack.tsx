@@ -3,6 +3,13 @@ import {
   type NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 
+import type { Lectura } from '@dominio/captura-lecturas/types';
+import type {
+  Estrato,
+  ParametrosTarifa,
+  ResultadoCalculo as ResultadoCalculoTipo,
+} from '@dominio/motor-tarifario/types';
+
 import AltaSuscriptor from '../pantallas/AltaSuscriptor';
 import DetalleSuscriptor from '../pantallas/DetalleSuscriptor';
 import HolaMediApp from '../pantallas/HolaMediApp';
@@ -14,6 +21,13 @@ import ListaSuscriptores from '../pantallas/ListaSuscriptores';
  * Mapa de rutas del stack raíz.
  * `DetalleSuscriptor` recibe `id_suscriptor: number` (PK autoincremental
  * de la tabla suscriptores — ver `src/suscriptores/types.ts`).
+ *
+ * `CapturarLectura` recibe el `id_medidor` sobre el que se va a leer y
+ * el `id_suscriptor` solo para mostrar contexto en el header.
+ *
+ * `ResultadoCalculo` recibe el desglose completo del calculo + el
+ * `id_suscriptor` y `id_medidor` para poder ofrecer "Capturar otra"
+ * sobre el mismo medidor.
  */
 export type RootStackParamList = {
   Home: undefined;
@@ -22,6 +36,14 @@ export type RootStackParamList = {
   ImportarCsv: undefined;
   HolaMediApp: undefined;
   DetalleSuscriptor: { id_suscriptor: number };
+  CapturarLectura: { id_medidor: number; id_suscriptor: number };
+  ResultadoCalculo: {
+    lectura: Lectura;
+    resultado: ResultadoCalculoTipo;
+    parametros: ParametrosTarifa;
+    estrato: Estrato;
+    id_suscriptor: number;
+  };
 };
 
 /**
