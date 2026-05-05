@@ -68,4 +68,15 @@ describe('crearSuscriptorRepositorySqlite', () => {
     const repo = crearSuscriptorRepositorySqlite(db);
     expect(await repo.buscarPorCodigo('9999')).toBeNull();
   });
+
+  it('existePorCodigo() devuelve true si el codigo existe', async () => {
+    const repo = crearSuscriptorRepositorySqlite(db);
+    await repo.crear(suscriptorBase({ codigo: '0007' }));
+    expect(await repo.existePorCodigo('0007')).toBe(true);
+  });
+
+  it('existePorCodigo() devuelve false si el codigo no existe', async () => {
+    const repo = crearSuscriptorRepositorySqlite(db);
+    expect(await repo.existePorCodigo('9999')).toBe(false);
+  });
 });
