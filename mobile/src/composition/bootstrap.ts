@@ -1,62 +1,58 @@
-// Composition root para la app móvil.
+// Composition root real para la app movil.
 //
-// Por ahora, los bootstraps SQLite del dominio (crearBootstrapFacturaSqlite,
-// crearBootstrapLecturaSqlite, crearBootstrapColaSqlite) usan better-sqlite3,
-// que es Node-only y NO funciona en React Native. Cuando se implementen
-// adapters compatibles con expo-sqlite, este bootstrap los va a cablear.
+// Cablea las repos SQLite (factura, lectura, cola) sobre `expo-sqlite`,
+// aplicando las migraciones idempotentemente al arrancar.
 //
-// Mientras tanto importamos solo del dominio puro (motor-tarifario) para
-// validar que el path mapping y la importación funcionan extremo a extremo.
+// Esta funcion es ASYNC y depende de modulos nativos de RN — solo se
+// puede invocar desde el runtime movil. El wiring test del root valida
+// `smokeDominio()` por separado en `smoke-dominio.ts`, que NO importa
+// expo-sqlite y por eso es Node-importable.
 
-import { calcularLiquidacion } from '@dominio/motor-tarifario';
-import type { EntradaCalculo } from '@dominio/motor-tarifario';
+import * as SQLite from 'expo-sqlite';
+import { aplicarMigracionesAsync } from '../persistencia/expo-sqlite/migraciones';
+import {
+  crearFacturaRepositoryExpoSqlite,
+  type FacturaRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/factura-repository-expo-sqlite';
+import {
+  crearLecturaRepositoryExpoSqlite,
+  type LecturaRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/lectura-repository-expo-sqlite';
+import {
+  crearColaRepositoryExpoSqlite,
+  type ColaRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/cola-repository-expo-sqlite';
+import { smokeDominio, type ResultadoSmokeDominio } from './smoke-dominio';
 
-export interface ResultadoBootstrap {
-  estado: 'OK' | 'ERROR';
-  mensaje: string;
-  timestamp: string;
-  smokeMotorTarifario?: {
-    consumoM3: number;
-    totalCalculado: number;
-  };
+export const NOMBRE_DB_MOVIL = 'mediapp.db';
+
+export interface BootstrapApp {
+  readonly db: SQLite.SQLiteDatabase;
+  readonly facturaRepo: FacturaRepositoryExpoSqlite;
+  readonly lecturaRepo: LecturaRepositoryExpoSqlite;
+  readonly colaRepo: ColaRepositoryExpoSqlite;
+  readonly smoke: ResultadoSmokeDominio;
 }
 
 /**
- * Inicializa el dominio para la app móvil y corre un smoke test del motor
- * tarifario para confirmar que el wiring funciona en runtime (no solo en
- * tipos). Devuelve un objeto serializable para mostrarlo en pantalla.
+ * Abre la DB SQLite local, aplica migraciones pendientes y devuelve los
+ * repos cableados con la conexion. Tambien corre el smoke del dominio
+ * (motor tarifario puro) por sanidad.
+ *
+ * Lifecycle: el caller es responsable de cerrar la conexion (a traves
+ * de cualquiera de los `*.cerrar()` o `db.closeAsync()`) cuando termina.
+ * En la practica el celular cierra la app y la DB queda persistida en
+ * disco.
  */
-export function bootstrapApp(): ResultadoBootstrap {
-  try {
-    // Smoke test: liquidación trivial con parámetros mínimos.
-    // No depende de persistencia, sólo de la función pura del dominio.
-    const entrada: EntradaCalculo = {
-      lecturaAnterior: 1000,
-      lecturaActual: 1015,
-      estrato: 3,
-      parametros: {
-        cargoFijo: 5000,
-        precioM3: 1500,
-        precioM3Excedente: 3000,
-        consumoBasico: 20,
-      },
-    };
-    const resultado = calcularLiquidacion(entrada);
+export async function bootstrapApp(): Promise<BootstrapApp> {
+  const db = await SQLite.openDatabaseAsync(NOMBRE_DB_MOVIL);
+  await aplicarMigracionesAsync(db);
 
-    return {
-      estado: 'OK',
-      mensaje: 'MediApp - Dominio cargado correctamente',
-      timestamp: new Date().toISOString(),
-      smokeMotorTarifario: {
-        consumoM3: resultado.consumo,
-        totalCalculado: resultado.total,
-      },
-    };
-  } catch (error) {
-    return {
-      estado: 'ERROR',
-      mensaje: `Falló el bootstrap del dominio: ${(error as Error).message}`,
-      timestamp: new Date().toISOString(),
-    };
-  }
+  const facturaRepo = crearFacturaRepositoryExpoSqlite(db);
+  const lecturaRepo = crearLecturaRepositoryExpoSqlite(db);
+  const colaRepo = crearColaRepositoryExpoSqlite(db);
+
+  const smoke = smokeDominio();
+
+  return { db, facturaRepo, lecturaRepo, colaRepo, smoke };
 }

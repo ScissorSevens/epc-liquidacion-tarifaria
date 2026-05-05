@@ -1,17 +1,19 @@
 // mobile/__tests__/bootstrap.test.ts
 //
-// Test de wiring: confirma que el bootstrap movil importa el dominio
-// (motor-tarifario puro) sin romper, y devuelve un objeto OK con el
-// smoke del calculador.
+// Test de wiring del dominio puro: confirma que el path mapping
+// `@dominio/*` funciona desde mobile/ y que el motor tarifario corre
+// extremo a extremo en Node.
 //
 // Este test corre con el jest del root (ts-jest, env node), NO en RN.
-// No exercita ningun adapter SQLite ni APIs nativas — solo el dominio puro.
+// El bootstrap REAL (`bootstrap.ts`) usa expo-sqlite y solo se puede
+// invocar en runtime movil; la cobertura contractual de los repos
+// SQLite vive en sus espejos Node (`src/persistencia/sqlite/*`).
 
-import { bootstrapApp } from '../src/composition/bootstrap';
+import { smokeDominio } from '../src/composition/smoke-dominio';
 
-describe('bootstrap movil', () => {
+describe('wiring dominio movil', () => {
   it('importa el dominio y corre un smoke del motor tarifario', () => {
-    const resultado = bootstrapApp();
+    const resultado = smokeDominio();
 
     expect(resultado.estado).toBe('OK');
     expect(resultado.mensaje).toContain('MediApp');
@@ -24,7 +26,7 @@ describe('bootstrap movil', () => {
   });
 
   it('devuelve un objeto JSON-serializable (para Alert.alert en RN)', () => {
-    const resultado = bootstrapApp();
+    const resultado = smokeDominio();
     expect(() => JSON.stringify(resultado)).not.toThrow();
   });
 });
