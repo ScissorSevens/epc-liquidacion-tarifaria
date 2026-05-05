@@ -74,6 +74,7 @@ const SQL_INSERT = `
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
+const SQL_SELECT_BY_CODIGO = `SELECT * FROM suscriptor WHERE codigo = ?`;
 
 function traducirErrorAdapter(err: unknown, ctx: { codigo?: string }): Error {
   const mapeado = mapearErrorSqlite(err, { tabla: 'suscriptor' });
@@ -93,6 +94,7 @@ export function crearSuscriptorRepositorySqlite(
 ): SuscriptorRepositorySqlite {
   const stmtInsert = db.prepare(SQL_INSERT);
   const stmtSelectById = db.prepare(SQL_SELECT_BY_ID);
+  const stmtSelectByCodigo = db.prepare(SQL_SELECT_BY_CODIGO);
 
   function toInsertParams(s: SuscriptorBorrador): Record<string, unknown> {
     return {
@@ -127,8 +129,9 @@ export function crearSuscriptorRepositorySqlite(
       return row ? fromRow(row) : null;
     },
 
-    async buscarPorCodigo(_codigo: string): Promise<Suscriptor | null> {
-      throw new Error('buscarPorCodigo: no implementado');
+    async buscarPorCodigo(codigo: string): Promise<Suscriptor | null> {
+      const row = stmtSelectByCodigo.get(codigo) as SuscriptorRow | undefined;
+      return row ? fromRow(row) : null;
     },
 
     async listar(): Promise<Suscriptor[]> {
