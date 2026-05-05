@@ -154,6 +154,14 @@ CREATE TABLE IF NOT EXISTS __migraciones_aplicadas (
 export async function aplicarMigracionesAsync(
   db: SQLite.SQLiteDatabase,
 ): Promise<void> {
+  // CRITICO: expo-sqlite (igual que SQLite estandar) no respeta las
+  // FOREIGN KEY si no se habilita por sesion. Sin este PRAGMA, la FK
+  // `medidor.id_suscriptor -> suscriptor.id_suscriptor` se ignora y
+  // se podrian insertar medidores apuntando a suscriptores inexistentes.
+  // Hay que correrlo ANTES de aplicar migraciones por si alguna depende
+  // del check de FK durante el CREATE.
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+
   await db.execAsync(SQL_TABLA_CONTROL);
 
   const aplicadas = (await db.getAllAsync<{ version: number }>(
