@@ -4,16 +4,40 @@
  */
 
 import { registrarEvento } from '../auditoria';
+import type { Hasher, IdGenerator } from '../../shared/ports';
+
+// Hasher determinista por contenido (no crypto real, pero estable: mismo input → mismo hash).
+// Necesario para que verificarCadena pueda recalcular y comparar.
+function fakeChecksum(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+let _seqId = 0;
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${fakeChecksum(input)}` };
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seqId).padStart(4, '0')}` };
+beforeEach(() => { _seqId = 0; });
 
 describe('registrarEvento - LIQUIDACION_CREADA', () => {
   const actorMock = { id: 'USR-001', rol: 'OPERARIO' };
+
+  it('usa el Hasher e IdGenerator inyectados (no crypto built-in)', () => {
+    const evento = registrarEvento({
+      tipo: 'LIQUIDACION_CREADA',
+      actor: actorMock,
+      payload: { liquidacionId: 'LIQ-001', total: 17000 },
+    }, hasher, idGen);
+
+    expect(evento.id).toBe('uuid-fake-0001');
+    expect(evento.hash.startsWith('hash-fake-')).toBe(true);
+  });
 
   it('debería crear un evento con id, timestamp, actor, tipo y payload', () => {
     const evento = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     expect(evento.id).toBeDefined();
     expect(typeof evento.id).toBe('string');
@@ -28,10 +52,10 @@ describe('registrarEvento - LIQUIDACION_CREADA', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     expect(evento.hash).toBeDefined();
-    expect(evento.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(evento.hash.length).toBeGreaterThan(0);
   });
 
   it('el primer evento de la cadena debería tener hashAnterior = null', () => {
@@ -39,7 +63,7 @@ describe('registrarEvento - LIQUIDACION_CREADA', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     expect(evento.hashAnterior).toBeNull();
   });
@@ -49,12 +73,12 @@ describe('registrarEvento - LIQUIDACION_CREADA', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
     const e2 = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-002', total: 18000 },
-    });
+    }, hasher, idGen);
 
     expect(e1.id).not.toBe(e2.id);
     expect(e1.hash).not.toBe(e2.hash);
@@ -70,14 +94,14 @@ describe('encadenamiento de eventos', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     const e2 = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-002', total: 18000 },
       hashAnterior: e1.hash,
-    });
+    }, hasher, idGen);
 
     expect(e2.hashAnterior).toBe(e1.hash);
   });
@@ -87,7 +111,7 @@ describe('encadenamiento de eventos', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     // Si encadenamos a e1.hash vs a un hash distinto, los hashes finales deben diferir
     const e2a = registrarEvento({
@@ -95,14 +119,14 @@ describe('encadenamiento de eventos', () => {
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-002', total: 18000 },
       hashAnterior: e1.hash,
-    });
+    }, hasher, idGen);
 
     const e2b = registrarEvento({
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-002', total: 18000 },
       hashAnterior: 'hash-diferente-falso',
-    });
+    }, hasher, idGen);
 
     expect(e2a.hash).not.toBe(e2b.hash);
   });
@@ -117,7 +141,7 @@ describe('inmutabilidad runtime de eventos', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     expect(Object.isFrozen(evento)).toBe(true);
   });
@@ -127,7 +151,7 @@ describe('inmutabilidad runtime de eventos', () => {
       tipo: 'EVIDENCIA_REGISTRADA',
       actor: actorMock,
       payload: { suscriptorId: 'SUSC-001', hashFoto: 'abc123', gps: { lat: 4.6, lng: -74.08 } },
-    });
+    }, hasher, idGen);
 
     expect(Object.isFrozen(evento.actor)).toBe(true);
     expect(Object.isFrozen(evento.payload)).toBe(true);
@@ -139,7 +163,7 @@ describe('inmutabilidad runtime de eventos', () => {
       tipo: 'LIQUIDACION_CREADA',
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     expect(() => {
       (evento as any).tipo = 'INTEGRIDAD_VIOLADA';
@@ -165,7 +189,7 @@ describe('verificarCadena', () => {
         actor: actorMock,
         payload: { liquidacionId: `LIQ-${String(i).padStart(3, '0')}`, total: 17000 },
         hashAnterior,
-      });
+      }, hasher, idGen);
       eventos.push(e);
       hashAnterior = e.hash;
     }
@@ -175,7 +199,7 @@ describe('verificarCadena', () => {
 
   it('debería retornar { valida: true } para una cadena vacía', () => {
     const { verificarCadena } = require('../auditoria');
-    const resultado = verificarCadena([]);
+    const resultado = verificarCadena([], hasher);
 
     expect(resultado.valida).toBe(true);
   });
@@ -184,14 +208,14 @@ describe('verificarCadena', () => {
     const { verificarCadena } = require('../auditoria');
     const cadena = construirCadena(1);
 
-    expect(verificarCadena(cadena).valida).toBe(true);
+    expect(verificarCadena(cadena, hasher).valida).toBe(true);
   });
 
   it('debería retornar { valida: true } para una cadena correcta de 5 eventos', () => {
     const { verificarCadena } = require('../auditoria');
     const cadena = construirCadena(5);
 
-    expect(verificarCadena(cadena).valida).toBe(true);
+    expect(verificarCadena(cadena, hasher).valida).toBe(true);
   });
 
   it('debería retornar { valida: false, razon: "PRIMER_EVENTO_HASH_ANTERIOR_NO_NULO" } si el primer evento tiene hashAnterior', () => {
@@ -200,7 +224,7 @@ describe('verificarCadena', () => {
     // Forzamos primer evento con hashAnterior no nulo (simulando manipulación)
     const cadenaInvalida = [{ ...cadena[0], hashAnterior: 'falso' }, cadena[1]];
 
-    const resultado = verificarCadena(cadenaInvalida);
+    const resultado = verificarCadena(cadenaInvalida, hasher);
     expect(resultado.valida).toBe(false);
     expect(resultado.razon).toBe('PRIMER_EVENTO_HASH_ANTERIOR_NO_NULO');
   });
@@ -212,7 +236,7 @@ describe('verificarCadena', () => {
     // Eliminamos el evento del medio
     const cadenaRota = [cadena[0], cadena[1], cadena[3], cadena[4]];
 
-    const resultado = verificarCadena(cadenaRota);
+    const resultado = verificarCadena(cadenaRota, hasher);
     expect(resultado.valida).toBe(false);
     expect(resultado.razon).toBe('CADENA_ROTA');
     expect(resultado.indice).toBe(2); // el 3er evento (índice 2) tiene hashAnterior que no coincide
@@ -229,7 +253,7 @@ describe('verificarCadena', () => {
       cadena[2],
     ];
 
-    const resultado = verificarCadena(cadenaManipulada);
+    const resultado = verificarCadena(cadenaManipulada, hasher);
     expect(resultado.valida).toBe(false);
     expect(resultado.razon).toBe('HASH_INVALIDO');
     expect(resultado.indice).toBe(1);
@@ -245,7 +269,7 @@ describe('eventos tipados (discriminated union)', () => {
     const evento = registrarLiquidacionCreada({
       actor: actorMock,
       payload: { liquidacionId: 'LIQ-001', total: 17000 },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('LIQUIDACION_CREADA');
     expect(evento.payload.liquidacionId).toBe('LIQ-001');
@@ -261,7 +285,7 @@ describe('eventos tipados (discriminated union)', () => {
         liquidacionNuevaId: 'LIQ-002',
         motivo: 'Error en lectura',
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('LIQUIDACION_ANULADA');
     expect(evento.payload.motivo).toBe('Error en lectura');
@@ -273,7 +297,7 @@ describe('eventos tipados (discriminated union)', () => {
     const evento = registrarLecturaCapturada({
       actor: actorMock,
       payload: { suscriptorId: 'SUSC-001', lecturaActual: 1234, fechaLectura: fecha },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('LECTURA_CAPTURADA');
     expect(evento.payload.lecturaActual).toBe(1234);
@@ -288,7 +312,7 @@ describe('eventos tipados (discriminated union)', () => {
         hashFoto: 'abc123',
         gps: { lat: 4.6, lng: -74.08 },
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('EVIDENCIA_REGISTRADA');
     expect(evento.payload.hashFoto).toBe('abc123');
@@ -304,7 +328,7 @@ describe('eventos tipados (discriminated union)', () => {
         hashEsperado: 'abc',
         hashRecibido: 'xyz',
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('INTEGRIDAD_VIOLADA');
     expect(evento.payload.entidadTipo).toBe('Liquidacion');

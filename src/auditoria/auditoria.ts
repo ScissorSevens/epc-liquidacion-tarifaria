@@ -2,7 +2,7 @@
  * Módulo AUDITORIA — Eventos inmutables encadenados
  */
 
-import { randomUUID, createHash } from 'crypto';
+import type { Hasher, IdGenerator } from '../shared/ports';
 import type {
   EventoAuditoria,
   RegistrarEventoInput,
@@ -39,7 +39,7 @@ function deepFreeze<T>(obj: T): T {
  * Calcula el hash SHA-256 del contenido de un evento.
  * Incluye hashAnterior — esto es lo que crea la cadena.
  */
-export function calcularHash(contenido: ContenidoHasheable): string {
+export function calcularHash(contenido: ContenidoHasheable, hasher: Hasher): string {
   const payload = JSON.stringify({
     id: contenido.id,
     timestamp: contenido.timestamp.toISOString(),
@@ -49,15 +49,19 @@ export function calcularHash(contenido: ContenidoHasheable): string {
     hashAnterior: contenido.hashAnterior,
   });
 
-  return createHash('sha256').update(payload).digest('hex');
+  return hasher.sha256(payload);
 }
 
-export function registrarEvento(input: RegistrarEventoInput): EventoAuditoria {
+export function registrarEvento(
+  input: RegistrarEventoInput,
+  hasher: Hasher,
+  idGen: IdGenerator,
+): EventoAuditoria {
   // Clonamos para no compartir referencias con el caller
   const actorClonado = JSON.parse(JSON.stringify(input.actor));
   const payloadClonado = JSON.parse(JSON.stringify(input.payload));
 
-  const id = randomUUID();
+  const id = idGen.uuid();
   const timestamp = new Date();
   const hashAnterior = input.hashAnterior ?? null;
 
@@ -68,7 +72,7 @@ export function registrarEvento(input: RegistrarEventoInput): EventoAuditoria {
     tipo: input.tipo,
     payload: payloadClonado,
     hashAnterior,
-  });
+  }, hasher);
 
   const evento: EventoAuditoria = {
     id,
@@ -85,57 +89,71 @@ export function registrarEvento(input: RegistrarEventoInput): EventoAuditoria {
 
 // Constructores tipados — type-safe por cada tipo de evento
 export function registrarLiquidacionCreada(
-  input: RegistrarTipadoInput<PayloadLiquidacionCreada>
+  input: RegistrarTipadoInput<PayloadLiquidacionCreada>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'LIQUIDACION_CREADA' } {
-  return registrarEvento({ ...input, tipo: 'LIQUIDACION_CREADA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'LIQUIDACION_CREADA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'LIQUIDACION_CREADA';
   };
 }
 
 export function registrarLiquidacionAnulada(
-  input: RegistrarTipadoInput<PayloadLiquidacionAnulada>
+  input: RegistrarTipadoInput<PayloadLiquidacionAnulada>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'LIQUIDACION_ANULADA' } {
-  return registrarEvento({ ...input, tipo: 'LIQUIDACION_ANULADA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'LIQUIDACION_ANULADA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'LIQUIDACION_ANULADA';
   };
 }
 
 export function registrarLecturaCapturada(
-  input: RegistrarTipadoInput<PayloadLecturaCapturada>
+  input: RegistrarTipadoInput<PayloadLecturaCapturada>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'LECTURA_CAPTURADA' } {
-  return registrarEvento({ ...input, tipo: 'LECTURA_CAPTURADA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'LECTURA_CAPTURADA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'LECTURA_CAPTURADA';
   };
 }
 
 export function registrarEvidenciaRegistrada(
-  input: RegistrarTipadoInput<PayloadEvidenciaRegistrada>
+  input: RegistrarTipadoInput<PayloadEvidenciaRegistrada>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'EVIDENCIA_REGISTRADA' } {
-  return registrarEvento({ ...input, tipo: 'EVIDENCIA_REGISTRADA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'EVIDENCIA_REGISTRADA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'EVIDENCIA_REGISTRADA';
   };
 }
 
 export function registrarIntegridadViolada(
-  input: RegistrarTipadoInput<PayloadIntegridadViolada>
+  input: RegistrarTipadoInput<PayloadIntegridadViolada>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'INTEGRIDAD_VIOLADA' } {
-  return registrarEvento({ ...input, tipo: 'INTEGRIDAD_VIOLADA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'INTEGRIDAD_VIOLADA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'INTEGRIDAD_VIOLADA';
   };
 }
 
 export function registrarFacturaEmitida(
-  input: RegistrarTipadoInput<PayloadFacturaEmitida>
+  input: RegistrarTipadoInput<PayloadFacturaEmitida>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'FACTURA_EMITIDA' } {
-  return registrarEvento({ ...input, tipo: 'FACTURA_EMITIDA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'FACTURA_EMITIDA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'FACTURA_EMITIDA';
   };
 }
 
 export function registrarFacturaAnulada(
-  input: RegistrarTipadoInput<PayloadFacturaAnulada>
+  input: RegistrarTipadoInput<PayloadFacturaAnulada>,
+  hasher: Hasher,
+  idGen: IdGenerator,
 ): EventoAuditoria & { tipo: 'FACTURA_ANULADA' } {
-  return registrarEvento({ ...input, tipo: 'FACTURA_ANULADA' }) as EventoAuditoria & {
+  return registrarEvento({ ...input, tipo: 'FACTURA_ANULADA' }, hasher, idGen) as EventoAuditoria & {
     tipo: 'FACTURA_ANULADA';
   };
 }
@@ -157,7 +175,7 @@ export type ResultadoVerificacion =
  *
  * Detecta: borrados, reordenamientos, manipulaciones de contenido.
  */
-export function verificarCadena(eventos: EventoAuditoria[]): ResultadoVerificacion {
+export function verificarCadena(eventos: EventoAuditoria[], hasher: Hasher): ResultadoVerificacion {
   if (eventos.length === 0) {
     return { valida: true };
   }
@@ -185,7 +203,7 @@ export function verificarCadena(eventos: EventoAuditoria[]): ResultadoVerificaci
       tipo: evento.tipo,
       payload: evento.payload,
       hashAnterior: evento.hashAnterior,
-    });
+    }, hasher);
 
     if (hashRecalculado !== evento.hash) {
       return { valida: false, razon: 'HASH_INVALIDO', indice: i };

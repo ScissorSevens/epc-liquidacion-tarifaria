@@ -28,11 +28,17 @@ import {
 } from '../sincronizacion';
 import { ClienteHTTPSincronizacion } from '../cliente-http';
 import type { ParametrosTarifa } from '../motor-tarifario/types';
-import type { IdGenerator } from '../shared/ports';
+import type { Hasher, IdGenerator } from '../shared/ports';
 
-let _seq = 0;
-const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seq).padStart(4, '0')}` };
-beforeEach(() => { _seq = 0; });
+function fakeChecksum(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+let _seqId = 0;
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${fakeChecksum(input)}` };
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seqId).padStart(4, '0')}` };
+beforeEach(() => { _seqId = 0; });
 
 // Tarifas de referencia (CRA Res. 688/2014, valores estilizados)
 const PARAMETROS: ParametrosTarifa = {
@@ -93,7 +99,7 @@ describe('E2E: integración del núcleo TS', () => {
           lecturaActual: lectura.lectura_actual,
           fechaLectura: new Date(),
         },
-      });
+      }, hasher, idGen);
 
       const eventoLiquidacion = registrarLiquidacionCreada({
         actor: ACTOR,
@@ -102,10 +108,10 @@ describe('E2E: integración del núcleo TS', () => {
           liquidacionId: liquidacion.id,
           total: resultado.total,
         },
-      });
+      }, hasher, idGen);
 
       const cadena: EventoAuditoria[] = [eventoLectura, eventoLiquidacion];
-      expect(verificarCadena(cadena)).toEqual({ valida: true });
+      expect(verificarCadena(cadena, hasher)).toEqual({ valida: true });
 
       // 5. Encolamos los items con dependencias
       //    (la liquidación depende de la lectura — la lectura debe llegar primero al server)

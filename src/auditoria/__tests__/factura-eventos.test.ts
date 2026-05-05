@@ -4,6 +4,17 @@
  */
 
 import { registrarEvento, verificarCadena } from '../auditoria';
+import type { Hasher, IdGenerator } from '../../shared/ports';
+
+function fakeChecksum(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+let _seqId = 0;
+const hasher: Hasher = { sha256: (input: string) => `hash-fake-${fakeChecksum(input)}` };
+const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seqId).padStart(4, '0')}` };
+beforeEach(() => { _seqId = 0; });
 
 const actorMock = { id: 'USR-001', rol: 'OPERARIO' };
 
@@ -18,14 +29,14 @@ describe('evento FACTURA_EMITIDA', () => {
         suscriptorId: 5,
         total: 45000,
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('FACTURA_EMITIDA');
     expect(evento.payload.facturaId).toBe('FAC-001');
     expect(evento.payload.numeroFactura).toBe('MZ-001-2981');
     expect(evento.payload.suscriptorId).toBe(5);
     expect(evento.payload.total).toBe(45000);
-    expect(evento.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(evento.hash).toMatch(/^hash-fake-/);
   });
 
   it('FACTURA_EMITIDA debería poder usarse en registrarEvento genérico', () => {
@@ -38,7 +49,7 @@ describe('evento FACTURA_EMITIDA', () => {
         suscriptorId: 7,
         total: 17000,
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('FACTURA_EMITIDA');
     expect(evento.hashAnterior).toBeNull();
@@ -54,7 +65,7 @@ describe('evento FACTURA_ANULADA', () => {
         facturaAnuladaId: 'FAC-001',
         motivo: 'Error de digitación',
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.tipo).toBe('FACTURA_ANULADA');
     expect(evento.payload.facturaAnuladaId).toBe('FAC-001');
@@ -71,7 +82,7 @@ describe('evento FACTURA_ANULADA', () => {
         facturaNuevaId: 'FAC-002',
         motivo: 'Liquidación reemplazada',
       },
-    });
+    }, hasher, idGen);
 
     expect(evento.payload.facturaNuevaId).toBe('FAC-002');
     expect(evento.payload.motivo).toBe('Liquidación reemplazada');
@@ -90,7 +101,7 @@ describe('eventos de factura encadenados al hash chain', () => {
         suscriptorId: 9,
         total: 50000,
       },
-    });
+    }, hasher, idGen);
 
     const e2 = registrarFacturaAnulada({
       actor: actorMock,
@@ -99,11 +110,11 @@ describe('eventos de factura encadenados al hash chain', () => {
         motivo: 'Error de digitación',
       },
       hashAnterior: e1.hash,
-    });
+    }, hasher, idGen);
 
     expect(e2.hashAnterior).toBe(e1.hash);
 
-    const resultado = verificarCadena([e1, e2]);
+    const resultado = verificarCadena([e1, e2], hasher);
     expect(resultado.valida).toBe(true);
   });
 
@@ -118,7 +129,7 @@ describe('eventos de factura encadenados al hash chain', () => {
         suscriptorId: 4,
         total: 22000,
       },
-    });
+    }, hasher, idGen);
 
     const e2 = registrarFacturaAnulada({
       actor: actorMock,
@@ -127,12 +138,12 @@ describe('eventos de factura encadenados al hash chain', () => {
         motivo: 'Original',
       },
       hashAnterior: e1.hash,
-    });
+    }, hasher, idGen);
 
     // Tampering: cambiamos motivo sin recalcular hash
     const cadenaManipulada = [e1, { ...e2, payload: { ...e2.payload, motivo: 'HACKED' } }];
 
-    const resultado = verificarCadena(cadenaManipulada);
+    const resultado = verificarCadena(cadenaManipulada, hasher);
     expect(resultado.valida).toBe(false);
     if (resultado.valida) throw new Error('Esperaba cadena invalida');
     expect(resultado.razon).toBe('HASH_INVALIDO');
