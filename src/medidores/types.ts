@@ -31,6 +31,22 @@ export type ActualizarMedidorInput = Partial<Pick<Medidor, 'estado' | 'observaci
 export interface MedidorRepository {
   crear(data: MedidorBorrador): Promise<Medidor>;
   buscarPorId(id: number): Promise<Medidor | null>;
+  /**
+   * Devuelve el medidor con `numero_medidor` dado o `null` si no existe.
+   * Util para el flujo de importacion CSV (politica skip-on-duplicate).
+   */
+  buscarPorNumero(numero: string): Promise<Medidor | null>;
+  /**
+   * Devuelve true si existe un medidor con el `numero_medidor` dado.
+   * Util para validacion previa antes de crear.
+   */
+  existePorNumero(numero: string): Promise<boolean>;
+  /**
+   * Lista los medidores asociados a un suscriptor (ordenados por
+   * `numero_medidor` ascendente). Devuelve [] si el suscriptor no
+   * tiene medidores o no existe.
+   */
+  listarPorSuscriptor(idSuscriptor: number): Promise<Medidor[]>;
   listar(): Promise<Medidor[]>;
   actualizar(id: number, cambios: ActualizarMedidorInput): Promise<Medidor>;
   eliminar(id: number): Promise<void>;
