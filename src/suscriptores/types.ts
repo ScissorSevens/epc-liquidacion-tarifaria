@@ -36,6 +36,11 @@ export interface SuscriptorRepository {
   crear(data: SuscriptorBorrador): Promise<Suscriptor>;
   buscarPorId(id: number): Promise<Suscriptor | null>;
   buscarPorCodigo(codigo: string): Promise<Suscriptor | null>;
+  /**
+   * Devuelve true si existe un suscriptor con el `codigo` dado. Util
+   * para el flujo de importacion CSV (politica skip-on-duplicate).
+   */
+  existePorCodigo(codigo: string): Promise<boolean>;
   listar(): Promise<Suscriptor[]>;
   actualizar(id: number, cambios: ActualizarSuscriptorInput): Promise<Suscriptor>;
   eliminar(id: number): Promise<void>;
