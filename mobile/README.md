@@ -1,0 +1,117 @@
+# MediApp — App móvil
+
+Proyecto Expo + TypeScript de la app de captura de lecturas en campo.
+Reusa el dominio TS desde `../src` vía path mapping `@dominio/*`
+(Opción 2 monorepo "lazy", sin workspaces npm/yarn).
+
+## Arrancar dev server
+
+```bash
+cd mobile
+npm install         # primera vez (~700 paquetes, ~45 s)
+npx expo start      # dev server + QR para Expo Go
+```
+
+Escaneá el QR con **Expo Go** en Android (mismo WiFi que el PC). Si la
+red lo bloquea, usá `npx expo start --tunnel` (más lento pero atraviesa
+NAT).
+
+## Stack
+
+- React Native vía **Expo SDK 54** (managed workflow)
+- React 19, RN 0.81, TypeScript 5.9 strict
+- Metro observa `../src` y resuelve `@dominio/*`
+- Persistencia local: **expo-sqlite** (~16.0.10)
+
+## Persistencia local
+
+Toda la persistencia offline-first vive en una única base SQLite en
+disco del dispositivo:
+
+- **Tecnología**: `expo-sqlite`
+- **DB name**: `mediapp.db` (constante `NOMBRE_DB_MOVIL` en
+  `src/composition/bootstrap.ts`).
+- **Migraciones**: idempotentes, registradas en
+  `__migraciones_aplicadas`. Definidas en
+  `src/persistencia/expo-sqlite/migraciones.ts` espejando los `.sql` de
+  `../src/persistencia/sqlite/migrations/`.
+- **Adapters async**:
+  - `factura-repository-expo-sqlite.ts`
+  - `lectura-repository-expo-sqlite.ts`
+  - `cola-repository-expo-sqlite.ts`
+
+  Espejan a los adapters Node de `src/factura/` y
+  `src/persistencia/sqlite/`. Misma SQL, misma semántica, todos los
+  métodos `Promise<>` (la API de expo-sqlite es asíncrona).
+
+### Cablear los repos
+
+```typescript
+import { bootstrapApp } from './src/composition/bootstrap';
+
+const { db, facturaRepo, lecturaRepo, colaRepo, smoke } =
+  await bootstrapApp();
+```
+
+### Inspeccionar la DB en runtime
+
+1. `npx expo start` y abrí la app en Expo Go.
+2. Tocá **"Probar Persistencia SQLite"** en `HolaMediApp`. El demo
+   inserta una lectura, la lee de vuelta, encola un mensaje sync y
+   muestra todo en un `Alert`.
+3. Para inspección más profunda, los logs de las queries SQL aparecen
+   en la terminal de `expo start` (Metro forwarding).
+4. En Android emulator también podés extraer la DB de
+   `/data/data/host.exp.exponent/databases/mediapp.db` con `adb pull`.
+
+### Por qué adapters paralelos (no refactor)
+
+`better-sqlite3` (los adapters Node) tiene bindings nativos C++ que NO
+linkean en RN. La decisión arquitectónica fue duplicar el adapter en
+async sobre `expo-sqlite` antes que refactorizar todos los Node
+existentes. Tradeoff aceptado:
+
+- ✅ Cero impacto en los 491 tests del root (siguen verde con
+  better-sqlite3).
+- ✅ Validación contractual de la SQL ya está cubierta por los Node.
+- ⚠️ Si la SQL del root cambia, hay que reflejar el cambio en los
+  espejos de `mobile/src/persistencia/expo-sqlite/` a mano.
+
+## Tests
+
+Los tests del wiring móvil corren con el **jest del root**:
+
+```bash
+cd ..
+npm test                                      # 491 tests, incluye 2 del wiring móvil
+npx jest mobile/__tests__/bootstrap.test.ts   # solo el wiring
+```
+
+El bootstrap REAL (`bootstrap.ts`) usa expo-sqlite y solo se invoca en
+runtime móvil (Expo Go). Para tests Node-ables tenemos
+`smoke-dominio.ts` que NO importa expo-sqlite y valida el path mapping
++ el motor tarifario puro.
+
+## Estructura
+
+```
+mobile/
+├── App.tsx
+├── app.json                   # plugin expo-sqlite registrado
+├── metro.config.js            # watchFolders → workspaceRoot
+├── tsconfig.json              # paths @dominio/* → ../src/*
+├── __tests__/
+│   └── bootstrap.test.ts      # wiring smoke (corre con jest del root)
+└── src/
+    ├── composition/
+    │   ├── bootstrap.ts       # async, abre DB + migra + cablea repos
+    │   └── smoke-dominio.ts   # smoke puro (Node-importable)
+    ├── pantallas/
+    │   └── HolaMediApp.tsx    # demo end-to-end persistencia
+    └── persistencia/
+        └── expo-sqlite/
+            ├── migraciones.ts
+            ├── factura-repository-expo-sqlite.ts
+            ├── lectura-repository-expo-sqlite.ts
+            └── cola-repository-expo-sqlite.ts
+```
