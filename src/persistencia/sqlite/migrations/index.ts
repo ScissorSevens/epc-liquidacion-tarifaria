@@ -30,4 +30,9 @@ export const migrations: readonly Migration[] = Object.freeze([
     nombre: '003_cola_sync',
     sql: leerSQL('003_cola_sync.sql'),
   },
+  {
+    version: 4,
+    nombre: '004_suscriptor',
+    sql: leerSQL('004_suscriptor.sql'),
+  },
 ]);

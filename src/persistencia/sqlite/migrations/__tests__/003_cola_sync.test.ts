@@ -49,7 +49,7 @@ describe('migration 003_cola_sync — schema completo', () => {
     try {
       ejecutarMigrations(db, migrations);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(3);
+      expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
 
       const tabla = db
         .prepare(
@@ -172,10 +172,10 @@ describe('migration 003_cola_sync — schema completo', () => {
     const db = crearConexion();
     try {
       ejecutarMigrations(db, migrations);
-      expect(db.pragma('user_version', { simple: true })).toBe(3);
+      expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
 
       expect(() => ejecutarMigrations(db, migrations)).not.toThrow();
-      expect(db.pragma('user_version', { simple: true })).toBe(3);
+      expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
     } finally {
       db.close();
     }
@@ -184,7 +184,7 @@ describe('migration 003_cola_sync — schema completo', () => {
   it('crearDBTest devuelve una DB con la tabla cola_sincronizacion ya migrada (sanity check del fixture)', () => {
     const db = crearDBTest();
     try {
-      expect(db.pragma('user_version', { simple: true })).toBe(3);
+      expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
       const tabla = db
         .prepare(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='cola_sincronizacion'",
