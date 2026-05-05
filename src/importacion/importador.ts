@@ -23,7 +23,9 @@
  */
 
 import type { SuscriptorRepository, Suscriptor } from '../suscriptores';
+import { crearSuscriptor } from '../suscriptores';
 import type { MedidorRepository } from '../medidores';
+import { crearMedidor } from '../medidores';
 import type {
   ErrorImportacion,
   FilaCSV,
@@ -55,7 +57,7 @@ export async function importarSuscriptoresYMedidores(
           codigo: fila.codigo,
         });
       } else {
-        suscriptor = await repoSus.crear({
+        const borrador = crearSuscriptor({
           codigo: fila.codigo,
           nombre_apellidos: fila.nombre_apellidos,
           direccion: fila.direccion,
@@ -68,6 +70,7 @@ export async function importarSuscriptoresYMedidores(
             : {}),
           estado: 'activo',
         });
+        suscriptor = await repoSus.crear(borrador);
         suscriptoresCreados++;
       }
     } catch (e) {
@@ -90,15 +93,17 @@ export async function importarSuscriptoresYMedidores(
         });
         continue;
       }
-      await repoMed.crear({
-        numero_medidor: fila.numero_medidor,
-        id_suscriptor: suscriptor.id_suscriptor,
-        fecha_instalacion: fila.fecha_instalacion,
-        estado: 'activo',
-        ...(fila.observaciones_medidor
-          ? { observaciones: fila.observaciones_medidor }
-          : {}),
-      });
+      await repoMed.crear(
+        crearMedidor({
+          numero_medidor: fila.numero_medidor,
+          id_suscriptor: suscriptor.id_suscriptor,
+          fecha_instalacion: fila.fecha_instalacion,
+          estado: 'activo',
+          ...(fila.observaciones_medidor
+            ? { observaciones: fila.observaciones_medidor }
+            : {}),
+        }),
+      );
       medidoresCreados++;
     } catch (e) {
       errores.push({
