@@ -8,6 +8,11 @@
 // `smokeDominio()` por separado en `smoke-dominio.ts`, que NO importa
 // expo-sqlite y por eso es Node-importable.
 
+// IMPORTANTE: el polyfill de crypto.getRandomValues debe importarse ANTES
+// que cualquier modulo que use uuid v4. RN/Hermes no expone Web Crypto API
+// nativamente y `uuid` falla silenciosamente sin esto.
+import 'react-native-get-random-values';
+
 import * as SQLite from 'expo-sqlite';
 import { aplicarMigracionesAsync } from '../persistencia/expo-sqlite/migraciones';
 import {
@@ -22,6 +27,9 @@ import {
   crearColaRepositoryExpoSqlite,
   type ColaRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/cola-repository-expo-sqlite';
+import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
+import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
+import type { Hasher, IdGenerator } from '@dominio/shared/ports';
 import { smokeDominio, type ResultadoSmokeDominio } from './smoke-dominio';
 
 export const NOMBRE_DB_MOVIL = 'mediapp.db';
@@ -31,6 +39,8 @@ export interface BootstrapApp {
   readonly facturaRepo: FacturaRepositoryExpoSqlite;
   readonly lecturaRepo: LecturaRepositoryExpoSqlite;
   readonly colaRepo: ColaRepositoryExpoSqlite;
+  readonly hasher: Hasher;
+  readonly idGenerator: IdGenerator;
   readonly smoke: ResultadoSmokeDominio;
 }
 
@@ -52,7 +62,14 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const lecturaRepo = crearLecturaRepositoryExpoSqlite(db);
   const colaRepo = crearColaRepositoryExpoSqlite(db);
 
+  // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
+  // de crypto.getRandomValues importado al tope del archivo). Cualquier
+  // caso de uso del dominio que necesite hash o id debe recibir estos
+  // mismos singletons via inyeccion de parametros.
+  const hasher = crearHasherJs();
+  const idGenerator = crearIdGeneratorUuid();
+
   const smoke = smokeDominio();
 
-  return { db, facturaRepo, lecturaRepo, colaRepo, smoke };
+  return { db, facturaRepo, lecturaRepo, colaRepo, hasher, idGenerator, smoke };
 }
