@@ -3,21 +3,13 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
-  View,
-} from 'react-native';
-import {
-  ActivityIndicator,
-  Appbar,
-  Button,
-  HelperText,
-  SegmentedButtons,
-  Snackbar,
-  Surface,
   Text,
   TextInput,
-} from 'react-native-paper';
+  View,
+} from 'react-native';
 
 import {
   liquidarLectura,
@@ -28,13 +20,22 @@ import type {
   EvidenciaFoto,
 } from '@dominio/captura-lecturas/types';
 import type { Estrato } from '@dominio/motor-tarifario/types';
+import type { Suscriptor } from '@dominio/suscriptores/types';
+
 import { getBootstrap } from '../composition/get-bootstrap';
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import type { RootStackScreenProps } from '../navegacion/RootStack';
+import {
+  BORDERS,
+  COLORS,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/skeletal-tokens';
 
 type Props = RootStackScreenProps<'CapturarLectura'>;
 
-// Estratos validos del dominio (1-6) tipados como literales para el SegmentedButtons.
+// Estratos validos del dominio (1-6) tipados como literales para los chips.
 type EstratoStr = '1' | '2' | '3' | '4' | '5' | '6';
 
 interface FormState {
@@ -103,18 +104,26 @@ function validarCampo(nombre: CampoForm, valor: string): string | undefined {
 /**
  * Pantalla de captura de lectura + disparo del calculo tarifario.
  *
- * Flujo:
+ * REDISEÑO VISUAL — Skeletal Wireframe System (Stitch).
+ * Ver `stitch_mediapp_rural_water_wireframes/3._capturar_lectura/code.html`.
+ *
+ * NOTA: la LÓGICA es idéntica a la versión anterior con `react-native-paper`.
+ * Solo cambian los componentes presentacionales:
+ *  - Paper Appbar -> header custom blanco con borde negro.
+ *  - Paper TextInput -> RN <TextInput> con borde 1px black, radius 0.
+ *  - Paper SegmentedButtons -> chips Pressable estilo pill.
+ *  - Paper Button (cámara) -> Pressable con borde dashed.
+ *  - Paper Snackbar -> banner inline simple.
+ *
+ * Flujo (sin cambios):
  *  1) Prellena lectura anterior consultando la ultima lectura conocida
  *     del medidor (si existe) via `lecturaRepo.listar({ id_medidor })`.
- *     Si no hay historial, queda en blanco editable (primera lectura).
- *  2) Usuario completa actual + periodo (default mes actual) + estrato.
- *  3) Construye `EntradaLectura` con `id_operario: 1` HARDCODED — todavia
- *     no hay sistema de auth. Cuando exista, hay que reemplazar.
- *  4) Llama `registrarLectura` (valida + arma `Lectura`) y `liquidarLectura`
- *     (calcula via motor tarifario CRA).
- *  5) Si OK, navega a `ResultadoCalculo` con todo el contexto.
- *  6) Si error de validacion del dominio, muestra Snackbar con el mensaje
- *     tal cual lo tira la factory.
+ *  2) Carga el Suscriptor via `suscriptorRepo.buscarPorId` para mostrar
+ *     nombre + dirección + estado en la card superior. Si falla, placeholders.
+ *  3) Construye `EntradaLectura` con `id_operario: 1` HARDCODED.
+ *  4) Llama `registrarLectura` y `liquidarLectura` igual que antes.
+ *  5) Navega a `ResultadoCalculo` con todo el contexto.
+ *  6) Snackbar inline con mensajes del dominio si error.
  */
 export default function CapturarLectura({ navigation, route }: Props) {
   const { id_medidor, id_suscriptor } = route.params;
@@ -137,6 +146,11 @@ export default function CapturarLectura({ navigation, route }: Props) {
     mensaje: '',
     tipo: 'ok',
   });
+  // Datos del suscriptor para mostrar en la card superior. Se carga via
+  // `suscriptorRepo.buscarPorId`. Si falla, queda undefined y mostramos "—".
+  const [suscriptor, setSuscriptor] = useState<Suscriptor | undefined>(
+    undefined,
+  );
 
   // Recibe la evidencia cuando `CapturarFoto` navega de vuelta con el
   // param poblado. `route.params.evidenciaFoto` cambia cada vez que la
@@ -181,6 +195,27 @@ export default function CapturarLectura({ navigation, route }: Props) {
       cancelado = true;
     };
   }, [id_medidor]);
+
+  // Carga del suscriptor para la card de header. Solo presentación —
+  // si falla, dejamos el card con placeholders ("—") y la pantalla sigue
+  // siendo funcional. NO bloquea el cálculo.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const { suscriptorRepo } = await getBootstrap();
+        const s = await suscriptorRepo.buscarPorId(id_suscriptor);
+        if (cancelado) return;
+        if (s !== null) setSuscriptor(s);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[CapturarLectura] no se pudo cargar suscriptor:', e);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [id_suscriptor]);
 
   function setCampo<K extends CampoForm>(campo: K, valor: FormState[K]) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
@@ -249,20 +284,60 @@ export default function CapturarLectura({ navigation, route }: Props) {
     }
   }
 
+  function abrirCamara() {
+    navigation.navigate('CapturarFoto', {
+      id_medidor,
+      id_periodo: form.id_periodo.trim(),
+      id_suscriptor,
+    });
+  }
+
+  // Estado del badge superior: si conocemos al suscriptor usamos su `estado`,
+  // sino fallback "ACTIVO" (el plan acepta esto como demo).
+  const badgeTexto = (suscriptor?.estado ?? 'activo').toUpperCase();
+  const nombreSuscriptor = suscriptor?.nombre_apellidos ?? '—';
+  const direccionSuscriptor = suscriptor?.direccion ?? '—';
+
+  // Última lectura para mostrarla destacada arriba del input.
+  const lecturaAnteriorTxt =
+    form.lectura_anterior.trim() === ''
+      ? '—'
+      : `${form.lectura_anterior} m³`;
+
   const subtitulo = useMemo(
     () => `Suscriptor #${id_suscriptor} — Medidor #${id_medidor}`,
     [id_suscriptor, id_medidor],
   );
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction
+    <View style={styles.root}>
+      {/* Header brutalist: back + título capitalizado + account icon */}
+      <View style={styles.header}>
+        <Pressable
           onPress={() => navigation.goBack()}
           disabled={calculando}
-        />
-        <Appbar.Content title="Capturar lectura" />
-      </Appbar.Header>
+          style={({ pressed }) => [
+            styles.headerBtn,
+            pressed && styles.pressedDark,
+          ]}
+          accessibilityLabel="Volver"
+        >
+          <Text style={styles.headerIcon}>‹</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>CAPTURAR LECTURA</Text>
+        <Pressable
+          onPress={() => {
+            // TODO: abrir perfil/sesión cuando exista módulo de auth.
+          }}
+          style={({ pressed }) => [
+            styles.headerBtn,
+            pressed && styles.pressedDark,
+          ]}
+          accessibilityLabel="Cuenta"
+        >
+          <Text style={styles.headerIcon}>◉</Text>
+        </Pressable>
+      </View>
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -272,227 +347,661 @@ export default function CapturarLectura({ navigation, route }: Props) {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Surface style={styles.surface} elevation={1}>
-            <Text variant="titleMedium" style={styles.titulo}>
-              Datos de la lectura
-            </Text>
-            <Text variant="bodySmall" style={styles.subtitulo}>
-              {subtitulo}
-            </Text>
-
-            {cargandoPrefill && (
-              <View style={styles.loaderRow}>
-                <ActivityIndicator />
-                <Text variant="bodySmall" style={styles.loaderText}>
-                  Cargando lectura previa…
+          {/* Card del suscriptor */}
+          <View style={styles.cardSuscriptor}>
+            <View style={styles.cardSuscriptorTop}>
+              <View style={styles.flex}>
+                <Text style={styles.abonadoLabel}>
+                  ABONADO #{id_suscriptor}
+                </Text>
+                <Text style={styles.abonadoNombre} numberOfLines={1}>
+                  {nombreSuscriptor}
                 </Text>
               </View>
-            )}
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{badgeTexto}</Text>
+              </View>
+            </View>
+            <View style={styles.cardSuscriptorRow}>
+              <Text style={styles.cardSuscriptorLine} numberOfLines={2}>
+                ◎  {direccionSuscriptor}
+              </Text>
+            </View>
+            <View style={styles.cardSuscriptorRow}>
+              <Text style={styles.cardSuscriptorLine}>
+                ▦  Categoría: Estrato {form.estrato}
+              </Text>
+            </View>
+            <Text style={styles.subtituloMeta}>{subtitulo}</Text>
+          </View>
 
-            <TextInput
-              label="Lectura anterior (m³) *"
-              value={form.lectura_anterior}
-              onChangeText={(v) => setCampo('lectura_anterior', v)}
-              onBlur={() => onBlur('lectura_anterior')}
-              error={errores.lectura_anterior !== undefined}
-              mode="outlined"
-              keyboardType="decimal-pad"
-              disabled={calculando || cargandoPrefill}
-            />
-            <HelperText
-              type="error"
-              visible={errores.lectura_anterior !== undefined}
-            >
-              {errores.lectura_anterior ?? ' '}
-            </HelperText>
+          {cargandoPrefill && (
+            <View style={styles.loaderRow}>
+              <Text style={styles.loaderText}>Cargando lectura previa…</Text>
+            </View>
+          )}
 
+          {/* Card lectura anterior */}
+          <View style={styles.cardAnterior}>
+            <Text style={styles.anteriorLabel}>Lectura anterior</Text>
+            <Text style={styles.anteriorValor}>{lecturaAnteriorTxt}</Text>
+          </View>
+
+          {/* Input lectura actual */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Lectura actual (m³) *</Text>
             <TextInput
-              label="Lectura actual (m³) *"
               value={form.lectura_actual}
               onChangeText={(v) => setCampo('lectura_actual', v)}
               onBlur={() => onBlur('lectura_actual')}
-              error={errores.lectura_actual !== undefined}
-              mode="outlined"
+              placeholder="0000"
+              placeholderTextColor={COLORS.placeholder}
               keyboardType="decimal-pad"
-              disabled={calculando}
+              editable={!calculando}
+              style={[
+                styles.inputBig,
+                errores.lectura_actual !== undefined && styles.inputError,
+              ]}
             />
-            <HelperText
-              type="error"
-              visible={errores.lectura_actual !== undefined}
-            >
-              {errores.lectura_actual ?? ' '}
-            </HelperText>
+            {errores.lectura_actual !== undefined && (
+              <Text style={styles.errorText}>{errores.lectura_actual}</Text>
+            )}
+          </View>
 
+          {/* Input lectura anterior (editable, segun plan se conserva) */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Lectura anterior (m³) *</Text>
             <TextInput
-              label="Periodo (YYYYMM) *"
+              value={form.lectura_anterior}
+              onChangeText={(v) => setCampo('lectura_anterior', v)}
+              onBlur={() => onBlur('lectura_anterior')}
+              placeholder="0000"
+              placeholderTextColor={COLORS.placeholder}
+              keyboardType="decimal-pad"
+              editable={!calculando && !cargandoPrefill}
+              style={[
+                styles.input,
+                errores.lectura_anterior !== undefined && styles.inputError,
+              ]}
+            />
+            {errores.lectura_anterior !== undefined && (
+              <Text style={styles.errorText}>{errores.lectura_anterior}</Text>
+            )}
+          </View>
+
+          {/* Periodo */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Periodo (YYYYMM) *</Text>
+            <TextInput
               value={form.id_periodo}
               onChangeText={(v) => setCampo('id_periodo', v)}
               onBlur={() => onBlur('id_periodo')}
-              error={errores.id_periodo !== undefined}
-              mode="outlined"
+              placeholder="202410"
+              placeholderTextColor={COLORS.placeholder}
               keyboardType="number-pad"
               maxLength={6}
-              disabled={calculando}
+              editable={!calculando}
               autoCapitalize="none"
               autoCorrect={false}
-            />
-            <HelperText type="error" visible={errores.id_periodo !== undefined}>
-              {errores.id_periodo ?? ' '}
-            </HelperText>
-
-            <Text variant="labelMedium" style={styles.subLabel}>
-              Estrato *
-            </Text>
-            <SegmentedButtons
-              value={form.estrato}
-              onValueChange={(v) => {
-                setCampo('estrato', v as EstratoStr);
-                const msg = validarCampo('estrato', v);
-                setErrores((prev) => {
-                  const next = { ...prev };
-                  if (msg === undefined) delete next.estrato;
-                  else next.estrato = msg;
-                  return next;
-                });
-              }}
-              buttons={[
-                { value: '1', label: '1', disabled: calculando },
-                { value: '2', label: '2', disabled: calculando },
-                { value: '3', label: '3', disabled: calculando },
-                { value: '4', label: '4', disabled: calculando },
-                { value: '5', label: '5', disabled: calculando },
-                { value: '6', label: '6', disabled: calculando },
+              style={[
+                styles.input,
+                errores.id_periodo !== undefined && styles.inputError,
               ]}
             />
-            <HelperText type="error" visible={errores.estrato !== undefined}>
-              {errores.estrato ?? ' '}
-            </HelperText>
+            {errores.id_periodo !== undefined && (
+              <Text style={styles.errorText}>{errores.id_periodo}</Text>
+            )}
+          </View>
 
+          {/* Estrato como chips pill */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Estrato *</Text>
+            <View style={styles.chipsRow}>
+              {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => {
+                const seleccionado = form.estrato === e;
+                return (
+                  <Pressable
+                    key={e}
+                    disabled={calculando}
+                    onPress={() => {
+                      setCampo('estrato', e);
+                      const msg = validarCampo('estrato', e);
+                      setErrores((prev) => {
+                        const next = { ...prev };
+                        if (msg === undefined) delete next.estrato;
+                        else next.estrato = msg;
+                        return next;
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      seleccionado && styles.chipSel,
+                      pressed && !seleccionado && styles.pressedLight,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        seleccionado && styles.chipTextSel,
+                      ]}
+                    >
+                      {e}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {errores.estrato !== undefined && (
+              <Text style={styles.errorText}>{errores.estrato}</Text>
+            )}
+          </View>
+
+          {/* Observaciones */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Observaciones</Text>
             <TextInput
-              label="Observaciones"
               value={form.observaciones}
               onChangeText={(v) => setCampo('observaciones', v)}
               onBlur={() => onBlur('observaciones')}
-              error={errores.observaciones !== undefined}
-              mode="outlined"
+              placeholder="Notas opcionales sobre la lectura"
+              placeholderTextColor={COLORS.placeholder}
               multiline
               numberOfLines={3}
               maxLength={300}
-              disabled={calculando}
+              editable={!calculando}
+              textAlignVertical="top"
+              style={[
+                styles.inputMulti,
+                errores.observaciones !== undefined && styles.inputError,
+              ]}
             />
-            <HelperText
-              type="error"
-              visible={errores.observaciones !== undefined}
-            >
-              {errores.observaciones ?? ' '}
-            </HelperText>
-
-            <Text variant="labelMedium" style={styles.subLabel}>
-              Evidencia fotografica (opcional)
-            </Text>
-            {evidencia === undefined ? (
-              <Button
-                mode="outlined"
-                icon="camera"
-                onPress={() => {
-                  navigation.navigate('CapturarFoto', {
-                    id_medidor,
-                    id_periodo: form.id_periodo.trim(),
-                    id_suscriptor,
-                  });
-                }}
-                disabled={calculando}
-                style={styles.botonFoto}
-              >
-                Tomar foto del medidor
-              </Button>
-            ) : (
-              <View style={styles.evidenciaRow}>
-                <Image
-                  source={{ uri: evidencia.foto_path }}
-                  style={styles.thumb}
-                />
-                <View style={styles.evidenciaInfo}>
-                  <Text variant="bodySmall" style={styles.evidenciaTexto}>
-                    ✓ Foto capturada
-                  </Text>
-                  {evidencia.foto_hash !== undefined && (
-                    <Text variant="bodySmall" style={styles.evidenciaHash}>
-                      hash: {evidencia.foto_hash.substring(0, 8)}…
-                    </Text>
-                  )}
-                  <Button
-                    mode="text"
-                    icon="camera-retake"
-                    compact
-                    onPress={() => {
-                      navigation.navigate('CapturarFoto', {
-                        id_medidor,
-                        id_periodo: form.id_periodo.trim(),
-                        id_suscriptor,
-                      });
-                    }}
-                    disabled={calculando}
-                  >
-                    Reemplazar foto
-                  </Button>
-                </View>
-              </View>
+            {errores.observaciones !== undefined && (
+              <Text style={styles.errorText}>{errores.observaciones}</Text>
             )}
+          </View>
 
-            <Button
-              mode="contained"
-              onPress={onCalcular}
-              disabled={calculando || cargandoPrefill}
-              style={styles.submit}
-              icon="calculator"
+          {/*
+            TODO: detección de anomalía cuando exista cálculo de promedio
+            histórico — ver wireframe ref 3._capturar_lectura/code.html línea 168
+            (sección "Consumo inusual" con border error). El dominio actual
+            no calcula histórico; cuando exista, agregar aquí el banner.
+          */}
+
+          {/* Botón cámara / preview de evidencia */}
+          {evidencia === undefined ? (
+            <View>
+              <Pressable
+                onPress={abrirCamara}
+                disabled={calculando}
+                style={({ pressed }) => [
+                  styles.camBtn,
+                  pressed && styles.pressedLight,
+                ]}
+              >
+                <Text style={styles.camIcon}>▣</Text>
+                <Text style={styles.camLabel}>TOMAR FOTO DEL MEDIDOR</Text>
+              </Pressable>
+              <Text style={styles.camHint}>
+                Foto opcional para validación de consumo inusual
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.evidenciaCard}>
+              <Image
+                source={{ uri: evidencia.foto_path }}
+                style={styles.evidenciaThumb}
+              />
+              <View style={styles.evidenciaInfo}>
+                <Text style={styles.evidenciaOk}>✓ FOTO CAPTURADA</Text>
+                {evidencia.foto_hash !== undefined && (
+                  <Text style={styles.evidenciaHash}>
+                    {evidencia.foto_hash.substring(0, 8)}…
+                  </Text>
+                )}
+                <Pressable
+                  onPress={abrirCamara}
+                  disabled={calculando}
+                  style={({ pressed }) => [
+                    styles.replaceBtn,
+                    pressed && styles.pressedLight,
+                  ]}
+                >
+                  <Text style={styles.replaceBtnText}>REEMPLAZAR</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Snack inline (reemplazo del Paper Snackbar) */}
+          {snack.visible && (
+            <Pressable
+              onPress={() => setSnack((s) => ({ ...s, visible: false }))}
+              style={[
+                styles.snackBox,
+                snack.tipo === 'ok' ? styles.snackOk : styles.snackError,
+              ]}
             >
-              {calculando ? 'Calculando…' : 'Calcular'}
-            </Button>
-          </Surface>
+              <Text
+                style={[
+                  styles.snackText,
+                  snack.tipo === 'error' && styles.snackTextError,
+                ]}
+              >
+                {snack.mensaje}
+              </Text>
+              <Text style={styles.snackClose}>×</Text>
+            </Pressable>
+          )}
+
+          {/* Footer de marca dentro del scroll para que no tape */}
+          <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Snackbar
-        visible={snack.visible}
-        onDismiss={() => setSnack((s) => ({ ...s, visible: false }))}
-        duration={snack.tipo === 'ok' ? 1500 : 4000}
-        style={snack.tipo === 'ok' ? styles.snackOk : styles.snackError}
-      >
-        {snack.mensaje}
-      </Snackbar>
+      {/* Bottom fixed actions */}
+      <View style={styles.bottomBar}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          disabled={calculando}
+          style={({ pressed }) => [
+            styles.btnSecondary,
+            pressed && styles.pressedLight,
+          ]}
+        >
+          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+        </Pressable>
+        <Pressable
+          onPress={onCalcular}
+          disabled={calculando || cargandoPrefill}
+          style={({ pressed }) => [
+            styles.btnPrimary,
+            (calculando || cargandoPrefill) && styles.btnDisabled,
+            pressed && styles.pressedDark,
+          ]}
+        >
+          <Text style={styles.btnPrimaryText}>
+            {calculando ? 'CALCULANDO…' : 'GUARDAR Y CALCULAR'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
+const HEADER_HEIGHT = 56;
+const BOTTOM_HEIGHT = 88;
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   flex: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 48 },
-  surface: { padding: 16, borderRadius: 8 },
-  titulo: { marginBottom: 4 },
-  subtitulo: { marginBottom: 12, color: '#666' },
-  subLabel: { marginBottom: 6, marginTop: 4 },
-  submit: { marginTop: 12 },
+
+  // Header
+  header: {
+    height: HEADER_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.margin,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outline,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: -0.2,
+  },
+
+  // Scroll
+  scroll: {
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.lg,
+    paddingBottom: BOTTOM_HEIGHT + SPACING.lg,
+    gap: SPACING.lg,
+  },
+
+  // Card suscriptor
+  cardSuscriptor: {
+    backgroundColor: COLORS.surfaceLight,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    gap: SPACING.xs,
+  },
+  cardSuscriptorTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  abonadoLabel: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  abonadoNombre: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    marginTop: 2,
+  },
+  badge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+  },
+  badgeText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onPrimary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  cardSuscriptorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardSuscriptorLine: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  subtituloMeta: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  // Loader
   loaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 8,
-    gap: 8,
+    paddingVertical: SPACING.sm,
   },
-  loaderText: { marginLeft: 8 },
-  botonFoto: { marginTop: 4, marginBottom: 8 },
-  evidenciaRow: {
+  loaderText: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+  },
+
+  // Card lectura anterior
+  cardAnterior: {
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  anteriorLabel: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.textSecondary,
+  },
+  anteriorValor: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+  },
+
+  // Fields
+  fieldGroup: {
+    gap: SPACING.xs,
+  },
+  fieldLabel: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    marginLeft: 2,
+  },
+  input: {
+    width: '100%',
+    height: 48,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.none,
+    paddingHorizontal: SPACING.md,
+    color: COLORS.primary,
+    ...TYPOGRAPHY.bodyMd,
+  },
+  inputBig: {
+    width: '100%',
+    height: 64,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.none,
+    paddingHorizontal: SPACING.md,
+    color: COLORS.primary,
+    ...TYPOGRAPHY.headlineMd,
+  },
+  inputMulti: {
+    width: '100%',
+    minHeight: 96,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.none,
+    padding: SPACING.md,
+    color: COLORS.primary,
+    ...TYPOGRAPHY.bodyMd,
+  },
+  inputError: {
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.error,
+    marginLeft: 2,
+    marginTop: 2,
+  },
+
+  // Chips
+  chipsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    flexWrap: 'wrap',
+  },
+  chip: {
+    minWidth: 44,
+    height: 44,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipSel: {
+    backgroundColor: COLORS.primary,
+  },
+  chipText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  chipTextSel: {
+    color: COLORS.onPrimary,
+  },
+
+  // Cámara
+  camBtn: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: COLORS.background,
+    ...BORDERS.dashed,
+    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+  },
+  camIcon: {
+    fontSize: 36,
+    color: COLORS.primary,
+  },
+  camLabel: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: -0.2,
+  },
+  camHint: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+  },
+
+  // Evidencia preview
+  evidenciaCard: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+  },
+  evidenciaThumb: {
+    width: 96,
+    height: 96,
+    backgroundColor: COLORS.surfaceLight,
+    ...BORDERS.thin,
+  },
+  evidenciaInfo: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  evidenciaOk: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+  },
+  evidenciaHash: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.textSecondary,
+  },
+  replaceBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    ...BORDERS.thin,
+    backgroundColor: COLORS.background,
+  },
+  replaceBtnText: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  // Snack inline
+  snackBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 8,
-    gap: 12,
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.default,
   },
-  thumb: { width: 100, height: 100, borderRadius: 4, backgroundColor: '#eee' },
-  evidenciaInfo: { flex: 1, marginLeft: 12 },
-  evidenciaTexto: { color: '#2e7d32', fontWeight: '600' },
-  evidenciaHash: { color: '#666', marginTop: 2 },
-  snackOk: { backgroundColor: '#2e7d32' },
-  snackError: { backgroundColor: '#c62828' },
+  snackOk: {
+    backgroundColor: COLORS.surfaceLight,
+  },
+  snackError: {
+    backgroundColor: COLORS.errorContainer,
+    borderColor: COLORS.error,
+  },
+  snackText: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  snackTextError: {
+    color: COLORS.onErrorContainer,
+  },
+  snackClose: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    paddingHorizontal: SPACING.sm,
+  },
+
+  // Brand footer
+  brandFooter: {
+    ...TYPOGRAPHY.labelSm,
+    fontSize: 8,
+    color: COLORS.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginTop: SPACING.lg,
+  },
+
+  // Bottom bar
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: BOTTOM_HEIGHT,
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.md,
+    flexDirection: 'row',
+    gap: SPACING.md,
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outline,
+  },
+  btnSecondary: {
+    flex: 1,
+    height: 56,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnSecondaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  btnPrimary: {
+    flex: 1,
+    height: 56,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnPrimaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+
+  // Estados pressed
+  pressedLight: {
+    backgroundColor: COLORS.surfaceLight,
+  },
+  pressedDark: {
+    opacity: 0.85,
+  },
 });
