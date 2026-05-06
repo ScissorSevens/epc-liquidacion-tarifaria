@@ -21,6 +21,13 @@ public static class SyncHandler
     /// <param name="idGetter">Devuelve el Id server post-save.</param>
     /// <param name="fkExistsCheck">Si no es null, valida que las FKs existan; falso => 404.</param>
     /// <param name="tipo">Etiqueta corta para sync_registros (ej. "suscriptor").</param>
+    /// <param name="preProcess">
+    /// Hook opcional ejecutado DESPUÉS de validar/FK-check y ANTES de mapear a entidad. Sirve para
+    /// efectos colaterales que requieran I/O (ej. Lectura: persistir foto en filesystem y mutar
+    /// el payload para inyectar la ruta resuelta). Solo se llama cuando hay INSERT real (caso A)
+    /// o UPDATE forzado (caso C). NO se llama en el caso 200 idempotente porque no hay cambio
+    /// efectivo en DB y por lo tanto no debe haber side-effect (evita re-guardar foto idéntica).
+    /// </param>
     public static async Task<IResult> Handle<TPayload, TEntity>(
         SyncRequest<TPayload> req,
         IValidator<TPayload> validator,
@@ -31,7 +38,8 @@ public static class SyncHandler
         string tipo,
         MediAppDbContext db,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        Func<TPayload, CancellationToken, Task>? preProcess = null)
         where TEntity : class
     {
         // 1. Validación de payload de negocio.
@@ -75,6 +83,12 @@ public static class SyncHandler
         if (registro is null)
         {
             // Caso A: NUEVO. INSERT entidad + INSERT sync_registro en una transacción.
+            // preProcess corre acá: hay cambio efectivo en DB, los side-effects son válidos.
+            if (preProcess is not null)
+            {
+                await preProcess(req.Payload, ct);
+            }
+
             await using var tx = await db.Database.BeginTransactionAsync(ct);
             try
             {
@@ -121,6 +135,12 @@ public static class SyncHandler
         }
 
         // Sobrescritura forzada.
+        // preProcess corre acá también: vamos a UPDATE real, side-effects válidos.
+        if (preProcess is not null)
+        {
+            await preProcess(req.Payload, ct);
+        }
+
         await using (var tx = await db.Database.BeginTransactionAsync(ct))
         {
             try

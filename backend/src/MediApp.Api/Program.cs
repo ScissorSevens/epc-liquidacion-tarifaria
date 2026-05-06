@@ -1,5 +1,9 @@
 using FluentValidation;
+using MediApp.Api.Features.Lecturas;
+using MediApp.Api.Features.Liquidaciones;
+using MediApp.Api.Features.Medidores;
 using MediApp.Api.Features.Suscriptores;
+using MediApp.Api.Infrastructure.Almacen;
 using MediApp.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -36,6 +40,12 @@ try
 
     // Validators de FluentValidation registrados a mano (un Scoped por feature).
     builder.Services.AddScoped<IValidator<SuscriptorPayload>, SuscriptorValidator>();
+    builder.Services.AddScoped<IValidator<MedidorPayload>, MedidorValidator>();
+    builder.Services.AddScoped<IValidator<LecturaPayload>, LecturaValidator>();
+    builder.Services.AddScoped<IValidator<LiquidacionPayload>, LiquidacionValidator>();
+
+    // Almacén de evidencias fotográficas (Lectura). Singleton: stateless, lee config en el ctor.
+    builder.Services.AddSingleton<IAlmacenEvidencias, AlmacenLocal>();
 
     var app = builder.Build();
 
@@ -59,6 +69,9 @@ try
 
     // Endpoints de sync por tipo (protocolo #213).
     app.MapGroup("/api/v1/suscriptores").MapSuscriptoresEndpoints();
+    app.MapGroup("/api/v1/medidores").MapMedidoresEndpoints();
+    app.MapGroup("/api/v1/lecturas").MapLecturasEndpoints();
+    app.MapGroup("/api/v1/liquidaciones").MapLiquidacionesEndpoints();
 
     app.Run();
 }
