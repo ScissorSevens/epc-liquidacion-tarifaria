@@ -15,3 +15,8 @@ obj/
 
 ## EF Core sensible local
 *.pdb
+
+## Evidencias fotográficas locales (Lectura). Generadas en runtime por AlmacenLocal,
+## NUNCA versionar (pueden ocupar mucho y son datos del usuario).
+evidencias/
+**/evidencias/
