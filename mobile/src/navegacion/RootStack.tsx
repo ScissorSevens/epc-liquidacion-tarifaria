@@ -19,6 +19,7 @@ import Home from '../pantallas/Home';
 import ImportarCsv from '../pantallas/ImportarCsv';
 import ListaSuscriptores from '../pantallas/ListaSuscriptores';
 import ResultadoCalculo from '../pantallas/ResultadoCalculo';
+import Sincronizacion from '../pantallas/Sincronizacion';
 
 /**
  * Mapa de rutas del stack raíz.
@@ -61,6 +62,7 @@ export type RootStackParamList = {
     estrato: Estrato;
     id_suscriptor: number;
   };
+  Sincronizacion: undefined;
 };
 
 /**
@@ -84,6 +86,7 @@ export default function RootStack() {
       <Stack.Screen name="CapturarLectura" component={CapturarLectura} />
       <Stack.Screen name="CapturarFoto" component={CapturarFoto} />
       <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
+      <Stack.Screen name="Sincronizacion" component={Sincronizacion} />
     </Stack.Navigator>
   );
 }

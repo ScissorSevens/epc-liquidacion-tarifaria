@@ -41,6 +41,12 @@ export default function Home({ navigation }: Props) {
         >
           Demo Persistencia
         </Button>
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate('Sincronizacion')}
+        >
+          Sincronización
+        </Button>
       </View>
     </View>
   );
