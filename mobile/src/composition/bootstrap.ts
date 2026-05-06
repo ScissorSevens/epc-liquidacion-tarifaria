@@ -38,9 +38,39 @@ import {
 import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
 import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
 import type { Hasher, IdGenerator } from '@dominio/shared/ports';
+import {
+  ClienteHTTPSincronizacion,
+  type TokenProvider,
+} from '@dominio/cliente-http';
+import { procesarCola } from '@dominio/sincronizacion/procesador';
+import type { ClienteSincronizacion } from '@dominio/sincronizacion/procesador';
+import { obtenerApiBaseUrl } from '../config/api';
 import { smokeDominio, type ResultadoSmokeDominio } from './smoke-dominio';
 
+// Token provider stub: el backend del sprint 3 NO requiere JWT todavia.
+// Cuando se agregue auth, este stub se reemplaza por uno que lea de
+// AsyncStorage / SecureStore. Se exporta como singleton porque es
+// stateless y barato.
+const tokenProviderSinAuth: TokenProvider = {
+  async obtenerToken(): Promise<string | null> {
+    return null;
+  },
+};
+
 export const NOMBRE_DB_MOVIL = 'mediapp.db';
+
+/**
+ * Resultado de procesar la cola — devuelto por `procesadorCola()`.
+ * Calculado a partir del estado final de la cola tras `procesarCola()`,
+ * que es void en el dominio puro. Estos contadores los usa la pantalla
+ * de Sincronizacion para mostrar el feedback al operario.
+ */
+export interface ResultadoSync {
+  readonly enviados: number;
+  readonly conflictos: number;
+  readonly fallidos: number;
+  readonly pendientes: number;
+}
 
 export interface BootstrapApp {
   readonly db: SQLite.SQLiteDatabase;
@@ -53,6 +83,13 @@ export interface BootstrapApp {
   readonly medidorRepo: MedidorRepositoryExpoSqlite;
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
+  readonly clienteHttp: ClienteSincronizacion;
+  readonly apiBaseUrl: string;
+  /**
+   * Procesa la cola completa una sola vez (no hace polling).
+   * Devuelve los contadores del estado final para mostrar feedback.
+   */
+  readonly procesadorCola: () => Promise<ResultadoSync>;
   readonly smoke: ResultadoSmokeDominio;
 }
 
@@ -83,6 +120,35 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const hasher = crearHasherJs();
   const idGenerator = crearIdGeneratorUuid();
 
+  // Cliente HTTP del dominio + procesador de cola.
+  //
+  // El cliente usa `fetch` global — Hermes/RN lo expone de fabrica desde
+  // RN 0.60+, asi que NO inyectamos un fetch custom. La firma de
+  // `ClienteHTTPSincronizacion` es { baseUrl, tokenProvider } — NO acepta
+  // `timeoutMs` (limitacion conocida del cliente, queda como TODO post-MVP
+  // si la red rural lo demanda).
+  //
+  // El procesador es `procesarCola(cola, cliente)`, una funcion libre
+  // del dominio que ya internamente respeta MAX_INTENTOS, delays
+  // exponenciales y dependencias entre items. Lo envolvemos en una
+  // closure que tras procesar lee la cola y devuelve contadores.
+  const apiBaseUrl = obtenerApiBaseUrl();
+  const clienteHttp = new ClienteHTTPSincronizacion({
+    baseUrl: apiBaseUrl,
+    tokenProvider: tokenProviderSinAuth,
+  });
+
+  const procesadorCola = async (): Promise<ResultadoSync> => {
+    await procesarCola(colaRepo, clienteHttp);
+    const items = await colaRepo.listar();
+    return {
+      enviados: items.filter((i) => i.estado === 'EXITOSO').length,
+      conflictos: items.filter((i) => i.estado === 'CONFLICTO').length,
+      fallidos: items.filter((i) => i.estado === 'FALLIDO').length,
+      pendientes: items.filter((i) => i.estado === 'PENDIENTE').length,
+    };
+  };
+
   const smoke = smokeDominio();
 
   return {
@@ -94,6 +160,9 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
     medidorRepo,
     hasher,
     idGenerator,
+    clienteHttp,
+    apiBaseUrl,
+    procesadorCola,
     smoke,
   };
 }
