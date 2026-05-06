@@ -1,3 +1,5 @@
+using FluentValidation;
+using MediApp.Api.Features.Suscriptores;
 using MediApp.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -32,6 +34,9 @@ try
     // ProblemDetails RFC 7807 unificado para excepciones no atrapadas y status codes.
     builder.Services.AddProblemDetails();
 
+    // Validators de FluentValidation registrados a mano (un Scoped por feature).
+    builder.Services.AddScoped<IValidator<SuscriptorPayload>, SuscriptorValidator>();
+
     var app = builder.Build();
 
     if (app.Environment.IsDevelopment())
@@ -51,6 +56,9 @@ try
         status = "ok",
         utc = DateTimeOffset.UtcNow
     }));
+
+    // Endpoints de sync por tipo (protocolo #213).
+    app.MapGroup("/api/v1/suscriptores").MapSuscriptoresEndpoints();
 
     app.Run();
 }
