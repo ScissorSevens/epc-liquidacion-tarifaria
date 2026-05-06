@@ -1,17 +1,21 @@
-import { useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
 import {
-  Appbar,
-  Button,
-  Card,
-  Divider,
-  List,
-  Surface,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
-  useTheme,
-} from 'react-native-paper';
+  View,
+} from 'react-native';
 
 import type { RootStackScreenProps } from '../navegacion/RootStack';
+import {
+  BORDERS,
+  COLORS,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/skeletal-tokens';
 
 type Props = RootStackScreenProps<'ResultadoCalculo'>;
 
@@ -36,200 +40,633 @@ function formatearCOP(monto: number): string {
   }
 }
 
-/** Fila label/valor reutilizable en cards (alinea derecha el valor). */
-function Fila({
-  label,
-  valor,
-  destacado,
-}: {
-  label: string;
-  valor: string;
-  destacado?: boolean;
-}) {
-  return (
-    <View style={styles.fila}>
-      <Text variant={destacado ? 'titleMedium' : 'bodyMedium'} style={styles.filaLabel}>
-        {label}
-      </Text>
-      <Text
-        variant={destacado ? 'titleMedium' : 'bodyMedium'}
-        style={styles.filaValor}
-      >
-        {valor}
-      </Text>
-    </View>
-  );
+/**
+ * Formatea ISO-8601 -> "DD MMM YYYY - HH:MM" en español rioplatense.
+ * Si la entrada no parsea, devolvemos el string crudo (no rompe la UI).
+ */
+const MESES = [
+  'ENE',
+  'FEB',
+  'MAR',
+  'ABR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AGO',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DIC',
+] as const;
+
+function formatearFecha(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mes = MESES[d.getMonth()];
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${dd} ${mes} ${yyyy} - ${hh}:${mm}`;
 }
 
 /**
- * Muestra el desglose del calculo tarifario producido por el motor CRA.
+ * Pantalla de resultado de liquidación — REDISEÑO VISUAL Skeletal Stitch.
+ * Ver `stitch_mediapp_rural_water_wireframes/4._factura_calculada/code.html`.
  *
- * Recibe TODO por params (no consulta repos): `lectura`, `resultado`,
- * `parametros` aplicados y `estrato` elegido. Tambien `id_suscriptor`
- * para el header y `id_medidor` (sacado de `lectura.id_medidor`) para
- * permitir "Capturar otra".
+ * NOTA: la lógica es 100% presentacional. NO consulta repos. Recibe TODO
+ * por params (`lectura`, `resultado`, `parametros`, `estrato`, `id_suscriptor`).
  *
- * Pantalla es pura presentacion: no escribe en DB. La persistencia de
- * la lectura/calculo se hara en una tarea futura cuando exista el flujo
- * "Confirmar y guardar".
+ * Mapeo de botones:
+ *   "Ver historial"  -> "VOLVER AL INICIO"  (popToTop) — no hay historial.
+ *   "Volver a la ruta" -> "CAPTURAR OTRA"   (replace a CapturarLectura).
+ *
+ * Hash de verificación:
+ *   El dominio actual NO calcula hash de la liquidación. Usamos
+ *   `lectura.evidencia?.foto_hash` si existe; si no, mostramos el
+ *   placeholder "— (sin evidencia foto)".
  */
 export default function ResultadoCalculo({ navigation, route }: Props) {
-  const { lectura, resultado, parametros, estrato, id_suscriptor } = route.params;
-  const theme = useTheme();
+  const { lectura, resultado, parametros, estrato, id_suscriptor } =
+    route.params;
+
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
 
   const subsidioMostrar = resultado.subsidio > 0;
   const contribMostrar = resultado.contribucion > 0;
+  const excedenteMostrar = resultado.consumoExcedente > 0;
+
+  const fechaTxt = formatearFecha(lectura.timestamp_captura);
+  const hashTxt =
+    lectura.evidencia?.foto_hash !== undefined
+      ? lectura.evidencia.foto_hash
+      : '— (sin evidencia foto)';
 
   const subtitulo = useMemo(
-    () => `Suscriptor #${id_suscriptor} — Medidor #${lectura.id_medidor} — Periodo ${lectura.id_periodo}`,
+    () =>
+      `Suscriptor #${id_suscriptor} — Medidor #${lectura.id_medidor} — Periodo ${lectura.id_periodo}`,
     [id_suscriptor, lectura.id_medidor, lectura.id_periodo],
   );
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={() => navigation.goBack()} />
-        <Appbar.Content title="Resultado de liquidación" />
-      </Appbar.Header>
+    <View style={styles.root}>
+      {/* Header brutalist */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={({ pressed }) => [
+            styles.headerBtn,
+            pressed && styles.pressedDark,
+          ]}
+          accessibilityLabel="Volver"
+        >
+          <Text style={styles.headerIcon}>‹</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>FACTURA CALCULADA</Text>
+        <Pressable
+          onPress={() => {
+            // TODO: abrir perfil/sesión cuando exista módulo de auth.
+          }}
+          style={({ pressed }) => [
+            styles.headerBtn,
+            pressed && styles.pressedDark,
+          ]}
+          accessibilityLabel="Cuenta"
+        >
+          <Text style={styles.headerIcon}>◉</Text>
+        </Pressable>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text variant="bodySmall" style={styles.subtitulo}>
-          {subtitulo}
-        </Text>
+        {/* Status: círculo + título + subtítulo */}
+        <View style={styles.statusBlock}>
+          <View style={styles.checkCircle}>
+            <Text style={styles.checkMark}>✓</Text>
+          </View>
+          <Text style={styles.statusTitle}>Lectura registrada</Text>
+          <Text style={styles.statusSub}>
+            El proceso de facturación ha finalizado correctamente.
+          </Text>
+          <Text style={styles.subtituloMeta}>{subtitulo}</Text>
+        </View>
 
-        {/* Card 1 - Consumo */}
-        <Card style={styles.card}>
-          <Card.Title title="Consumo" left={(p) => <List.Icon {...p} icon="water" />} />
-          <Card.Content>
-            <Fila label="Total del periodo" valor={`${resultado.consumo} m³`} />
-            <Fila label="Dentro del básico" valor={`${resultado.consumoBasico} m³`} />
-            <Fila label="Excedente" valor={`${resultado.consumoExcedente} m³`} />
-            <Divider style={styles.divider} />
-            <Text variant="bodySmall" style={styles.muted}>
-              Lectura anterior: {lectura.lectura_anterior} m³ — actual: {lectura.lectura_actual} m³
+        {/* Bento grid: total + anterior/actual + consumo */}
+        <View style={styles.bentoColFull}>
+          <Text style={styles.bentoLabel}>MONTO TOTAL</Text>
+          <Text style={styles.bentoTotal}>{formatearCOP(resultado.total)}</Text>
+        </View>
+        <View style={styles.bentoRow}>
+          <View style={[styles.bentoColHalf, styles.bentoFill]}>
+            <Text style={styles.bentoLabelSm}>ANTERIOR</Text>
+            <Text style={styles.bentoMid}>
+              {lectura.lectura_anterior}{' '}
+              <Text style={styles.bentoUnit}>m³</Text>
             </Text>
-            <Text variant="bodySmall" style={styles.muted}>
-              Umbral básico aplicado: {parametros.consumoBasico} m³
+          </View>
+          <View style={[styles.bentoColHalf, styles.bentoFill]}>
+            <Text style={styles.bentoLabelSm}>ACTUAL</Text>
+            <Text style={styles.bentoMid}>
+              {lectura.lectura_actual}{' '}
+              <Text style={styles.bentoUnit}>m³</Text>
             </Text>
-          </Card.Content>
-        </Card>
+          </View>
+        </View>
+        <View style={styles.bentoColFullWhite}>
+          <View style={styles.bentoConsumoLeft}>
+            <Text style={styles.bentoConsumoIcon}>◷</Text>
+            <Text style={styles.bentoConsumoLabel}>Consumo del Periodo</Text>
+          </View>
+          <Text style={styles.bentoConsumoVal}>{resultado.consumo} m³</Text>
+        </View>
 
-        {/* Card 2 - Cargos */}
-        <Card style={styles.card}>
-          <Card.Title
-            title="Cargos"
-            left={(p) => <List.Icon {...p} icon="cash-multiple" />}
-          />
-          <Card.Content>
-            <Fila label="Cargo fijo" valor={formatearCOP(resultado.cargoFijo)} />
-            <Fila
-              label="Cargo consumo básico"
-              valor={formatearCOP(resultado.cargoConsumo)}
-            />
-            <Fila
-              label="Cargo excedente"
-              valor={formatearCOP(resultado.cargoExcedente)}
-            />
-          </Card.Content>
-        </Card>
-
-        {/* Card 3 - Subsidio / Contribucion */}
-        <Card style={styles.card}>
-          <Card.Title
-            title="Subsidio / Contribución"
-            left={(p) => <List.Icon {...p} icon="scale-balance" />}
-          />
-          <Card.Content>
-            <Fila label="Estrato aplicado" valor={String(estrato)} />
-            {subsidioMostrar && (
-              <Fila label="Subsidio" valor={`- ${formatearCOP(resultado.subsidio)}`} />
-            )}
-            {contribMostrar && (
-              <Fila
-                label="Contribución"
-                valor={`+ ${formatearCOP(resultado.contribucion)}`}
+        {/* Detalle colapsable */}
+        <View style={styles.detalleWrap}>
+          <Pressable
+            onPress={() => setDetalleAbierto((v) => !v)}
+            style={({ pressed }) => [
+              styles.detalleHeader,
+              pressed && styles.pressedLight,
+            ]}
+          >
+            <Text style={styles.detalleTitulo}>Detalle de cálculo</Text>
+            <Text style={styles.detalleChevron}>
+              {detalleAbierto ? '▲' : '▼'}
+            </Text>
+          </Pressable>
+          {detalleAbierto && (
+            <View style={styles.detalleBody}>
+              <FilaDetalle
+                label="Cargo Fijo"
+                valor={formatearCOP(resultado.cargoFijo)}
               />
-            )}
-            {!subsidioMostrar && !contribMostrar && (
-              <Text variant="bodySmall" style={styles.muted}>
-                Estrato neutro: sin subsidio ni contribución.
-              </Text>
-            )}
-          </Card.Content>
-        </Card>
+              <FilaDetalle
+                label={`Cargo Consumo Básico (${resultado.consumoBasico}m³)`}
+                valor={formatearCOP(resultado.cargoConsumo)}
+              />
+              {excedenteMostrar && (
+                <FilaDetalle
+                  label={`Cargo Excedente (${resultado.consumoExcedente}m³)`}
+                  valor={formatearCOP(resultado.cargoExcedente)}
+                />
+              )}
+              {subsidioMostrar && (
+                <FilaDetalle
+                  label={`Subsidio (estrato ${estrato})`}
+                  valor={`- ${formatearCOP(resultado.subsidio)}`}
+                />
+              )}
+              {contribMostrar && (
+                <FilaDetalle
+                  label={`Contribución (estrato ${estrato})`}
+                  valor={`+ ${formatearCOP(resultado.contribucion)}`}
+                />
+              )}
+              <FilaDetalle
+                label="Umbral básico aplicado"
+                valor={`${parametros.consumoBasico} m³`}
+                meta
+              />
+            </View>
+          )}
+        </View>
 
-        {/* Total destacado */}
-        <Surface
-          style={[styles.totalSurface, { backgroundColor: theme.colors.primaryContainer }]}
-          elevation={2}
-        >
-          <Text variant="labelLarge" style={styles.totalLabel}>
-            Total a facturar
-          </Text>
-          <Text
-            variant="headlineMedium"
-            style={[styles.totalValor, { color: theme.colors.primary }]}
-          >
-            {formatearCOP(resultado.total)}
-          </Text>
-        </Surface>
-
-        <View style={styles.botones}>
-          <Button
-            mode="contained-tonal"
-            icon="home"
+        {/* Acciones */}
+        <View style={styles.actionsCol}>
+          <Pressable
             onPress={() => navigation.popToTop()}
-            style={styles.boton}
+            style={({ pressed }) => [
+              styles.btnPrimary,
+              pressed && styles.pressedDark,
+            ]}
           >
-            Volver al inicio
-          </Button>
-          <Button
-            mode="contained"
-            icon="plus"
+            <Text style={styles.btnPrimaryText}>VOLVER AL INICIO</Text>
+          </Pressable>
+          <Pressable
             onPress={() =>
               navigation.replace('CapturarLectura', {
                 id_medidor: lectura.id_medidor,
                 id_suscriptor,
               })
             }
-            style={styles.boton}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.pressedLight,
+            ]}
           >
-            Capturar otra
-          </Button>
+            <Text style={styles.btnSecondaryText}>CAPTURAR OTRA</Text>
+          </Pressable>
+        </View>
+
+        {/* Metadata footer */}
+        <View style={styles.metaWrap}>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>FECHA</Text>
+            <Text style={styles.metaVal}>{fechaTxt}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>OPERADOR</Text>
+            <Text style={styles.metaVal}>
+              Operador #{lectura.id_operario}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>ESTRATO</Text>
+            <Text style={styles.metaVal}>{estrato}</Text>
+          </View>
+          <View style={styles.metaCol}>
+            <Text style={styles.metaLabel}>HASH DE VERIFICACIÓN</Text>
+            <Text style={styles.metaHash}>{hashTxt}</Text>
+          </View>
         </View>
       </ScrollView>
+
+      {/* Footer fijo */}
+      <View style={styles.footer}>
+        <Text style={styles.footerBrand}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+        <View style={styles.footerLinks}>
+          <Pressable
+            onPress={() => {
+              // TODO: abrir pantalla/url de soporte cuando exista.
+            }}
+          >
+            <Text style={styles.footerLink}>SOPORTE</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              // TODO: cerrar sesión cuando exista módulo de auth.
+            }}
+          >
+            <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
 
+/** Fila label/valor del detalle de cálculo. `meta` = estilo más sutil. */
+function FilaDetalle({
+  label,
+  valor,
+  meta,
+}: {
+  label: string;
+  valor: string;
+  meta?: boolean;
+}) {
+  return (
+    <View style={styles.filaDetalle}>
+      <Text style={[styles.filaDetalleLabel, meta && styles.filaMeta]}>
+        {label}
+      </Text>
+      <Text style={[styles.filaDetalleValor, meta && styles.filaMeta]}>
+        {valor}
+      </Text>
+    </View>
+  );
+}
+
+const HEADER_HEIGHT = 56;
+const FOOTER_HEIGHT = 48;
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 48 },
-  subtitulo: { marginBottom: 12, color: '#666' },
-  card: { marginBottom: 12 },
-  fila: {
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  // Header
+  header: {
+    height: HEADER_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.margin,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outline,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: -0.2,
+  },
+
+  // Scroll
+  scroll: {
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.lg,
+    paddingBottom: FOOTER_HEIGHT + SPACING.xl,
+    gap: SPACING.sm,
+  },
+
+  // Status
+  statusBlock: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    gap: SPACING.xs,
+  },
+  checkCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    ...BORDERS.thick,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  checkMark: {
+    fontSize: 32,
+    color: COLORS.primary,
+    fontWeight: '700',
+    lineHeight: 36,
+  },
+  statusTitle: {
+    ...TYPOGRAPHY.headlineMd,
+    color: COLORS.primary,
+  },
+  statusSub: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.md,
+  },
+  subtituloMeta: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+  },
+
+  // Bento grid
+  bentoColFull: {
+    width: '100%',
+    backgroundColor: COLORS.surfaceLight,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+  },
+  bentoLabel: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginBottom: SPACING.xs,
+  },
+  bentoTotal: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: COLORS.primary,
+    letterSpacing: -1.5,
+    lineHeight: 44,
+  },
+  bentoRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  bentoColHalf: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLight,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    minHeight: 80,
+  },
+  bentoFill: {},
+  bentoLabelSm: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: SPACING.xs,
+    letterSpacing: 1,
+  },
+  bentoMid: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  bentoUnit: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  bentoColFullWhite: {
+    width: '100%',
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
   },
-  filaLabel: { flex: 1 },
-  filaValor: { fontVariant: ['tabular-nums'], textAlign: 'right' },
-  divider: { marginVertical: 8 },
-  muted: { color: '#666', marginTop: 4 },
-  totalSurface: {
-    padding: 20,
-    borderRadius: 12,
+  bentoConsumoLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 12,
+    gap: SPACING.sm,
   },
-  totalLabel: { marginBottom: 4 },
-  totalValor: { fontWeight: 'bold', fontVariant: ['tabular-nums'] },
-  botones: {
+  bentoConsumoIcon: {
+    fontSize: 20,
+    color: COLORS.primary,
+  },
+  bentoConsumoLabel: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  bentoConsumoVal: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+
+  // Detalle colapsable
+  detalleWrap: {
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surfaceLight,
+    marginTop: SPACING.sm,
+  },
+  detalleHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
-    marginTop: 8,
+    alignItems: 'center',
+    padding: SPACING.md,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outline,
   },
-  boton: { flex: 1 },
+  detalleTitulo: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  detalleChevron: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  detalleBody: {
+    padding: SPACING.md,
+    gap: SPACING.sm,
+  },
+  filaDetalle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
+  },
+  filaDetalleLabel: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  filaDetalleValor: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  filaMeta: {
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+
+  // Acciones
+  actionsCol: {
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+  },
+  btnPrimary: {
+    width: '100%',
+    height: 48,
+    backgroundColor: COLORS.primary,
+    ...BORDERS.thin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnPrimaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  btnSecondary: {
+    width: '100%',
+    height: 48,
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnSecondaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+
+  // Metadata
+  metaWrap: {
+    marginTop: SPACING.xl,
+    paddingTop: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outline,
+    gap: SPACING.xs,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  metaLabel: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  metaVal: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  metaCol: {
+    flexDirection: 'column',
+    paddingTop: SPACING.sm,
+    gap: SPACING.xs,
+  },
+  metaHash: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: COLORS.primary,
+    // Fuente monoespaciada por plataforma. iOS = Menlo (sistema), Android =
+    // 'monospace' (alias garantizado de Roboto Mono / Droid Sans Mono).
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    backgroundColor: COLORS.surfaceMuted2,
+    padding: SPACING.sm,
+    ...BORDERS.dashed,
+  },
+
+  // Footer
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: FOOTER_HEIGHT,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.margin,
+    backgroundColor: COLORS.surfaceMuted,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  footerBrand: {
+    fontSize: 10,
+    lineHeight: 12,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginTop: 2,
+  },
+  footerLink: {
+    fontSize: 10,
+    lineHeight: 12,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+
+  // Pressed states
+  pressedLight: {
+    backgroundColor: COLORS.surfaceLight,
+  },
+  pressedDark: {
+    opacity: 0.85,
+  },
 });
+
