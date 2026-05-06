@@ -3,7 +3,7 @@ import {
   type NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 
-import type { Lectura } from '@dominio/captura-lecturas/types';
+import type { EvidenciaFoto, Lectura } from '@dominio/captura-lecturas/types';
 import type {
   Estrato,
   ParametrosTarifa,
@@ -38,7 +38,21 @@ export type RootStackParamList = {
   ImportarCsv: undefined;
   HolaMediApp: undefined;
   DetalleSuscriptor: { id_suscriptor: number };
-  CapturarLectura: { id_medidor: number; id_suscriptor: number };
+  CapturarLectura: {
+    id_medidor: number;
+    id_suscriptor: number;
+    /**
+     * Param de retorno desde `CapturarFoto`. Cuando esa pantalla termina
+     * la captura, navega de vuelta a `CapturarLectura` con este campo
+     * poblado para que el form lo asocie al `EntradaLectura`.
+     */
+    evidenciaFoto?: EvidenciaFoto;
+  };
+  CapturarFoto: {
+    id_medidor: number;
+    id_periodo: string;
+    id_suscriptor: number;
+  };
   ResultadoCalculo: {
     lectura: Lectura;
     resultado: ResultadoCalculoTipo;
