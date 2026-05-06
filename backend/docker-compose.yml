@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mediapp_pg
+    environment:
+      POSTGRES_DB: mediapp
+      POSTGRES_USER: mediapp
+      POSTGRES_PASSWORD: mediapp_dev
+    ports:
+      # 5433 en host porque el host ya tiene PG17 corriendo en 5432
+      # (servicio Windows postgresql-x64-17). Container sigue en 5432 internamente.
+      - "5433:5432"
+    volumes:
+      - mediapp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediapp -d mediapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mediapp_pgdata:
