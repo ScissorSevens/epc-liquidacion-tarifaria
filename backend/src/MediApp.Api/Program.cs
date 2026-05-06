@@ -1,5 +1,6 @@
 using MediApp.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -47,8 +48,10 @@ try
 
     app.Run();
 }
-catch (Exception ex)
+catch (Exception ex) when (ex is not HostAbortedException)
 {
+    // HostAbortedException la lanzan EF tools (migrations add/database update) a propósito
+    // tras inspeccionar servicios; NO es un error real y la silenciamos.
     Log.Fatal(ex, "La API terminó inesperadamente durante el bootstrap.");
     throw;
 }
