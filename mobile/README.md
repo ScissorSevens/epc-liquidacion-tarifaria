@@ -152,6 +152,56 @@ Get-NetIPAddress -AddressFamily IPv4 |
 Reemplazá `172.100.7.217` por la IP que te devuelva ese comando y
 reiniciá `npx expo start`.
 
+## Deuda técnica conocida
+
+### Adapter HTTP de sincronización
+
+`mobile/src/sincronizacion/adapter-cliente-http.ts` envuelve el
+wiring del mobile para traducir `ItemCola` (dominio) → `SyncRequest<T>`
+(backend). Existe porque la **decisión D33** congeló `src/` pre-entrega
+y el cliente HTTP del dominio tiene tres desalineaciones con el backend
+.NET ya desplegado:
+
+1. Rutas sin `/v1` (dominio: `/api/lecturas`, backend: `/api/v1/lecturas`).
+2. `ItemCola` no expone `idCliente` ni serializa `forzarSobrescribir`,
+   ambos exigidos por el `SyncRequest<T>`.
+3. `ItemCola` carga campos extra (`estado`, `ultimoError`, `creadoEn`)
+   que el backend ignora pero ensucian el body.
+
+**Cuándo se borra**: cuando se libere el congelamiento del dominio
+post-entrega. El mapeo se mueve al `ClienteHTTPSincronizacion` real y
+este adapter desaparece.
+
+### Tipos no sincronizados en el sprint
+
+El operario solo carga **lecturas** y **liquidaciones** en campo.
+Los siguientes `TipoItem` están definidos en el dominio pero el backend
+NO expone endpoints para ellos en el sprint actual:
+
+- `EVIDENCIA` — fotos de medidor (planificado para sprint posterior).
+- `EVENTO_AUDITORIA` — log de actividad del operario (sin endpoint).
+- `FACTURA` — emisión, va por otro flujo (no se sincroniza desde celu).
+
+Si por alguna razón aparece un item de estos tipos en la cola, el
+adapter responde `ok:false` con un error explícito (`tipo X no
+soportado en sprint actual`) y el procesador lo termina marcando como
+`FALLIDO` tras `MAX_INTENTOS` — sin loop, sin conflicto fantasma.
+
+### `dispositivoId` hardcoded
+
+El adapter construye `idCliente` como `${dispositivoId}:${item.id}`,
+con `dispositivoId = 'mobile'` como constante hardcoded. Funciona para
+el sprint con un solo operario / un solo dispositivo, pero **rompe**
+si dos celulares cargan items con el mismo `item.id` (no debería
+pasar — UUID v4 colisiona con probabilidad despreciable, pero dependés
+del PRNG del celu).
+
+Sofisticar post-entrega con:
+
+- `expo-application.getAndroidId()` — ID estable por instalación.
+- O un UUID generado al primer arranque y persistido en SQLite (tabla
+  `dispositivo`).
+
 ## Estructura
 
 ```
