@@ -29,6 +29,9 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
+    // ProblemDetails RFC 7807 unificado para excepciones no atrapadas y status codes.
+    builder.Services.AddProblemDetails();
+
     var app = builder.Build();
 
     if (app.Environment.IsDevelopment())
@@ -36,6 +39,9 @@ try
         app.UseSwagger();
         app.UseSwaggerUI();
     }
+
+    app.UseExceptionHandler();
+    app.UseStatusCodePages();
 
     app.UseSerilogRequestLogging();
 
