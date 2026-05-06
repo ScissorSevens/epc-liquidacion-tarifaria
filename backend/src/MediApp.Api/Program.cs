@@ -1,4 +1,5 @@
 using FluentValidation;
+using MediApp.Api.Dev;
 using MediApp.Api.Features.Lecturas;
 using MediApp.Api.Features.Liquidaciones;
 using MediApp.Api.Features.Medidores;
@@ -47,6 +48,9 @@ try
     // Almacén de evidencias fotográficas (Lectura). Singleton: stateless, lee config en el ctor.
     builder.Services.AddSingleton<IAlmacenEvidencias, AlmacenLocal>();
 
+    // Healthcheck con ping a la DB (reemplaza el handler manual mínimo del Día 1).
+    builder.Services.AddHealthChecks().AddDbContextCheck<MediAppDbContext>("postgres");
+
     var app = builder.Build();
 
     if (app.Environment.IsDevelopment())
@@ -60,18 +64,17 @@ try
 
     app.UseSerilogRequestLogging();
 
-    // Health endpoint mínimo. Día 2+ se reemplaza por uno que pinguee la DB.
-    app.MapGet("/health", () => Results.Ok(new
-    {
-        status = "ok",
-        utc = DateTimeOffset.UtcNow
-    }));
+    // Health endpoint con AddDbContextCheck (responde 200 + status JSON, 503 si DB no responde).
+    app.MapHealthChecks("/health");
 
     // Endpoints de sync por tipo (protocolo #213).
     app.MapGroup("/api/v1/suscriptores").MapSuscriptoresEndpoints();
     app.MapGroup("/api/v1/medidores").MapMedidoresEndpoints();
     app.MapGroup("/api/v1/lecturas").MapLecturasEndpoints();
     app.MapGroup("/api/v1/liquidaciones").MapLiquidacionesEndpoints();
+
+    // Endpoints de desarrollo (seed). Internamente solo se registran si IsDevelopment.
+    app.MapDevEndpoints();
 
     app.Run();
 }
