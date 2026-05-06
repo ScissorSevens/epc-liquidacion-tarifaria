@@ -1,0 +1,24 @@
+# Excluir todo lo que no necesita el build de Docker (acelera transfer + evita filtrar secretos).
+**/bin
+**/obj
+**/.vs
+**/.vscode
+**/*.user
+**/*.suo
+
+# Tests no van a la imagen (build solo publica MediApp.Api).
+tests/
+
+# Datos locales de desarrollo (NUNCA copiar al image).
+**/evidencias/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/appsettings.Development.json
+
+# Docs y meta del repo
+README.md
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml

@@ -8,7 +8,7 @@ API REST en .NET 8 (Minimal API) + PostgreSQL 16 + EF Core 8.
 - Docker Desktop.
 - (Opcional) `dotnet-ef` global tool para correr migrations.
 
-## Arrancar local
+## Arrancar local (modo desarrollo, API fuera de Docker)
 
 ```powershell
 # 1. Levantar Postgres en Docker
@@ -20,11 +20,33 @@ docker compose -f backend/docker-compose.yml ps
 # 3. Aplicar migrations
 dotnet ef database update -p backend/src/MediApp.Api
 
-# 4. Levantar API
+# 4. Levantar API en local (Development → expone /api/v1/_dev/seed y Swagger)
 dotnet run --project backend/src/MediApp.Api
 ```
 
-API en `http://localhost:5080`. Healthcheck: `GET /health`. Swagger UI en `/swagger`.
+API en `http://localhost:5080`. Healthcheck: `GET /health` (incluye ping a la DB).
+Swagger UI en `/swagger`. Cargar datos demo: `POST /api/v1/_dev/seed` (idempotente).
+
+## Levantar TODO en Docker (modo prod-like)
+
+```powershell
+# Build + up de db + api (api se construye desde Dockerfile multi-stage)
+docker compose -f backend/docker-compose.yml up -d --build
+
+# Logs de la API
+docker compose -f backend/docker-compose.yml logs -f api
+```
+
+API en `http://localhost:5080` (mismo puerto que en dev). En este modo
+`ASPNETCORE_ENVIRONMENT=Production`, así que `/api/v1/_dev/seed` NO se expone
+y Swagger queda apagado.
+
+### Rebuild solo la API
+
+```powershell
+docker compose -f backend/docker-compose.yml build api
+docker compose -f backend/docker-compose.yml up -d api
+```
 
 ## Por qué puerto 5433
 
@@ -56,13 +78,16 @@ docker compose -f backend/docker-compose.yml down -v
 ```
 backend/
 ├── global.json                   # SDK pin
-├── docker-compose.yml            # Postgres 16
+├── Dockerfile                    # multi-stage build de la API
+├── .dockerignore
+├── docker-compose.yml            # Postgres 16 + API
 ├── MediApp.Backend.sln
 ├── src/MediApp.Api/
-│   ├── Program.cs                # composition root + endpoints
+│   ├── Program.cs                # composition root + endpoints + healthcheck
+│   ├── Dev/                      # endpoints solo Development (seed)
 │   ├── Persistence/              # DbContext + Entities + Migrations
-│   ├── Features/                 # endpoints por feature (vacío Día 1)
-│   ├── Common/                   # cross-cutting (vacío Día 1)
-│   └── Infrastructure/           # adapters (vacío Día 1)
+│   ├── Features/                 # endpoints por feature (suscriptores, medidores, lecturas, liquidaciones)
+│   ├── Common/                   # SyncHandler, ProblemDetails, HashUtil
+│   └── Infrastructure/Almacen/   # IAlmacenEvidencias + AlmacenLocal
 └── tests/MediApp.Api.Tests/
 ```

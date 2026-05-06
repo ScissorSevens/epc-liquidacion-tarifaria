@@ -18,5 +18,28 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      # Context = backend/ (este mismo directorio), Dockerfile relativo.
+      context: .
+      dockerfile: Dockerfile
+    container_name: mediapp_api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # En la red interna de compose, el host del Postgres es "db" en el puerto 5432.
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=mediapp;Username=mediapp;Password=mediapp_dev"
+      # Almacén dentro del container (montado vía volume mediapp_evidencias).
+      Almacen__RutaLocal: "/app/evidencias"
+      # Forzar Production para que el endpoint /api/v1/_dev/seed NO se exponga.
+      ASPNETCORE_ENVIRONMENT: "Production"
+    ports:
+      # Mismo puerto 5080 que el dev local (launchSettings) para no romper smoke tests.
+      - "5080:8080"
+    volumes:
+      - mediapp_evidencias:/app/evidencias
+
 volumes:
   mediapp_pgdata:
+  mediapp_evidencias:
