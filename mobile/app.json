@@ -27,7 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MediApp necesita la camara para registrar la evidencia fotografica del medidor.",
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }
