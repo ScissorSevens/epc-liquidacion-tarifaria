@@ -35,6 +35,10 @@
           "recordAudioAndroid": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "apiBaseUrl": "http://10.0.2.2:5080",
+      "apiBaseUrlLan": "http://172.100.7.217:5080"
+    }
   }
 }
