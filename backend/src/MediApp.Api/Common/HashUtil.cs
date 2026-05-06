@@ -11,8 +11,10 @@ public static class HashUtil
     private static readonly Regex Sha256HexRegex =
         new("^[a-f0-9]{64}$", RegexOptions.Compiled);
 
+    // id_local es opaco para el server — solo requiere ser único y estable.
+    // Aceptamos UUIDs (mobile) e IDs numéricos (seed). Ver decisión #222.
     private static readonly Regex IdClienteRegex =
-        new(@"^[\w-]+:\d+$", RegexOptions.Compiled);
+        new(@"^[\w-]+:[\w-]+$", RegexOptions.Compiled);
 
     public static bool EsSha256HexValido(string? valor) =>
         !string.IsNullOrEmpty(valor) && Sha256HexRegex.IsMatch(valor);
