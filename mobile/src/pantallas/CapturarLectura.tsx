@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -22,7 +23,10 @@ import {
   liquidarLectura,
   registrarLectura,
 } from '@dominio/captura-lecturas/captura-lecturas';
-import type { EntradaLectura } from '@dominio/captura-lecturas/types';
+import type {
+  EntradaLectura,
+  EvidenciaFoto,
+} from '@dominio/captura-lecturas/types';
 import type { Estrato } from '@dominio/motor-tarifario/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
@@ -125,11 +129,27 @@ export default function CapturarLectura({ navigation, route }: Props) {
   const [errores, setErrores] = useState<Errores>({});
   const [calculando, setCalculando] = useState(false);
   const [cargandoPrefill, setCargandoPrefill] = useState(true);
+  const [evidencia, setEvidencia] = useState<EvidenciaFoto | undefined>(
+    undefined,
+  );
   const [snack, setSnack] = useState<SnackState>({
     visible: false,
     mensaje: '',
     tipo: 'ok',
   });
+
+  // Recibe la evidencia cuando `CapturarFoto` navega de vuelta con el
+  // param poblado. `route.params.evidenciaFoto` cambia cada vez que la
+  // pantalla hija invoca `navigation.navigate('CapturarLectura', {...})`.
+  useEffect(() => {
+    const recibida = route.params.evidenciaFoto;
+    if (recibida !== undefined) {
+      setEvidencia(recibida);
+      // Limpiamos el param para que no se "re-aplique" en futuros renders
+      // (por ejemplo si la pantalla pierde y recupera el foco).
+      navigation.setParams({ evidenciaFoto: undefined });
+    }
+  }, [route.params.evidenciaFoto, navigation]);
 
   // Prefill de lectura anterior usando el historial del medidor. Si no
   // hay registros previos asumimos primera lectura y dejamos vacio.
@@ -205,6 +225,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
         lectura_actual: Number.parseFloat(form.lectura_actual),
         lectura_anterior: Number.parseFloat(form.lectura_anterior),
         ...(obs !== '' && { observaciones: obs }),
+        ...(evidencia !== undefined && { evidencia }),
       };
       const lectura = registrarLectura(entrada);
       const estrato = Number.parseInt(form.estrato, 10) as Estrato;
@@ -366,6 +387,59 @@ export default function CapturarLectura({ navigation, route }: Props) {
               {errores.observaciones ?? ' '}
             </HelperText>
 
+            <Text variant="labelMedium" style={styles.subLabel}>
+              Evidencia fotografica (opcional)
+            </Text>
+            {evidencia === undefined ? (
+              <Button
+                mode="outlined"
+                icon="camera"
+                onPress={() => {
+                  navigation.navigate('CapturarFoto', {
+                    id_medidor,
+                    id_periodo: form.id_periodo.trim(),
+                    id_suscriptor,
+                  });
+                }}
+                disabled={calculando}
+                style={styles.botonFoto}
+              >
+                Tomar foto del medidor
+              </Button>
+            ) : (
+              <View style={styles.evidenciaRow}>
+                <Image
+                  source={{ uri: evidencia.foto_path }}
+                  style={styles.thumb}
+                />
+                <View style={styles.evidenciaInfo}>
+                  <Text variant="bodySmall" style={styles.evidenciaTexto}>
+                    ✓ Foto capturada
+                  </Text>
+                  {evidencia.foto_hash !== undefined && (
+                    <Text variant="bodySmall" style={styles.evidenciaHash}>
+                      hash: {evidencia.foto_hash.substring(0, 8)}…
+                    </Text>
+                  )}
+                  <Button
+                    mode="text"
+                    icon="camera-retake"
+                    compact
+                    onPress={() => {
+                      navigation.navigate('CapturarFoto', {
+                        id_medidor,
+                        id_periodo: form.id_periodo.trim(),
+                        id_suscriptor,
+                      });
+                    }}
+                    disabled={calculando}
+                  >
+                    Reemplazar foto
+                  </Button>
+                </View>
+              </View>
+            )}
+
             <Button
               mode="contained"
               onPress={onCalcular}
@@ -408,6 +482,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loaderText: { marginLeft: 8 },
+  botonFoto: { marginTop: 4, marginBottom: 8 },
+  evidenciaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+    gap: 12,
+  },
+  thumb: { width: 100, height: 100, borderRadius: 4, backgroundColor: '#eee' },
+  evidenciaInfo: { flex: 1, marginLeft: 12 },
+  evidenciaTexto: { color: '#2e7d32', fontWeight: '600' },
+  evidenciaHash: { color: '#666', marginTop: 2 },
   snackOk: { backgroundColor: '#2e7d32' },
   snackError: { backgroundColor: '#c62828' },
 });
