@@ -92,6 +92,66 @@ runtime móvil (Expo Go). Para tests Node-ables tenemos
 `smoke-dominio.ts` que NO importa expo-sqlite y valida el path mapping
 + el motor tarifario puro.
 
+## Sincronización con backend
+
+El bootstrap cablea un `clienteHttp` (`ClienteHTTPSincronizacion` del
+dominio) y un `procesadorCola()` que invoca la cola SQLite local
+contra el backend `.NET`. La pantalla **Sincronización** (accesible
+desde Home) ofrece tres acciones manuales:
+
+- **PROBAR CONEXIÓN** → `GET ${baseUrl}/health`.
+- **SINCRONIZAR AHORA** → ejecuta `procesarCola()` y muestra contadores
+  exitosos / conflictos / fallidos / pendientes.
+- **VER COLA** → lista items por estado.
+
+### Levantar el backend
+
+```powershell
+# Opcion A: docker compose (recomendado)
+docker compose -f ..\backend\docker-compose.yml up -d
+
+# Opcion B: dotnet run directo
+dotnet run --project ..\backend\src\MediApp.Api
+```
+
+Healthcheck:
+
+```powershell
+Invoke-RestMethod http://localhost:5080/health
+```
+
+Seedear datos demo (solo en Development):
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:5080/api/v1/_dev/seed
+```
+
+### Apuntar la app al backend correcto
+
+Editar `mobile/app.json` -> `expo.extra`:
+
+```json
+"extra": {
+  "apiBaseUrl": "http://10.0.2.2:5080",
+  "apiBaseUrlLan": "http://172.100.7.217:5080"
+}
+```
+
+Hoy `obtenerApiBaseUrl()` devuelve **siempre** `apiBaseUrlLan`. Si vas
+a usar emulador Android local sin red LAN, editá la función para que
+devuelva `apiBaseUrl` en su lugar (`mobile/src/config/api.ts`).
+
+Para descubrir la IP LAN del host Windows:
+
+```powershell
+Get-NetIPAddress -AddressFamily IPv4 |
+  Where-Object { $_.InterfaceAlias -match 'Ethernet|Wi-Fi' } |
+  Select-Object IPAddress, InterfaceAlias
+```
+
+Reemplazá `172.100.7.217` por la IP que te devuelva ese comando y
+reiniciá `npx expo start`.
+
 ## Estructura
 
 ```
