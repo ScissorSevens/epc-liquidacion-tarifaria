@@ -11,6 +11,7 @@ import type {
 } from '@dominio/motor-tarifario/types';
 
 import AltaSuscriptor from '../pantallas/AltaSuscriptor';
+import CapturarFoto from '../pantallas/CapturarFoto';
 import CapturarLectura from '../pantallas/CapturarLectura';
 import DetalleSuscriptor from '../pantallas/DetalleSuscriptor';
 import HolaMediApp from '../pantallas/HolaMediApp';
@@ -81,6 +82,7 @@ export default function RootStack() {
       <Stack.Screen name="HolaMediApp" component={HolaMediApp} />
       <Stack.Screen name="DetalleSuscriptor" component={DetalleSuscriptor} />
       <Stack.Screen name="CapturarLectura" component={CapturarLectura} />
+      <Stack.Screen name="CapturarFoto" component={CapturarFoto} />
       <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
     </Stack.Navigator>
   );
