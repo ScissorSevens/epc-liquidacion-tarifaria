@@ -38,13 +38,11 @@ import {
 import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
 import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
 import type { Hasher, IdGenerator } from '@dominio/shared/ports';
-import {
-  ClienteHTTPSincronizacion,
-  type TokenProvider,
-} from '@dominio/cliente-http';
+import type { TokenProvider } from '@dominio/cliente-http';
 import { procesarCola } from '@dominio/sincronizacion/procesador';
 import type { ClienteSincronizacion } from '@dominio/sincronizacion/procesador';
 import { obtenerApiBaseUrl } from '../config/api';
+import { crearClienteHttpAdapter } from '../sincronizacion/adapter-cliente-http';
 import { smokeDominio, type ResultadoSmokeDominio } from './smoke-dominio';
 
 // Token provider stub: el backend del sprint 3 NO requiere JWT todavia.
@@ -120,22 +118,31 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const hasher = crearHasherJs();
   const idGenerator = crearIdGeneratorUuid();
 
-  // Cliente HTTP del dominio + procesador de cola.
+  // Cliente HTTP del backend + procesador de cola.
   //
-  // El cliente usa `fetch` global — Hermes/RN lo expone de fabrica desde
-  // RN 0.60+, asi que NO inyectamos un fetch custom. La firma de
-  // `ClienteHTTPSincronizacion` es { baseUrl, tokenProvider } — NO acepta
-  // `timeoutMs` (limitacion conocida del cliente, queda como TODO post-MVP
-  // si la red rural lo demanda).
+  // Usamos `crearClienteHttpAdapter` (mobile-only) en vez del
+  // `ClienteHTTPSincronizacion` del dominio porque el dominio quedo
+  // congelado pre-entrega (D33) con rutas sin /v1 y sin mapear
+  // `idCliente`/`forzarSobrescribir` al shape `SyncRequest<T>` del
+  // backend. Ver `mobile/src/sincronizacion/adapter-cliente-http.ts`
+  // para el detalle. El adapter implementa la misma interface
+  // `ClienteSincronizacion`, asi que el procesador lo consume sin
+  // diferencias.
+  //
+  // El adapter usa `fetch` global — Hermes/RN lo expone de fabrica
+  // desde RN 0.60+, no inyectamos fetch custom. No hay timeout
+  // configurable (limitacion conocida, queda como TODO post-MVP si la
+  // red rural lo demanda).
   //
   // El procesador es `procesarCola(cola, cliente)`, una funcion libre
   // del dominio que ya internamente respeta MAX_INTENTOS, delays
   // exponenciales y dependencias entre items. Lo envolvemos en una
   // closure que tras procesar lee la cola y devuelve contadores.
   const apiBaseUrl = obtenerApiBaseUrl();
-  const clienteHttp = new ClienteHTTPSincronizacion({
+  const clienteHttp: ClienteSincronizacion = crearClienteHttpAdapter({
     baseUrl: apiBaseUrl,
     tokenProvider: tokenProviderSinAuth,
+    dispositivoId: 'mobile', // TODO: sofisticar con expo-application post-entrega
   });
 
   const procesadorCola = async (): Promise<ResultadoSync> => {
