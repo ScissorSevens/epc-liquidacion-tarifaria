@@ -65,3 +65,9 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+/// <summary>
+/// Marker público para que WebApplicationFactory&lt;Program&gt; (Microsoft.AspNetCore.Mvc.Testing)
+/// pueda referenciar el entry point del top-level Program.cs.
+/// </summary>
+public partial class Program;
