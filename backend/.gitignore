@@ -1,0 +1,17 @@
+## .NET build output
+bin/
+obj/
+
+## Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+
+## Local SQLite (no deberia haber, pero por las dudas)
+*.db
+*.db-journal
+
+## EF Core sensible local
+*.pdb
