@@ -16,7 +16,9 @@ describe('mapearErrorSqlite', () => {
       }
 
       // sanity: el INSERT debió fallar
-      expect(errorNativo).toBeInstanceOf(Database.SqliteError);
+      // No usamos toBeInstanceOf(Database.SqliteError) porque better-sqlite3 puede
+      // ser instanciado dos veces (módulo duplicado) y la comparación de clase falla.
+      expect(errorNativo).toBeTruthy();
       expect((errorNativo as { code: string }).code).toBe('SQLITE_CONSTRAINT_CHECK');
 
       const mapeado = mapearErrorSqlite(errorNativo, { tabla: 'factura' });

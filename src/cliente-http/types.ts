@@ -30,4 +30,11 @@ export const RUTAS_POR_TIPO: Record<TipoItem, string> = {
   EVIDENCIA: '/api/evidencias',
   EVENTO_AUDITORIA: '/api/auditoria',
   FACTURA: '/api/facturas',
+  // D33+ Camino 3: el cliente HTTP "viejo" (de tests dominio) no rutea
+  // SUSCRIPTOR/MEDIDOR — el ruteo real lo hace el adapter mobile
+  // `mobile/src/sincronizacion/adapter-cliente-http.ts` con su propia
+  // tabla `RUTAS_BACKEND_V1`. Acá los registramos con sus rutas v1
+  // canonicas para mantener `Record<TipoItem, string>` exhaustivo.
+  SUSCRIPTOR: '/api/v1/suscriptores',
+  MEDIDOR: '/api/v1/medidores',
 };

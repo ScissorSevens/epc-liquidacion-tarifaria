@@ -3,7 +3,14 @@
  * Cola offline para enviar items al backend cuando hay conexión
  */
 
-export type TipoItem = 'LIQUIDACION' | 'LECTURA' | 'EVIDENCIA' | 'EVENTO_AUDITORIA' | 'FACTURA';
+export type TipoItem =
+  | 'LIQUIDACION'
+  | 'LECTURA'
+  | 'EVIDENCIA'
+  | 'EVENTO_AUDITORIA'
+  | 'FACTURA'
+  | 'SUSCRIPTOR'
+  | 'MEDIDOR';
 
 export type EstadoItem =
   | 'PENDIENTE'    // Esperando ser enviado
