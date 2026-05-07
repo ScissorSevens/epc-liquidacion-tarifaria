@@ -24,18 +24,18 @@ public class MediAppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Suscriptor: documento e id_cliente únicos (un cliente offline = una entidad).
+        // Suscriptor: codigo e id_cliente unicos (un cliente offline = una entidad).
         modelBuilder.Entity<Suscriptor>()
-            .HasIndex(s => s.Documento)
+            .HasIndex(s => s.Codigo)
             .IsUnique();
 
         modelBuilder.Entity<Suscriptor>()
             .HasIndex(s => s.IdCliente)
             .IsUnique();
 
-        // Medidor: codigo e id_cliente únicos.
+        // Medidor: numero_medidor e id_cliente unicos.
         modelBuilder.Entity<Medidor>()
-            .HasIndex(m => m.Codigo)
+            .HasIndex(m => m.NumeroMedidor)
             .IsUnique();
 
         modelBuilder.Entity<Medidor>()

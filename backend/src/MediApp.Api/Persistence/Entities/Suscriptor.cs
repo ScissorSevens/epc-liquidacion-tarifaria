@@ -3,35 +3,54 @@ using System.ComponentModel.DataAnnotations;
 namespace MediApp.Api.Persistence.Entities;
 
 /// <summary>
-/// Suscriptor de servicios. Día 1: entidad mínima para validar pipeline EF + snake_case.
-/// Día 2 amplía campos (matricula, catastral, etc.) y se reconcilia con el dominio mobile.
+/// Suscriptor de servicios. Espejo de la entidad del dominio mobile
+/// (src/suscriptores/types.ts). Naming snake_case en DB se aplica via
+/// UseSnakeCaseNamingConvention.
 /// </summary>
 public class Suscriptor
 {
     [Key]
     public int Id { get; set; }
 
+    /// <summary>Codigo del suscriptor (1-10 digitos). Espejo de `codigo` del dominio.</summary>
     [Required]
-    [MaxLength(50)]
-    public string Documento { get; set; } = string.Empty;
+    [MaxLength(10)]
+    public string Codigo { get; set; } = string.Empty;
 
+    /// <summary>Nombre y apellidos completos. Espejo de `nombre_apellidos` del dominio.</summary>
     [Required]
     [MaxLength(150)]
-    public string Nombre { get; set; } = string.Empty;
+    public string NombreApellidos { get; set; } = string.Empty;
 
+    /// <summary>Direccion del suscriptor. REQUERIDA segun dominio mobile.</summary>
+    [Required]
     [MaxLength(200)]
-    public string? Direccion { get; set; }
+    public string Direccion { get; set; } = string.Empty;
 
-    /// <summary>Estrato socioeconómico colombiano: 1..6.</summary>
+    /// <summary>Estrato socioeconomico colombiano: 1..6.</summary>
     public short Estrato { get; set; }
+
+    /// <summary>Matricula inmobiliaria (opcional, hasta 50 chars).</summary>
+    [MaxLength(50)]
+    public string? MatriculaInmobiliaria { get; set; }
+
+    /// <summary>Numero catastral (opcional, hasta 50 chars).</summary>
+    [MaxLength(50)]
+    public string? NumeroCatastral { get; set; }
 
     /// <summary>Valores esperados: "activo" | "inactivo" | "suspendido".</summary>
     [Required]
     [MaxLength(20)]
     public string Estado { get; set; } = "activo";
 
-    /// <summary>Mapeado a `timestamp with time zone` por Npgsql.</summary>
-    public DateTimeOffset FechaAlta { get; set; }
+    /// <summary>
+    /// Fecha de creacion en formato ISO 8601 (string, espejo de `created_at` del dominio).
+    /// El dominio mobile maneja fechas como string ISO; el backend las persiste igual para
+    /// que el round-trip sea exacto.
+    /// </summary>
+    [Required]
+    [MaxLength(40)]
+    public string CreatedAt { get; set; } = string.Empty;
 
     /// <summary>Identificador del cliente offline. Formato `dispositivo:id_local`.</summary>
     [Required]

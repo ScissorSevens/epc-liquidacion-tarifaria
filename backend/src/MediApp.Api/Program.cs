@@ -1,5 +1,4 @@
 using FluentValidation;
-using MediApp.Api.Dev;
 using MediApp.Api.Features.Lecturas;
 using MediApp.Api.Features.Liquidaciones;
 using MediApp.Api.Features.Medidores;
@@ -72,9 +71,6 @@ try
     app.MapGroup("/api/v1/medidores").MapMedidoresEndpoints();
     app.MapGroup("/api/v1/lecturas").MapLecturasEndpoints();
     app.MapGroup("/api/v1/liquidaciones").MapLiquidacionesEndpoints();
-
-    // Endpoints de desarrollo (seed). Internamente solo se registran si IsDevelopment.
-    app.MapDevEndpoints();
 
     app.Run();
 }
