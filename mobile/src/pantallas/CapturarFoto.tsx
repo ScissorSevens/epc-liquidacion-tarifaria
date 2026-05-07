@@ -14,6 +14,7 @@ import {
   calcularSha256DeArchivo,
   persistirFoto,
 } from '../adapters/foto-evidencia';
+import { photoCaptureStore } from '../composition/photo-capture-store';
 import type { RootStackScreenProps } from '../navegacion/RootStack';
 
 type Props = RootStackScreenProps<'CapturarFoto'>;
@@ -76,14 +77,11 @@ export default function CapturarFoto({ navigation, route }: Props) {
         id_periodo,
       });
       const fotoHash = await calcularSha256DeArchivo(fotoPath);
-      navigation.navigate('CapturarLectura', {
-        id_medidor,
-        id_suscriptor,
-        evidenciaFoto: {
-          foto_path: fotoPath,
-          foto_hash: fotoHash,
-        },
+      photoCaptureStore.setEvidencia({
+        foto_path: fotoPath,
+        foto_hash: fotoHash,
       });
+      navigation.goBack();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       mostrarError(`No se pudo capturar la foto: ${msg}`);

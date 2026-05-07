@@ -24,6 +24,7 @@ import type { Suscriptor } from '@dominio/suscriptores/types';
 
 import { getBootstrap } from '../composition/get-bootstrap';
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
+import { photoCaptureStore } from '../composition/photo-capture-store';
 import type { RootStackScreenProps } from '../navegacion/RootStack';
 import {
   BORDERS,
@@ -152,18 +153,18 @@ export default function CapturarLectura({ navigation, route }: Props) {
     undefined,
   );
 
-  // Recibe la evidencia cuando `CapturarFoto` navega de vuelta con el
-  // param poblado. `route.params.evidenciaFoto` cambia cada vez que la
-  // pantalla hija invoca `navigation.navigate('CapturarLectura', {...})`.
+  // Recibe la evidencia cuando `CapturarFoto` llama `goBack()` y depositó
+  // la evidencia en `photoCaptureStore`. El listener de 'focus' garantiza
+  // que el componente NUNCA se desmonte y el estado del formulario se preserve.
   useEffect(() => {
-    const recibida = route.params.evidenciaFoto;
-    if (recibida !== undefined) {
-      setEvidencia(recibida);
-      // Limpiamos el param para que no se "re-aplique" en futuros renders
-      // (por ejemplo si la pantalla pierde y recupera el foco).
-      navigation.setParams({ evidenciaFoto: undefined });
-    }
-  }, [route.params.evidenciaFoto, navigation]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      const ev = photoCaptureStore.getAndClear();
+      if (ev !== null) {
+        setEvidencia(ev);
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // Prefill de lectura anterior usando el historial del medidor. Si no
   // hay registros previos asumimos primera lectura y dejamos vacio.
