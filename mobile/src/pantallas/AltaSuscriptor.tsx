@@ -21,6 +21,7 @@ import {
 import { crearMedidor } from '@dominio/medidores';
 import { crearSuscriptor } from '@dominio/suscriptores';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import type { RootStackScreenProps } from '../navegacion/RootStack';
 
 type Props = RootStackScreenProps<'AltaSuscriptor'>;
@@ -259,41 +260,46 @@ export default function AltaSuscriptor({ navigation }: Props) {
             : form.numero_catastral.trim(),
       });
 
-      const sus = await bs.suscriptorRepo.crear(borradorSus);
-
-      try {
-        const borradorMed = crearMedidor({
-          numero_medidor: form.numero_medidor.trim(),
-          id_suscriptor: sus.id_suscriptor,
-          fecha_instalacion: form.fecha_instalacion.trim(),
-          observaciones:
-            form.observaciones_medidor.trim() === ''
-              ? undefined
-              : form.observaciones_medidor.trim(),
-        });
-        await bs.medidorRepo.crear(borradorMed);
-      } catch (errMed) {
-        // Compensacion manual: borrar el suscriptor recien creado para
-        // no dejar huerfano. `eliminar` esta stubeado y tira siempre,
-        // asi que en la practica vamos por el catch interno.
-        const msgMed = errMed instanceof Error ? errMed.message : String(errMed);
+      const sus = await (async () => {
+        // Camino 3 (D33+): persistir + encolar suscriptor + medidor en
+        // una sola operacion atomica con compensacion. Reemplaza el
+        // try/catch inline que solo persistia (sin encolar al backend).
         try {
-          await bs.suscriptorRepo.eliminar(sus.id_suscriptor);
-          mostrarSnack(`Error al crear medidor: ${msgMed}`, 'error');
-        } catch (errCompensacion) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[AltaSuscriptor] Suscriptor huerfano: id=${sus.id_suscriptor} (eliminar fallo:`,
-            errCompensacion,
-            ')',
-          );
-          mostrarSnack(
-            `Error al crear medidor (${msgMed}). Suscriptor quedó huérfano (id ${sus.id_suscriptor}). Contactá soporte.`,
-            'warning',
-          );
+          const borradorMed = crearMedidor({
+            numero_medidor: form.numero_medidor.trim(),
+            // id_suscriptor placeholder: el adapter lo inyecta tras crear
+            // el suscriptor. Pasamos 0 para satisfacer el tipo del factory;
+            // el adapter usa Omit<MedidorBorrador,'id_suscriptor'>.
+            id_suscriptor: 0,
+            fecha_instalacion: form.fecha_instalacion.trim(),
+            observaciones:
+              form.observaciones_medidor.trim() === ''
+                ? undefined
+                : form.observaciones_medidor.trim(),
+          });
+          // El adapter ignora `id_suscriptor` del borradorMed: lo sobreescribe
+          // con el del suscriptor recien creado. Quitamos via destructuring
+          // para no acoplar el contrato.
+          const { id_suscriptor: _ignored, ...borradorMedSinSus } = borradorMed;
+
+          const out = await persistirYEncolarAltaSuscriptor({
+            borradorSuscriptor: borradorSus,
+            borradorMedidor: borradorMedSinSus,
+            suscriptorRepo: bs.suscriptorRepo,
+            medidorRepo: bs.medidorRepo,
+            colaRepo: bs.colaRepo,
+            idGenerator: bs.idGenerator,
+            hasher: bs.hasher,
+          });
+          return out.suscriptor;
+        } catch (errAlta) {
+          const msg = errAlta instanceof Error ? errAlta.message : String(errAlta);
+          mostrarSnack(`Error al crear medidor: ${msg}`, 'error');
+          return null;
         }
-        return;
-      }
+      })();
+
+      if (sus === null) return;
 
       mostrarSnack('Suscriptor y medidor creados correctamente', 'ok');
       // Pequeno delay para que el snack sea visible antes de navegar.

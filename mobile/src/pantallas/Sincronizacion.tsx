@@ -131,6 +131,12 @@ export default function Sincronizacion({ navigation }: Props) {
     setCargando('cola');
     try {
       const items = await bootstrap.colaRepo.listar();
+      if (items.length === 0) {
+        agregarEvento('cola', 'Cola vacia');
+        return;
+      }
+
+      // Resumen agregado por estado.
       const porEstado = items.reduce<Record<string, number>>((acc, it) => {
         acc[it.estado] = (acc[it.estado] ?? 0) + 1;
         return acc;
@@ -138,10 +144,46 @@ export default function Sincronizacion({ navigation }: Props) {
       const detalle = Object.entries(porEstado)
         .map(([k, v]) => `${k}:${v}`)
         .join(' ');
-      agregarEvento(
-        'cola',
-        items.length === 0 ? 'Cola vacia' : `Total ${items.length} — ${detalle}`,
-      );
+      agregarEvento('cola', `Total ${items.length} — ${detalle}`);
+
+      // Detalle item por item — solo los no-EXITOSO para reducir ruido.
+      // Los EXITOSO ya cumplieron su trabajo; solo interesan los que
+      // siguen pendientes, bloqueados o fallidos.
+      const idsEnCola = new Set(items.map((i) => i.id));
+      const itemsActivos = items.filter((i) => i.estado !== 'EXITOSO');
+      if (itemsActivos.length === 0) {
+        agregarEvento('cola', 'Todos los items sincronizados ✓');
+        return;
+      }
+      for (const it of itemsActivos) {
+        const partes = [
+          it.tipo,
+          it.estado,
+          `int:${it.intentos}`,
+        ];
+        if (it.dependeDe && it.dependeDe.length > 0) {
+          const deps = it.dependeDe.map((dep) => {
+            const enc = items.find((x) => x.id === dep);
+            if (!enc) return `${dep.slice(0, 6)}=AUSENTE`;
+            return `${dep.slice(0, 6)}=${enc.estado}`;
+          });
+          partes.push(`dep:[${deps.join(',')}]`);
+          // Bloqueado si alguna dep no esta EXITOSO.
+          const bloqueado = it.dependeDe.some((dep) => {
+            const enc = items.find((x) => x.id === dep);
+            return !enc || enc.estado !== 'EXITOSO';
+          });
+          if (bloqueado && it.estado === 'PENDIENTE') {
+            partes.push('⚠ BLOQUEADO');
+          }
+        }
+        if (it.ultimoError) {
+          partes.push(`err:"${it.ultimoError.slice(0, 40)}"`);
+        }
+        agregarEvento('cola', partes.join(' '));
+      }
+      // Marcador para detectar IDs huerfanos faciles de leer.
+      void idsEnCola;
     } catch (e) {
       agregarEvento(
         'error',

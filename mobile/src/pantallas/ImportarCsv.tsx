@@ -16,7 +16,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 
 import { parsearCSV } from '@dominio/importacion/parser-csv';
-import { importarSuscriptoresYMedidores } from '@dominio/importacion/importador';
 import type {
   ErrorImportacion,
   ErrorParseo,
@@ -24,6 +23,7 @@ import type {
   ItemSaltado,
   ResultadoImportacion,
 } from '@dominio/importacion/types';
+import { persistirYEncolarImportacion } from '../adapters/persistir-y-encolar-importacion';
 import { getBootstrap } from '../composition/get-bootstrap';
 import type { RootStackScreenProps } from '../navegacion/RootStack';
 
@@ -157,11 +157,17 @@ export default function ImportarCsv({ navigation }: Props) {
     setEstado({ fase: 'importando' });
     try {
       const bs = await getBootstrap();
-      const reporte = await importarSuscriptoresYMedidores(
-        archivo.filas,
-        bs.suscriptorRepo,
-        bs.medidorRepo,
-      );
+      // Camino 3 (D33+): persistir + encolar en una sola operacion.
+      // Antes solo persistia (importarSuscriptoresYMedidores) y la cola
+      // quedaba vacia → el backend nunca veia los suscriptores nuevos.
+      const { reporte } = await persistirYEncolarImportacion({
+        filas: archivo.filas,
+        suscriptorRepo: bs.suscriptorRepo,
+        medidorRepo: bs.medidorRepo,
+        colaRepo: bs.colaRepo,
+        idGenerator: bs.idGenerator,
+        hasher: bs.hasher,
+      });
       setEstado({
         fase: 'resultado',
         reporte,

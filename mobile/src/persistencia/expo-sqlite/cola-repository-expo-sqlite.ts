@@ -82,9 +82,24 @@ const SQL_UPSERT = `
 const SQL_SELECT_ALL = `SELECT * FROM cola_sincronizacion`;
 const SQL_SELECT_PENDIENTES = `SELECT * FROM cola_sincronizacion WHERE estado = 'PENDIENTE'`;
 const SQL_SELECT_BY_ID = `SELECT * FROM cola_sincronizacion WHERE id = ?`;
+const SQL_DELETE_BY_ID = `DELETE FROM cola_sincronizacion WHERE id = ?`;
 
 export interface ColaRepositoryExpoSqlite extends ColaSincronizacion {
   cerrar(): Promise<void>;
+  /**
+   * Borra fisicamente un item de la cola por id.
+   *
+   * NO esta en la interface dominio `ColaSincronizacion` (congelada
+   * D33) — vive solo en este adapter mobile. La motivacion es la
+   * compensacion del adapter `persistir-y-encolar-alta-suscriptor`:
+   * cuando el alta de medidor falla y borramos el suscriptor de
+   * SQLite, queremos sacar el item SUSCRIPTOR de la cola para que
+   * no intente sincronizar una entidad inexistente. Marcarlo
+   * DESCARTADO via guardar() funciona pero deja basura.
+   *
+   * Idempotente: si el id no existe, no hace nada (DELETE de 0 rows).
+   */
+  eliminar(id: string): Promise<void>;
 }
 
 export function crearColaRepositoryExpoSqlite(
@@ -126,6 +141,10 @@ export function crearColaRepositoryExpoSqlite(
     async buscarPorId(id: string): Promise<ItemCola | null> {
       const row = await db.getFirstAsync<ColaRow>(SQL_SELECT_BY_ID, id);
       return row ? fromRow(row) : null;
+    },
+
+    async eliminar(id: string): Promise<void> {
+      await db.runAsync(SQL_DELETE_BY_ID, id);
     },
 
     async cerrar(): Promise<void> {

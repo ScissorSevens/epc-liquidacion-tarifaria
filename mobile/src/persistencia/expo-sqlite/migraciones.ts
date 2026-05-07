@@ -128,12 +128,43 @@ CREATE TABLE IF NOT EXISTS medidor (
 CREATE INDEX IF NOT EXISTS ix_medidor_suscriptor ON medidor (id_suscriptor);
 `;
 
+/**
+ * Recrea `cola_sincronizacion` con el CHECK constraint correcto.
+ *
+ * El constraint original (v3) no incluía 'MEDIDOR' ni 'SUSCRIPTOR', lo que
+ * impedía encolar entidades importadas desde CSV o agregadas manualmente.
+ * SQLite no soporta ALTER TABLE para modificar CHECK constraints, así que
+ * la única opción válida es recrear la tabla preservando los datos.
+ */
+const MIGRACION_006_COLA_SYNC_FIX_TIPO = `
+ALTER TABLE cola_sincronizacion RENAME TO cola_sincronizacion_v3;
+CREATE TABLE cola_sincronizacion (
+  id                   TEXT    PRIMARY KEY NOT NULL,
+  tipo                 TEXT    NOT NULL CHECK (tipo IN ('LIQUIDACION','LECTURA','EVIDENCIA','EVENTO_AUDITORIA','FACTURA','SUSCRIPTOR','MEDIDOR')),
+  payload              TEXT    NOT NULL,
+  hash_local           TEXT    NOT NULL,
+  hash_server          TEXT,
+  estado               TEXT    NOT NULL CHECK (estado IN ('PENDIENTE','ENVIANDO','EXITOSO','CONFLICTO','FALLIDO','DESCARTADO')),
+  intentos             INTEGER NOT NULL DEFAULT 0 CHECK (intentos >= 0),
+  ultimo_error         TEXT,
+  ultimo_intento_en    TEXT,
+  creado_en            TEXT    NOT NULL,
+  depende_de           TEXT,
+  forzar_sobrescribir  INTEGER
+);
+INSERT INTO cola_sincronizacion SELECT * FROM cola_sincronizacion_v3;
+DROP TABLE cola_sincronizacion_v3;
+CREATE INDEX IF NOT EXISTS idx_cola_estado ON cola_sincronizacion (estado);
+CREATE INDEX IF NOT EXISTS idx_cola_creado_en ON cola_sincronizacion (creado_en);
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
   { version: 3, nombre: '003_cola_sync', sql: MIGRACION_003_COLA_SYNC },
   { version: 4, nombre: '004_suscriptor', sql: MIGRACION_004_SUSCRIPTOR },
   { version: 5, nombre: '005_medidor', sql: MIGRACION_005_MEDIDOR },
+  { version: 6, nombre: '006_cola_sync_fix_tipo', sql: MIGRACION_006_COLA_SYNC_FIX_TIPO },
 ];
 
 const SQL_TABLA_CONTROL = `

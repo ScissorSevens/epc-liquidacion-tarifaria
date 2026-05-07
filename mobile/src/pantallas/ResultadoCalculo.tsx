@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 
+import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
+import { getBootstrap } from '../composition/get-bootstrap';
 import type { RootStackScreenProps } from '../navegacion/RootStack';
 import {
   BORDERS,
@@ -91,6 +93,44 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
     route.params;
 
   const [detalleAbierto, setDetalleAbierto] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+
+  /**
+   * Persiste la lectura en SQLite local y la encola en `cola_sync` con
+   * `tipo: 'LECTURA'`. La evidencia foto viaja embebida en el payload —
+   * el backend deriva la liquidacion del lado server.
+   *
+   * Si el item ya estaba en la cola por la restriccion `UNIQUE(id_medidor,
+   * id_periodo)` del repo, mostramos el mensaje al usuario sin tirar.
+   */
+  async function onGuardar() {
+    if (guardando || guardado) return;
+    setGuardando(true);
+    setErrorGuardar(null);
+    try {
+      const bootstrap = await getBootstrap();
+      await persistirYEncolarLectura({
+        lectura,
+        lecturaRepo: bootstrap.lecturaRepo,
+        colaRepo: bootstrap.colaRepo,
+        idGenerator: bootstrap.idGenerator,
+        hasher: bootstrap.hasher,
+      });
+      setGuardado(true);
+      navigation.popToTop();
+    } catch (e) {
+      const causa = (e as { cause?: { codigo?: string } })?.cause?.codigo;
+      const mensaje =
+        causa === 'RESTRICCION_UNICIDAD'
+          ? 'Ya existe una lectura para este medidor en este periodo.'
+          : (e as Error)?.message ?? 'Error desconocido al guardar.';
+      setErrorGuardar(mensaje);
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   const subsidioMostrar = resultado.subsidio > 0;
   const contribMostrar = resultado.contribucion > 0;
@@ -232,14 +272,36 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Acciones */}
         <View style={styles.actionsCol}>
+          {errorGuardar !== null && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{errorGuardar}</Text>
+            </View>
+          )}
           <Pressable
-            onPress={() => navigation.popToTop()}
+            onPress={onGuardar}
+            disabled={guardando || guardado}
             style={({ pressed }) => [
               styles.btnPrimary,
               pressed && styles.pressedDark,
+              (guardando || guardado) && styles.btnDisabled,
             ]}
           >
-            <Text style={styles.btnPrimaryText}>VOLVER AL INICIO</Text>
+            <Text style={styles.btnPrimaryText}>
+              {guardado
+                ? 'GUARDADO ✓'
+                : guardando
+                  ? 'GUARDANDO...'
+                  : 'GUARDAR Y VOLVER'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.popToTop()}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.pressedLight,
+            ]}
+          >
+            <Text style={styles.btnSecondaryText}>VOLVER SIN GUARDAR</Text>
           </Pressable>
           <Pressable
             onPress={() =>
@@ -581,6 +643,21 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     textTransform: 'uppercase',
     letterSpacing: 1.5,
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  errorBox: {
+    padding: SPACING.sm,
+    backgroundColor: '#FEE',
+    borderWidth: 1,
+    borderColor: '#C33',
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.xs,
+  },
+  errorText: {
+    ...TYPOGRAPHY.bodySm,
+    color: '#900',
   },
 
   // Metadata
