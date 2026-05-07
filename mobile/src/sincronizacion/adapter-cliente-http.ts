@@ -35,6 +35,12 @@ import type {
   RespuestaCliente,
 } from '@dominio/sincronizacion/procesador';
 import type { TokenProvider } from '@dominio/cliente-http';
+import type { Lectura } from '@dominio/captura-lecturas/types';
+import type { Medidor } from '@dominio/medidores/types';
+import type { Suscriptor } from '@dominio/suscriptores/types';
+import { mapearLecturaParaBackend } from './mapeadores/lectura-a-backend';
+import { mapearSuscriptorParaBackend } from './mapeadores/suscriptor-a-backend';
+import { mapearMedidorParaBackend } from './mapeadores/medidor-a-backend';
 
 /**
  * Mapeo tipo → ruta del backend `/api/v1/*`.
@@ -46,6 +52,8 @@ import type { TokenProvider } from '@dominio/cliente-http';
 const RUTAS_BACKEND_V1: Record<TipoItem, string | null> = {
   LECTURA: '/api/v1/lecturas',
   LIQUIDACION: '/api/v1/liquidaciones',
+  SUSCRIPTOR: '/api/v1/suscriptores',
+  MEDIDOR: '/api/v1/medidores',
   EVIDENCIA: null, // backend no expone endpoint en sprint actual
   EVENTO_AUDITORIA: null, // idem
   FACTURA: null, // idem
@@ -56,6 +64,18 @@ export interface OpcionesAdapter {
   readonly tokenProvider: TokenProvider;
   /** default: 'mobile' — TODO sofisticar post-entrega */
   readonly dispositivoId?: string;
+  /**
+   * Repos / adapters necesarios para mapear el payload `LECTURA` del
+   * dominio (snake_case) al `LecturaPayload` camelCase del backend.
+   * Se inyectan desde el bootstrap real. Para tipos != LECTURA no se
+   * usan, el payload se reenvia tal cual.
+   */
+  readonly medidorRepo: { buscarPorId(id: number): Promise<Medidor | null> };
+  readonly suscriptorRepo: { buscarPorId(id: number): Promise<Suscriptor | null> };
+  readonly hasher: { sha256(input: string | Uint8Array): string };
+  readonly leerFotoBase64: (
+    path: string,
+  ) => Promise<{ base64: string; mime: string }>;
 }
 
 /**
@@ -120,13 +140,80 @@ export function crearClienteHttpAdapter(
         };
       }
 
+      // Para LECTURA: traducimos el payload snake_case del dominio
+      // al `LecturaPayload` camelCase del backend (FK por idCliente,
+      // foto en base64+mime+hash). Ver
+      // `mapeadores/lectura-a-backend.ts` para la justificacion y la
+      // decision sobre `idMedidorCliente`.
+      //
+      // Tambien fijamos el `idCliente` del SOBRE (`SyncRequest`) al
+      // formato `dispositivo:id_local` para LECTURA — el `item.id` del
+      // dominio es un UUID y NO matchea el regex `^[\w-]+:\d+$` que
+      // valida el backend en `SyncRequest.IdCliente`. Para tipos !=
+      // LECTURA dejamos el comportamiento previo (UUID) — el backend
+      // de LIQUIDACION arrastra el mismo bug pero queda fuera de scope
+      // de esta correccion (TODO post-entrega).
+      let payloadFinal: unknown = item.payload;
+      let idClienteSobre = `${dispositivoId}:${item.id}`;
+
+      if (item.tipo === 'LECTURA') {
+        const lectura = item.payload as Lectura;
+        payloadFinal = await mapearLecturaParaBackend(lectura, {
+          medidorRepo: opts.medidorRepo,
+          hasher: opts.hasher,
+          leerFotoBase64: opts.leerFotoBase64,
+          dispositivoId,
+        });
+        // Pre-condicion: la lectura ya fue persistida y tiene
+        // id_lectura. Si no, reventamos explicito antes del POST en
+        // vez de mandar `mobile:undefined` y comer un 400 oscuro.
+        if (lectura.id_lectura === undefined) {
+          return {
+            ok: false,
+            error: 'Lectura sin id_lectura: no se puede armar idCliente del sobre',
+          };
+        }
+        idClienteSobre = `${dispositivoId}:${lectura.id_lectura}`;
+      }
+
+      // Camino 3 (D33+): SUSCRIPTOR y MEDIDOR se sincronizan ANTES que
+      // las LECTURAs para que el backend pueda resolver la FK logica
+      // por `idCliente`. Mismo patron de mapping snake_case → camelCase
+      // y mismo formato `${dispositivoId}:${id_local}` para el sobre.
+      if (item.tipo === 'SUSCRIPTOR') {
+        const sus = item.payload as Suscriptor;
+        if (sus.id_suscriptor === undefined) {
+          return {
+            ok: false,
+            error: 'Suscriptor sin id_suscriptor: no se puede armar idCliente del sobre',
+          };
+        }
+        payloadFinal = mapearSuscriptorParaBackend(sus, { dispositivoId });
+        idClienteSobre = `${dispositivoId}:${sus.id_suscriptor}`;
+      }
+
+      if (item.tipo === 'MEDIDOR') {
+        const med = item.payload as Medidor;
+        if (med.id_medidor === undefined) {
+          return {
+            ok: false,
+            error: 'Medidor sin id_medidor: no se puede armar idCliente del sobre',
+          };
+        }
+        payloadFinal = await mapearMedidorParaBackend(med, {
+          suscriptorRepo: opts.suscriptorRepo,
+          dispositivoId,
+        });
+        idClienteSobre = `${dispositivoId}:${med.id_medidor}`;
+      }
+
       const body: SyncRequestBody = {
         id: item.id,
         tipo: item.tipo.toLowerCase(),
-        payload: item.payload,
+        payload: payloadFinal,
         hashLocal: item.hashLocal,
         forzarSobrescribir: item.forzarSobrescribir ?? false,
-        idCliente: `${dispositivoId}:${item.id}`,
+        idCliente: idClienteSobre,
         intentos: item.intentos,
         ultimoIntento: item.ultimoIntentoEn?.toISOString() ?? null,
       };

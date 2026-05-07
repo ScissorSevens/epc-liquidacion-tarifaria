@@ -43,6 +43,7 @@ import { procesarCola } from '@dominio/sincronizacion/procesador';
 import type { ClienteSincronizacion } from '@dominio/sincronizacion/procesador';
 import { obtenerApiBaseUrl } from '../config/api';
 import { crearClienteHttpAdapter } from '../sincronizacion/adapter-cliente-http';
+import { leerFotoBase64 } from '../adapters/leer-foto-base64';
 import { smokeDominio, type ResultadoSmokeDominio } from './smoke-dominio';
 
 // Token provider stub: el backend del sprint 3 NO requiere JWT todavia.
@@ -143,6 +144,14 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
     baseUrl: apiBaseUrl,
     tokenProvider: tokenProviderSinAuth,
     dispositivoId: 'mobile', // TODO: sofisticar con expo-application post-entrega
+    // Deps para mapear el payload LECTURA snake_case → camelCase del
+    // backend (ver `mapeadores/lectura-a-backend.ts`). El medidorRepo
+    // resuelve la FK por id local; el hasher calcula sha256 del
+    // base64 de la foto; leerFotoBase64 usa expo-file-system.
+    medidorRepo,
+    suscriptorRepo,
+    hasher,
+    leerFotoBase64,
   });
 
   const procesadorCola = async (): Promise<ResultadoSync> => {
