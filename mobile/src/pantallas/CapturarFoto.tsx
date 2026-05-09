@@ -15,9 +15,9 @@ import {
   persistirFoto,
 } from '../adapters/foto-evidencia';
 import { photoCaptureStore } from '../composition/photo-capture-store';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { LecturasStackScreenProps } from '../navegacion/types';
 
-type Props = RootStackScreenProps<'CapturarFoto'>;
+type Props = LecturasStackScreenProps<'CapturarFoto'>;
 
 interface SnackState {
   visible: boolean;

@@ -25,7 +25,7 @@ import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import { photoCaptureStore } from '../composition/photo-capture-store';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
   COLORS,
@@ -34,7 +34,7 @@ import {
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 
-type Props = RootStackScreenProps<'CapturarLectura'>;
+type Props = LecturasStackScreenProps<'CapturarLectura'>;
 
 // Estratos validos del dominio (1-6) tipados como literales para los chips.
 type EstratoStr = '1' | '2' | '3' | '4' | '5' | '6';

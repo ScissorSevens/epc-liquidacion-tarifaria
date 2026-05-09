@@ -10,7 +10,7 @@ import {
 
 import type { BootstrapApp, ResultadoSync } from '../composition/bootstrap';
 import { getBootstrap } from '../composition/get-bootstrap';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { SyncStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
   COLORS,
@@ -19,7 +19,7 @@ import {
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 
-type Props = RootStackScreenProps<'Sincronizacion'>;
+type Props = SyncStackScreenProps<'Sincronizacion'>;
 
 interface EventoLog {
   readonly id: string;
@@ -42,7 +42,10 @@ const formatHora = (d: Date): string =>
  *  - Revisar el log de los ultimos eventos en la sesion actual (no
  *    persiste cross-launch — es solo feedback inmediato).
  */
-export default function Sincronizacion({ navigation }: Props) {
+// navigation no se usa en esta pantalla (era para goBack — eliminado al migrar
+// Sincronizacion a tab raíz de SyncStack). Se mantiene en Props para
+// compatibilidad de tipo con NativeStackScreenProps.
+export default function Sincronizacion(_props: Props) {
   const [bootstrap, setBootstrap] = useState<BootstrapApp | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [cargando, setCargando] = useState<null | 'health' | 'sync' | 'cola'>(
@@ -214,9 +217,6 @@ export default function Sincronizacion({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={[TYPOGRAPHY.labelLg, styles.backText]}>{'< VOLVER'}</Text>
-        </Pressable>
         <Text style={[TYPOGRAPHY.headlineMd, styles.title]}>SINCRONIZACIÓN</Text>
         <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
           {bootstrap.apiBaseUrl}
@@ -320,12 +320,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: SPACING.lg,
-  },
-  back: {
-    marginBottom: SPACING.sm,
-  },
-  backText: {
-    color: COLORS.primary,
   },
   title: {
     color: COLORS.primary,

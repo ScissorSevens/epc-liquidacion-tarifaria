@@ -22,9 +22,9 @@ import { crearMedidor } from '@dominio/medidores';
 import { crearSuscriptor } from '@dominio/suscriptores';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { ConfigStackScreenProps } from '../navegacion/types';
 
-type Props = RootStackScreenProps<'AltaSuscriptor'>;
+type Props = ConfigStackScreenProps<'AltaSuscriptor'>;
 
 // Valores literales validos de estrato (1-6) - el dominio rechaza cualquier
 // otro entero. Tipamos asi para que SegmentedButtons + parseInt sean type-safe.
@@ -305,8 +305,9 @@ export default function AltaSuscriptor({ navigation }: Props) {
       // Pequeno delay para que el snack sea visible antes de navegar.
       // `replace` (no navigate) para que el back vaya a la lista, no al form.
       setTimeout(() => {
-        navigation.replace('DetalleSuscriptor', {
-          id_suscriptor: sus.id_suscriptor,
+        navigation.navigate('Lecturas', {
+          screen: 'DetalleSuscriptor',
+          params: { id_suscriptor: sus.id_suscriptor },
         });
       }, 800);
     } catch (err) {

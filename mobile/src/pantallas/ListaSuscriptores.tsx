@@ -13,9 +13,9 @@ import {
 
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { LecturasStackScreenProps } from '../navegacion/types';
 
-type Props = RootStackScreenProps<'ListaSuscriptores'>;
+type Props = LecturasStackScreenProps<'ListaSuscriptores'>;
 
 /**
  * Lista de suscriptores con buscador in-memory.
@@ -107,7 +107,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           </Text>
           <Button
             mode="contained"
-            onPress={() => navigation.navigate('AltaSuscriptor')}
+            onPress={() => navigation.navigate('Config', { screen: 'AltaSuscriptor' })}
             style={styles.emptyButton}
           >
             Agregar suscriptor

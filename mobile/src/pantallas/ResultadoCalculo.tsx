@@ -10,7 +10,7 @@ import {
 
 import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
 import { getBootstrap } from '../composition/get-bootstrap';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
   COLORS,
@@ -19,7 +19,7 @@ import {
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 
-type Props = RootStackScreenProps<'ResultadoCalculo'>;
+type Props = LecturasStackScreenProps<'ResultadoCalculo'>;
 
 /**
  * Formatea pesos colombianos sin decimales con `Intl.NumberFormat`.

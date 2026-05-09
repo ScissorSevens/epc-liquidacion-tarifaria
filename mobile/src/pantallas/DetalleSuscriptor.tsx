@@ -14,9 +14,9 @@ import {
 import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { LecturasStackScreenProps } from '../navegacion/types';
 
-type Props = RootStackScreenProps<'DetalleSuscriptor'>;
+type Props = LecturasStackScreenProps<'DetalleSuscriptor'>;
 
 /** Fila label/valor reutilizable dentro de la card de datos. */
 function Campo({ label, valor }: { label: string; valor: string }) {

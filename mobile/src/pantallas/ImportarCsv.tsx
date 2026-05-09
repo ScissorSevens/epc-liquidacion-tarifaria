@@ -25,9 +25,9 @@ import type {
 } from '@dominio/importacion/types';
 import { persistirYEncolarImportacion } from '../adapters/persistir-y-encolar-importacion';
 import { getBootstrap } from '../composition/get-bootstrap';
-import type { RootStackScreenProps } from '../navegacion/RootStack';
+import type { ConfigStackScreenProps } from '../navegacion/types';
 
-type Props = RootStackScreenProps<'ImportarCsv'>;
+type Props = ConfigStackScreenProps<'ImportarCsv'>;
 
 // Header esperado por el parser. Lo replicamos solo para mostrarlo en el
 // dialog de ayuda — la validacion REAL la hace `parsearCSV()`.
