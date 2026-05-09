@@ -13,7 +13,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // Mapa de íconos MaterialIcons por nombre de tab
 const TAB_ICONS: Record<keyof TabParamList, string> = {
   Inicio: 'home',
-  Lecturas: 'edit-note',
+  Lecturas: 'menu-book',
   Sincronizacion: 'sync',
   Config: 'settings',
 };
@@ -22,7 +22,7 @@ const TAB_ICONS: Record<keyof TabParamList, string> = {
 const TAB_LABELS: Record<keyof TabParamList, string> = {
   Inicio: 'INICIO',
   Lecturas: 'LECTURAS',
-  Sincronizacion: 'SINCRONIZACIÓN',
+  Sincronizacion: 'SYNC',
   Config: 'CONFIG',
 };
 
@@ -44,6 +44,9 @@ export default function AppNavigator() {
         tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarLabelStyle: {
           ...TYPOGRAPHY.labelSm,
+        },
+        tabBarActiveTabStyle: {
+          fontWeight: '700',
         },
         tabBarLabel: TAB_LABELS[route.name as keyof TabParamList] ?? route.name,
         tabBarIcon: ({ color, size }: { color: string; size: number }) => (

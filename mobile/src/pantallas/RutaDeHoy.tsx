@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
@@ -75,6 +76,12 @@ export default function RutaDeHoy({ navigation }: Props) {
     void cargar();
   }, [cargar]);
 
+  const fechaHoy = new Date().toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -97,31 +104,57 @@ export default function RutaDeHoy({ navigation }: Props) {
     );
   }
 
+  const progreso = suscriptores.length > 0 ? capturasHoy / suscriptores.length : 0;
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>RUTA DE HOY</Text>
-        <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
-          {capturasHoy} / {suscriptores.length} capturadas hoy
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTexts}>
+            <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>RUTA DE HOY</Text>
+            <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>{fechaHoy}</Text>
+          </View>
+          <MaterialIcons name="account-circle" size={28} color={COLORS.primary} />
+        </View>
       </View>
 
-      {/* Banner offline — siempre visible (useNetInfo shim retorna false) */}
-      {isConnected === false && (
-        <View style={styles.banner}>
-          <Text style={[TYPOGRAPHY.bodySm, styles.bannerText]}>
-            Sin conexión — los datos se guardarán localmente
-          </Text>
-        </View>
-      )}
-
-      {/* Lista de suscriptores */}
       <FlatList
         data={suscriptores}
         keyExtractor={(item) => String(item.id_suscriptor)}
         contentContainerStyle={
           suscriptores.length === 0 ? styles.listaVaciaContainer : styles.lista
+        }
+        ListHeaderComponent={
+          <>
+            {/* Banner offline */}
+            {isConnected === false && (
+              <View style={styles.banner}>
+                <MaterialIcons name="cloud-off" size={20} color={COLORS.primary} />
+                <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
+                  Sin conexión — los datos se guardarán acá
+                </Text>
+              </View>
+            )}
+
+            {/* Progreso */}
+            <View style={styles.progresoSection}>
+              <View style={styles.progresoRow}>
+                <Text style={[TYPOGRAPHY.labelLg]}>Progreso de lectura</Text>
+                <Text style={[TYPOGRAPHY.labelLg]}>
+                  {capturasHoy} / {suscriptores.length} capturadas
+                </Text>
+              </View>
+              <View style={styles.barraContainer}>
+                <View
+                  style={[
+                    styles.barraFill,
+                    { width: `${Math.round(progreso * 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          </>
         }
         ListEmptyComponent={
           <View style={styles.center}>
@@ -142,17 +175,17 @@ export default function RutaDeHoy({ navigation }: Props) {
           >
             <View style={styles.cardContent}>
               <View style={styles.cardInfo}>
-                <Text style={[TYPOGRAPHY.labelLg, styles.cardCodigo]}>
-                  {item.codigo}
+                <Text style={[TYPOGRAPHY.labelSm, styles.cardCodigo]}>
+                  {item.codigo.toUpperCase()}
                 </Text>
-                <Text style={[TYPOGRAPHY.bodyMd]}>{item.nombre_apellidos}</Text>
-                {item.direccion !== '' && (
-                  <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
-                    {item.direccion} · Estrato {item.estrato}
-                  </Text>
-                )}
+                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
+                  {item.nombre_apellidos}
+                </Text>
+                <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
+                  Lectura pendiente
+                </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
             </View>
           </Pressable>
         )}
@@ -168,6 +201,7 @@ export default function RutaDeHoy({ navigation }: Props) {
             ]}
             onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
           >
+            <MaterialIcons name="sync" size={20} color={COLORS.onPrimary} />
             <Text style={[TYPOGRAPHY.labelLg, styles.btnSyncText]}>
               SINCRONIZAR ({pendientesCola} pendientes)
             </Text>
@@ -193,10 +227,20 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.xl,
     paddingHorizontal: SPACING.margin,
     paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.primary,
+    backgroundColor: COLORS.background,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTexts: {
+    flex: 1,
   },
   titulo: {
     color: COLORS.primary,
-    marginBottom: SPACING.xs,
   },
   muted: {
     color: COLORS.textSecondary,
@@ -207,16 +251,43 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   banner: {
-    backgroundColor: COLORS.surfaceLight,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.margin,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.background,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
     ...BORDERS.thin,
     marginHorizontal: SPACING.margin,
+    marginTop: SPACING.lg,
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.sm,
   },
   bannerText: {
-    color: COLORS.textSecondary,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  progresoSection: {
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  progresoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  barraContainer: {
+    height: 8,
+    backgroundColor: COLORS.surfaceLight,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  barraFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
   },
   lista: {
     paddingHorizontal: SPACING.margin,
@@ -226,7 +297,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceLight,
     borderRadius: RADIUS.default,
     marginBottom: SPACING.sm,
     ...BORDERS.thin,
@@ -238,35 +309,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.gutter,
+    paddingHorizontal: SPACING.md,
   },
   cardInfo: {
     flex: 1,
     gap: SPACING.xs,
   },
   cardCodigo: {
-    color: COLORS.primary,
-  },
-  chevron: {
-    fontSize: 24,
     color: COLORS.textSecondary,
-    marginLeft: SPACING.sm,
+  },
+  cardNombre: {
+    color: COLORS.primary,
   },
   stickyFooter: {
     paddingHorizontal: SPACING.margin,
     paddingVertical: SPACING.md,
     backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
   },
   btnSync: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     alignItems: 'center',
     borderRadius: RADIUS.default,
-    ...BORDERS.thin,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    minHeight: 48,
   },
   btnSyncPressed: {
     opacity: 0.7,
