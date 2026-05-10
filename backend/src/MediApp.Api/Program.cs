@@ -61,6 +61,10 @@ try
     app.UseExceptionHandler();
     app.UseStatusCodePages();
 
+    // Sirve wwwroot/index.html (dashboard web estático, sin build/npm externo).
+    app.UseStaticFiles();
+    app.MapFallbackToFile("index.html");
+
     app.UseSerilogRequestLogging();
 
     // Health endpoint con AddDbContextCheck (responde 200 + status JSON, 503 si DB no responde).

@@ -45,6 +45,37 @@ public static class LiquidacionesEndpoints
                 ct);
         });
 
+        // GET /api/v1/liquidaciones — listado para el dashboard
+        grupo.MapGet("/", async (MediAppDbContext db, CancellationToken ct) =>
+        {
+            var lista = await db.Liquidaciones
+                .Include(liq => liq.Lectura)
+                    .ThenInclude(l => l!.Medidor)
+                        .ThenInclude(m => m!.Suscriptor)
+                .OrderByDescending(liq => liq.Id)
+                .Select(liq => new
+                {
+                    liq.Id,
+                    liq.Estrato,
+                    liq.ConsumoM3,
+                    liq.CargoFijo,
+                    liq.CargoBasico,
+                    liq.CargoExcedente,
+                    liq.Subsidio,
+                    liq.Contribucion,
+                    liq.Total,
+                    Periodo = liq.Lectura != null ? liq.Lectura.Periodo : null,
+                    NumeroMedidor = liq.Lectura != null && liq.Lectura.Medidor != null
+                        ? liq.Lectura.Medidor.NumeroMedidor
+                        : null,
+                    NombreSuscriptor = liq.Lectura != null && liq.Lectura.Medidor != null && liq.Lectura.Medidor.Suscriptor != null
+                        ? liq.Lectura.Medidor.Suscriptor.NombreApellidos
+                        : null,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(lista);
+        });
+
         return grupo;
     }
 }

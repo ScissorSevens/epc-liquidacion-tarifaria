@@ -59,6 +59,32 @@ public static class LecturasEndpoints
                 });
         });
 
+        // GET /api/v1/lecturas — listado para el dashboard
+        grupo.MapGet("/", async (MediAppDbContext db, CancellationToken ct) =>
+        {
+            var lista = await db.Lecturas
+                .Include(l => l.Medidor)
+                    .ThenInclude(m => m!.Suscriptor)
+                .OrderByDescending(l => l.Periodo)
+                .Select(l => new
+                {
+                    l.Id,
+                    l.Periodo,
+                    l.LecturaActual,
+                    l.LecturaAnterior,
+                    ConsumoM3 = l.LecturaActual - l.LecturaAnterior,
+                    l.TimestampCaptura,
+                    l.Observaciones,
+                    l.EvidenciaFotoRuta,
+                    NumeroMedidor = l.Medidor != null ? l.Medidor.NumeroMedidor : null,
+                    NombreSuscriptor = l.Medidor != null && l.Medidor.Suscriptor != null
+                        ? l.Medidor.Suscriptor.NombreApellidos
+                        : null,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(lista);
+        });
+
         return grupo;
     }
 }

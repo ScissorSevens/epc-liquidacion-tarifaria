@@ -10,6 +10,7 @@ public static class MedidoresEndpoints
 {
     public static RouteGroupBuilder MapMedidoresEndpoints(this RouteGroupBuilder grupo)
     {
+        // POST /api/v1/medidores — sync desde mobile
         grupo.MapPost("/", async (
             SyncRequest<MedidorPayload> req,
             IValidator<MedidorPayload> validator,
@@ -19,9 +20,6 @@ public static class MedidoresEndpoints
         {
             var logger = loggerFactory.CreateLogger("MedidoresEndpoints");
 
-            // El FK al Suscriptor se resuelve mirando sync_registros: el mobile sólo conoce el
-            // idCliente del Suscriptor, no su Id server. Cacheamos el id resuelto en una closure
-            // capturada por mapToEntity/applyToEntity.
             int idSuscriptorResuelto = 0;
 
             return await SyncHandler.Handle<MedidorPayload, Medidor>(
@@ -46,6 +44,27 @@ public static class MedidoresEndpoints
                 db,
                 logger,
                 ct);
+        });
+
+        // GET /api/v1/medidores — listado para el dashboard
+        grupo.MapGet("/", async (MediAppDbContext db, CancellationToken ct) =>
+        {
+            var lista = await db.Medidores
+                .Include(m => m.Suscriptor)
+                .OrderBy(m => m.NumeroMedidor)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.NumeroMedidor,
+                    m.FechaInstalacion,
+                    m.Estado,
+                    m.Observaciones,
+                    m.IdSuscriptor,
+                    NombreSuscriptor = m.Suscriptor != null ? m.Suscriptor.NombreApellidos : null,
+                    CodigoSuscriptor = m.Suscriptor != null ? m.Suscriptor.Codigo : null,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(lista);
         });
 
         return grupo;
