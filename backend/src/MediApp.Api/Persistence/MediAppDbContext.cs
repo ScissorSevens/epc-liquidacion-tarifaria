@@ -14,6 +14,7 @@ public class MediAppDbContext : DbContext
     {
     }
 
+    public DbSet<Operario> Operarios => Set<Operario>();
     public DbSet<Suscriptor> Suscriptores => Set<Suscriptor>();
     public DbSet<Medidor> Medidores => Set<Medidor>();
     public DbSet<Lectura> Lecturas => Set<Lectura>();
@@ -79,8 +80,23 @@ public class MediAppDbContext : DbContext
             .HasIndex(sr => new { sr.IdCliente, sr.Tipo })
             .IsUnique();
 
-        // Index secundario para búsquedas inversas (debug futuro: dado tipo+id server, hallar id_cliente).
-        modelBuilder.Entity<SyncRegistro>()
-            .HasIndex(sr => new { sr.Tipo, sr.IdEntidad });
+        // Operario: numero_cedula, email y dispositivo_id únicos.
+        modelBuilder.Entity<Operario>()
+            .HasIndex(o => o.NumeroCedula).IsUnique();
+
+        modelBuilder.Entity<Operario>()
+            .HasIndex(o => o.Email).IsUnique();
+
+        // NULL no viola UNIQUE en Postgres — múltiples operarios sin dispositivo son válidos.
+        modelBuilder.Entity<Operario>()
+            .HasIndex(o => o.DispositivoId).IsUnique();
+
+        // Lectura → Operario: FK nullable, lecturas históricas conservan IdOperario = NULL.
+        modelBuilder.Entity<Lectura>()
+            .HasOne(l => l.Operario)
+            .WithMany()
+            .HasForeignKey(l => l.IdOperario)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

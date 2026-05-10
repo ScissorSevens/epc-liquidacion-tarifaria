@@ -29,7 +29,10 @@ public class Lectura
     [Column(TypeName = "char(6)")]
     public string Periodo { get; set; } = string.Empty;
 
-    public int IdOperario { get; set; }
+    public int? IdOperario { get; set; }
+
+    [ForeignKey(nameof(IdOperario))]
+    public Operario? Operario { get; set; }
 
     /// <summary>Mapeado a `timestamp with time zone` por Npgsql.</summary>
     public DateTimeOffset TimestampCaptura { get; set; }

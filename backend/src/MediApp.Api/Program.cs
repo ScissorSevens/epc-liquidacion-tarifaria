@@ -2,6 +2,7 @@ using FluentValidation;
 using MediApp.Api.Features.Lecturas;
 using MediApp.Api.Features.Liquidaciones;
 using MediApp.Api.Features.Medidores;
+using MediApp.Api.Features.Operarios;
 using MediApp.Api.Features.Suscriptores;
 using MediApp.Api.Infrastructure.Almacen;
 using MediApp.Api.Persistence;
@@ -43,6 +44,7 @@ try
     builder.Services.AddScoped<IValidator<MedidorPayload>, MedidorValidator>();
     builder.Services.AddScoped<IValidator<LecturaPayload>, LecturaValidator>();
     builder.Services.AddScoped<IValidator<LiquidacionPayload>, LiquidacionValidator>();
+    builder.Services.AddScoped<IValidator<OperarioPayload>, OperarioValidator>();
 
     // Almacén de evidencias fotográficas (Lectura). Singleton: stateless, lee config en el ctor.
     builder.Services.AddSingleton<IAlmacenEvidencias, AlmacenLocal>();
@@ -75,6 +77,7 @@ try
     app.MapGroup("/api/v1/medidores").MapMedidoresEndpoints();
     app.MapGroup("/api/v1/lecturas").MapLecturasEndpoints();
     app.MapGroup("/api/v1/liquidaciones").MapLiquidacionesEndpoints();
+    app.MapGroup("/api/v1/operarios").MapOperariosEndpoints();
 
     app.Run();
 }

@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     * { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
@@ -103,6 +104,9 @@
       </button>
       <button class="tab-btn" data-tab="liquidaciones" role="tab" aria-selected="false">
         <i data-lucide="receipt" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Liquidaciones
+      </button>
+      <button class="tab-btn" data-tab="operarios" role="tab" aria-selected="false">
+        <i data-lucide="hard-hat" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Operarios
       </button>
     </nav>
 
@@ -231,11 +235,105 @@
       </div>
     </div>
 
+    <div id="sec-operarios" class="seccion hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-white/70 tracking-tight">Operarios</h2>
+        <button onclick="abrirModalOperario()" class="flex items-center gap-1.5 text-xs font-medium bg-[#0C5CAB] hover:bg-[#0C5CAB]/80 text-white rounded-lg px-3 py-2 transition-colors duration-150">
+          <i data-lucide="plus" class="w-3.5 h-3.5" style="stroke-width:2"></i>
+          Nuevo Operario
+        </button>
+      </div>
+      <div class="glass rounded-xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+          <table id="tbl-operarios" class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/[0.06]">
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Cédula</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Nombre</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Email</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Rol</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Estado</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Dispositivo</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-operarios"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /max-w -->
+
+  <!-- ═══════════════ MODAL OPERARIO ═══════════════ -->
+  <div id="modal-operario" class="modal" style="display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); align-items:center; justify-content:center;">
+    <div class="glass rounded-2xl p-6 w-full max-w-md mx-4" style="background:#111113; border:1px solid rgba(255,255,255,0.1);">
+      <div class="flex items-center justify-between mb-5">
+        <h3 id="modal-op-titulo" class="text-sm font-semibold text-white/90 tracking-tight">Nuevo Operario</h3>
+        <button onclick="cerrarModalOperario()" class="text-white/30 hover:text-white/70 transition-colors" aria-label="Cerrar">
+          <i data-lucide="x" class="w-4 h-4" style="stroke-width:1.5"></i>
+        </button>
+      </div>
+      <div class="flex flex-col gap-4">
+        <!-- Cédula -->
+        <div>
+          <label class="block text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wide">Número de Cédula</label>
+          <input id="op-cedula" type="text" placeholder="Ej: 1234567890"
+            class="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" />
+        </div>
+        <!-- Nombre -->
+        <div>
+          <label class="block text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wide">Nombre completo</label>
+          <input id="op-nombre" type="text" placeholder="Nombre y apellidos"
+            class="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors" />
+        </div>
+        <!-- Email -->
+        <div>
+          <label class="block text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wide">Email</label>
+          <input id="op-email" type="email" placeholder="correo@ejemplo.com"
+            class="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors" />
+        </div>
+        <!-- Password (solo creación) -->
+        <div id="op-pwd-wrap">
+          <label class="block text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wide">Contraseña</label>
+          <input id="op-password" type="password" placeholder="Mínimo 8 caracteres"
+            class="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors" />
+        </div>
+        <!-- Rol -->
+        <div>
+          <label class="block text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wide">Rol</label>
+          <select id="op-rol"
+            class="w-full bg-[#111113] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors">
+            <option value="operario">Operario</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <!-- Estado (solo edición) -->
+        <div id="op-estado-wrap" style="display:none">
+          <label class="block text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wide">Estado</label>
+          <select id="op-estado"
+            class="w-full bg-[#111113] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors">
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+      </div>
+      <!-- Botones -->
+      <div class="flex gap-3 mt-6 justify-end">
+        <button onclick="cerrarModalOperario()" class="text-xs text-white/50 hover:text-white/80 border border-white/10 hover:border-white/20 rounded-lg px-4 py-2 transition-colors">
+          Cancelar
+        </button>
+        <button onclick="guardarOperario()" id="btn-guardar-op" class="text-xs font-medium bg-[#0C5CAB] hover:bg-[#0C5CAB]/80 text-white rounded-lg px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
 
 <script>
 // ── Datos ────────────────────────────────────────────────────────────────────
-const data = { suscriptores: [], medidores: [], lecturas: [], liquidaciones: [] };
+const data = { suscriptores: [], medidores: [], lecturas: [], liquidaciones: [], operarios: [] };
 let tabActual = 'suscriptores';
 let cargado   = {};
 
@@ -446,17 +544,40 @@ function renderLiquidaciones() {
     </tr>`).join('');
 }
 
+function renderOperarios() {
+  const lista = filtrar(data.operarios, ['numeroCedula','nombre','email','rol','estado','dispositivoId']);
+  const tbody = document.getElementById('tbody-operarios');
+  setConteo(lista.length, data.operarios.length);
+  if (!lista.length) { tbody.innerHTML = emptyRow(7); return; }
+  tbody.innerHTML = lista.map(op => `
+    <tr class="row-hover border-b border-white/[0.04] last:border-0 transition-colors">
+      <td class="px-4 py-3"><code class="mono text-xs text-white/50">${op.numeroCedula||'—'}</code></td>
+      <td class="px-4 py-3 text-white/80 font-light">${op.nombre||'—'}</td>
+      <td class="px-4 py-3 text-white/40 text-xs">${op.email||'—'}</td>
+      <td class="px-4 py-3">${badge(op.rol||'—','blue')}</td>
+      <td class="px-4 py-3">${estadoCell(op.estado)}</td>
+      <td class="px-4 py-3 text-white/30 text-xs mono">${op.dispositivoId||'—'}</td>
+      <td class="px-4 py-3">
+        <button onclick="abrirModalOperario(${JSON.stringify(op).replace(/"/g,'&quot;')})"
+          class="text-xs text-white/40 hover:text-white/80 border border-white/10 hover:border-white/20 rounded-md px-2 py-1 transition-colors">
+          Editar
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
 const renderMap = {
   suscriptores: renderSuscriptores,
   medidores:    renderMedidores,
   lecturas:     renderLecturas,
-  liquidaciones:renderLiquidaciones
+  liquidaciones:renderLiquidaciones,
+  operarios:    renderOperarios
 };
 
 function renderTabActual() { renderMap[tabActual]?.(); }
 
 // ── Carga de datos ────────────────────────────────────────────────────────────
-const colsMap = { suscriptores:7, medidores:7, lecturas:8, liquidaciones:11 };
+const colsMap = { suscriptores:7, medidores:7, lecturas:8, liquidaciones:11, operarios:7 };
 
 async function cargar(nombre) {
   const tbody = document.getElementById(`tbody-${nombre}`);
@@ -473,7 +594,10 @@ async function cargar(nombre) {
 
 async function recargarTodo() {
   cargado = {};
-  await Promise.all(Object.keys(data).map(k => cargar(k)));
+  await Promise.all([
+    ...['suscriptores','medidores','lecturas','liquidaciones'].map(k => cargar(k)),
+    cargarOperarios()
+  ]);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -487,9 +611,127 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     tabActual = btn.dataset.tab;
     document.getElementById(`sec-${tabActual}`).classList.remove('hidden');
     document.getElementById('search-input').value = '';
-    if (!cargado[tabActual]) { cargado[tabActual] = true; cargar(tabActual); }
+    if (!cargado[tabActual]) {
+        cargado[tabActual] = true;
+        if (tabActual === 'operarios') cargarOperarios();
+        else cargar(tabActual);
+      }
     else renderTabActual();
   });
+});
+
+// ── Operarios: carga, modal, CRUD ────────────────────────────────────────────
+let _opEditando = null; // null = crear, objeto = editar
+
+async function cargarOperarios() {
+  const tbody = document.getElementById('tbody-operarios');
+  tbody.innerHTML = loadingRow(7);
+  try {
+    data.operarios = await get('/operarios');
+    renderOperarios();
+  } catch(e) {
+    tbody.innerHTML = errorRow(7, `Error: ${e.message}`);
+  }
+}
+
+function abrirModalOperario(op = null) {
+  _opEditando = op;
+  const modal    = document.getElementById('modal-operario');
+  const titulo   = document.getElementById('modal-op-titulo');
+  const cedula   = document.getElementById('op-cedula');
+  const nombre   = document.getElementById('op-nombre');
+  const email    = document.getElementById('op-email');
+  const password = document.getElementById('op-password');
+  const rol      = document.getElementById('op-rol');
+  const estado   = document.getElementById('op-estado');
+  const pwdWrap  = document.getElementById('op-pwd-wrap');
+  const estWrap  = document.getElementById('op-estado-wrap');
+
+  if (op) {
+    // Modo edición
+    titulo.textContent      = 'Editar Operario';
+    cedula.value            = op.numeroCedula || '';
+    cedula.disabled         = true;
+    nombre.value            = op.nombre || '';
+    email.value             = op.email || '';
+    password.value          = '';
+    rol.value               = op.rol || 'operario';
+    estado.value            = op.estado || 'activo';
+    pwdWrap.style.display   = 'none';
+    estWrap.style.display   = '';
+  } else {
+    // Modo creación
+    titulo.textContent      = 'Nuevo Operario';
+    cedula.value            = '';
+    cedula.disabled         = false;
+    nombre.value            = '';
+    email.value             = '';
+    password.value          = '';
+    rol.value               = 'operario';
+    estado.value            = 'activo';
+    pwdWrap.style.display   = '';
+    estWrap.style.display   = 'none';
+  }
+
+  modal.style.display = 'flex';
+  lucide.createIcons();
+}
+
+function cerrarModalOperario() {
+  document.getElementById('modal-operario').style.display = 'none';
+  _opEditando = null;
+}
+
+async function guardarOperario() {
+  const btn      = document.getElementById('btn-guardar-op');
+  const cedula   = document.getElementById('op-cedula').value.trim();
+  const nombre   = document.getElementById('op-nombre').value.trim();
+  const email    = document.getElementById('op-email').value.trim();
+  const password = document.getElementById('op-password').value;
+  const rol      = document.getElementById('op-rol').value;
+  const estado   = document.getElementById('op-estado').value;
+
+  if (!nombre || !email) { alert('Nombre y email son obligatorios.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  try {
+    if (!_opEditando) {
+      // CREAR — requiere cédula y password
+      if (!cedula) { alert('La cédula es obligatoria.'); return; }
+      if (!password) { alert('La contraseña es obligatoria.'); return; }
+      const passwordHash = await bcrypt.hash(password, 10);
+      await fetch(`${API}/operarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numeroCedula: cedula, nombre, email, rol, estado: 'activo', passwordHash })
+      }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); });
+    } else {
+      // EDITAR
+      const payload = { nombre, email, rol, estado };
+      if (password) {
+        payload.passwordHash = await bcrypt.hash(password, 10);
+      }
+      await fetch(`${API}/operarios/${_opEditando.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); });
+    }
+    cerrarModalOperario();
+    await cargarOperarios();
+  } catch(e) {
+    alert(`Error al guardar: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar';
+  }
+}
+
+// Cerrar modal al hacer click fuera del contenido
+document.getElementById('modal-operario').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalOperario();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

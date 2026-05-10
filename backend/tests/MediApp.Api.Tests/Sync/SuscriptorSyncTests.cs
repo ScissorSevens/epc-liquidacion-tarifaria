@@ -182,7 +182,7 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
         var sus = db.Suscriptores.Single(s => s.IdCliente == idCliente);
-        Assert.Equal("Carlos Ruiz", sus.Nombre);
+        Assert.Equal("Carlos Ruiz", sus.NombreApellidos);
         var sync = db.SyncRegistros.Single(sr => sr.IdCliente == idCliente && sr.Tipo == "suscriptor");
         Assert.Equal(hashA, sync.HashServer);
     }
