@@ -1,5 +1,6 @@
+import type { ComponentProps } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { BORDERS, COLORS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 import type { TabParamList } from './types';
@@ -10,8 +11,10 @@ import SyncStack from './stacks/SyncStack';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
+type IconName = ComponentProps<typeof MaterialIcons>['name'];
+
 // Mapa de íconos MaterialIcons por nombre de tab
-const TAB_ICONS: Record<keyof TabParamList, string> = {
+const TAB_ICONS: Record<keyof TabParamList, IconName> = {
   Inicio: 'home',
   Lecturas: 'menu-book',
   Sincronizacion: 'sync',

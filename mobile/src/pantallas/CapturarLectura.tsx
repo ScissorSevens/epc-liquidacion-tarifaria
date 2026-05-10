@@ -36,15 +36,11 @@ import {
 
 type Props = LecturasStackScreenProps<'CapturarLectura'>;
 
-// Estratos validos del dominio (1-6) tipados como literales para los chips.
-type EstratoStr = '1' | '2' | '3' | '4' | '5' | '6';
-
 interface FormState {
   lectura_anterior: string;
   lectura_actual: string;
   id_periodo: string;
   observaciones: string;
-  estrato: EstratoStr;
 }
 
 type CampoForm = keyof FormState;
@@ -94,9 +90,6 @@ function validarCampo(nombre: CampoForm, valor: string): string | undefined {
     case 'observaciones':
       if (valor.length > 300) return 'Maximo 300 caracteres';
       return undefined;
-    case 'estrato':
-      if (valor === undefined || valor === '') return 'Estrato obligatorio';
-      return undefined;
     default:
       return undefined;
   }
@@ -134,7 +127,6 @@ export default function CapturarLectura({ navigation, route }: Props) {
     lectura_actual: '',
     id_periodo: periodoActual(),
     observaciones: '',
-    estrato: '3',
   });
   const [errores, setErrores] = useState<Errores>({});
   const [calculando, setCalculando] = useState(false);
@@ -251,6 +243,10 @@ export default function CapturarLectura({ navigation, route }: Props) {
       mostrarSnack('Revisa los campos marcados', 'error');
       return;
     }
+    if (suscriptor === undefined) {
+      mostrarSnack('Cargando datos del suscriptor, reintentar en un momento', 'error');
+      return;
+    }
     setCalculando(true);
     try {
       const obs = form.observaciones.trim();
@@ -264,7 +260,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
         ...(evidencia !== undefined && { evidencia }),
       };
       const lectura = registrarLectura(entrada);
-      const estrato = Number.parseInt(form.estrato, 10) as Estrato;
+      const estrato = suscriptor.estrato as Estrato;
       const resultado = liquidarLectura(
         lectura,
         PARAMETROS_TARIFARIOS_DEMO,
@@ -370,7 +366,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
             </View>
             <View style={styles.cardSuscriptorRow}>
               <Text style={styles.cardSuscriptorLine}>
-                ▦  Categoría: Estrato {form.estrato}
+                ▦  Categoría: Estrato {suscriptor?.estrato ?? '—'}
               </Text>
             </View>
             <Text style={styles.subtituloMeta}>{subtitulo}</Text>
@@ -451,49 +447,6 @@ export default function CapturarLectura({ navigation, route }: Props) {
             />
             {errores.id_periodo !== undefined && (
               <Text style={styles.errorText}>{errores.id_periodo}</Text>
-            )}
-          </View>
-
-          {/* Estrato como chips pill */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Estrato *</Text>
-            <View style={styles.chipsRow}>
-              {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => {
-                const seleccionado = form.estrato === e;
-                return (
-                  <Pressable
-                    key={e}
-                    disabled={calculando}
-                    onPress={() => {
-                      setCampo('estrato', e);
-                      const msg = validarCampo('estrato', e);
-                      setErrores((prev) => {
-                        const next = { ...prev };
-                        if (msg === undefined) delete next.estrato;
-                        else next.estrato = msg;
-                        return next;
-                      });
-                    }}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      seleccionado && styles.chipSel,
-                      pressed && !seleccionado && styles.pressedLight,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        seleccionado && styles.chipTextSel,
-                      ]}
-                    >
-                      {e}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {errores.estrato !== undefined && (
-              <Text style={styles.errorText}>{errores.estrato}</Text>
             )}
           </View>
 
@@ -810,33 +763,6 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginLeft: 2,
     marginTop: 2,
-  },
-
-  // Chips
-  chipsRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    flexWrap: 'wrap',
-  },
-  chip: {
-    minWidth: 44,
-    height: 44,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipSel: {
-    backgroundColor: COLORS.primary,
-  },
-  chipText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-  },
-  chipTextSel: {
-    color: COLORS.onPrimary,
   },
 
   // Cámara

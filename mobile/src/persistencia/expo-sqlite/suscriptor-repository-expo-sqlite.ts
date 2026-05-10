@@ -40,6 +40,7 @@ interface SuscriptorRow {
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
   readonly numero_catastral: string | null;
+  readonly aplica_subsidio: number;
   readonly estado: string;
   readonly created_at: string;
 }
@@ -51,6 +52,7 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     nombre_apellidos: row.nombre_apellidos,
     direccion: row.direccion,
     estrato: row.estrato as Suscriptor['estrato'],
+    aplica_subsidio: row.aplica_subsidio === 1,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
     ...(row.matricula_inmobiliaria !== null && {
@@ -66,16 +68,18 @@ function fromRow(row: SuscriptorRow): Suscriptor {
 const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
-    matricula_inmobiliaria, numero_catastral, estado
-  ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
 const SQL_SELECT_BY_CODIGO = `SELECT * FROM suscriptor WHERE codigo = ?`;
 const SQL_EXISTE_POR_CODIGO = `SELECT 1 AS uno FROM suscriptor WHERE codigo = ? LIMIT 1`;
+const SQL_MAX_CODIGO = `SELECT MAX(CAST(codigo AS INTEGER)) AS max_codigo FROM suscriptor`;
 // Listar ordenado por codigo ASC (igual que el adapter Node): es el
 // orden natural de presentacion para listas de clientes.
 const SQL_LISTAR = `SELECT * FROM suscriptor ORDER BY codigo ASC`;
+const SQL_UPDATE_SUBSIDIO = `UPDATE suscriptor SET aplica_subsidio = ? WHERE id_suscriptor = ?`;
 
 /**
  * Traduce errores expo-sqlite a mensajes de dominio especificos para
@@ -111,6 +115,7 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.matricula_inmobiliaria ?? null,
           data.numero_catastral ?? null,
           data.estado,
+          data.aplica_subsidio ? 1 : 0,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });
@@ -141,6 +146,12 @@ export function crearSuscriptorRepositoryExpoSqlite(
       return row !== null;
     },
 
+    async maxCodigo(): Promise<string | null> {
+      const row = await db.getFirstAsync<{ max_codigo: number | null }>(SQL_MAX_CODIGO);
+      if (!row || row.max_codigo === null) return null;
+      return String(row.max_codigo).padStart(4, '0');
+    },
+
     async listar(): Promise<Suscriptor[]> {
       const rows = await db.getAllAsync<SuscriptorRow>(SQL_LISTAR);
       return rows.map(fromRow);
@@ -150,6 +161,13 @@ export function crearSuscriptorRepositoryExpoSqlite(
       throw new Error(
         'actualizar: no implementado todavia — fuera de scope MVP, ver post-entrega',
       );
+    },
+
+    async toggleSubsidio(id: number, valor: boolean): Promise<Suscriptor> {
+      await db.runAsync(SQL_UPDATE_SUBSIDIO, valor ? 1 : 0, id);
+      const row = await db.getFirstAsync<SuscriptorRow>(SQL_SELECT_BY_ID, id);
+      if (!row) throw new Error(`toggleSubsidio: suscriptor ${id} no encontrado`);
+      return fromRow(row);
     },
 
     async eliminar(_id: number): Promise<void> {

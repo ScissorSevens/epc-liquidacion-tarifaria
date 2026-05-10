@@ -158,6 +158,10 @@ CREATE INDEX IF NOT EXISTS idx_cola_estado ON cola_sincronizacion (estado);
 CREATE INDEX IF NOT EXISTS idx_cola_creado_en ON cola_sincronizacion (creado_en);
 `;
 
+const MIGRACION_007_SUSCRIPTOR_SUBSIDIO = `
+ALTER TABLE suscriptor ADD COLUMN aplica_subsidio INTEGER NOT NULL DEFAULT 0;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -165,6 +169,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 4, nombre: '004_suscriptor', sql: MIGRACION_004_SUSCRIPTOR },
   { version: 5, nombre: '005_medidor', sql: MIGRACION_005_MEDIDOR },
   { version: 6, nombre: '006_cola_sync_fix_tipo', sql: MIGRACION_006_COLA_SYNC_FIX_TIPO },
+  { version: 7, nombre: '007_suscriptor_add_aplica_subsidio', sql: MIGRACION_007_SUSCRIPTOR_SUBSIDIO },
 ];
 
 const SQL_TABLA_CONTROL = `

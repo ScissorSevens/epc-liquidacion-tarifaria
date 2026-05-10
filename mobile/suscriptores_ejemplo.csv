@@ -1,0 +1,6 @@
+nombre_apellidos,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor
+Carlos Andrés Romero Vargas,Calle 5 # 12-34 Barrio Centro,2,050001-00-00-0001-000,,2023-03-15,
+María Elena Suárez López,Carrera 8 # 45-67 Barrio La Paz,1,,050001-02-03-0045,2022-11-20,Medidor antiguo requiere revisión
+José Ignacio Pérez Mora,Diagonal 10 # 3-89 Vereda El Roble,3,050001-00-00-0078-000,050001-00-00-0078,2024-01-08,
+Luz Marina Castro Ospina,Calle 2 # 7-12 Barrio Nuevo,1,,,2023-07-30,Instalación en zona rural
+Hernando Gutiérrez Beltrán,Transversal 4 # 22-55 Barrio Libertad,4,050001-00-00-0210-000,,2021-09-01,

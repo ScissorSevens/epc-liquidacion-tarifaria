@@ -38,7 +38,7 @@
     ],
     "extra": {
       "apiBaseUrl": "http://10.0.2.2:5080",
-      "apiBaseUrlLan": "http://10.45.65.233:5080"
+      "apiBaseUrlLan": "http://192.168.10.19:5080"
     }
   }
 }

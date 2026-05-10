@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';

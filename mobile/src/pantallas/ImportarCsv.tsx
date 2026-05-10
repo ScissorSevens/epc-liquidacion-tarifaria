@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
-  Appbar,
-  Button,
-  Card,
-  Dialog,
-  Divider,
-  List,
-  Paragraph,
-  Portal,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
-} from 'react-native-paper';
+  View,
+} from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { parsearCSV } from '@dominio/importacion/parser-csv';
 import type {
@@ -26,13 +23,19 @@ import type {
 import { persistirYEncolarImportacion } from '../adapters/persistir-y-encolar-importacion';
 import { getBootstrap } from '../composition/get-bootstrap';
 import type { ConfigStackScreenProps } from '../navegacion/types';
+import {
+  BORDERS,
+  COLORS,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/skeletal-tokens';
 
 type Props = ConfigStackScreenProps<'ImportarCsv'>;
 
-// Header esperado por el parser. Lo replicamos solo para mostrarlo en el
-// dialog de ayuda — la validacion REAL la hace `parsearCSV()`.
+// Header nuevo (7 columnas) — codigo y numero_medidor se asignan automáticamente.
 const HEADER_ESPERADO_TXT =
-  'codigo,nombre_apellidos,direccion,estrato,matricula_inmobiliaria,numero_catastral,numero_medidor,fecha_instalacion,observaciones_medidor';
+  'nombre_apellidos,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
 
 // Umbral a partir del cual pedimos confirmacion al usuario antes de
 // procesar. RN no tiene workers triviales y el bucle es JS thread, asi
@@ -191,14 +194,19 @@ export default function ImportarCsv({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction
+    <View style={styles.root}>
+      {/* Header brutalist */}
+      <View style={styles.header}>
+        <Pressable
           onPress={() => navigation.goBack()}
           disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
-        />
-        <Appbar.Content title="Importar CSV" />
-      </Appbar.Header>
+          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
+        >
+          <Text style={styles.headerIcon}>‹</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>IMPORTAR CSV</Text>
+        <View style={styles.headerBtn} />
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {estado.fase === 'idle' && (
@@ -234,73 +242,82 @@ export default function ImportarCsv({ navigation }: Props) {
         {estado.fase === 'error' && (
           <RenderError mensaje={estado.mensaje} onReintentar={reset} />
         )}
+
+        <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
       </ScrollView>
 
-      <Portal>
-        <Dialog
-          visible={dialogFormatoVisible}
-          onDismiss={() => setDialogFormatoVisible(false)}
-        >
-          <Dialog.Title>Formato esperado</Dialog.Title>
-          <Dialog.Content>
-            <Paragraph>
-              El archivo debe ser un CSV (separado por comas) con las
-              siguientes 9 columnas en este orden:
-            </Paragraph>
-            <Text variant="bodySmall" style={styles.codeBlock}>
-              {HEADER_ESPERADO_TXT}
+      {/* Dialog: formato esperado */}
+      <Modal
+        visible={dialogFormatoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDialogFormatoVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setDialogFormatoVisible(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitulo}>FORMATO ESPERADO</Text>
+            <Text style={styles.modalBody}>
+              El archivo debe ser un CSV (separado por comas) con{'\n'}
+              <Text style={{ fontWeight: '700' }}>7 columnas</Text> en este orden:
             </Text>
-            <Paragraph style={styles.dialogPara}>
+            <Text style={styles.modalCode}>{HEADER_ESPERADO_TXT}</Text>
+            <Text style={styles.modalBody}>
+              • Código y número de medidor se asignan automáticamente.{'\n'}
               • Encoding: UTF-8.{'\n'}
               • Estrato: entero entre 1 y 6.{'\n'}
               • Fecha de instalación: formato YYYY-MM-DD.{'\n'}
-              • Campos opcionales (matrícula, catastral, observaciones)
-              pueden venir vacíos.
-            </Paragraph>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDialogFormatoVisible(false)}>
-              Entendido
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
+              • Campos opcionales (matrícula, catastral, observaciones) pueden venir vacíos.{'\n'}
+              • También acepta el formato legado de 9 columnas con código y número de medidor.
+            </Text>
+            <Pressable
+              onPress={() => setDialogFormatoVisible(false)}
+              style={styles.modalBtn}
+            >
+              <Text style={styles.modalBtnText}>ENTENDIDO</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-        <Dialog
-          visible={dialogConfirmGrande.visible}
-          onDismiss={() =>
-            setDialogConfirmGrande({ visible: false, archivo: null })
-          }
+      {/* Dialog: archivo grande */}
+      <Modal
+        visible={dialogConfirmGrande.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDialogConfirmGrande({ visible: false, archivo: null })}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setDialogConfirmGrande({ visible: false, archivo: null })}
         >
-          <Dialog.Title>Archivo grande</Dialog.Title>
-          <Dialog.Content>
-            <Paragraph>
-              El archivo tiene{' '}
-              {dialogConfirmGrande.archivo?.filas.length ?? 0} filas
-              válidas. Procesarlas puede tardar varios segundos y la app
-              puede sentirse lenta. ¿Continuar?
-            </Paragraph>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              onPress={() =>
-                setDialogConfirmGrande({ visible: false, archivo: null })
-              }
-            >
-              Cancelar
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => {
-                const a = dialogConfirmGrande.archivo;
-                setDialogConfirmGrande({ visible: false, archivo: null });
-                if (a) void ejecutarImporte(a);
-              }}
-            >
-              Continuar
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitulo}>ARCHIVO GRANDE</Text>
+            <Text style={styles.modalBody}>
+              El archivo tiene {dialogConfirmGrande.archivo?.filas.length ?? 0} filas válidas.
+              Procesarlas puede tardar varios segundos y la app puede sentirse lenta.
+              ¿Continuar?
+            </Text>
+            <View style={styles.modalBtnsRow}>
+              <Pressable
+                onPress={() => setDialogConfirmGrande({ visible: false, archivo: null })}
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+              >
+                <Text style={styles.modalBtnSecondaryText}>CANCELAR</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  const a = dialogConfirmGrande.archivo;
+                  setDialogConfirmGrande({ visible: false, archivo: null });
+                  if (a) void ejecutarImporte(a);
+                }}
+                style={styles.modalBtn}
+              >
+                <Text style={styles.modalBtnText}>CONTINUAR</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -315,35 +332,28 @@ function RenderIdle({
   onVerFormato: () => void;
 }) {
   return (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text variant="titleMedium" style={styles.cardTitulo}>
-          Importar suscriptores desde CSV
-        </Text>
-        <Text variant="bodyMedium" style={styles.cardBody}>
-          Cargá un archivo .csv con tus suscriptores y medidores. El
-          sistema valida cada fila y reporta duplicados y errores sin
-          abortar el lote.
-        </Text>
-        <Text variant="bodySmall" style={styles.cardHint}>
-          Formato: 9 columnas separadas por coma · UTF-8
-        </Text>
-        <Button
-          mode="contained"
-          icon="file-upload"
-          onPress={onSeleccionar}
-          style={styles.cta}
-        >
-          Seleccionar archivo CSV
-        </Button>
-        <Button mode="text" onPress={onVerFormato} style={styles.linkBtn}>
-          Ver formato esperado
-        </Button>
-        <Text variant="bodySmall" style={styles.cardHintMuted}>
-          Ningún archivo seleccionado.
-        </Text>
-      </Card.Content>
-    </Card>
+    <View style={styles.card}>
+      <Text style={styles.cardTitulo}>IMPORTAR SUSCRIPTORES DESDE CSV</Text>
+      <Text style={styles.cardBody}>
+        Cargá un archivo .csv con tus suscriptores y medidores. El sistema
+        valida cada fila y reporta duplicados y errores sin abortar el lote.
+      </Text>
+      <Text style={styles.cardHint}>7 columnas separadas por coma · UTF-8</Text>
+      <View style={styles.separador} />
+      <Pressable
+        onPress={onSeleccionar}
+        style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
+      >
+        <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
+        <Text style={styles.btnPrimaryText}>SELECCIONAR ARCHIVO CSV</Text>
+      </Pressable>
+      <Pressable
+        onPress={onVerFormato}
+        style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
+      >
+        <Text style={styles.btnSecondaryText}>VER FORMATO ESPERADO</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -351,11 +361,9 @@ function RenderIdle({
 
 function RenderCargando({ texto }: { texto: string }) {
   return (
-    <View style={styles.cargando}>
-      <ActivityIndicator size="large" />
-      <Text variant="bodyLarge" style={styles.cargandoTexto}>
-        {texto}
-      </Text>
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
+      <Text style={styles.loadingText}>{texto}</Text>
     </View>
   );
 }
@@ -375,65 +383,68 @@ function RenderPreview({
   const hayErroresParseo = archivo.erroresParseo.length > 0;
 
   return (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text variant="titleMedium" style={styles.cardTitulo}>
-          Vista previa
-        </Text>
-        <Text variant="bodyMedium" style={styles.cardBody}>
-          Archivo: <Text style={styles.bold}>{archivo.nombre}</Text>
-        </Text>
-        <Text variant="bodyLarge" style={styles.bigCount}>
-          Se detectaron {archivo.filas.length} fila
-          {archivo.filas.length === 1 ? '' : 's'} válida
-          {archivo.filas.length === 1 ? '' : 's'}.
-        </Text>
+    <View style={styles.card}>
+      <Text style={styles.cardTitulo}>VISTA PREVIA</Text>
+      <Text style={styles.cardBody}>
+        Archivo: <Text style={styles.bold}>{archivo.nombre}</Text>
+      </Text>
+      <Text style={styles.bigCount}>
+        Se detectaron {archivo.filas.length} fila
+        {archivo.filas.length === 1 ? '' : 's'} válida
+        {archivo.filas.length === 1 ? '' : 's'}.
+      </Text>
 
-        {hayErroresParseo && (
-          <View style={styles.warningBox}>
-            <Text variant="bodyMedium" style={styles.warningTitulo}>
-              ⚠ {archivo.erroresParseo.length} fila
-              {archivo.erroresParseo.length === 1 ? '' : 's'} con errores de
-              formato (se omitirán):
+      {hayErroresParseo && (
+        <View style={styles.warningBox}>
+          <Text style={styles.warningText}>
+            ⚠ {archivo.erroresParseo.length} fila
+            {archivo.erroresParseo.length === 1 ? '' : 's'} con errores de
+            formato (se omitirán):
+          </Text>
+          {archivo.erroresParseo.slice(0, 5).map((e, i) => (
+            <Text key={i} style={styles.warningText}>
+              • Línea {e.linea}: {e.mensaje}
             </Text>
-            {archivo.erroresParseo.slice(0, 5).map((e, i) => (
-              <Text key={i} variant="bodySmall" style={styles.warningItem}>
-                • Línea {e.linea}: {e.mensaje}
-              </Text>
-            ))}
-            {archivo.erroresParseo.length > 5 && (
-              <Text variant="bodySmall" style={styles.warningItem}>
-                … y {archivo.erroresParseo.length - 5} más.
-              </Text>
-            )}
-          </View>
-        )}
-
-        {grande && (
-          <View style={styles.warningBox}>
-            <Text variant="bodyMedium" style={styles.warningTitulo}>
-              ⚠ Archivo grande ({archivo.filas.length} filas). El proceso
-              puede tardar.
+          ))}
+          {archivo.erroresParseo.length > 5 && (
+            <Text style={styles.warningText}>
+              … y {archivo.erroresParseo.length - 5} más.
             </Text>
-          </View>
-        )}
-
-        <View style={styles.row}>
-          <Button mode="text" onPress={onCancelar} style={styles.flex1}>
-            Cancelar
-          </Button>
-          <Button
-            mode="contained"
-            icon="database-import"
-            onPress={onConfirmar}
-            style={styles.flex1}
-            disabled={archivo.filas.length === 0}
-          >
-            Importar
-          </Button>
+          )}
         </View>
-      </Card.Content>
-    </Card>
+      )}
+
+      {grande && (
+        <View style={styles.warningBox}>
+          <Text style={styles.warningText}>
+            ⚠ Archivo grande ({archivo.filas.length} filas). El proceso puede tardar.
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.separador} />
+      <View style={styles.botonesRow}>
+        <Pressable
+          onPress={onCancelar}
+          style={({ pressed }) => [styles.btnSecondary, styles.flex1, pressed && styles.pressedLight]}
+        >
+          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+        </Pressable>
+        <Pressable
+          onPress={onConfirmar}
+          disabled={archivo.filas.length === 0}
+          style={({ pressed }) => [
+            styles.btnPrimary,
+            styles.flex1,
+            archivo.filas.length === 0 && styles.btnDisabled,
+            pressed && styles.pressedDark,
+          ]}
+        >
+          <MaterialIcons name="cloud-upload" size={18} color={COLORS.onPrimary} />
+          <Text style={styles.btnPrimaryText}>IMPORTAR</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -458,87 +469,60 @@ function RenderResultado({
   );
 
   return (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text variant="titleMedium" style={styles.cardTitulo}>
-          Resultado de la importación
-        </Text>
-        <Text variant="bodySmall" style={styles.cardHintMuted}>
-          {archivoNombre}
-        </Text>
+    <View style={styles.card}>
+      <Text style={styles.cardTitulo}>RESULTADO DE LA IMPORTACIÓN</Text>
+      <Text style={styles.cardHint}>{archivoNombre}</Text>
+      <View style={styles.separador} />
 
-        <Divider style={styles.divider} />
+      <View style={styles.metricRow}>
+        <Text style={styles.metricLabel}>SUSCRIPTORES CREADOS</Text>
+        <Text style={styles.metricValorOk}>{reporte.suscriptoresCreados}</Text>
+      </View>
+      <View style={styles.metricRow}>
+        <Text style={styles.metricLabel}>MEDIDORES CREADOS</Text>
+        <Text style={styles.metricValorOk}>{reporte.medidoresCreados}</Text>
+      </View>
 
+      {dupSus.length > 0 && (
         <View style={styles.metricRow}>
-          <Text variant="bodyLarge" style={styles.metricOk}>
-            ✓ Suscriptores creados
-          </Text>
-          <Text variant="bodyLarge" style={styles.metricNum}>
-            {reporte.suscriptoresCreados}
-          </Text>
+          <Text style={styles.metricLabel}>SUSCRIPTORES DUPLICADOS</Text>
+          <Text style={styles.metricValorWarn}>{dupSus.length}</Text>
         </View>
+      )}
+      {dupMed.length > 0 && (
         <View style={styles.metricRow}>
-          <Text variant="bodyLarge" style={styles.metricOk}>
-            ✓ Medidores creados
-          </Text>
-          <Text variant="bodyLarge" style={styles.metricNum}>
-            {reporte.medidoresCreados}
-          </Text>
+          <Text style={styles.metricLabel}>MEDIDORES DUPLICADOS</Text>
+          <Text style={styles.metricValorWarn}>{dupMed.length}</Text>
         </View>
-
-        {dupSus.length > 0 && (
-          <View style={styles.metricRow}>
-            <Text variant="bodyLarge" style={styles.metricWarn}>
-              ⚠ Suscriptores duplicados (omitidos)
-            </Text>
-            <Text variant="bodyLarge" style={styles.metricNum}>
-              {dupSus.length}
-            </Text>
-          </View>
-        )}
-        {dupMed.length > 0 && (
-          <View style={styles.metricRow}>
-            <Text variant="bodyLarge" style={styles.metricWarn}>
-              ⚠ Medidores duplicados (omitidos)
-            </Text>
-            <Text variant="bodyLarge" style={styles.metricNum}>
-              {dupMed.length}
-            </Text>
-          </View>
-        )}
-
-        {reporte.errores.length > 0 && (
-          <View style={styles.metricRow}>
-            <Text variant="bodyLarge" style={styles.metricErr}>
-              ✗ Errores
-            </Text>
-            <Text variant="bodyLarge" style={styles.metricNum}>
-              {reporte.errores.length}
-            </Text>
-          </View>
-        )}
-
-        {(reporte.errores.length > 0 || reporte.saltados.length > 0) && (
-          <DetalleListas saltados={reporte.saltados} errores={reporte.errores} />
-        )}
-
-        <Divider style={styles.divider} />
-
-        <View style={styles.row}>
-          <Button mode="text" onPress={onImportarOtro} style={styles.flex1}>
-            Importar otro
-          </Button>
-          <Button
-            mode="contained"
-            icon="home"
-            onPress={onVolverInicio}
-            style={styles.flex1}
-          >
-            Volver al inicio
-          </Button>
+      )}
+      {reporte.errores.length > 0 && (
+        <View style={styles.metricRow}>
+          <Text style={styles.metricLabel}>ERRORES</Text>
+          <Text style={styles.metricValorErr}>{reporte.errores.length}</Text>
         </View>
-      </Card.Content>
-    </Card>
+      )}
+
+      {(reporte.saltados.length > 0 || reporte.errores.length > 0) && (
+        <DetalleListas saltados={reporte.saltados} errores={reporte.errores} />
+      )}
+
+      <View style={styles.separador} />
+      <View style={styles.botonesRow}>
+        <Pressable
+          onPress={onImportarOtro}
+          style={({ pressed }) => [styles.btnSecondary, styles.flex1, pressed && styles.pressedLight]}
+        >
+          <Text style={styles.btnSecondaryText}>IMPORTAR OTRO</Text>
+        </Pressable>
+        <Pressable
+          onPress={onVolverInicio}
+          style={({ pressed }) => [styles.btnPrimary, styles.flex1, pressed && styles.pressedDark]}
+        >
+          <MaterialIcons name="home" size={18} color={COLORS.onPrimary} />
+          <Text style={styles.btnPrimaryText}>INICIO</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -550,44 +534,35 @@ function DetalleListas({
   errores: ReadonlyArray<ErrorImportacion>;
 }) {
   return (
-    <List.Section>
+    <View style={{ marginTop: SPACING.md }}>
       {saltados.length > 0 && (
-        <List.Accordion
-          title={`Detalle de duplicados (${saltados.length})`}
-          left={(props) => <List.Icon {...props} icon="alert-circle-outline" />}
-        >
+        <View style={styles.warningBox}>
+          <Text style={[styles.warningText, { fontWeight: '700', marginBottom: SPACING.xs }]}>
+            Duplicados ({saltados.length})
+          </Text>
           {saltados.map((s, i) => (
-            <List.Item
-              key={`s-${i}`}
-              title={
-                s.motivo === 'suscriptor_duplicado'
-                  ? `Suscriptor código ${s.codigo ?? '?'}`
-                  : `Medidor número ${s.numero_medidor ?? '?'}`
-              }
-              description={`Línea ${s.linea} — ${s.motivo.replace('_', ' ')}`}
-              titleNumberOfLines={2}
-              descriptionNumberOfLines={2}
-            />
+            <Text key={`s-${i}`} style={styles.warningText}>
+              • Línea {s.linea} —{' '}
+              {s.motivo === 'suscriptor_duplicado'
+                ? `Suscriptor código ${s.codigo ?? '?'}`
+                : `Medidor número ${s.numero_medidor ?? '?'}`}
+            </Text>
           ))}
-        </List.Accordion>
+        </View>
       )}
       {errores.length > 0 && (
-        <List.Accordion
-          title={`Detalle de errores (${errores.length})`}
-          left={(props) => <List.Icon {...props} icon="alert-octagon-outline" />}
-        >
+        <View style={[styles.warningBox, { marginTop: SPACING.sm }]}>
+          <Text style={[styles.warningText, { fontWeight: '700', marginBottom: SPACING.xs, color: COLORS.error }]}>
+            Errores ({errores.length})
+          </Text>
           {errores.map((e, i) => (
-            <List.Item
-              key={`e-${i}`}
-              title={`Línea ${e.linea}`}
-              description={e.mensaje}
-              titleNumberOfLines={1}
-              descriptionNumberOfLines={4}
-            />
+            <Text key={`e-${i}`} style={[styles.warningText, { color: COLORS.error }]}>
+              • Línea {e.linea}: {e.mensaje}
+            </Text>
           ))}
-        </List.Accordion>
+        </View>
       )}
-    </List.Section>
+    </View>
   );
 }
 
@@ -601,75 +576,240 @@ function RenderError({
   onReintentar: () => void;
 }) {
   return (
-    <Card style={[styles.card, styles.cardError]}>
-      <Card.Content>
-        <Text variant="titleMedium" style={styles.errorTitulo}>
-          ✗ No se pudo procesar el archivo
-        </Text>
-        <Text variant="bodyMedium" style={styles.errorBody}>
-          {mensaje}
-        </Text>
-        <Button
-          mode="contained"
-          icon="refresh"
-          onPress={onReintentar}
-          style={styles.cta}
-        >
-          Reintentar
-        </Button>
-      </Card.Content>
-    </Card>
+    <View style={styles.errorCard}>
+      <Text style={styles.errorTitulo}>✗ NO SE PUDO PROCESAR EL ARCHIVO</Text>
+      <Text style={styles.errorBody}>{mensaje}</Text>
+      <Pressable
+        onPress={onReintentar}
+        style={({ pressed }) => [styles.btnPrimary, { marginTop: SPACING.md }, pressed && styles.pressedDark]}
+      >
+        <MaterialIcons name="refresh" size={18} color={COLORS.onPrimary} />
+        <Text style={styles.btnPrimaryText}>REINTENTAR</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 48 },
-  card: { marginBottom: 16 },
-  cardError: { backgroundColor: '#fdecea' },
-  cardTitulo: { marginBottom: 8 },
-  cardBody: { marginBottom: 8 },
-  cardHint: { opacity: 0.7, marginBottom: 16 },
-  cardHintMuted: { opacity: 0.6, marginTop: 12, textAlign: 'center' },
-  cta: { marginTop: 8 },
-  linkBtn: { marginTop: 4 },
+  root: { flex: 1, backgroundColor: COLORS.background },
+
+  // Header
+  header: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.margin,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outline,
+  },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerIcon: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+  headerTitle: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: -0.2,
+  },
+
+  // Scroll
+  scroll: { padding: SPACING.margin, paddingBottom: SPACING.xl },
+
+  // Card
+  card: {
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.background,
+    marginBottom: SPACING.md,
+  },
+  cardTitulo: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: SPACING.sm,
+  },
+  cardBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.textSecondary, marginBottom: SPACING.sm },
+  cardHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, opacity: 0.7 },
   bold: { fontWeight: '700' },
-  bigCount: { marginTop: 8, marginBottom: 12, fontWeight: '600' },
-  row: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  bigCount: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+
+  // Separador
+  separador: { height: 1, backgroundColor: COLORS.outline, marginVertical: SPACING.md },
+
+  // Botones
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.default,
+    minHeight: 48,
+    marginTop: SPACING.md,
+  },
+  btnPrimaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  btnSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    ...BORDERS.thin,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.default,
+    marginTop: SPACING.sm,
+    minHeight: 44,
+  },
+  btnSecondaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  btnDisabled: { backgroundColor: COLORS.textSecondary },
+  botonesRow: { flexDirection: 'row', gap: SPACING.sm },
   flex1: { flex: 1 },
-  divider: { marginVertical: 12 },
+
+  // Loading
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.margin,
+    gap: SPACING.md,
+    paddingVertical: SPACING.xl,
+  },
+  loadingText: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.md,
+  },
+
+  // Warning box
+  warningBox: {
+    backgroundColor: COLORS.surfaceLight,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    gap: SPACING.xs,
+    marginVertical: SPACING.sm,
+  },
+  warningText: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary },
+
+  // Métricas
   metricRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: SPACING.xs,
   },
-  metricOk: { color: '#2e7d32' },
-  metricWarn: { color: '#ef6c00' },
-  metricErr: { color: '#c62828' },
-  metricNum: { fontWeight: '700' },
-  warningBox: {
-    backgroundColor: '#fff4e5',
-    padding: 12,
-    borderRadius: 6,
-    marginVertical: 8,
+  metricLabel: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  warningTitulo: { color: '#a65a00', fontWeight: '600', marginBottom: 4 },
-  warningItem: { color: '#5a3d00', marginLeft: 4 },
-  errorTitulo: { color: '#b71c1c', marginBottom: 8 },
-  errorBody: { color: '#5d1010', marginBottom: 16 },
-  codeBlock: {
-    backgroundColor: '#f0f0f0',
-    padding: 8,
-    borderRadius: 4,
-    marginVertical: 8,
-    fontFamily: 'monospace',
+  metricValorOk: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+  metricValorWarn: { ...TYPOGRAPHY.headlineSm, color: '#ef6c00' },
+  metricValorErr: { ...TYPOGRAPHY.headlineSm, color: COLORS.error },
+
+  // Error card
+  errorCard: {
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.errorContainer,
+    borderColor: COLORS.error,
+    marginBottom: SPACING.md,
   },
-  dialogPara: { marginTop: 8 },
-  cargando: {
-    paddingVertical: 48,
+  errorTitulo: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.error,
+    textTransform: 'uppercase',
+    marginBottom: SPACING.sm,
+  },
+  errorBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.error },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: SPACING.margin,
   },
-  cargandoTexto: { marginTop: 16, textAlign: 'center' },
+  modalCard: {
+    backgroundColor: COLORS.background,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+    width: '100%',
+    gap: SPACING.md,
+  },
+  modalTitulo: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  modalCode: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.primary,
+    backgroundColor: COLORS.surfaceLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.sm,
+    fontFamily: 'monospace',
+  },
+  modalBody: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, lineHeight: 20 },
+  modalBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.default,
+    alignItems: 'center',
+    marginTop: SPACING.sm,
+    flex: 1,
+  },
+  modalBtnText: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary, textTransform: 'uppercase' },
+  modalBtnSecondary: {
+    backgroundColor: 'transparent',
+    ...BORDERS.thin,
+  },
+  modalBtnSecondaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+  },
+  modalBtnsRow: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
+
+  // Brand footer
+  brandFooter: {
+    ...TYPOGRAPHY.labelSm,
+    fontSize: 8,
+    color: COLORS.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginTop: SPACING.lg,
+  },
+
+  // Press states
+  pressedLight: { opacity: 0.7 },
+  pressedDark: { opacity: 0.85 },
 });

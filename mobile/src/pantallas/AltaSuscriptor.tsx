@@ -1,43 +1,49 @@
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
-  View,
-} from 'react-native';
-import {
-  ActivityIndicator,
-  Appbar,
-  Button,
-  Divider,
-  HelperText,
-  SegmentedButtons,
-  Snackbar,
   Text,
   TextInput,
-} from 'react-native-paper';
+  View,
+} from 'react-native';
 
 import { crearMedidor } from '@dominio/medidores';
 import { crearSuscriptor } from '@dominio/suscriptores';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import type { ConfigStackScreenProps } from '../navegacion/types';
+import {
+  BORDERS,
+  COLORS,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/skeletal-tokens';
 
 type Props = ConfigStackScreenProps<'AltaSuscriptor'>;
 
-// Valores literales validos de estrato (1-6) - el dominio rechaza cualquier
-// otro entero. Tipamos asi para que SegmentedButtons + parseInt sean type-safe.
+function siguienteCodigo(maxCodigo: string | null | undefined): string {
+  const n = maxCodigo ? Number.parseInt(maxCodigo, 10) : 0;
+  return String(n + 1).padStart(4, '0');
+}
+
+function codigoANumeroMedidor(codigo: string): string {
+  return `MED-${codigo}`;
+}
+
 type EstratoStr = '' | '1' | '2' | '3' | '4' | '5' | '6';
 
 interface FormState {
-  codigo: string;
   nombre_apellidos: string;
   direccion: string;
   estrato: EstratoStr;
+  aplica_subsidio: boolean;
   matricula_inmobiliaria: string;
   numero_catastral: string;
-  numero_medidor: string;
   fecha_instalacion: string;
   observaciones_medidor: string;
 }
@@ -53,94 +59,67 @@ interface SnackState {
 }
 
 const ESTADO_INICIAL: FormState = {
-  codigo: '',
   nombre_apellidos: '',
   direccion: '',
   estrato: '',
+  aplica_subsidio: true,
   matricula_inmobiliaria: '',
   numero_catastral: '',
-  numero_medidor: '',
   fecha_instalacion: '',
   observaciones_medidor: '',
 };
 
-const REGEX_CODIGO = /^\d{1,10}$/;
 const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/;
-// El dominio acepta letras, digitos y guiones en numero_medidor (ver
-// REGEX_NUMERO_MEDIDOR en src/medidores/medidores.ts). Replicamos aca para
-// dar feedback temprano antes de tocar la DB.
-const REGEX_NUMERO_MEDIDOR = /^[A-Za-z0-9-]{1,50}$/;
 
-/**
- * Valida un campo individual y devuelve mensaje de error o undefined.
- * Las reglas espejan las del dominio (`crearSuscriptor` / `crearMedidor`).
- * Si el dominio rechaza algo que pasa estas reglas, el dominio MANDA y
- * el mensaje cae en el catch del submit.
- */
-function validarCampo(nombre: CampoForm, valor: string): string | undefined {
+const HEADER_HEIGHT = 56;
+const BOTTOM_HEIGHT = 88;
+
+function validarCampo(nombre: CampoForm, valor: string | boolean): string | undefined {
+  if (nombre === 'aplica_subsidio') return undefined;
+  const v = valor as string;
   switch (nombre) {
-    case 'codigo':
-      if (valor.trim() === '') return 'Código obligatorio';
-      if (!REGEX_CODIGO.test(valor)) {
-        return 'Código debe ser numérico, máx 10 dígitos';
-      }
-      return undefined;
-
     case 'nombre_apellidos': {
-      const v = valor.trim();
-      if (v.length === 0) return 'Nombre obligatorio';
-      if (v.length < 3) return 'Nombre obligatorio (mín 3 caracteres)';
-      if (v.length > 150) return 'Nombre no puede superar 150 caracteres';
+      const t = v.trim();
+      if (t.length === 0) return 'Nombre obligatorio';
+      if (t.length < 3) return 'Nombre obligatorio (mín 3 caracteres)';
+      if (t.length > 150) return 'Nombre no puede superar 150 caracteres';
       return undefined;
     }
 
     case 'direccion': {
-      const v = valor.trim();
-      if (v.length === 0) return 'Dirección obligatoria';
-      if (v.length < 3) return 'Dirección obligatoria (mín 3 caracteres)';
-      if (v.length > 200) return 'Dirección no puede superar 200 caracteres';
+      const t = v.trim();
+      if (t.length === 0) return 'Dirección obligatoria';
+      if (t.length < 3) return 'Dirección obligatoria (mín 3 caracteres)';
+      if (t.length > 200) return 'Dirección no puede superar 200 caracteres';
       return undefined;
     }
 
     case 'estrato':
-      if (valor === '') return 'Estrato obligatorio';
+      if (v === '') return 'Estrato obligatorio';
       return undefined;
 
     case 'matricula_inmobiliaria':
-      if (valor.length > 50) return 'Matrícula no puede superar 50 caracteres';
+      if (v.length > 50) return 'Matrícula no puede superar 50 caracteres';
       return undefined;
 
     case 'numero_catastral':
-      if (valor.length > 50) return 'N° catastral no puede superar 50 caracteres';
+      if (v.length > 50) return 'N° catastral no puede superar 50 caracteres';
       return undefined;
-
-    case 'numero_medidor': {
-      const v = valor.trim();
-      if (v.length === 0) return 'Número de medidor obligatorio';
-      if (!REGEX_NUMERO_MEDIDOR.test(v)) {
-        return 'Solo letras, dígitos y guiones (1-50)';
-      }
-      return undefined;
-    }
 
     case 'fecha_instalacion': {
-      const v = valor.trim();
-      if (v.length === 0) return 'Fecha de instalación obligatoria';
-      if (!REGEX_FECHA.test(v)) return 'Formato YYYY-MM-DD';
-      // Validamos parseabilidad real (descarta 2025-13-40 que pasa el regex).
-      const parsed = new Date(`${v}T00:00:00Z`);
+      const t = v.trim();
+      if (t.length === 0) return 'Fecha de instalación obligatoria';
+      if (!REGEX_FECHA.test(t)) return 'Formato YYYY-MM-DD';
+      const parsed = new Date(`${t}T00:00:00Z`);
       if (Number.isNaN(parsed.getTime())) return 'Fecha inválida';
-      // Re-serializamos para detectar fechas tipo 2025-02-31 que JS
-      // "corrige" silenciosamente a 2025-03-03.
-      if (parsed.toISOString().slice(0, 10) !== v) return 'Fecha inválida';
-      // No permitir futuro (mismo criterio que el dominio).
+      if (parsed.toISOString().slice(0, 10) !== t) return 'Fecha inválida';
       const hoy = new Date().toISOString().slice(0, 10);
-      if (v > hoy) return 'Fecha no puede ser futura';
+      if (t > hoy) return 'Fecha no puede ser futura';
       return undefined;
     }
 
     case 'observaciones_medidor':
-      if (valor.length > 500) return 'Observaciones no puede superar 500 caracteres';
+      if (v.length > 500) return 'Observaciones no puede superar 500 caracteres';
       return undefined;
 
     default:
@@ -169,9 +148,6 @@ export default function AltaSuscriptor({ navigation }: Props) {
     tipo: 'ok',
   });
 
-  // Reset al unmount: si el usuario sale sin guardar, no preservamos el
-  // form entre visitas. (En la practica el componente se desmonta solo
-  // por replace/back, pero es explicito y barato.)
   useEffect(() => {
     return () => {
       setForm(ESTADO_INICIAL);
@@ -183,9 +159,9 @@ export default function AltaSuscriptor({ navigation }: Props) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
   }
 
-  // Blur: valida solo ese campo. NO validamos on-change (molesto).
   function onBlur(campo: CampoForm) {
-    const msg = validarCampo(campo, form[campo]);
+    const val = form[campo];
+    const msg = validarCampo(campo, val as string);
     setErrores((prev) => {
       const next = { ...prev };
       if (msg === undefined) delete next[campo];
@@ -197,7 +173,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
   function validarTodo(): boolean {
     const next: Errores = {};
     (Object.keys(form) as CampoForm[]).forEach((c) => {
-      const msg = validarCampo(c, form[c]);
+      const msg = validarCampo(c, form[c] as string);
       if (msg !== undefined) next[c] = msg;
     });
     setErrores(next);
@@ -217,39 +193,17 @@ export default function AltaSuscriptor({ navigation }: Props) {
     try {
       const bs = await getBootstrap();
 
-      // Pre-checks de duplicados ANTES de crear nada. Bajamos riesgo de
-      // dejar huerfano por una colision evitable.
-      const codigoExiste = await bs.suscriptorRepo.existePorCodigo(
-        form.codigo.trim(),
-      );
-      if (codigoExiste) {
-        mostrarSnack(
-          `Ya existe un suscriptor con código ${form.codigo.trim()}`,
-          'error',
-        );
-        return;
-      }
-      const numeroExiste = await bs.medidorRepo.existePorNumero(
-        form.numero_medidor.trim(),
-      );
-      if (numeroExiste) {
-        mostrarSnack(
-          `Ya existe un medidor con número ${form.numero_medidor.trim()}`,
-          'error',
-        );
-        return;
-      }
+      const codigoGenerado = siguienteCodigo(await bs.suscriptorRepo.maxCodigo());
+      const numeroMedidorGenerado = codigoANumeroMedidor(codigoGenerado);
 
-      // Construimos los borradores via factories del dominio. Esto da
-      // doble defensa (validacion local + dominio) y setea estado='activo'.
-      // parseInt es seguro porque validarCampo ya garantizo '1'..'6'.
       const estratoNum = Number.parseInt(form.estrato, 10) as 1 | 2 | 3 | 4 | 5 | 6;
 
       const borradorSus = crearSuscriptor({
-        codigo: form.codigo.trim(),
+        codigo: codigoGenerado,
         nombre_apellidos: form.nombre_apellidos.trim(),
         direccion: form.direccion.trim(),
         estrato: estratoNum,
+        aplica_subsidio: form.aplica_subsidio,
         matricula_inmobiliaria:
           form.matricula_inmobiliaria.trim() === ''
             ? undefined
@@ -261,15 +215,9 @@ export default function AltaSuscriptor({ navigation }: Props) {
       });
 
       const sus = await (async () => {
-        // Camino 3 (D33+): persistir + encolar suscriptor + medidor en
-        // una sola operacion atomica con compensacion. Reemplaza el
-        // try/catch inline que solo persistia (sin encolar al backend).
         try {
           const borradorMed = crearMedidor({
-            numero_medidor: form.numero_medidor.trim(),
-            // id_suscriptor placeholder: el adapter lo inyecta tras crear
-            // el suscriptor. Pasamos 0 para satisfacer el tipo del factory;
-            // el adapter usa Omit<MedidorBorrador,'id_suscriptor'>.
+            numero_medidor: numeroMedidorGenerado,
             id_suscriptor: 0,
             fecha_instalacion: form.fecha_instalacion.trim(),
             observaciones:
@@ -277,9 +225,6 @@ export default function AltaSuscriptor({ navigation }: Props) {
                 ? undefined
                 : form.observaciones_medidor.trim(),
           });
-          // El adapter ignora `id_suscriptor` del borradorMed: lo sobreescribe
-          // con el del suscriptor recien creado. Quitamos via destructuring
-          // para no acoplar el contrato.
           const { id_suscriptor: _ignored, ...borradorMedSinSus } = borradorMed;
 
           const out = await persistirYEncolarAltaSuscriptor({
@@ -302,8 +247,6 @@ export default function AltaSuscriptor({ navigation }: Props) {
       if (sus === null) return;
 
       mostrarSnack('Suscriptor y medidor creados correctamente', 'ok');
-      // Pequeno delay para que el snack sea visible antes de navegar.
-      // `replace` (no navigate) para que el back vaya a la lista, no al form.
       setTimeout(() => {
         navigation.navigate('Lecturas', {
           screen: 'DetalleSuscriptor',
@@ -321,14 +264,19 @@ export default function AltaSuscriptor({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction
+    <View style={styles.root}>
+      {/* Header brutalist */}
+      <View style={styles.header}>
+        <Pressable
           onPress={() => navigation.goBack()}
           disabled={enviando}
-        />
-        <Appbar.Content title="Nuevo Suscriptor" />
-      </Appbar.Header>
+          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
+        >
+          <Text style={styles.headerIcon}>‹</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>NUEVO SUSCRIPTOR</Text>
+        <View style={styles.headerBtn} />
+      </View>
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -338,250 +286,460 @@ export default function AltaSuscriptor({ navigation }: Props) {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Seccion 1 - Datos del Suscriptor */}
-          <Text variant="titleMedium" style={styles.seccionTitulo}>
-            Datos del Suscriptor
+          {/* Sección 1 — Datos del Suscriptor */}
+          <Text style={styles.seccionTitulo}>DATOS DEL SUSCRIPTOR</Text>
+
+          <Text style={styles.autoGenInfo}>
+            Código y número de medidor se asignan automáticamente.
           </Text>
 
-          <TextInput
-            label="Código *"
-            value={form.codigo}
-            onChangeText={(v) => setCampo('codigo', v)}
-            onBlur={() => onBlur('codigo')}
-            error={errores.codigo !== undefined}
-            mode="outlined"
-            keyboardType="number-pad"
-            maxLength={10}
-            disabled={enviando}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <HelperText type="error" visible={errores.codigo !== undefined}>
-            {errores.codigo ?? ' '}
-          </HelperText>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>NOMBRE Y APELLIDOS *</Text>
+            <TextInput
+              style={[styles.input, errores.nombre_apellidos !== undefined && styles.inputError]}
+              value={form.nombre_apellidos}
+              onChangeText={(v) => setCampo('nombre_apellidos', v)}
+              onBlur={() => onBlur('nombre_apellidos')}
+              maxLength={150}
+              editable={!enviando}
+              placeholderTextColor={COLORS.placeholder}
+            />
+            {errores.nombre_apellidos !== undefined && (
+              <Text style={styles.errorText}>{errores.nombre_apellidos}</Text>
+            )}
+          </View>
 
-          <TextInput
-            label="Nombre y apellidos *"
-            value={form.nombre_apellidos}
-            onChangeText={(v) => setCampo('nombre_apellidos', v)}
-            onBlur={() => onBlur('nombre_apellidos')}
-            error={errores.nombre_apellidos !== undefined}
-            mode="outlined"
-            maxLength={150}
-            disabled={enviando}
-          />
-          <HelperText
-            type="error"
-            visible={errores.nombre_apellidos !== undefined}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>DIRECCIÓN *</Text>
+            <TextInput
+              style={[styles.input, errores.direccion !== undefined && styles.inputError]}
+              value={form.direccion}
+              onChangeText={(v) => setCampo('direccion', v)}
+              onBlur={() => onBlur('direccion')}
+              maxLength={200}
+              editable={!enviando}
+              placeholderTextColor={COLORS.placeholder}
+            />
+            {errores.direccion !== undefined && (
+              <Text style={styles.errorText}>{errores.direccion}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>ESTRATO *</Text>
+            <View style={styles.chipsRow}>
+              {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
+                <Pressable
+                  key={e}
+                  onPress={() => {
+                    setCampo('estrato', e);
+                    const msg = validarCampo('estrato', e);
+                    setErrores((prev) => {
+                      const next = { ...prev };
+                      if (msg === undefined) delete next.estrato;
+                      else next.estrato = msg;
+                      return next;
+                    });
+                  }}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    form.estrato === e && styles.chipSel,
+                    pressed && styles.pressedLight,
+                  ]}
+                >
+                  <Text style={[styles.chipText, form.estrato === e && styles.chipTextSel]}>
+                    {e}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {errores.estrato !== undefined && (
+              <Text style={styles.errorText}>{errores.estrato}</Text>
+            )}
+          </View>
+
+          {/* Toggle aplica_subsidio */}
+          <Pressable
+            onPress={() => setCampo('aplica_subsidio', !form.aplica_subsidio)}
+            style={styles.toggleRow}
           >
-            {errores.nombre_apellidos ?? ' '}
-          </HelperText>
-
-          <TextInput
-            label="Dirección *"
-            value={form.direccion}
-            onChangeText={(v) => setCampo('direccion', v)}
-            onBlur={() => onBlur('direccion')}
-            error={errores.direccion !== undefined}
-            mode="outlined"
-            maxLength={200}
-            disabled={enviando}
-          />
-          <HelperText type="error" visible={errores.direccion !== undefined}>
-            {errores.direccion ?? ' '}
-          </HelperText>
-
-          <Text variant="labelMedium" style={styles.subLabel}>
-            Estrato *
-          </Text>
-          <SegmentedButtons
-            value={form.estrato}
-            onValueChange={(v) => {
-              setCampo('estrato', v as EstratoStr);
-              // Estrato no tiene blur natural (no es input de texto).
-              // Validamos al cambiar para limpiar el error apenas eligen.
-              const msg = validarCampo('estrato', v);
-              setErrores((prev) => {
-                const next = { ...prev };
-                if (msg === undefined) delete next.estrato;
-                else next.estrato = msg;
-                return next;
-              });
-            }}
-            buttons={[
-              { value: '1', label: '1', disabled: enviando },
-              { value: '2', label: '2', disabled: enviando },
-              { value: '3', label: '3', disabled: enviando },
-              { value: '4', label: '4', disabled: enviando },
-              { value: '5', label: '5', disabled: enviando },
-              { value: '6', label: '6', disabled: enviando },
-            ]}
-          />
-          <HelperText type="error" visible={errores.estrato !== undefined}>
-            {errores.estrato ?? ' '}
-          </HelperText>
-
-          <TextInput
-            label="Matrícula inmobiliaria"
-            value={form.matricula_inmobiliaria}
-            onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
-            onBlur={() => onBlur('matricula_inmobiliaria')}
-            error={errores.matricula_inmobiliaria !== undefined}
-            mode="outlined"
-            maxLength={50}
-            disabled={enviando}
-          />
-          <HelperText
-            type="error"
-            visible={errores.matricula_inmobiliaria !== undefined}
-          >
-            {errores.matricula_inmobiliaria ?? ' '}
-          </HelperText>
-
-          <TextInput
-            label="Número catastral"
-            value={form.numero_catastral}
-            onChangeText={(v) => setCampo('numero_catastral', v)}
-            onBlur={() => onBlur('numero_catastral')}
-            error={errores.numero_catastral !== undefined}
-            mode="outlined"
-            maxLength={50}
-            disabled={enviando}
-          />
-          <HelperText
-            type="error"
-            visible={errores.numero_catastral !== undefined}
-          >
-            {errores.numero_catastral ?? ' '}
-          </HelperText>
-
-          <Divider style={styles.divider} />
-
-          {/* Seccion 2 - Datos del Medidor */}
-          <Text variant="titleMedium" style={styles.seccionTitulo}>
-            Datos del Medidor
-          </Text>
-
-          <TextInput
-            label="Número de medidor *"
-            value={form.numero_medidor}
-            onChangeText={(v) => setCampo('numero_medidor', v)}
-            onBlur={() => onBlur('numero_medidor')}
-            error={errores.numero_medidor !== undefined}
-            mode="outlined"
-            maxLength={50}
-            disabled={enviando}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-          <HelperText
-            type="error"
-            visible={errores.numero_medidor !== undefined}
-          >
-            {errores.numero_medidor ?? ' '}
-          </HelperText>
-
-          <TextInput
-            label="Fecha de instalación *"
-            value={form.fecha_instalacion}
-            onChangeText={(v) => setCampo('fecha_instalacion', v)}
-            onBlur={() => onBlur('fecha_instalacion')}
-            error={errores.fecha_instalacion !== undefined}
-            mode="outlined"
-            placeholder="YYYY-MM-DD"
-            maxLength={10}
-            disabled={enviando}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="numbers-and-punctuation"
-          />
-          <HelperText
-            type="error"
-            visible={errores.fecha_instalacion !== undefined}
-          >
-            {errores.fecha_instalacion ?? ' '}
-          </HelperText>
-
-          <TextInput
-            label="Observaciones del medidor"
-            value={form.observaciones_medidor}
-            onChangeText={(v) => setCampo('observaciones_medidor', v)}
-            onBlur={() => onBlur('observaciones_medidor')}
-            error={errores.observaciones_medidor !== undefined}
-            mode="outlined"
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-            disabled={enviando}
-          />
-          <HelperText
-            type="error"
-            visible={errores.observaciones_medidor !== undefined}
-          >
-            {errores.observaciones_medidor ?? ' '}
-          </HelperText>
-
-          <Button
-            mode="contained"
-            onPress={() => void onSubmit()}
-            disabled={enviando}
-            style={styles.submit}
-            icon={enviando ? undefined : 'content-save'}
-          >
-            {enviando ? '' : 'Guardar suscriptor y medidor'}
-          </Button>
-          {enviando && (
-            <View style={styles.loaderRow}>
-              <ActivityIndicator />
-              <Text variant="bodySmall" style={styles.loaderText}>
-                Guardando…
+            <View style={[styles.toggleBox, form.aplica_subsidio && styles.toggleBoxOn]}>
+              {form.aplica_subsidio && <Text style={styles.toggleCheck}>✓</Text>}
+            </View>
+            <View style={styles.toggleTexts}>
+              <Text style={styles.toggleLabel}>APLICA SUBSIDIO</Text>
+              <Text style={styles.toggleHint}>
+                El suscriptor se acoge al subsidio por estrato
               </Text>
             </View>
-          )}
+          </Pressable>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>MATRÍCULA INMOBILIARIA</Text>
+            <TextInput
+              style={[styles.input, errores.matricula_inmobiliaria !== undefined && styles.inputError]}
+              value={form.matricula_inmobiliaria}
+              onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
+              onBlur={() => onBlur('matricula_inmobiliaria')}
+              maxLength={50}
+              editable={!enviando}
+              placeholderTextColor={COLORS.placeholder}
+            />
+            {errores.matricula_inmobiliaria !== undefined && (
+              <Text style={styles.errorText}>{errores.matricula_inmobiliaria}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>NÚMERO CATASTRAL</Text>
+            <TextInput
+              style={[styles.input, errores.numero_catastral !== undefined && styles.inputError]}
+              value={form.numero_catastral}
+              onChangeText={(v) => setCampo('numero_catastral', v)}
+              onBlur={() => onBlur('numero_catastral')}
+              maxLength={50}
+              editable={!enviando}
+              placeholderTextColor={COLORS.placeholder}
+            />
+            {errores.numero_catastral !== undefined && (
+              <Text style={styles.errorText}>{errores.numero_catastral}</Text>
+            )}
+          </View>
+
+          <View style={styles.separador} />
+
+          {/* Sección 2 — Datos del Medidor */}
+          <Text style={styles.seccionTitulo}>DATOS DEL MEDIDOR</Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>FECHA DE INSTALACIÓN *</Text>
+            <TextInput
+              style={[styles.input, errores.fecha_instalacion !== undefined && styles.inputError]}
+              value={form.fecha_instalacion}
+              onChangeText={(v) => setCampo('fecha_instalacion', v)}
+              onBlur={() => onBlur('fecha_instalacion')}
+              placeholder="YYYY-MM-DD"
+              maxLength={10}
+              editable={!enviando}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="numbers-and-punctuation"
+              placeholderTextColor={COLORS.placeholder}
+            />
+            {errores.fecha_instalacion !== undefined && (
+              <Text style={styles.errorText}>{errores.fecha_instalacion}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>OBSERVACIONES DEL MEDIDOR</Text>
+            <TextInput
+              style={[
+                styles.input,
+                styles.inputMultiline,
+                errores.observaciones_medidor !== undefined && styles.inputError,
+              ]}
+              value={form.observaciones_medidor}
+              onChangeText={(v) => setCampo('observaciones_medidor', v)}
+              onBlur={() => onBlur('observaciones_medidor')}
+              multiline
+              numberOfLines={3}
+              maxLength={500}
+              editable={!enviando}
+              placeholderTextColor={COLORS.placeholder}
+            />
+            {errores.observaciones_medidor !== undefined && (
+              <Text style={styles.errorText}>{errores.observaciones_medidor}</Text>
+            )}
+          </View>
+
+          <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Snackbar
-        visible={snack.visible}
-        onDismiss={() => setSnack((s) => ({ ...s, visible: false }))}
-        duration={
-          snack.tipo === 'ok'
-            ? 1500
-            : snack.tipo === 'warning'
-              ? 6000
-              : 4000
-        }
-        style={
-          snack.tipo === 'ok'
-            ? styles.snackOk
-            : snack.tipo === 'warning'
-              ? styles.snackWarning
-              : styles.snackError
-        }
-      >
-        {snack.mensaje}
-      </Snackbar>
+      {/* Snack inline */}
+      {snack.visible && (
+        <Pressable
+          onPress={() => setSnack((s) => ({ ...s, visible: false }))}
+          style={[
+            styles.snackBox,
+            snack.tipo === 'error'
+              ? styles.snackError
+              : snack.tipo === 'warning'
+                ? styles.snackWarning
+                : styles.snackOk,
+          ]}
+        >
+          <Text
+            style={[styles.snackText, snack.tipo === 'error' && styles.snackTextError]}
+          >
+            {snack.mensaje}
+          </Text>
+          <Text style={styles.snackClose}>×</Text>
+        </Pressable>
+      )}
+
+      {/* Bottom bar fijo */}
+      <View style={styles.bottomBar}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          disabled={enviando}
+          style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
+        >
+          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => void onSubmit()}
+          disabled={enviando}
+          style={({ pressed }) => [
+            styles.btnPrimary,
+            enviando && styles.btnDisabled,
+            pressed && styles.pressedDark,
+          ]}
+        >
+          {enviando ? (
+            <ActivityIndicator color={COLORS.onPrimary} size="small" />
+          ) : (
+            <Text style={styles.btnPrimaryText}>GUARDAR</Text>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1, backgroundColor: COLORS.background },
   flex: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 48 },
-  seccionTitulo: { marginBottom: 8, marginTop: 4 },
-  subLabel: { marginBottom: 6, marginTop: 4 },
-  divider: { marginVertical: 12 },
-  submit: { marginTop: 8 },
-  loaderRow: {
+
+  // Header
+  header: {
+    height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    gap: 8,
+    ...BORDERS.thick,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    backgroundColor: COLORS.background,
   },
-  loaderText: { marginLeft: 8 },
+  headerBtn: {
+    width: HEADER_HEIGHT,
+    height: HEADER_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    ...TYPOGRAPHY.headlineLg,
+    color: COLORS.primary,
+    lineHeight: HEADER_HEIGHT,
+  },
+  headerTitle: {
+    flex: 1,
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+
+  // Scroll
+  scroll: {
+    padding: SPACING.md,
+    paddingBottom: BOTTOM_HEIGHT + SPACING.lg,
+  },
+
+  // Sección título
+  seccionTitulo: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.textSecondary,
+    letterSpacing: 2,
+    marginBottom: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+
+  // Separador
+  separador: {
+    height: 1,
+    backgroundColor: COLORS.outline,
+    marginVertical: SPACING.lg,
+  },
+
+  // Campos
+  fieldGroup: { marginBottom: SPACING.md },
+  autoGenInfo: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  fieldLabel: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
+    letterSpacing: 1,
+  },
+  input: {
+    ...BORDERS.thin,
+    borderRadius: RADIUS.none,
+    padding: SPACING.sm,
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.primary,
+    backgroundColor: COLORS.background,
+  },
+  inputMultiline: {
+    minHeight: 72,
+    textAlignVertical: 'top',
+  },
+  inputError: {
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
+  },
+
+  // Chips estrato
+  chipsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  chip: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    ...BORDERS.thin,
+    borderRadius: RADIUS.none,
+    backgroundColor: COLORS.background,
+  },
+  chipSel: {
+    backgroundColor: COLORS.primary,
+  },
+  chipText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  chipTextSel: {
+    color: COLORS.onPrimary,
+  },
+
+  // Toggle
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  toggleBox: {
+    width: 24,
+    height: 24,
+    ...BORDERS.thin,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+  },
+  toggleBoxOn: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  toggleCheck: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.onPrimary,
+    fontWeight: '700',
+  },
+  toggleTexts: { flex: 1 },
+  toggleLabel: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  toggleHint: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+
+  // Brand footer
+  brandFooter: {
+    ...TYPOGRAPHY.labelSm,
+    fontSize: 8,
+    color: COLORS.textTertiary,
+    textAlign: 'center',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: SPACING.lg,
+  },
+
+  // Snack inline
+  snackBox: {
+    position: 'absolute',
+    bottom: BOTTOM_HEIGHT + SPACING.md,
+    left: SPACING.md,
+    right: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    gap: SPACING.sm,
+  },
   snackOk: { backgroundColor: '#2e7d32' },
-  snackError: { backgroundColor: '#c62828' },
   snackWarning: { backgroundColor: '#ef6c00' },
+  snackError: { backgroundColor: '#c62828' },
+  snackText: {
+    flex: 1,
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onPrimary,
+  },
+  snackTextError: { color: COLORS.onPrimary },
+  snackClose: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
+  },
+
+  // Bottom bar
+  bottomBar: {
+    height: BOTTOM_HEIGHT,
+    flexDirection: 'row',
+    ...BORDERS.thick,
+    borderBottomWidth: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    backgroundColor: COLORS.background,
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    alignItems: 'center',
+  },
+  btnSecondary: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    ...BORDERS.thin,
+    borderRadius: RADIUS.none,
+  },
+  btnSecondaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+    letterSpacing: 1,
+  },
+  btnPrimary: {
+    flex: 2,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.none,
+  },
+  btnPrimaryText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
+    letterSpacing: 1,
+  },
+  btnDisabled: {
+    backgroundColor: COLORS.textSecondary,
+  },
+
+  // Press states
+  pressedLight: { opacity: 0.6 },
+  pressedDark: { opacity: 0.75 },
 });
