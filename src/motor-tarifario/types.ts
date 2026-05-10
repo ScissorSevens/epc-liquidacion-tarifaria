@@ -22,6 +22,7 @@ export interface EntradaCalculo {
   lecturaActual: number;    // Lectura actual del medidor en m³
   parametros: ParametrosTarifa;
   estrato?: Estrato;        // Estrato socioeconómico (1-6), opcional para backwards compat
+  aplicaSubsidio?: boolean;  // Si false, no aplica factor aunque tenga estrato
   periodo?: PeriodoFacturacion;  // Periodo de facturación, opcional para backwards compat
 }
 

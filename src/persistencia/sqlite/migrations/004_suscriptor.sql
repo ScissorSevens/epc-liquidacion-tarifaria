@@ -18,6 +18,9 @@
 --    de auditoria, no campo de negocio).
 --  - Indice por estrato: sirve para reportes de subsidio cruzado por
 --    estrato (consulta tipica del modelo EPC).
+--
+-- NOTA: la columna `aplica_subsidio` se agrega en la migración 007
+--    (007_suscriptor_add_aplica_subsidio.sql). No modificar este CREATE TABLE.
 
 CREATE TABLE IF NOT EXISTS suscriptor (
     id_suscriptor          INTEGER   PRIMARY KEY AUTOINCREMENT,

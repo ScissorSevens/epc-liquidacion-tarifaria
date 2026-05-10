@@ -12,6 +12,7 @@ export interface Suscriptor {
   readonly estrato: 1 | 2 | 3 | 4 | 5 | 6;
   readonly matricula_inmobiliaria?: string;
   readonly numero_catastral?: string;
+  readonly aplica_subsidio: boolean;
   readonly estado: EstadoSuscriptor;
   readonly created_at: string;
 }
@@ -41,6 +42,11 @@ export interface SuscriptorRepository {
    * para el flujo de importacion CSV (politica skip-on-duplicate).
    */
   existePorCodigo(codigo: string): Promise<boolean>;
+  /**
+   * Devuelve el codigo numerico mas alto registrado, o null si no hay suscriptores.
+   * Usado para auto-generar el siguiente codigo correlativo.
+   */
+  maxCodigo(): Promise<string | null>;
   listar(): Promise<Suscriptor[]>;
   actualizar(id: number, cambios: ActualizarSuscriptorInput): Promise<Suscriptor>;
   eliminar(id: number): Promise<void>;

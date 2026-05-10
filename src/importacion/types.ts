@@ -19,13 +19,13 @@
  */
 export interface FilaCSV {
   readonly linea: number;
-  readonly codigo: string;
+  readonly codigo?: string;           // opcional: se auto-genera si viene vacío
   readonly nombre_apellidos: string;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria?: string;
   readonly numero_catastral?: string;
-  readonly numero_medidor: string;
+  readonly numero_medidor?: string;   // opcional: se auto-genera si viene vacío
   readonly fecha_instalacion: string;
   readonly observaciones_medidor?: string;
 }

@@ -73,7 +73,9 @@ export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
   // Subsidio/contribución por estrato (CRA Res. 688/2014)
   // Subsidio: aplica sobre cargo fijo + cargo consumo básico
   // Contribución: aplica sobre cargo fijo + cargo consumo total (básico + excedente)
-  const factor = entrada.estrato ? FACTOR_ESTRATO[entrada.estrato] : 0;
+  const factor = (entrada.estrato && entrada.aplicaSubsidio !== false)
+    ? FACTOR_ESTRATO[entrada.estrato]
+    : 0;
   const cargoConsumoTotal = cargoConsumo + cargoExcedente;
   const baseSubsidio = cargoFijo + cargoConsumo;
   const baseContribucion = cargoFijo + cargoConsumoTotal;

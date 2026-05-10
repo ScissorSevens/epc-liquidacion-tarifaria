@@ -43,22 +43,33 @@ export async function importarSuscriptoresYMedidores(
   const saltados: ItemSaltado[] = [];
   const errores: ErrorImportacion[] = [];
 
+  // Obtener el max codigo actual para auto-generacion correlativa.
+  const maxCodigoActual = await repoSus.maxCodigo();
+  let contadorCodigo = maxCodigoActual ? Number.parseInt(maxCodigoActual, 10) : 0;
+
   for (const fila of filas) {
     let suscriptor: Suscriptor | null = null;
 
+    // Resolver codigo: si viene del CSV (legacy) usarlo; si no, auto-generar.
+    const codigo: string = fila.codigo !== undefined
+      ? fila.codigo
+      : (() => { contadorCodigo++; return String(contadorCodigo).padStart(4, '0'); })();
+
+    const numero_medidor: string = fila.numero_medidor ?? `MED-${codigo}`;
+
     // --- Suscriptor ---
     try {
-      const previo = await repoSus.buscarPorCodigo(fila.codigo);
+      const previo = await repoSus.buscarPorCodigo(codigo);
       if (previo) {
         suscriptor = previo;
         saltados.push({
           linea: fila.linea,
           motivo: 'suscriptor_duplicado',
-          codigo: fila.codigo,
+          codigo,
         });
       } else {
         const borrador = crearSuscriptor({
-          codigo: fila.codigo,
+          codigo,
           nombre_apellidos: fila.nombre_apellidos,
           direccion: fila.direccion,
           estrato: fila.estrato as Suscriptor['estrato'],
@@ -76,7 +87,7 @@ export async function importarSuscriptoresYMedidores(
     } catch (e) {
       errores.push({
         linea: fila.linea,
-        mensaje: `error al crear suscriptor '${fila.codigo}': ${e instanceof Error ? e.message : String(e)}`,
+        mensaje: `error al crear suscriptor '${codigo}': ${e instanceof Error ? e.message : String(e)}`,
       });
       // Sin suscriptor no podemos asociar medidor; pasamos a la siguiente fila.
       continue;
@@ -84,18 +95,18 @@ export async function importarSuscriptoresYMedidores(
 
     // --- Medidor ---
     try {
-      const medPrevio = await repoMed.buscarPorNumero(fila.numero_medidor);
+      const medPrevio = await repoMed.buscarPorNumero(numero_medidor);
       if (medPrevio) {
         saltados.push({
           linea: fila.linea,
           motivo: 'medidor_duplicado',
-          numero_medidor: fila.numero_medidor,
+          numero_medidor,
         });
         continue;
       }
       await repoMed.crear(
         crearMedidor({
-          numero_medidor: fila.numero_medidor,
+          numero_medidor,
           id_suscriptor: suscriptor.id_suscriptor,
           fecha_instalacion: fila.fecha_instalacion,
           estado: 'activo',
@@ -108,7 +119,7 @@ export async function importarSuscriptoresYMedidores(
     } catch (e) {
       errores.push({
         linea: fila.linea,
-        mensaje: `error al crear medidor '${fila.numero_medidor}': ${e instanceof Error ? e.message : String(e)}`,
+        mensaje: `error al crear medidor '${numero_medidor}': ${e instanceof Error ? e.message : String(e)}`,
       });
     }
   }

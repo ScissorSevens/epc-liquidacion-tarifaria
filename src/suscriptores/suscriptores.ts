@@ -64,6 +64,7 @@ export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador
     estrato: input.estrato,
     matricula_inmobiliaria: input.matricula_inmobiliaria,
     numero_catastral: input.numero_catastral,
+    aplica_subsidio: input.aplica_subsidio,
     estado: input.estado ?? 'activo',
   };
 }

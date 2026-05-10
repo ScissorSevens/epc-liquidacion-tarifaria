@@ -5,7 +5,13 @@
  * texto. Esto permite testear sin tocar disco y reusar el parser desde
  * mobile (donde el texto viene del DocumentPicker, no de fs).
  *
- * Formato esperado (header en orden estricto):
+ * Formatos aceptados:
+ *
+ * NUEVO (7 columnas — codigo y numero_medidor se auto-generan):
+ *   nombre_apellidos,direccion,estrato,matricula_inmobiliaria,
+ *   numero_catastral,fecha_instalacion,observaciones_medidor
+ *
+ * LEGACY (9 columnas — backward compat con CSVs anteriores):
  *   codigo,nombre_apellidos,direccion,estrato,matricula_inmobiliaria,
  *   numero_catastral,numero_medidor,fecha_instalacion,observaciones_medidor
  *
@@ -21,7 +27,19 @@
 
 import type { ErrorParseo, FilaCSV, ResultadoParseo } from './types';
 
-const HEADER_ESPERADO = [
+/** Header nuevo (7 columnas): codigo y numero_medidor se auto-generan. */
+const HEADER_NUEVO = [
+  'nombre_apellidos',
+  'direccion',
+  'estrato',
+  'matricula_inmobiliaria',
+  'numero_catastral',
+  'fecha_instalacion',
+  'observaciones_medidor',
+] as const;
+
+/** Header legacy (9 columnas): backward compat con CSVs anteriores. */
+const HEADER_LEGACY = [
   'codigo',
   'nombre_apellidos',
   'direccion',
@@ -32,6 +50,9 @@ const HEADER_ESPERADO = [
   'fecha_instalacion',
   'observaciones_medidor',
 ] as const;
+
+/** Alias para el header esperado por defecto (nuevo de 7 cols). */
+const HEADER_ESPERADO = HEADER_NUEVO;
 
 const REGEX_FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -64,6 +85,7 @@ function parsearLineaCSV(linea: string): string[] {
 
 /**
  * Parsea un CSV completo y devuelve filas validas + errores acumulados.
+ * Acepta tanto el formato nuevo (7 cols) como el legacy (9 cols).
  */
 export function parsearCSV(texto: string): ResultadoParseo {
   const filas: FilaCSV[] = [];
@@ -82,16 +104,22 @@ export function parsearCSV(texto: string): ResultadoParseo {
   }
 
   const headerCampos = parsearLineaCSV(lineas[0]!).map((c) => c.trim());
-  const headerOk =
-    headerCampos.length === HEADER_ESPERADO.length &&
-    HEADER_ESPERADO.every((esperado, i) => headerCampos[i] === esperado);
-  if (!headerOk) {
+
+  const esNuevo =
+    headerCampos.length === HEADER_NUEVO.length &&
+    HEADER_NUEVO.every((esperado, i) => headerCampos[i] === esperado);
+
+  const esLegacy =
+    headerCampos.length === HEADER_LEGACY.length &&
+    HEADER_LEGACY.every((esperado, i) => headerCampos[i] === esperado);
+
+  if (!esNuevo && !esLegacy) {
     return {
       filas: [],
       errores: [
         {
           linea: 1,
-          mensaje: `header invalido: se esperaba '${HEADER_ESPERADO.join(',')}'`,
+          mensaje: `header invalido: se esperaba '${HEADER_ESPERADO.join(',')}' (7 cols) o el formato legado de 9 columnas`,
         },
       ],
     };
@@ -103,27 +131,54 @@ export function parsearCSV(texto: string): ResultadoParseo {
     const numLinea = i + 1; // 1-indexed para el usuario
     const campos = parsearLineaCSV(cruda);
 
-    if (campos.length !== HEADER_ESPERADO.length) {
+    const expectedCols = esLegacy ? HEADER_LEGACY.length : HEADER_NUEVO.length;
+    if (campos.length !== expectedCols) {
       errores.push({
         linea: numLinea,
-        mensaje: `cantidad de columnas (${campos.length}) no coincide con el header (${HEADER_ESPERADO.length})`,
+        mensaje: `cantidad de columnas (${campos.length}) no coincide con el header (${expectedCols})`,
       });
       continue;
     }
 
-    const [
-      codigo,
-      nombre_apellidos,
-      direccion,
-      estratoCrudo,
-      matricula,
-      catastral,
-      numero_medidor,
-      fecha_instalacion,
-      observaciones,
-    ] = campos.map((c) => c.trim());
+    let codigo: string | undefined;
+    let nombre_apellidos: string;
+    let direccion: string;
+    let estratoCrudo: string;
+    let matricula: string;
+    let catastral: string;
+    let numero_medidor: string | undefined;
+    let fecha_instalacion: string;
+    let observaciones: string;
 
-    const estratoNum = Number(estratoCrudo);
+    if (esLegacy) {
+      const trimmed = campos.map((c) => c.trim());
+      [
+        codigo,
+        nombre_apellidos,
+        direccion,
+        estratoCrudo,
+        matricula,
+        catastral,
+        numero_medidor,
+        fecha_instalacion,
+        observaciones,
+      ] = trimmed as [string, string, string, string, string, string, string, string, string];
+    } else {
+      const trimmed = campos.map((c) => c.trim());
+      [
+        nombre_apellidos,
+        direccion,
+        estratoCrudo,
+        matricula,
+        catastral,
+        fecha_instalacion,
+        observaciones,
+      ] = trimmed as [string, string, string, string, string, string, string];
+      codigo = undefined;
+      numero_medidor = undefined;
+    }
+
+    const estratoNum = Number(estratoCrudo!);
     if (
       !Number.isInteger(estratoNum) ||
       estratoNum < 1 ||
@@ -136,7 +191,7 @@ export function parsearCSV(texto: string): ResultadoParseo {
       continue;
     }
 
-    if (!REGEX_FECHA_ISO.test(fecha_instalacion ?? '')) {
+    if (!REGEX_FECHA_ISO.test(fecha_instalacion! ?? '')) {
       errores.push({
         linea: numLinea,
         mensaje: `fecha_instalacion invalida '${fecha_instalacion}': se esperaba formato YYYY-MM-DD`,
@@ -148,13 +203,13 @@ export function parsearCSV(texto: string): ResultadoParseo {
     // `Object.keys` y deep-equal en tests no las vean como undefined.
     const fila: Mutable<FilaCSV> = {
       linea: numLinea,
-      codigo: codigo!,
       nombre_apellidos: nombre_apellidos!,
       direccion: direccion!,
       estrato: estratoNum,
-      numero_medidor: numero_medidor!,
       fecha_instalacion: fecha_instalacion!,
     };
+    if (codigo) fila.codigo = codigo;
+    if (numero_medidor) fila.numero_medidor = numero_medidor;
     if (matricula) fila.matricula_inmobiliaria = matricula;
     if (catastral) fila.numero_catastral = catastral;
     if (observaciones) fila.observaciones_medidor = observaciones;
