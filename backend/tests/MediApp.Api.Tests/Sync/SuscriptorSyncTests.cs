@@ -38,12 +38,12 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
 
     private static object PayloadValido() => new
     {
-        documento = "CC-1234567890",
-        nombre = "Pedro Pérez",
+        codigo = "1234567890",
+        nombreApellidos = "Pedro Pérez",
         direccion = "Vereda La Esperanza, lote 12",
         estrato = (short)2,
         estado = "activo",
-        fechaAlta = DateTimeOffset.UtcNow,
+        createdAt = DateTimeOffset.UtcNow.ToString("o"),
         idCliente = "tablet-01:42"
     };
 
@@ -98,12 +98,12 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
         var idCliente = "tablet-02:100";
         var payload = new
         {
-            documento = "CC-2222",
-            nombre = "Ana Gómez",
-            direccion = (string?)null,
+            codigo = "2222",
+            nombreApellidos = "Ana Gómez",
+            direccion = "Calle 10",
             estrato = (short)3,
             estado = "activo",
-            fechaAlta = DateTimeOffset.UtcNow,
+            createdAt = DateTimeOffset.UtcNow.ToString("o"),
             idCliente
         };
         var sobre = SobreSync(payload, idCliente, HashValido);
@@ -143,12 +143,12 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
 
         var payloadA = new
         {
-            documento = "CC-3333",
-            nombre = "Carlos Ruiz",
+            codigo = "3333",
+            nombreApellidos = "Carlos Ruiz",
             direccion = "Calle 1",
             estrato = (short)2,
             estado = "activo",
-            fechaAlta = DateTimeOffset.UtcNow,
+            createdAt = DateTimeOffset.UtcNow.ToString("o"),
             idCliente
         };
         var sobreA = SobreSync(payloadA, idCliente, hashA);
@@ -159,12 +159,12 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
         // Payload con datos diferentes (cambia nombre y direccion) y hash distinto.
         var payloadB = new
         {
-            documento = "CC-3333",
-            nombre = "Carlos Ruiz Modificado",
+            codigo = "3333",
+            nombreApellidos = "Carlos Ruiz Modificado",
             direccion = "Calle 999",
             estrato = (short)2,
             estado = "activo",
-            fechaAlta = DateTimeOffset.UtcNow,
+            createdAt = DateTimeOffset.UtcNow.ToString("o"),
             idCliente
         };
         var sobreB = SobreSync(payloadB, idCliente, hashB, forzar: false);
