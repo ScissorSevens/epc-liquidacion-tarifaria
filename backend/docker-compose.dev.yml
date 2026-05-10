@@ -1,0 +1,6 @@
+services:
+  api:
+    environment:
+      # Override solo para sesiones de validacion local: habilita /api/v1/_dev/seed
+      # y Swagger. NO commitear como default — el compose base sigue en Production.
+      ASPNETCORE_ENVIRONMENT: "Development"

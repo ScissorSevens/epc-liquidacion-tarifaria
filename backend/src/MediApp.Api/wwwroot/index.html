@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediApp — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+    code, .mono { font-family: 'IBM Plex Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #18181b; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
+    .glass {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .tab-active {
+      color: #fafafa !important;
+      border-bottom-color: #0C5CAB !important;
+      background: rgba(12,92,171,0.08);
+    }
+    .row-hover:hover { background: rgba(255,255,255,0.04); }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body class="bg-[#09090b] text-[#fafafa] min-h-screen">
+
+  <!-- ═══════════════ HEADER ═══════════════ -->
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] glass">
+    <div class="max-w-screen-xl mx-auto px-6 h-14 flex items-center gap-3">
+      <!-- Logo -->
+      <span class="text-sm font-semibold tracking-tight text-[#fafafa] select-none">
+        MEDI<span class="text-[#0C5CAB]">APP</span>
+      </span>
+      <div class="w-px h-4 bg-white/10"></div>
+      <span class="text-xs text-white/40 font-light">Dashboard</span>
+
+      <div class="ml-auto flex items-center gap-3">
+        <!-- API status -->
+        <div id="api-badge" class="flex items-center gap-1.5 text-xs text-white/40 border border-white/10 rounded-full px-3 py-1">
+          <span id="api-dot" class="inline-block w-1.5 h-1.5 rounded-full bg-white/20"></span>
+          <span id="api-text">Verificando…</span>
+        </div>
+        <!-- Refresh global -->
+        <button onclick="recargarTodo()" class="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/80 border border-white/10 hover:border-white/20 rounded-full px-3 py-1 transition-colors duration-150" aria-label="Recargar todo">
+          <i data-lucide="refresh-cw" class="w-3 h-3" style="stroke-width:1.5"></i>
+          Recargar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════ KPI STRIP ═══════════════ -->
+  <div class="max-w-screen-xl mx-auto px-6 pt-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div class="glass rounded-xl p-4">
+        <p class="text-xs text-white/40 uppercase tracking-wide font-medium mb-1">Suscriptores</p>
+        <p id="kpi-sus" class="text-2xl font-semibold tracking-tight text-[#fafafa]">—</p>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <p class="text-xs text-white/40 uppercase tracking-wide font-medium mb-1">Medidores</p>
+        <p id="kpi-med" class="text-2xl font-semibold tracking-tight text-[#fafafa]">—</p>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <p class="text-xs text-white/40 uppercase tracking-wide font-medium mb-1">Lecturas</p>
+        <p id="kpi-lec" class="text-2xl font-semibold tracking-tight text-[#fafafa]">—</p>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <p class="text-xs text-white/40 uppercase tracking-wide font-medium mb-1">Liquidaciones</p>
+        <p id="kpi-liq" class="text-2xl font-semibold tracking-tight text-[#fafafa]">—</p>
+      </div>
+    </div>
+
+    <!-- Chart row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
+      <div class="glass rounded-xl p-5">
+        <p class="text-sm font-medium text-white/70 mb-4 tracking-tight">Suscriptores por estrato</p>
+        <div><canvas id="chart-estrato"></canvas></div>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <p class="text-sm font-medium text-white/70 mb-4 tracking-tight">Consumo m³ por período</p>
+        <div><canvas id="chart-consumo"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TABS ═══════════════ -->
+  <div class="max-w-screen-xl mx-auto px-6">
+    <nav class="flex border-b border-white/[0.06] mb-4 overflow-x-auto" role="tablist">
+      <button class="tab-btn tab-active" data-tab="suscriptores" role="tab" aria-selected="true">
+        <i data-lucide="users" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Suscriptores
+      </button>
+      <button class="tab-btn" data-tab="medidores" role="tab" aria-selected="false">
+        <i data-lucide="gauge" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Medidores
+      </button>
+      <button class="tab-btn" data-tab="lecturas" role="tab" aria-selected="false">
+        <i data-lucide="clipboard-list" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Lecturas
+      </button>
+      <button class="tab-btn" data-tab="liquidaciones" role="tab" aria-selected="false">
+        <i data-lucide="receipt" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Liquidaciones
+      </button>
+    </nav>
+
+    <style>
+      .tab-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px 8px;
+        font-size: .8rem;
+        font-weight: 500;
+        color: rgba(250,250,250,0.4);
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        white-space: nowrap;
+        transition: color 150ms, background 150ms, border-color 150ms;
+        border-radius: 6px 6px 0 0;
+      }
+      .tab-btn:hover:not(.tab-active) { color: rgba(250,250,250,0.7); background: rgba(255,255,255,0.04); }
+      .tab-btn:focus-visible { outline: 2px solid #0C5CAB; outline-offset: -2px; }
+    </style>
+
+    <!-- ═══ Toolbar genérico ═══ -->
+    <div class="flex items-center gap-3 mb-4 flex-wrap">
+      <div class="relative flex-1 min-w-[200px] max-w-sm">
+        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" style="stroke-width:1.5"></i>
+        <input id="search-input" type="text" placeholder="Buscar…"
+          class="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg pl-9 pr-4 py-2 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:border-[#0C5CAB]/60 focus:ring-1 focus:ring-[#0C5CAB]/30 transition-colors"
+          aria-label="Buscar en la tabla"
+          oninput="renderTabActual()" />
+      </div>
+      <span id="conteo-badge" class="ml-auto text-xs text-white/30 font-light tabular-nums"></span>
+    </div>
+
+    <!-- ═══════════════ SECCIONES ═══════════════ -->
+    <div id="sec-suscriptores" class="seccion">
+      <div class="glass rounded-xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/[0.06]">
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Código</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Nombre</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Dirección</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Estrato</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Matrícula</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Estado</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Registro</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-suscriptores"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec-medidores" class="seccion hidden">
+      <div class="glass rounded-xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/[0.06]">
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Número</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Suscriptor</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Código</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Marca</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Modelo</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">F. Instalación</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-medidores"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec-lecturas" class="seccion hidden">
+      <div class="glass rounded-xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/[0.06]">
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Período</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Suscriptor</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Medidor</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Ant.</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Actual</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Consumo m³</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Observaciones</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Captura</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-lecturas"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec-liquidaciones" class="seccion hidden">
+      <div class="glass rounded-xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/[0.06]">
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Período</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Suscriptor</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Medidor</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">E.</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Consumo m³</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Cargo fijo</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Básico</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Excedente</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Subsidio</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Contribución</th>
+                <th class="text-left px-4 py-3 text-xs font-medium text-white/30 uppercase tracking-wide">Total</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-liquidaciones"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /max-w -->
+
+<script>
+// ── Datos ────────────────────────────────────────────────────────────────────
+const data = { suscriptores: [], medidores: [], lecturas: [], liquidaciones: [] };
+let tabActual = 'suscriptores';
+let cargado   = {};
+
+// ── Utilidades ───────────────────────────────────────────────────────────────
+const API = '/api/v1';
+async function get(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+const fmt  = (n, d=2) => n == null ? '—' : Number(n).toLocaleString('es-CO', {minimumFractionDigits:d, maximumFractionDigits:d});
+const fmtF = iso => iso ? new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+const fmtP = p => (p && p.length===6) ? `${p.slice(0,4)}-${p.slice(4)}` : (p||'—');
+
+function badge(text, cls) {
+  const map = {
+    blue:  'bg-[#0C5CAB]/20 text-[#60a5fa] border-[#0C5CAB]/30',
+    green: 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20',
+    red:   'bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/20',
+    zinc:  'bg-white/5 text-white/40 border-white/10',
+    warn:  'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20',
+  };
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-medium ${map[cls]||map.zinc}">${text}</span>`;
+}
+
+function estadoCell(e) {
+  if (!e) return badge('—','zinc');
+  if (e === 'activo') return badge('Activo','green');
+  return badge(e,'zinc');
+}
+
+function emptyRow(cols, msg='Sin registros') {
+  return `<tr><td colspan="${cols}"><div class="py-16 text-center text-white/20 text-sm">${msg}</div></td></tr>`;
+}
+function loadingRow(cols) {
+  return `<tr><td colspan="${cols}"><div class="py-16 text-center text-white/20 text-sm flex flex-col items-center gap-2">
+    <svg class="animate-spin w-5 h-5 text-[#0C5CAB]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+    Cargando…</div></td></tr>`;
+}
+function errorRow(cols, msg) {
+  return `<tr><td colspan="${cols}"><div class="py-16 text-center text-[#ef4444]/70 text-sm">${msg}</div></td></tr>`;
+}
+
+function filtrar(lista, campos) {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  if (!q) return lista;
+  return lista.filter(d => campos.some(c => (d[c]??'').toString().toLowerCase().includes(q)));
+}
+
+function setConteo(filtrados, total) {
+  document.getElementById('conteo-badge').textContent =
+    filtrados === total ? `${total} registros` : `${filtrados} de ${total}`;
+}
+
+// ── API status ────────────────────────────────────────────────────────────────
+async function checkApi() {
+  const dot  = document.getElementById('api-dot');
+  const text = document.getElementById('api-text');
+  try {
+    const r = await fetch('/health');
+    if (r.ok) {
+      dot.className  = 'inline-block w-1.5 h-1.5 rounded-full bg-[#10b981]';
+      text.textContent = 'API en línea';
+      text.className = 'text-[#10b981]';
+    } else { throw new Error(); }
+  } catch {
+    dot.className  = 'inline-block w-1.5 h-1.5 rounded-full bg-[#ef4444]';
+    text.textContent = 'Sin conexión';
+    text.className = 'text-[#ef4444]';
+  }
+}
+
+// ── KPI + Charts ─────────────────────────────────────────────────────────────
+let chartEstrato, chartConsumo;
+
+function actualizarKpis() {
+  document.getElementById('kpi-sus').textContent = data.suscriptores.length || '—';
+  document.getElementById('kpi-med').textContent = data.medidores.length    || '—';
+  document.getElementById('kpi-lec').textContent = data.lecturas.length     || '—';
+  document.getElementById('kpi-liq').textContent = data.liquidaciones.length|| '—';
+}
+
+function buildCharts() {
+  // Chart 1: suscriptores por estrato
+  const est = [0,0,0,0,0,0];
+  data.suscriptores.forEach(s => { if (s.estrato>=1&&s.estrato<=6) est[s.estrato-1]++; });
+  if (chartEstrato) chartEstrato.destroy();
+  chartEstrato = new Chart(document.getElementById('chart-estrato'), {
+    type: 'bar',
+    data: {
+      labels: ['E1','E2','E3','E4','E5','E6'],
+      datasets: [{ data: est, backgroundColor: '#0C5CAB', borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color:'rgba(255,255,255,0.04)' }, ticks: { color:'rgba(255,255,255,0.3)', font:{family:'IBM Plex Sans'} } },
+        y: { grid: { color:'rgba(255,255,255,0.04)' }, ticks: { color:'rgba(255,255,255,0.3)', font:{family:'IBM Plex Sans'} }, beginAtZero:true }
+      }
+    }
+  });
+
+  // Chart 2: consumo por período
+  const periodos = {};
+  data.lecturas.forEach(l => {
+    const p = fmtP(l.periodo);
+    periodos[p] = (periodos[p]||0) + (Number(l.consumoM3)||0);
+  });
+  const pKeys = Object.keys(periodos).sort().slice(-12);
+  const pVals = pKeys.map(k => periodos[k]);
+  if (chartConsumo) chartConsumo.destroy();
+  chartConsumo = new Chart(document.getElementById('chart-consumo'), {
+    type: 'line',
+    data: {
+      labels: pKeys.length ? pKeys : ['Sin datos'],
+      datasets: [{
+        data: pVals.length ? pVals : [0],
+        borderColor: '#0C5CAB',
+        backgroundColor: 'rgba(12,92,171,0.12)',
+        borderWidth: 1.5,
+        pointRadius: 3,
+        pointBackgroundColor: '#0C5CAB',
+        fill: true,
+        tension: 0.35
+      }]
+    },
+    options: {
+      responsive: true, plugins: { legend: { display:false } },
+      scales: {
+        x: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(255,255,255,0.3)',font:{family:'IBM Plex Sans'}} },
+        y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(255,255,255,0.3)',font:{family:'IBM Plex Sans'}}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+// ── Renders ───────────────────────────────────────────────────────────────────
+function renderSuscriptores() {
+  const lista  = filtrar(data.suscriptores, ['codigo','nombreApellidos','direccion','matriculaInmobiliaria']);
+  const tbody  = document.getElementById('tbody-suscriptores');
+  setConteo(lista.length, data.suscriptores.length);
+  if (!lista.length) { tbody.innerHTML = emptyRow(7); return; }
+  tbody.innerHTML = lista.map(s => `
+    <tr class="row-hover border-b border-white/[0.04] last:border-0 transition-colors">
+      <td class="px-4 py-3"><code class="mono text-xs text-white/50">${s.codigo||'—'}</code></td>
+      <td class="px-4 py-3 text-white/80 font-light">${s.nombreApellidos||'—'}</td>
+      <td class="px-4 py-3 text-white/40 text-xs font-light">${s.direccion||'—'}</td>
+      <td class="px-4 py-3">${badge('E'+s.estrato,'blue')}</td>
+      <td class="px-4 py-3 text-white/40 text-xs mono">${s.matriculaInmobiliaria||'—'}</td>
+      <td class="px-4 py-3">${estadoCell(s.estado)}</td>
+      <td class="px-4 py-3 text-white/30 text-xs">${fmtF(s.createdAt)}</td>
+    </tr>`).join('');
+}
+
+function renderMedidores() {
+  const lista = filtrar(data.medidores, ['numeroMedidor','nombreSuscriptor','codigoSuscriptor','marca','modelo']);
+  const tbody = document.getElementById('tbody-medidores');
+  setConteo(lista.length, data.medidores.length);
+  if (!lista.length) { tbody.innerHTML = emptyRow(7); return; }
+  tbody.innerHTML = lista.map(m => `
+    <tr class="row-hover border-b border-white/[0.04] last:border-0 transition-colors">
+      <td class="px-4 py-3"><code class="mono text-xs text-white/60">${m.numeroMedidor||'—'}</code></td>
+      <td class="px-4 py-3 text-white/80 font-light">${m.nombreSuscriptor||'—'}</td>
+      <td class="px-4 py-3"><code class="mono text-xs text-white/40">${m.codigoSuscriptor||'—'}</code></td>
+      <td class="px-4 py-3 text-white/40 text-xs">${m.marca||'—'}</td>
+      <td class="px-4 py-3 text-white/40 text-xs">${m.modelo||'—'}</td>
+      <td class="px-4 py-3 text-white/30 text-xs">${fmtF(m.fechaInstalacion)}</td>
+      <td class="px-4 py-3">${estadoCell(m.estado)}</td>
+    </tr>`).join('');
+}
+
+function renderLecturas() {
+  const lista = filtrar(data.lecturas, ['periodo','nombreSuscriptor','numeroMedidor']);
+  const tbody = document.getElementById('tbody-lecturas');
+  setConteo(lista.length, data.lecturas.length);
+  if (!lista.length) { tbody.innerHTML = emptyRow(8); return; }
+  tbody.innerHTML = lista.map(l => `
+    <tr class="row-hover border-b border-white/[0.04] last:border-0 transition-colors">
+      <td class="px-4 py-3">${badge(fmtP(l.periodo),'blue')}</td>
+      <td class="px-4 py-3 text-white/80 font-light">${l.nombreSuscriptor||'—'}</td>
+      <td class="px-4 py-3"><code class="mono text-xs text-white/50">${l.numeroMedidor||'—'}</code></td>
+      <td class="px-4 py-3 text-white/40 text-xs tabular-nums">${fmt(l.lecturaAnterior,3)}</td>
+      <td class="px-4 py-3 text-white/60 text-xs tabular-nums">${fmt(l.lecturaActual,3)}</td>
+      <td class="px-4 py-3 text-white/90 text-xs font-medium tabular-nums">${fmt(l.consumoM3,3)}</td>
+      <td class="px-4 py-3 text-white/30 text-xs max-w-[180px] truncate">${l.observaciones||'—'}</td>
+      <td class="px-4 py-3 text-white/30 text-xs">${fmtF(l.timestampCaptura)}</td>
+    </tr>`).join('');
+}
+
+function renderLiquidaciones() {
+  const lista = filtrar(data.liquidaciones, ['nombreSuscriptor','numeroMedidor','periodo']);
+  const tbody = document.getElementById('tbody-liquidaciones');
+  setConteo(lista.length, data.liquidaciones.length);
+  if (!lista.length) { tbody.innerHTML = emptyRow(11); return; }
+  tbody.innerHTML = lista.map(liq => `
+    <tr class="row-hover border-b border-white/[0.04] last:border-0 transition-colors">
+      <td class="px-4 py-3">${badge(fmtP(liq.periodo),'blue')}</td>
+      <td class="px-4 py-3 text-white/80 font-light">${liq.nombreSuscriptor||'—'}</td>
+      <td class="px-4 py-3"><code class="mono text-xs text-white/50">${liq.numeroMedidor||'—'}</code></td>
+      <td class="px-4 py-3">${badge('E'+liq.estrato,'zinc')}</td>
+      <td class="px-4 py-3 text-white/60 text-xs tabular-nums">${fmt(liq.consumoM3,3)}</td>
+      <td class="px-4 py-3 text-white/50 text-xs tabular-nums">$${fmt(liq.cargoFijo)}</td>
+      <td class="px-4 py-3 text-white/50 text-xs tabular-nums">$${fmt(liq.cargoBasico)}</td>
+      <td class="px-4 py-3 text-white/50 text-xs tabular-nums">$${fmt(liq.cargoExcedente)}</td>
+      <td class="px-4 py-3 text-xs tabular-nums">${liq.subsidio>0 ? badge('-$'+fmt(liq.subsidio),'green') : badge('—','zinc')}</td>
+      <td class="px-4 py-3 text-xs tabular-nums">${liq.contribucion>0 ? badge('+$'+fmt(liq.contribucion),'warn') : badge('—','zinc')}</td>
+      <td class="px-4 py-3 text-white/90 text-sm font-semibold tabular-nums">$${fmt(liq.total)}</td>
+    </tr>`).join('');
+}
+
+const renderMap = {
+  suscriptores: renderSuscriptores,
+  medidores:    renderMedidores,
+  lecturas:     renderLecturas,
+  liquidaciones:renderLiquidaciones
+};
+
+function renderTabActual() { renderMap[tabActual]?.(); }
+
+// ── Carga de datos ────────────────────────────────────────────────────────────
+const colsMap = { suscriptores:7, medidores:7, lecturas:8, liquidaciones:11 };
+
+async function cargar(nombre) {
+  const tbody = document.getElementById(`tbody-${nombre}`);
+  tbody.innerHTML = loadingRow(colsMap[nombre]);
+  try {
+    data[nombre] = await get(`/${nombre}`);
+    actualizarKpis();
+    buildCharts();
+    renderMap[nombre]();
+  } catch(e) {
+    tbody.innerHTML = errorRow(colsMap[nombre], `Error: ${e.message}`);
+  }
+}
+
+async function recargarTodo() {
+  cargado = {};
+  await Promise.all(Object.keys(data).map(k => cargar(k)));
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('tab-active'); b.setAttribute('aria-selected','false');
+    });
+    document.querySelectorAll('.seccion').forEach(s => s.classList.add('hidden'));
+    btn.classList.add('tab-active'); btn.setAttribute('aria-selected','true');
+    tabActual = btn.dataset.tab;
+    document.getElementById(`sec-${tabActual}`).classList.remove('hidden');
+    document.getElementById('search-input').value = '';
+    if (!cargado[tabActual]) { cargado[tabActual] = true; cargar(tabActual); }
+    else renderTabActual();
+  });
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkApi();
+// Carga suscriptores al inicio (tab activo) + el resto en background
+cargado.suscriptores = true;
+cargar('suscriptores');
+['medidores','lecturas','liquidaciones'].forEach(k => { cargado[k]=true; cargar(k); });
+
+lucide.createIcons();
+</script>
+</body>
+</html>
