@@ -8,8 +8,6 @@ import {
   View,
 } from 'react-native';
 
-import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
-import { getBootstrap } from '../composition/get-bootstrap';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -92,45 +90,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
   const { lectura, resultado, parametros, estrato, id_suscriptor } =
     route.params;
 
-  const [detalleAbierto, setDetalleAbierto] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
-  const [guardado, setGuardado] = useState(false);
-
-  /**
-   * Persiste la lectura en SQLite local y la encola en `cola_sync` con
-   * `tipo: 'LECTURA'`. La evidencia foto viaja embebida en el payload —
-   * el backend deriva la liquidacion del lado server.
-   *
-   * Si el item ya estaba en la cola por la restriccion `UNIQUE(id_medidor,
-   * id_periodo)` del repo, mostramos el mensaje al usuario sin tirar.
-   */
-  async function onGuardar() {
-    if (guardando || guardado) return;
-    setGuardando(true);
-    setErrorGuardar(null);
-    try {
-      const bootstrap = await getBootstrap();
-      await persistirYEncolarLectura({
-        lectura,
-        lecturaRepo: bootstrap.lecturaRepo,
-        colaRepo: bootstrap.colaRepo,
-        idGenerator: bootstrap.idGenerator,
-        hasher: bootstrap.hasher,
-      });
-      setGuardado(true);
-      navigation.popToTop();
-    } catch (e) {
-      const causa = (e as { cause?: { codigo?: string } })?.cause?.codigo;
-      const mensaje =
-        causa === 'RESTRICCION_UNICIDAD'
-          ? 'Ya existe una lectura para este medidor en este periodo.'
-          : (e as Error)?.message ?? 'Error desconocido al guardar.';
-      setErrorGuardar(mensaje);
-    } finally {
-      setGuardando(false);
-    }
-  }
+  const [detalleAbierto, setDetalleAbierto] = useState(true);
 
   const subsidioMostrar = resultado.subsidio > 0;
   const contribMostrar = resultado.contribucion > 0;
@@ -153,7 +113,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
       {/* Header brutalist */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.popToTop()}
           style={({ pressed }) => [
             styles.headerBtn,
             pressed && styles.pressedDark,
@@ -272,36 +232,11 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Acciones */}
         <View style={styles.actionsCol}>
-          {errorGuardar !== null && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorGuardar}</Text>
-            </View>
-          )}
-          <Pressable
-            onPress={onGuardar}
-            disabled={guardando || guardado}
-            style={({ pressed }) => [
-              styles.btnPrimary,
-              pressed && styles.pressedDark,
-              (guardando || guardado) && styles.btnDisabled,
-            ]}
-          >
-            <Text style={styles.btnPrimaryText}>
-              {guardado
-                ? 'GUARDADO ✓'
-                : guardando
-                  ? 'GUARDANDO...'
-                  : 'GUARDAR Y VOLVER'}
-            </Text>
-          </Pressable>
           <Pressable
             onPress={() => navigation.popToTop()}
-            style={({ pressed }) => [
-              styles.btnSecondary,
-              pressed && styles.pressedLight,
-            ]}
+            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
           >
-            <Text style={styles.btnSecondaryText}>VOLVER SIN GUARDAR</Text>
+            <Text style={styles.btnPrimaryText}>VER HISTORIAL</Text>
           </Pressable>
           <Pressable
             onPress={() =>
@@ -310,12 +245,9 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
                 id_suscriptor,
               })
             }
-            style={({ pressed }) => [
-              styles.btnSecondary,
-              pressed && styles.pressedLight,
-            ]}
+            style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
           >
-            <Text style={styles.btnSecondaryText}>CAPTURAR OTRA</Text>
+            <Text style={styles.btnSecondaryText}>VOLVER A LA RUTA</Text>
           </Pressable>
         </View>
 

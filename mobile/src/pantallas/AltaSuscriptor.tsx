@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import FechaPicker from '../components/FechaPicker';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,8 +12,8 @@ import {
   View,
 } from 'react-native';
 
-import { crearMedidor } from '@dominio/medidores';
 import { crearSuscriptor } from '@dominio/suscriptores';
+import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import type { ConfigStackScreenProps } from '../navegacion/types';
@@ -216,16 +217,15 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
       const sus = await (async () => {
         try {
-          const borradorMed = crearMedidor({
+          const borradorMedSinSus: MedidorBorradorSinSuscriptor = {
             numero_medidor: numeroMedidorGenerado,
-            id_suscriptor: 0,
             fecha_instalacion: form.fecha_instalacion.trim(),
+            estado: 'activo',
             observaciones:
               form.observaciones_medidor.trim() === ''
                 ? undefined
                 : form.observaciones_medidor.trim(),
-          });
-          const { id_suscriptor: _ignored, ...borradorMedSinSus } = borradorMed;
+          };
 
           const out = await persistirYEncolarAltaSuscriptor({
             borradorSuscriptor: borradorSus,
@@ -413,18 +413,12 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>FECHA DE INSTALACIÓN *</Text>
-            <TextInput
-              style={[styles.input, errores.fecha_instalacion !== undefined && styles.inputError]}
+            <FechaPicker
               value={form.fecha_instalacion}
-              onChangeText={(v) => setCampo('fecha_instalacion', v)}
-              onBlur={() => onBlur('fecha_instalacion')}
-              placeholder="YYYY-MM-DD"
-              maxLength={10}
-              editable={!enviando}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="numbers-and-punctuation"
-              placeholderTextColor={COLORS.placeholder}
+              onChange={(v) => setCampo('fecha_instalacion', v)}
+              disabled={enviando}
+              error={errores.fecha_instalacion !== undefined}
+              maxDate={new Date().toISOString().slice(0, 10)}
             />
             {errores.fecha_instalacion !== undefined && (
               <Text style={styles.errorText}>{errores.fecha_instalacion}</Text>

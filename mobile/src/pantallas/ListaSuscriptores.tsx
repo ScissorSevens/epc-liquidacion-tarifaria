@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
@@ -53,9 +54,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    void cargar();
-  }, [cargar]);
+  useFocusEffect(useCallback(() => { cargar(); }, [cargar]));
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -37,6 +37,18 @@ CREATE TABLE IF NOT EXISTS operarios (
 
 const SQL_LISTAR = `SELECT * FROM operarios ORDER BY nombre ASC`;
 const SQL_BUSCAR_POR_DISPOSITIVO = `SELECT * FROM operarios WHERE dispositivo_id = ? LIMIT 1`;
+const SQL_UPSERT = `
+INSERT INTO operarios (id_operario, numero_cedula, nombre, email, rol, estado, dispositivo_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id_operario) DO UPDATE SET
+  numero_cedula  = excluded.numero_cedula,
+  nombre         = excluded.nombre,
+  email          = excluded.email,
+  rol            = excluded.rol,
+  estado         = excluded.estado,
+  dispositivo_id = excluded.dispositivo_id,
+  created_at     = excluded.created_at
+`;
 
 function fromRow(row: OperarioRow): Operario {
   return {
@@ -55,6 +67,7 @@ export interface OperarioRepositoryExpoSqlite {
   inicializar(): Promise<void>;
   listar(): Promise<Operario[]>;
   buscarPorDispositivoId(id: string): Promise<Operario | null>;
+  guardar(operario: Operario): Promise<void>;
 }
 
 export function crearOperarioRepositoryExpoSqlite(
@@ -73,6 +86,19 @@ export function crearOperarioRepositoryExpoSqlite(
     async buscarPorDispositivoId(id: string): Promise<Operario | null> {
       const row = await db.getFirstAsync<OperarioRow>(SQL_BUSCAR_POR_DISPOSITIVO, id);
       return row ? fromRow(row) : null;
+    },
+
+    async guardar(operario: Operario): Promise<void> {
+      await db.runAsync(SQL_UPSERT,
+        operario.id_operario,
+        operario.numero_cedula,
+        operario.nombre,
+        operario.email,
+        operario.rol,
+        operario.estado,
+        operario.dispositivo_id ?? null,
+        operario.created_at ?? null,
+      );
     },
   };
 }

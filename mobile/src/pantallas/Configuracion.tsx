@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
+  Pressable,
+  Alert,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SQLite from 'expo-sqlite';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
@@ -17,8 +20,8 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
-import { Pressable } from 'react-native';
 import { obtenerApiBaseUrl } from '../config/api';
+import { getBootstrap } from '../composition/get-bootstrap';
 import {
   crearOperarioRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
@@ -36,6 +39,7 @@ function generarUuid(): string {
 }
 
 const CLAVE_DEVICE_ID = 'device_uuid';
+const CLAVE_CEDULA = 'cedula_operario';
 
 async function obtenerOCrearDeviceId(): Promise<string> {
   const existente = await AsyncStorage.getItem(CLAVE_DEVICE_ID);
@@ -48,6 +52,7 @@ async function obtenerOCrearDeviceId(): Promise<string> {
 type EstadoPerfil =
   | { tipo: 'cargando' }
   | { tipo: 'sin-operario' }
+  | { tipo: 'asignando' }
   | { tipo: 'operario'; operario: Operario }
   | { tipo: 'error'; mensaje: string };
 
@@ -56,68 +61,159 @@ type EstadoPerfil =
  */
 export default function Configuracion({ navigation }: Props) {
   const [perfil, setPerfil] = useState<EstadoPerfil>({ tipo: 'cargando' });
+  const [cedula, setCedula] = useState('');
+  const [password, setPassword] = useState('');
+  const [asignando, setAsignando] = useState(false);
 
-  useEffect(() => {
-    let activo = true;
-
-    async function cargarPerfil(): Promise<void> {
-      try {
-        const cedula = await AsyncStorage.getItem('cedula_operario');
-
-        if (!cedula) {
-          if (activo) setPerfil({ tipo: 'sin-operario' });
-          return;
-        }
-
-        const deviceId = await obtenerOCrearDeviceId();
-
-        // Vincular dispositivo en el backend (idempotente)
-        let operarioDesdeBackend: Operario | null = null;
-        try {
-          const baseUrl = obtenerApiBaseUrl();
-          const resp = await fetch(`${baseUrl}/api/v1/operarios/vincular-dispositivo`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ numero_cedula: cedula, dispositivo_id: deviceId }),
-          });
-          if (resp.ok) {
-            operarioDesdeBackend = (await resp.json()) as Operario;
-          }
-        } catch {
-          // Sin red: seguimos con el repo local
-        }
-
-        // Buscar en repo local
-        const db = await SQLite.openDatabaseAsync('mediapp.db');
-        const repo = crearOperarioRepositoryExpoSqlite(db);
-        await repo.inicializar();
-        const operarioLocal = await repo.buscarPorDispositivoId(deviceId);
-
-        if (!activo) return;
-
-        if (operarioLocal) {
-          setPerfil({ tipo: 'operario', operario: operarioLocal });
-        } else if (operarioDesdeBackend) {
-          setPerfil({ tipo: 'operario', operario: operarioDesdeBackend });
-        } else {
-          // Hay cédula pero no hay datos aún
-          setPerfil({ tipo: 'sin-operario' });
-        }
-      } catch (e) {
-        if (activo) {
-          setPerfil({
-            tipo: 'error',
-            mensaje: e instanceof Error ? e.message : String(e),
-          });
-        }
+  const cargarPerfil = useCallback(async () => {
+    setPerfil({ tipo: 'cargando' });
+    try {
+      const cedulaGuardada = await AsyncStorage.getItem(CLAVE_CEDULA);
+      if (!cedulaGuardada) {
+        setPerfil({ tipo: 'sin-operario' });
+        return;
       }
+
+      const deviceId = await obtenerOCrearDeviceId();
+
+      // Buscar en repo local primero (funciona sin red)
+      const bootstrap = await getBootstrap();
+      const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
+      await repo.inicializar();
+      const operarioLocal = await repo.buscarPorDispositivoId(deviceId);
+
+      if (operarioLocal) {
+        setPerfil({ tipo: 'operario', operario: operarioLocal });
+        return;
+      }
+
+      // Sin datos locales → buscar en backend por cédula (ya fue vinculado previamente)
+      try {
+        const baseUrl = obtenerApiBaseUrl();
+        const resp = await fetch(`${baseUrl}/api/v1/operarios`);
+        if (resp.ok) {
+          const lista = (await resp.json()) as Array<{
+            id: number; numeroCedula: string; nombre: string;
+            email: string; rol: string; estado: string;
+            dispositivoId?: string; createdAt?: string;
+          }>;
+          const encontrado = lista.find(
+            (o) => o.numeroCedula === cedulaGuardada && o.dispositivoId === deviceId,
+          );
+          if (encontrado) {
+            const operario: Operario = {
+              id_operario: encontrado.id,
+              numero_cedula: encontrado.numeroCedula,
+              nombre: encontrado.nombre,
+              email: encontrado.email,
+              rol: encontrado.rol,
+              estado: encontrado.estado,
+              dispositivo_id: encontrado.dispositivoId,
+              created_at: encontrado.createdAt,
+            };
+            // Cachear en SQLite para próximas cargas sin red
+            await repo.guardar(operario);
+            setPerfil({ tipo: 'operario', operario });
+            return;
+          }
+        }
+      } catch {
+        // Sin red: mostramos sin-operario para que pueda reintentar
+      }
+
+      setPerfil({ tipo: 'sin-operario' });
+    } catch (e) {
+      setPerfil({
+        tipo: 'error',
+        mensaje: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { cargarPerfil(); }, [cargarPerfil]));
+
+  async function asignarOperario(): Promise<void> {
+    if (!cedula.trim()) {
+      Alert.alert('Campo requerido', 'Ingresá tu número de cédula.');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Campo requerido', 'Ingresá tu contraseña.');
+      return;
     }
 
-    void cargarPerfil();
-    return () => {
-      activo = false;
-    };
-  }, []);
+    setAsignando(true);
+    try {
+      const deviceId = await obtenerOCrearDeviceId();
+      const baseUrl = obtenerApiBaseUrl();
+
+      const resp = await fetch(`${baseUrl}/api/v1/operarios/vincular-dispositivo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cedula: cedula.trim(),
+          password: password.trim(),
+          dispositivoId: deviceId,
+        }),
+      });
+
+      if (resp.status === 401 || resp.status === 404) {
+        Alert.alert('Error', 'Cédula o contraseña incorrectos.');
+        return;
+      }
+
+      if (resp.status === 409) {
+        Alert.alert('Dispositivo ocupado', 'Este dispositivo ya está vinculado a otro operario. Contactá al administrador.');
+        return;
+      }
+
+      if (!resp.ok) {
+        Alert.alert('Error', `No se pudo asignar el operario (${resp.status}).`);
+        return;
+      }
+
+      const operario = (await resp.json()) as Operario;
+
+      // Guardar cédula localmente para futuras cargas
+      await AsyncStorage.setItem(CLAVE_CEDULA, cedula.trim());
+
+      // Persistir operario en SQLite para que funcione sin red
+      const bootstrap = await getBootstrap();
+      const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
+      await repo.inicializar();
+      await repo.guardar(operario);
+
+      // Limpiar formulario
+      setCedula('');
+      setPassword('');
+
+      setPerfil({ tipo: 'operario', operario });
+    } catch {
+      Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
+    } finally {
+      setAsignando(false);
+    }
+  }
+
+  async function desasignarOperario(): Promise<void> {
+    Alert.alert(
+      'Desasignar operario',
+      '¿Seguro que querés desasignar este dispositivo? Necesitarás conexión para volver a asignarlo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Desasignar',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem(CLAVE_CEDULA);
+            setCedula('');
+            setPassword('');
+            setPerfil({ tipo: 'sin-operario' });
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -168,6 +264,7 @@ export default function Configuracion({ navigation }: Props) {
       <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>MI PERFIL</Text>
 
       <View style={styles.seccion}>
+        {/* CARGANDO */}
         {perfil.tipo === 'cargando' && (
           <View style={styles.perfilCargando}>
             <ActivityIndicator size="small" color={COLORS.primary} />
@@ -175,13 +272,7 @@ export default function Configuracion({ navigation }: Props) {
           </View>
         )}
 
-        {perfil.tipo === 'sin-operario' && (
-          <View style={styles.item}>
-            <MaterialIcons name="person-off" size={24} color={COLORS.textSecondary} />
-            <Text style={[TYPOGRAPHY.bodyMd, styles.itemValor]}>Sin operario asignado</Text>
-          </View>
-        )}
-
+        {/* ERROR */}
         {perfil.tipo === 'error' && (
           <View style={styles.item}>
             <MaterialIcons name="error" size={24} color={COLORS.error ?? '#B00020'} />
@@ -191,6 +282,58 @@ export default function Configuracion({ navigation }: Props) {
           </View>
         )}
 
+        {/* SIN OPERARIO → formulario de asignación */}
+        {perfil.tipo === 'sin-operario' && (
+          <View style={styles.formulario}>
+            <View style={styles.formularioHeader}>
+              <MaterialIcons name="person-off" size={24} color={COLORS.textSecondary} />
+              <Text style={[TYPOGRAPHY.bodyMd, styles.itemValor]}>
+                Sin operario asignado
+              </Text>
+            </View>
+
+            <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CÉDULA</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Número de cédula"
+              placeholderTextColor={COLORS.textSecondary}
+              value={cedula}
+              onChangeText={setCedula}
+              keyboardType="numeric"
+              autoCapitalize="none"
+              editable={!asignando}
+            />
+
+            <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CONTRASEÑA</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Contraseña"
+              placeholderTextColor={COLORS.textSecondary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!asignando}
+            />
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.botonAsignar,
+                pressed && styles.botonAsignarPressed,
+                asignando && styles.botonAsignarDisabled,
+              ]}
+              onPress={asignarOperario}
+              disabled={asignando}
+            >
+              {asignando
+                ? <ActivityIndicator size="small" color={COLORS.background} />
+                : <Text style={styles.botonAsignarTexto}>ASIGNAR OPERARIO</Text>
+              }
+            </Pressable>
+          </View>
+        )}
+
+        {/* CON OPERARIO → datos + botón desasignar */}
         {perfil.tipo === 'operario' && (
           <>
             <View style={styles.perfilFila}>
@@ -220,6 +363,14 @@ export default function Configuracion({ navigation }: Props) {
                 {perfil.operario.estado}
               </Text>
             </View>
+            <View style={styles.separador} />
+            <Pressable
+              style={({ pressed }) => [styles.botonDesasignar, pressed && styles.botonDesasignarPressed]}
+              onPress={desasignarOperario}
+            >
+              <MaterialIcons name="logout" size={18} color={COLORS.error ?? '#B00020'} />
+              <Text style={styles.botonDesasignarTexto}>Desasignar este dispositivo</Text>
+            </Pressable>
           </>
         )}
       </View>
@@ -304,5 +455,62 @@ const styles = StyleSheet.create({
   perfilValor: {
     flex: 1,
     color: COLORS.primary,
+  },
+  // Formulario de asignación
+  formulario: {
+    padding: SPACING.margin,
+    gap: SPACING.sm,
+  },
+  formularioHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  inputLabel: {
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    color: COLORS.primary,
+    backgroundColor: COLORS.background,
+    marginBottom: SPACING.sm,
+    ...(TYPOGRAPHY.bodyMd as object),
+  },
+  botonAsignar: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.sm,
+    height: 48,
+  },
+  botonAsignarPressed: {
+    opacity: 0.8,
+  },
+  botonAsignarDisabled: {
+    opacity: 0.5,
+  },
+  botonAsignarTexto: {
+    color: COLORS.background,
+    ...(TYPOGRAPHY.labelMd as object),
+  },
+  botonDesasignar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.margin,
+    paddingVertical: SPACING.md,
+  },
+  botonDesasignarPressed: {
+    backgroundColor: COLORS.surfaceLight,
+  },
+  botonDesasignarTexto: {
+    color: COLORS.error ?? '#B00020',
+    ...(TYPOGRAPHY.bodySm as object),
   },
 });

@@ -28,6 +28,7 @@ interface EventoLog {
   readonly tipo: 'health' | 'sync' | 'cola' | 'error';
   readonly mensaje: string;
   readonly status?: string;
+  readonly detalles?: Record<string, string | number>;
 }
 
 interface ContadoresSync {
@@ -84,6 +85,7 @@ export default function Sincronizacion(_props: Props) {
       tipo: EventoLog['tipo'],
       mensaje: string,
       status?: string,
+      detalles?: Record<string, string | number>,
     ) => {
       const evento: EventoLog = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -91,6 +93,7 @@ export default function Sincronizacion(_props: Props) {
         tipo,
         mensaje,
         ...(status !== undefined && { status }),
+        ...(detalles !== undefined && { detalles }),
       };
       setEventos((prev) => [evento, ...prev].slice(0, 50));
     },
@@ -181,30 +184,15 @@ export default function Sincronizacion(_props: Props) {
         return;
       }
       for (const it of itemsActivos) {
-        const partes = [
-          it.tipo,
-          it.estado,
-          `int:${it.intentos}`,
-        ];
-        if (it.dependeDe && it.dependeDe.length > 0) {
-          const deps = it.dependeDe.map((dep) => {
-            const enc = items.find((x) => x.id === dep);
-            if (!enc) return `${dep.slice(0, 6)}=AUSENTE`;
-            return `${dep.slice(0, 6)}=${enc.estado}`;
-          });
-          partes.push(`dep:[${deps.join(',')}]`);
-          const bloqueado = it.dependeDe.some((dep) => {
-            const enc = items.find((x) => x.id === dep);
-            return !enc || enc.estado !== 'EXITOSO';
-          });
-          if (bloqueado && it.estado === 'PENDIENTE') {
-            partes.push('⚠ BLOQUEADO');
-          }
-        }
+        const detalles: Record<string, string | number> = {
+          tipo_item: it.tipo,
+          estado: it.estado,
+          intentos: it.intentos,
+        };
         if (it.ultimoError) {
-          partes.push(`err:"${it.ultimoError.slice(0, 40)}"`);
+          detalles.error = it.ultimoError.slice(0, 40);
         }
-        agregarEvento('cola', partes.join(' '));
+        agregarEvento('cola', it.tipo, undefined, detalles);
       }
     } catch (e) {
       agregarEvento(
@@ -278,15 +266,12 @@ export default function Sincronizacion(_props: Props) {
               </Text>
             </View>
 
-            {/* Barra de progreso — solo visible mientras sincroniza */}
+            {/* Indicador de progreso — solo visible mientras sincroniza */}
             {sincronizando && (
               <View style={styles.progresoSection}>
                 <View style={styles.progresoRow}>
                   <Text style={[TYPOGRAPHY.labelLg]}>Progreso total</Text>
                   <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
-                <View style={styles.barraContainer}>
-                  <View style={styles.barraFillAnimated} />
                 </View>
               </View>
             )}
@@ -406,6 +391,15 @@ export default function Sincronizacion(_props: Props) {
               </Text>
             </View>
             <Text style={TYPOGRAPHY.bodySm}>{item.mensaje}</Text>
+            {item.detalles && (
+              <View style={styles.chipsRow}>
+                {Object.entries(item.detalles).map(([k, v]) => (
+                  <View key={k} style={styles.chip}>
+                    <Text style={[TYPOGRAPHY.labelSm, styles.chipText]}>{k}: {v}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       />
@@ -486,18 +480,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  barraContainer: {
-    height: 8,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.full,
-    overflow: 'hidden',
-  },
-  barraFillAnimated: {
-    height: '100%',
-    width: '60%',
-    backgroundColor: COLORS.primary,
   },
   bentoGrid: {
     flexDirection: 'row',
@@ -599,6 +581,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
   },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginTop: SPACING.xs,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  chipText: {
+    color: COLORS.textSecondary,
+  },
 });
 
 // Helper de color por tipo de evento. Vive fuera de StyleSheet.create
@@ -609,7 +608,9 @@ function colorPorTipo(tipo: EventoLog['tipo']): { color: string } {
       tipo === 'error'
         ? COLORS.error
         : tipo === 'sync'
-        ? COLORS.primary
+        ? '#16a34a'
+        : tipo === 'health'
+        ? '#1d4ed8'
         : COLORS.textSecondary,
   };
 }

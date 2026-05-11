@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import PeriodoPicker from '../components/PeriodoPicker';
 import {
   Image,
   KeyboardAvoidingView,
@@ -23,6 +24,7 @@ import type { Estrato } from '@dominio/motor-tarifario/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 
 import { getBootstrap } from '../composition/get-bootstrap';
+import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import { photoCaptureStore } from '../composition/photo-capture-store';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -238,7 +240,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
     setSnack({ visible: true, mensaje, tipo });
   }
 
-  function onCalcular() {
+  async function onCalcular() {
     if (!validarTodo()) {
       mostrarSnack('Revisa los campos marcados', 'error');
       return;
@@ -266,6 +268,14 @@ export default function CapturarLectura({ navigation, route }: Props) {
         PARAMETROS_TARIFARIOS_DEMO,
         estrato,
       );
+      const bootstrap = await getBootstrap();
+      await persistirYEncolarLectura({
+        lectura,
+        lecturaRepo: bootstrap.lecturaRepo,
+        colaRepo: bootstrap.colaRepo,
+        idGenerator: bootstrap.idGenerator,
+        hasher: bootstrap.hasher,
+      });
       navigation.navigate('ResultadoCalculo', {
         lectura,
         resultado,
@@ -274,7 +284,11 @@ export default function CapturarLectura({ navigation, route }: Props) {
         id_suscriptor,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const causa = (err as { cause?: { codigo?: string } })?.cause?.codigo;
+      const msg =
+        causa === 'RESTRICCION_UNICIDAD'
+          ? 'Ya existe una lectura para este medidor en este periodo.'
+          : err instanceof Error ? err.message : String(err);
       mostrarSnack(msg, 'error');
     } finally {
       setCalculando(false);
@@ -428,22 +442,12 @@ export default function CapturarLectura({ navigation, route }: Props) {
 
           {/* Periodo */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Periodo (YYYYMM) *</Text>
-            <TextInput
+            <Text style={styles.fieldLabel}>Periodo *</Text>
+            <PeriodoPicker
               value={form.id_periodo}
-              onChangeText={(v) => setCampo('id_periodo', v)}
-              onBlur={() => onBlur('id_periodo')}
-              placeholder="202410"
-              placeholderTextColor={COLORS.placeholder}
-              keyboardType="number-pad"
-              maxLength={6}
-              editable={!calculando}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={[
-                styles.input,
-                errores.id_periodo !== undefined && styles.inputError,
-              ]}
+              onChange={(v) => setCampo('id_periodo', v)}
+              disabled={calculando}
+              error={errores.id_periodo !== undefined}
             />
             {errores.id_periodo !== undefined && (
               <Text style={styles.errorText}>{errores.id_periodo}</Text>

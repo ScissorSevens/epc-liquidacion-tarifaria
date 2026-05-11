@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { useNetInfo } from '../hooks/useNetInfo';
@@ -37,6 +38,7 @@ export default function RutaDeHoy({ navigation }: Props) {
   const [pendientesCola, setPendientesCola] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [capturadosHoy, setCapturadosHoy] = useState<Map<number, boolean>>(new Map());
 
   const { isConnected } = useNetInfo();
 
@@ -45,10 +47,11 @@ export default function RutaDeHoy({ navigation }: Props) {
     setError(null);
     try {
       const bootstrap = await getBootstrap();
-      const [listaSuscriptores, todasLecturas, itemsCola] = await Promise.all([
+      const [listaSuscriptores, todasLecturas, itemsCola, todosMedidores] = await Promise.all([
         bootstrap.suscriptorRepo.listar(),
         bootstrap.lecturaRepo.listar(),
         bootstrap.colaRepo.listar(),
+        bootstrap.medidorRepo.listar(),
       ]);
 
       // Contar lecturas capturadas hoy (comparar fecha ISO-8601 con fecha local)
@@ -59,12 +62,32 @@ export default function RutaDeHoy({ navigation }: Props) {
           .map((l) => l.id_medidor),
       );
 
+      // Mapa: id_suscriptor → id_medidor[]
+      const medsPorSusc = (todosMedidores as Medidor[]).reduce<Map<number, number[]>>(
+        (acc, med) => {
+          const lista = acc.get(med.id_suscriptor) ?? [];
+          lista.push(med.id_medidor);
+          acc.set(med.id_suscriptor, lista);
+          return acc;
+        },
+        new Map(),
+      );
+
+      // Mapa: id_suscriptor → capturado hoy (OR multi-medidor)
+      const capturadosMap = new Map<number, boolean>(
+        listaSuscriptores.map((s) => {
+          const meds = medsPorSusc.get(s.id_suscriptor) ?? [];
+          return [s.id_suscriptor, meds.some((id) => idsConLecturaHoy.has(id))];
+        }),
+      );
+
       // Contar items PENDIENTE en cola para el botón sticky
       const pendientes = itemsCola.filter((i) => i.estado === 'PENDIENTE').length;
 
       setSuscriptores(listaSuscriptores);
       setCapturasHoy(idsConLecturaHoy.size);
       setPendientesCola(pendientes);
+      setCapturadosHoy(capturadosMap);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -181,9 +204,16 @@ export default function RutaDeHoy({ navigation }: Props) {
                 <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
                   {item.nombre_apellidos}
                 </Text>
-                <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
-                  Lectura pendiente
-                </Text>
+                {capturadosHoy.get(item.id_suscriptor) === true ? (
+                  <View style={styles.statusRow}>
+                    <MaterialIcons name="check-circle" size={14} color={COLORS.primary} />
+                    <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>Capturada hoy</Text>
+                  </View>
+                ) : (
+                  <View style={styles.statusRow}>
+                    <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>Pendiente</Text>
+                  </View>
+                )}
               </View>
               <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
             </View>
@@ -320,6 +350,17 @@ const styles = StyleSheet.create({
   },
   cardNombre: {
     color: COLORS.primary,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  statusCapturada: {
+    color: COLORS.primary,
+  },
+  statusPendiente: {
+    color: COLORS.textSecondary,
   },
   stickyFooter: {
     paddingHorizontal: SPACING.margin,

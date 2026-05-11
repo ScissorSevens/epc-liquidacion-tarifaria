@@ -80,6 +80,7 @@ const SQL_EXISTE_POR_CODIGO = `SELECT 1 FROM suscriptor WHERE codigo = ? LIMIT 1
 // para listas de clientes (catalogo). El usuario reconoce el codigo
 // EPC mas rapido que el id interno autoincremental.
 const SQL_LISTAR = `SELECT * FROM suscriptor ORDER BY codigo ASC`;
+const SQL_MAX_CODIGO = `SELECT MAX(codigo) AS max_codigo FROM suscriptor`;
 
 function traducirErrorAdapter(err: unknown, ctx: { codigo?: string }): Error {
   const mapeado = mapearErrorSqlite(err, { tabla: 'suscriptor' });
@@ -102,6 +103,7 @@ export function crearSuscriptorRepositorySqlite(
   const stmtSelectByCodigo = db.prepare(SQL_SELECT_BY_CODIGO);
   const stmtExistePorCodigo = db.prepare(SQL_EXISTE_POR_CODIGO);
   const stmtListar = db.prepare(SQL_LISTAR);
+  const stmtMaxCodigo = db.prepare(SQL_MAX_CODIGO);
 
   function toInsertParams(s: SuscriptorBorrador): Record<string, unknown> {
     return {
@@ -149,6 +151,11 @@ export function crearSuscriptorRepositorySqlite(
     async listar(): Promise<Suscriptor[]> {
       const rows = stmtListar.all() as SuscriptorRow[];
       return rows.map(fromRow);
+    },
+
+    async maxCodigo(): Promise<string | null> {
+      const row = stmtMaxCodigo.get() as { max_codigo: string | null } | undefined;
+      return row?.max_codigo ?? null;
     },
 
     async actualizar(_id: number, _cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
