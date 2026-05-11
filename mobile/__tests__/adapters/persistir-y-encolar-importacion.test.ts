@@ -51,6 +51,7 @@ function suscriptorDe(codigo: string, id: number): Suscriptor {
     nombre_apellidos: `Suscriptor ${codigo}`,
     direccion: 'Direccion X',
     estrato: 2,
+    aplica_subsidio: false,
     estado: 'activo',
     created_at: '2026-05-07T00:00:00.000Z',
   };
@@ -89,6 +90,7 @@ function setup(opts: {
     listar: jest.fn(),
     actualizar: jest.fn(),
     eliminar: jest.fn(),
+    maxCodigo: jest.fn(async () => null),
   };
 
   const medidorRepo = {

@@ -29,6 +29,7 @@ const BORRADOR_SUS = {
   nombre_apellidos: 'Test User',
   direccion: 'Calle 1',
   estrato: 2 as const,
+  aplica_subsidio: false,
   estado: 'activo' as const,
 };
 
@@ -45,6 +46,7 @@ function susCreado(id: number): Suscriptor {
     nombre_apellidos: BORRADOR_SUS.nombre_apellidos,
     direccion: BORRADOR_SUS.direccion,
     estrato: BORRADOR_SUS.estrato,
+    aplica_subsidio: false,
     estado: BORRADOR_SUS.estado,
     created_at: '2026-05-07T00:00:00.000Z',
   };

@@ -10,5 +10,5 @@
     "**/*.ts",
     "**/*.tsx"
   ],
-  "exclude": ["node_modules", ".expo", "dist", "web-build", "__tests__", "../src/**/*.test.ts"]
+  "exclude": ["node_modules", ".expo", "dist", "web-build", "../src/**/*.test.ts"]
 }
