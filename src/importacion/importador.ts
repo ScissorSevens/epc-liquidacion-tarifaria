@@ -73,6 +73,7 @@ export async function importarSuscriptoresYMedidores(
           nombre_apellidos: fila.nombre_apellidos,
           direccion: fila.direccion,
           estrato: fila.estrato as Suscriptor['estrato'],
+          aplica_subsidio: fila.aplica_subsidio ?? false,
           ...(fila.matricula_inmobiliaria
             ? { matricula_inmobiliaria: fila.matricula_inmobiliaria }
             : {}),

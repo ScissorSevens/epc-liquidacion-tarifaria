@@ -74,6 +74,7 @@ describe('importarSuscriptoresYMedidores', () => {
       nombre_apellidos: 'Original',
       direccion: 'Vieja',
       estrato: 2,
+      aplica_subsidio: false,
       estado: 'activo',
     });
 
@@ -103,6 +104,7 @@ describe('importarSuscriptoresYMedidores', () => {
       nombre_apellidos: 'X',
       direccion: 'Y',
       estrato: 1,
+      aplica_subsidio: false,
       estado: 'activo',
     });
     await sis.medidorRepo.crear({
@@ -135,6 +137,7 @@ describe('importarSuscriptoresYMedidores', () => {
       nombre_apellidos: 'PrevioSus',
       direccion: 'X',
       estrato: 1,
+      aplica_subsidio: false,
       estado: 'activo',
     });
     const susConMed = await sis.suscriptorRepo.crear({
@@ -142,6 +145,7 @@ describe('importarSuscriptoresYMedidores', () => {
       nombre_apellidos: 'X',
       direccion: 'Y',
       estrato: 1,
+      aplica_subsidio: false,
       estado: 'activo',
     });
     await sis.medidorRepo.crear({

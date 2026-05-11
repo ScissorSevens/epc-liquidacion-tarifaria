@@ -25,6 +25,7 @@ export interface FilaCSV {
   readonly estrato: number;
   readonly matricula_inmobiliaria?: string;
   readonly numero_catastral?: string;
+  readonly aplica_subsidio?: boolean;   // opcional: default false si no viene en el CSV
   readonly numero_medidor?: string;   // opcional: se auto-genera si viene vacío
   readonly fecha_instalacion: string;
   readonly observaciones_medidor?: string;

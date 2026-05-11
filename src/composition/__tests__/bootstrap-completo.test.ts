@@ -52,6 +52,7 @@ describe('bootstrapCompleto', () => {
         nombre_apellidos: 'Juana Perez',
         direccion: 'Av Siempreviva 742',
         estrato: 3,
+        aplica_subsidio: false,
         estado: 'activo',
       });
       const med = await sis.medidorRepo.crear({

@@ -11,6 +11,7 @@ const inputValido: CrearSuscriptorInput = {
   nombre_apellidos: 'Juan Pérez',
   direccion: 'Calle 5 #10-20',
   estrato: 3,
+  aplica_subsidio: false,
 };
 
 describe('crearSuscriptor — factory de borrador', () => {
@@ -22,6 +23,7 @@ describe('crearSuscriptor — factory de borrador', () => {
       nombre_apellidos: 'Juan Pérez',
       direccion: 'Calle 5 #10-20',
       estrato: 3,
+      aplica_subsidio: false,
       estado: 'activo',
     });
     expect(resultado).not.toHaveProperty('id_suscriptor');
