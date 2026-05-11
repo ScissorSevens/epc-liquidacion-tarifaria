@@ -14,8 +14,25 @@
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
     ],
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx"],
-    "testMatch": ["**/__tests__/**/*.test.(ts|tsx|js)"]
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.(ts|tsx|js)"
+    ],
+    "moduleDirectories": [
+      "node_modules",
+      "<rootDir>/node_modules"
+    ],
+    "moduleNameMapper": {
+      "@expo/vector-icons/(.*)": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
+      "@expo/vector-icons": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
+      "^expo-sqlite$": "<rootDir>/__tests__/__mocks__/expo-sqlite.js",
+      "expo-asset": "<rootDir>/__tests__/__mocks__/expo-asset.js"
+    }
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -41,8 +58,10 @@
     "react-native-vector-icons": "^10.3.0"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^13.3.3",
     "@types/react": "~19.1.0",
     "@types/react-native-vector-icons": "^6.4.18",
+    "react-test-renderer": "^19.1.0",
     "typescript": "~5.9.2"
   },
   "private": true
