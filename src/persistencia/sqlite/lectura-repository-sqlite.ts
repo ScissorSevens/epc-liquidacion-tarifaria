@@ -18,10 +18,10 @@
  * periodo Y"). Esto preserva el contrato de error visible al dominio.
  *
  * NOTA: el modulo `persistencia/lectura-repository.ts` no expone un
- * objeto MENSAJES_ERROR_LECTURA todavia. Cuando se cree (siguiente
- * sprint), centralizar estos textos ahi y consumirlos desde aca y
- * desde el in-memory. Por ahora viven duplicados en harness +
- * in-memory + SQLite (3 lugares, source-of-truth = harness).
+ * objeto MENSAJES_ERROR_LECTURA todavia. Cuando se cree, centralizar
+ * estos textos ahi y consumirlos desde aca y desde el in-memory.
+ * Actualmente viven duplicados en harness + in-memory + SQLite
+ * (3 lugares, source-of-truth = harness).
  *
  * Hexagonal: persistencia pura. Sin eventos de auditoria; eso queda
  * para orquestadores `*ConRepo` (no existen aun para lecturas).

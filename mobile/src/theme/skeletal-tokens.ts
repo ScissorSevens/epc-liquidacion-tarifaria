@@ -14,8 +14,7 @@
  *   El design system pide `Inter`. NO instalamos `expo-google-fonts/inter`
  *   en este ciclo (sin nuevas deps por mandato del plan). Dejamos
  *   `fontFamily: undefined` para que el sistema use la default — en Android
- *   queda Roboto, en iOS San Francisco. Aceptable para esta iteración.
- *   TODO: cargar Inter via `expo-font` cuando exista presupuesto de deps.
+ *   queda Roboto, en iOS San Francisco. Aceptable para esta versión.
  */
 
 export const COLORS = {
@@ -138,9 +137,9 @@ export const TYPOGRAPHY = {
 /**
  * Bordes preconfigurados. Sobre `dashed` en Android RN:
  *   `borderStyle: 'dashed'` solo funciona si `borderRadius === 0`. Cuando
- *   se aplica con radius > 0 cae a `solid` silenciosamente. Workaround:
- *   envolver el elemento en un `View` con borde dashed sin radius y otro
- *   View interno con el radius — o aceptar el solid en Android.
+ *   se aplica con radius > 0 cae a `solid` silenciosamente en Android.
+ *   Para evitarlo: envolver el elemento en un `View` con borde dashed sin
+ *   radius y otro View interno con el radius — o aceptar el fallback a solid.
  *   Nuestra implementación usa `dashed` en el botón de cámara y acepta
  *   el fallback a solid en Android (degradación grácil).
  */

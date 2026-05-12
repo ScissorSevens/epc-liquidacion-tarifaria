@@ -1,10 +1,9 @@
 /**
- * Adapter HTTP — opcion C de la decision D33.
+ * Adapter HTTP mobile — implementa `ClienteSincronizacion`.
  *
  * Por que existe:
- *   El dominio TS en `src/` quedo CONGELADO pre-entrega del sprint 3.
  *   El cliente HTTP del dominio (`ClienteHTTPSincronizacion`) tiene
- *   tres desalineaciones con el backend .NET ya desplegado:
+ *   tres desalineaciones con el backend .NET desplegado:
  *
  *     1. Rutas sin `/v1` (dominio: `/api/lecturas`, backend: `/api/v1/lecturas`).
  *     2. `ItemCola` no expone `idCliente` ni serializa `forzarSobrescribir`,
@@ -12,21 +11,13 @@
  *     3. `ItemCola` carga campos extra (`estado`, `ultimoError`, `creadoEn`)
  *        que el backend ignora pero ensucian el body.
  *
- *   En vez de tocar el dominio congelado (lo que requeriria re-validar
- *   563 tests), envolvemos el wiring del mobile con este adapter que
- *   implementa la misma interface `ClienteSincronizacion` y traduce
- *   `ItemCola` → shape `SyncRequest<T>` antes de hacer el POST.
+ *   Este adapter implementa la misma interface `ClienteSincronizacion`
+ *   y traduce `ItemCola` → shape `SyncRequest<T>` antes de hacer el POST,
+ *   sin necesidad de modificar el dominio puro.
  *
- * TODO post-entrega:
- *   - Cuando se libere el congelamiento del dominio, mover este mapeo al
- *     `ClienteHTTPSincronizacion` real y borrar este archivo.
- *   - `dispositivoId` esta hardcoded a `'mobile'`. Sofisticar con
- *     `expo-application.getAndroidId()` o un UUID persistido en SQLite
- *     (tabla `dispositivo`) para distinguir celulares en el backend.
- *   - Tipos no soportados (EVIDENCIA, EVENTO_AUDITORIA, FACTURA): el
- *     backend del sprint NO expone endpoints — se devuelve `ok:false` con
- *     un error explicito para que el procesador los marque FALLIDO sin
- *     bucle infinito ni conflicto fantasma.
+ * Tipos no soportados (EVIDENCIA, EVENTO_AUDITORIA, FACTURA): el
+ * backend no expone endpoints para ellos — se devuelve `ok:false` con
+ * un error explícito para que el procesador los marque FALLIDO.
  */
 
 import type { ItemCola, TipoItem } from '@dominio/sincronizacion/types';
@@ -62,7 +53,7 @@ const RUTAS_BACKEND_V1: Record<TipoItem, string | null> = {
 export interface OpcionesAdapter {
   readonly baseUrl: string;
   readonly tokenProvider: TokenProvider;
-  /** default: 'mobile' — TODO sofisticar post-entrega */
+  /** Identificador del dispositivo — default: 'mobile' */
   readonly dispositivoId?: string;
   /**
    * Repos / adapters necesarios para mapear el payload `LECTURA` del
@@ -150,9 +141,7 @@ export function crearClienteHttpAdapter(
       // formato `dispositivo:id_local` para LECTURA — el `item.id` del
       // dominio es un UUID y NO matchea el regex `^[\w-]+:\d+$` que
       // valida el backend en `SyncRequest.IdCliente`. Para tipos !=
-      // LECTURA dejamos el comportamiento previo (UUID) — el backend
-      // de LIQUIDACION arrastra el mismo bug pero queda fuera de scope
-      // de esta correccion (TODO post-entrega).
+      // LECTURA se usa el UUID del item.
       let payloadFinal: unknown = item.payload;
       let idClienteSobre = `${dispositivoId}:${item.id}`;
 

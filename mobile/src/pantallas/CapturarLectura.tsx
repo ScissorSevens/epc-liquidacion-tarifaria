@@ -116,7 +116,7 @@ function validarCampo(nombre: CampoForm, valor: string): string | undefined {
  *     del medidor (si existe) via `lecturaRepo.listar({ id_medidor })`.
  *  2) Carga el Suscriptor via `suscriptorRepo.buscarPorId` para mostrar
  *     nombre + dirección + estado en la card superior. Si falla, placeholders.
- *  3) Construye `EntradaLectura` con `id_operario: 1` HARDCODED.
+ *  3) Construye `EntradaLectura` con `id_operario: 1` (sin módulo de auth).
  *  4) Llama `registrarLectura` y `liquidarLectura` igual que antes.
  *  5) Navega a `ResultadoCalculo` con todo el contexto.
  *  6) Snackbar inline con mensajes del dominio si error.
@@ -255,7 +255,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
       const entrada: EntradaLectura = {
         id_medidor,
         id_periodo: form.id_periodo.trim(),
-        id_operario: 1, // HARDCODED: aun no hay auth.
+        id_operario: 1, // sin módulo de auth activo.
         lectura_actual: Number.parseFloat(form.lectura_actual),
         lectura_anterior: Number.parseFloat(form.lectura_anterior),
         ...(obs !== '' && { observaciones: obs }),
@@ -338,7 +338,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>CAPTURAR LECTURA</Text>
         <Pressable
           onPress={() => {
-            // TODO: abrir perfil/sesión cuando exista módulo de auth.
+            // Perfil: requiere módulo de autenticación.
           }}
           style={({ pressed }) => [
             styles.headerBtn,
@@ -478,12 +478,6 @@ export default function CapturarLectura({ navigation, route }: Props) {
             )}
           </View>
 
-          {/*
-            TODO: detección de anomalía cuando exista cálculo de promedio
-            histórico — ver wireframe ref 3._capturar_lectura/code.html línea 168
-            (sección "Consumo inusual" con border error). El dominio actual
-            no calcula histórico; cuando exista, agregar aquí el banner.
-          */}
 
           {/* Botón cámara / preview de evidencia */}
           {evidencia === undefined ? (

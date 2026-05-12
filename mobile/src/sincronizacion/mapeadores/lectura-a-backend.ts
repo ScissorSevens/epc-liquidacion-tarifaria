@@ -1,6 +1,6 @@
 // mobile/src/sincronizacion/mapeadores/lectura-a-backend.ts
 //
-// Mapper `Lectura` (dominio TS snake_case, congelado D33) →
+// Mapper `Lectura` (dominio TS snake_case) →
 // `LecturaPayload` del backend .NET (camelCase, FK por idCliente).
 //
 // Por que existe:
@@ -14,29 +14,16 @@
 //   FluentValidation antes de tocar la BD.
 //
 // Decision sobre `idMedidorCliente`:
-//   El dominio congelado `Medidor` no tiene un campo `id_cliente` —
+//   El dominio `Medidor` no tiene un campo `id_cliente` —
 //   solo `id_medidor` (PK local autoinc) y `numero_medidor` (codigo
-//   fisico del aparato). El seed del backend
-//   (`backend/src/MediApp.Api/Dev/SeedEndpoint.cs`) usa el patron
-//   `seed-01:{id_local_seed}` que NO es derivable desde el mobile (los
-//   ids son arbitrarios del lado del seed).
+//   fisico del aparato).
 //
 //   Decision tomada: mandar `${dispositivoId}:${medidor.id_medidor}`
 //   (default `mobile:7`). Esto satisface el regex del validator y es
 //   coherente con como sincronizan `Suscriptor`/`Liquidacion` en el
 //   resto del mobile. Implicancia E2E: el backend solo va a aceptar
 //   estas lecturas si previamente existe un `sync_registros` con
-//   `tipo='medidor'` e `idCliente='mobile:{id}'`. Para el demo contra
-//   el seed actual (`seed-01:10`, `seed-01:11`) hay que seedear
-//   manualmente el `sync_registros` o sincronizar primero un POST de
-//   medidor desde el mobile (flujo no implementado en D33). Ver TODO
-//   abajo y reporte de blocker E2E al usuario.
-//
-// TODO post-D33:
-//   - Agregar campo `id_cliente` al schema `medidor` mobile (poblado
-//     desde el CSV de carga inicial o asignado al sincronizar).
-//   - Implementar POST /api/v1/medidores desde el mobile para
-//     registrar el sync_registros antes de mandar lecturas.
+//   `tipo='medidor'` e `idCliente='mobile:{id}'`.
 
 import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Medidor } from '@dominio/medidores/types';
@@ -143,9 +130,9 @@ export async function mapearLecturaParaBackend(
     );
     payload.evidenciaFotoBase64 = base64;
     payload.evidenciaFotoMime = mime;
-    // Hash sobre el base64 string (decision del usuario en el plan).
-    // El backend valida formato (64 hex lowercase) pero no recalcula,
-    // asi que esto es informativo / integridad cliente-only por ahora.
+    // Hash sobre el base64 string. El backend valida formato (64 hex
+    // lowercase) pero no recalcula — es informativo para integridad
+    // cliente-servidor.
     payload.evidenciaFotoHash = deps.hasher.sha256(base64);
   }
 

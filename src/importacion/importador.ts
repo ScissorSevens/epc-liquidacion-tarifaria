@@ -16,10 +16,9 @@
  * `MedidorRepository`, no de implementaciones SQLite. Asi se puede
  * testear con in-memory si quisieramos.
  *
- * Performance: sin transaccion explicita por ahora. Cada `crear()` del
+ * Performance: sin transaccion explicita. Cada `crear()` del
  * adapter SQLite ya envuelve su INSERT. Para lotes grandes (>1000
- * filas) habria que envolver TODO el bucle en una transaccion — YAGNI
- * para el MVP, lo agregamos cuando duela.
+ * filas) conviene envolver el bucle en una transaccion.
  */
 
 import type { SuscriptorRepository, Suscriptor } from '../suscriptores';

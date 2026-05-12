@@ -46,10 +46,9 @@ import { crearClienteHttpAdapter } from '../sincronizacion/adapter-cliente-http'
 import { leerFotoBase64 } from '../adapters/leer-foto-base64';
 import { smokeDominio, type ResultadoSmokeDominio } from './smoke-dominio';
 
-// Token provider stub: el backend del sprint 3 NO requiere JWT todavia.
-// Cuando se agregue auth, este stub se reemplaza por uno que lea de
-// AsyncStorage / SecureStore. Se exporta como singleton porque es
-// stateless y barato.
+// Token provider sin autenticación. Cuando se agregue auth, este stub
+// se reemplaza por uno que lea de AsyncStorage / SecureStore. Se exporta
+// como singleton porque es stateless y barato.
 const tokenProviderSinAuth: TokenProvider = {
   async obtenerToken(): Promise<string | null> {
     return null;
@@ -122,28 +121,19 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   // Cliente HTTP del backend + procesador de cola.
   //
   // Usamos `crearClienteHttpAdapter` (mobile-only) en vez del
-  // `ClienteHTTPSincronizacion` del dominio porque el dominio quedo
-  // congelado pre-entrega (D33) con rutas sin /v1 y sin mapear
-  // `idCliente`/`forzarSobrescribir` al shape `SyncRequest<T>` del
-  // backend. Ver `mobile/src/sincronizacion/adapter-cliente-http.ts`
-  // para el detalle. El adapter implementa la misma interface
-  // `ClienteSincronizacion`, asi que el procesador lo consume sin
-  // diferencias.
+  // `ClienteHTTPSincronizacion` del dominio porque este adapter
+  // implementa el shape `SyncRequest<T>` que exige el backend.
+  // Ver `mobile/src/sincronizacion/adapter-cliente-http.ts`.
   //
-  // El adapter usa `fetch` global — Hermes/RN lo expone de fabrica
-  // desde RN 0.60+, no inyectamos fetch custom. No hay timeout
-  // configurable (limitacion conocida, queda como TODO post-MVP si la
-  // red rural lo demanda).
-  //
+  // El adapter usa `fetch` global disponible desde RN 0.60+.
   // El procesador es `procesarCola(cola, cliente)`, una funcion libre
-  // del dominio que ya internamente respeta MAX_INTENTOS, delays
-  // exponenciales y dependencias entre items. Lo envolvemos en una
-  // closure que tras procesar lee la cola y devuelve contadores.
+  // del dominio que respeta MAX_INTENTOS, delays exponenciales y
+  // dependencias entre items.
   const apiBaseUrl = obtenerApiBaseUrl();
   const clienteHttp: ClienteSincronizacion = crearClienteHttpAdapter({
     baseUrl: apiBaseUrl,
     tokenProvider: tokenProviderSinAuth,
-    dispositivoId: 'mobile', // TODO: sofisticar con expo-application post-entrega
+    dispositivoId: 'mobile',
     // Deps para mapear el payload LECTURA snake_case → camelCase del
     // backend (ver `mapeadores/lectura-a-backend.ts`). El medidorRepo
     // resuelve la FK por id local; el hasher calcula sha256 del

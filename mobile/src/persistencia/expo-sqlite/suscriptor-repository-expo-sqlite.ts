@@ -159,7 +159,7 @@ export function crearSuscriptorRepositoryExpoSqlite(
 
     async actualizar(_id: number, _cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
       throw new Error(
-        'actualizar: no implementado todavia — fuera de scope MVP, ver post-entrega',
+        'actualizar: no implementado todavia — fuera de scope de la versión actual',
       );
     },
 
@@ -172,7 +172,7 @@ export function crearSuscriptorRepositoryExpoSqlite(
 
     async eliminar(_id: number): Promise<void> {
       throw new Error(
-        'eliminar: no implementado todavia — fuera de scope MVP, ver post-entrega',
+        'eliminar: no implementado todavia — fuera de scope de la versión actual',
       );
     },
 

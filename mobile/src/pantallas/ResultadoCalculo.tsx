@@ -125,7 +125,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>FACTURA CALCULADA</Text>
         <Pressable
           onPress={() => {
-            // TODO: abrir perfil/sesión cuando exista módulo de auth.
+            // Perfil: requiere módulo de autenticación.
           }}
           style={({ pressed }) => [
             styles.headerBtn,
@@ -280,14 +280,14 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         <View style={styles.footerLinks}>
           <Pressable
             onPress={() => {
-              // TODO: abrir pantalla/url de soporte cuando exista.
+              // Soporte: pendiente de implementación.
             }}
           >
             <Text style={styles.footerLink}>SOPORTE</Text>
           </Pressable>
           <Pressable
             onPress={() => {
-              // TODO: cerrar sesión cuando exista módulo de auth.
+              // Cerrar sesión: requiere módulo de autenticación.
             }}
           >
             <Text style={styles.footerLink}>CERRAR SESIÓN</Text>

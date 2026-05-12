@@ -171,13 +171,13 @@ export function crearMedidorRepositoryExpoSqlite(
 
     async actualizar(_id: number, _cambios: ActualizarMedidorInput): Promise<Medidor> {
       throw new Error(
-        'actualizar: no implementado todavia — fuera de scope MVP, ver post-entrega',
+        'actualizar: no implementado todavia — fuera de scope de la versión actual',
       );
     },
 
     async eliminar(_id: number): Promise<void> {
       throw new Error(
-        'eliminar: no implementado todavia — fuera de scope MVP, ver post-entrega',
+        'eliminar: no implementado todavia — fuera de scope de la versión actual',
       );
     },
 
