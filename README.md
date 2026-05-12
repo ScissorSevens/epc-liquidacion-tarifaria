@@ -1,66 +1,129 @@
-# Sistema de Liquidación Tarifaria — EPC Cundinamarca
+# MediApp — Sistema de Liquidación Tarifaria EPC Cundinamarca
 
-Motor de liquidación tarifaria para prestadores rurales de agua potable.  
-Desarrollado bajo normativa CRA, con enfoque offline-first para trabajo en campo.
+Solución full-stack para prestadores rurales de agua potable vinculados a **Empresas Públicas de Cundinamarca (EPC)**. Automatiza la captura de lecturas de medidores en campo (modo offline) y el cálculo de liquidaciones tarifarias según la normativa CRA (Resolución 688/2014).
 
-## Stack
+---
 
-- **Lenguaje**: TypeScript
-- **Testing**: Jest + ts-jest (TDD)
-- **CI/CD**: GitHub Actions
+## Stack tecnológico
 
-## Estructura
+| Capa | Tecnología |
+|---|---|
+| Dominio puro | TypeScript 5, Jest + ts-jest |
+| Aplicación móvil | React Native + Expo SDK, expo-sqlite |
+| Backend | .NET 8, ASP.NET Core Minimal API, EF Core 8 |
+| Base de datos servidor | PostgreSQL 16 |
+| Base de datos local | SQLite (expo-sqlite) |
+| Dashboard web | HTML5 estático, Vanilla JS, bcrypt.js |
+
+---
+
+## Estructura del repositorio
 
 ```
-src/
-└── motor-tarifario/     # Lógica de cálculo tarifario CRA
-    ├── types.ts          # Tipos e interfaces
-    ├── motor-tarifario.ts
-    ├── index.ts
-    └── __tests__/        # Tests unitarios (TDD)
+sistema/
+├── src/                        # Dominio puro TypeScript (motor tarifario, repos, casos de uso)
+│   ├── motor-tarifario/        # Cálculo CRA: cargo fijo, consumo básico, excedente, subsidio
+│   ├── suscriptores/           # Dominio de suscriptores
+│   ├── lecturas/               # Dominio de lecturas
+│   ├── medidores/              # Dominio de medidores
+│   ├── operarios/              # Dominio de operarios
+│   ├── sincronizacion/         # Cola de sincronización offline
+│   ├── importacion/            # Importación masiva desde CSV
+│   └── persistencia/           # Adaptadores SQLite (tests de integración)
+├── mobile/                     # App Android (Expo + React Native)
+│   └── src/
+│       ├── pantallas/          # Pantallas: RutaDeHoy, CapturarLectura, Sync, etc.
+│       ├── persistencia/       # Repositorios expo-sqlite
+│       └── composition/        # Bootstrap (inyección de dependencias)
+└── backend/                    # API REST (.NET 8) + Dashboard web
+    └── src/MediApp.Api/
+        ├── Features/           # Operarios, Suscriptores, Medidores, Lecturas, Liquidaciones
+        ├── Persistence/        # EF Core + migraciones PostgreSQL
+        └── wwwroot/            # Dashboard HTML estático
 ```
 
-## Comandos
+---
+
+## Pruebas automatizadas
+
+| Suite | Runner | Pruebas |
+|---|---|---|
+| Dominio TypeScript (`src/`) | Jest + ts-jest | 592 ✅ |
+| Mobile (`mobile/`) | jest-expo + RNTL | 52 ✅ |
+| Backend .NET (`backend/`) | xUnit | 38 |
+| **Total** | | **682** |
 
 ```bash
-npm test              # Ejecutar tests
-npm run test:watch    # Tests en modo watch (TDD)
-npm run test:coverage # Tests con reporte de cobertura
-npm run build         # Compilar TypeScript
+# Tests del dominio TypeScript
+cd sistema
+npm test
+
+# Tests mobile
+cd sistema/mobile
+npx jest --no-coverage
+
+# Tests backend .NET
+cd sistema/backend
+dotnet test
 ```
 
-## Ciclo TDD
+---
 
-Cada funcionalidad se desarrolla en tres pasos:
+## Comandos principales
 
-1. 🔴 **Red** — escribir el test que falla
-2. 🟢 **Green** — implementar lo mínimo para que pase
-3. 🔵 **Refactor** — limpiar sin romper tests
+### Backend
 
-## App móvil (`mobile/`)
+```bash
+# Aplicar migraciones
+cd backend/src/MediApp.Api
+dotnet ef database update
 
-Proyecto Expo + TypeScript que reusa el dominio TS desde `../src` vía path
-mapping `@dominio/*` (Opción 2 monorepo "lazy", sin workspaces npm/yarn).
+# Ejecutar servidor (puerto 5180)
+dotnet run --project backend/src/MediApp.Api
+```
 
-### Arrancar dev server
+### App móvil
 
 ```bash
 cd mobile
-npm install        # primera vez (~700 paquetes, ~45 s)
-npx expo start     # abre el dev server, muestra QR
+npx expo start
 ```
 
-Escaneá el QR con **Expo Go** en Android (mismo WiFi que el PC). Si la red lo
-bloquea, usá `npx expo start --tunnel` (más lento, pero atraviesa NAT).
+Escaneá el QR con **Expo Go** en Android (mismo WiFi que el servidor).
 
-### Stack móvil
+---
 
-- React Native vía **Expo SDK 54** (managed workflow)
-- React 19, RN 0.81, TypeScript 5.9 strict
-- Metro configurado para observar `../src` y resolver `@dominio/*`
-- Wiring del dominio en `mobile/src/composition/bootstrap.ts`
+## Arquitectura offline-first
 
-### Tests del wiring
+```
+Dispositivo Android (sin internet)
+  └── Captura lecturas + fotos → SQLite local → cola de sincronización
+          │
+          │  (cuando hay WiFi — acción manual del operario)
+          ▼
+Servidor local (red LAN del prestador)
+  └── MediApp.Api → PostgreSQL → Dashboard web
+```
 
-Los tests del bootstrap móvil corren con el **jest del root** (no se instala
-otra copia en `mobile/`). Lanzá todo con `npm test` desde la raíz.
+---
+
+## Configuración
+
+La URL del servidor se configura desde la pantalla **CONFIG** de la app móvil.  
+Puerto por defecto: `http://<IP-servidor>:5180`
+
+Archivo de conexión del backend: `backend/src/MediApp.Api/appsettings.json`
+
+```json
+{
+  "ConnectionStrings": {
+    "Default": "Host=localhost;Database=mediapp;Username=...;Password=..."
+  }
+}
+```
+
+---
+
+## Autor
+
+**Felipe Bernal Pachón** — Universidad de Cundinamarca, Ingeniería de Sistemas (2026)
