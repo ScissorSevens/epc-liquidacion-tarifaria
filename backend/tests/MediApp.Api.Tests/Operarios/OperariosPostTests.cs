@@ -2,11 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using MediApp.Api.Persistence;
 using MediApp.Api.Tests.Fixtures;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace MediApp.Api.Tests.Operarios;
 
@@ -22,27 +20,7 @@ public class OperariosPostTests
 
     public OperariosPostTests(PostgresContainerFixture pg) => _pg = pg;
 
-    private WebApplicationFactory<Program> CrearFactory()
-    {
-        var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Development");
-                builder.UseSetting("ConnectionStrings:Default", _pg.ConnectionString);
-                // Evitar el freeze del ReloadableLogger de Serilog en tests paralelos.
-                builder.ConfigureLogging(logging =>
-                {
-                    logging.ClearProviders();
-                    logging.AddConsole();
-                });
-            });
-
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
-        db.Database.Migrate();
-
-        return factory;
-    }
+    private WebApplicationFactory<Program> CrearFactory() => _pg.Factory;
 
     private static object PayloadValido(string cedula = "123456", string email = "op@test.com") => new
     {
@@ -61,7 +39,7 @@ public class OperariosPostTests
     [Fact]
     public async Task Post_PayloadValido_Devuelve201_SinPasswordHash()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var cedula = $"100{Random.Shared.Next(100000, 999999)}";
@@ -86,7 +64,7 @@ public class OperariosPostTests
     [Fact]
     public async Task Post_CedulaDuplicada_Devuelve409()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var cedula = $"200{Random.Shared.Next(100000, 999999)}";
@@ -105,7 +83,7 @@ public class OperariosPostTests
     [Fact]
     public async Task Post_EmailDuplicado_Devuelve409()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var cedula1 = $"300{Random.Shared.Next(100000, 999999)}";
@@ -124,7 +102,7 @@ public class OperariosPostTests
     [Fact]
     public async Task Post_CedulaMenorA6Digitos_Devuelve400()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var resp = await client.PostAsJsonAsync("/api/v1/operarios", PayloadValido("12", "v400@test.com"));
@@ -137,7 +115,7 @@ public class OperariosPostTests
     [Fact]
     public async Task Post_PasswordHashVacio_Devuelve400()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var payload = new

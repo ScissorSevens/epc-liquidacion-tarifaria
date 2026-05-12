@@ -4,11 +4,9 @@ using System.Text.Json;
 using MediApp.Api.Persistence;
 using MediApp.Api.Persistence.Entities;
 using MediApp.Api.Tests.Fixtures;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace MediApp.Api.Tests.Operarios;
 
@@ -24,26 +22,7 @@ public class OperariosGetTests
 
     public OperariosGetTests(PostgresContainerFixture pg) => _pg = pg;
 
-    private WebApplicationFactory<Program> CrearFactory()
-    {
-        var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Development");
-                builder.UseSetting("ConnectionStrings:Default", _pg.ConnectionString);
-                builder.ConfigureLogging(logging =>
-                {
-                    logging.ClearProviders();
-                    logging.AddConsole();
-                });
-            });
-
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
-        db.Database.Migrate();
-
-        return factory;
-    }
+    private WebApplicationFactory<Program> CrearFactory() => _pg.Factory;
 
     private static Operario NuevoOperario(string cedula, string email, string estado = "activo") => new()
     {
@@ -61,7 +40,7 @@ public class OperariosGetTests
     [Fact]
     public async Task Get_SinFiltro_Devuelve200_YLosOperariosIncluidosInactivos()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         // Insertar 3 operarios directamente en DB con prefijos únicos
         var prefix = Random.Shared.Next(10000, 99999).ToString();
@@ -102,7 +81,7 @@ public class OperariosGetTests
     [Fact]
     public async Task Get_SoloActivos_FiltraInactivos()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         using (var scope = factory.Services.CreateScope())
@@ -144,7 +123,7 @@ public class OperariosGetTests
         // de otros tests, filtramos con soloActivos=true y verificamos la estructura.
         // Para garantizar array vacío usamos una DB completamente limpia via
         // truncate directo antes del test.
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         // Truncar la tabla operarios para este test específico
         using (var scope = factory.Services.CreateScope())

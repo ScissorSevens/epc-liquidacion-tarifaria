@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using MediApp.Api.Persistence;
 using MediApp.Api.Tests.Fixtures;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,29 +11,17 @@ namespace MediApp.Api.Tests.Sync;
 /// <summary>
 /// Tests de integración del handler genérico de sync usando Suscriptor como caso piloto.
 /// Cubre los 3 caminos del protocolo #213: 201 nuevo, 200 idempotente, 409 conflicto.
+/// Pertenece a la collection "Operarios" para compartir la fixture Postgres y evitar
+/// que Serilog lance "logger already frozen" al crear una segunda WebApplicationFactory.
 /// </summary>
-public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
+[Collection("Operarios")]
+public class SuscriptorSyncTests
 {
     private readonly PostgresContainerFixture _pg;
 
     public SuscriptorSyncTests(PostgresContainerFixture pg) => _pg = pg;
 
-    private WebApplicationFactory<Program> CrearFactory()
-    {
-        var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Development");
-                builder.UseSetting("ConnectionStrings:Default", _pg.ConnectionString);
-            });
-
-        // Aplicar migrations contra el container post-build (una sola vez por factory).
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
-        db.Database.Migrate();
-
-        return factory;
-    }
+    private WebApplicationFactory<Program> CrearFactory() => _pg.Factory;
 
     private static object PayloadValido() => new
     {
@@ -65,7 +52,7 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
     [Fact]
     public async Task Post_NuevoSuscriptor_DevuelveCreated201_YGuardaSyncRegistro()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var sobre = SobreSync(PayloadValido(), "tablet-01:42", HashValido);
@@ -91,7 +78,7 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
     [Fact]
     public async Task Post_MismoIdClienteYHash_DevuelveOk200Idempotente()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         // Usamos un idCliente único por test para no chocar con otros (DB compartida en la fixture).
@@ -134,7 +121,7 @@ public class SuscriptorSyncTests : IClassFixture<PostgresContainerFixture>
     [Fact]
     public async Task Post_MismoIdClienteHashDistintoSinForzar_DevuelveConflict409ConHashServer()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var idCliente = "tablet-03:200";

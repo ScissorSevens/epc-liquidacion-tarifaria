@@ -3,11 +3,9 @@ using System.Net.Http.Json;
 using MediApp.Api.Persistence;
 using MediApp.Api.Persistence.Entities;
 using MediApp.Api.Tests.Fixtures;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace MediApp.Api.Tests.Operarios;
 
@@ -23,26 +21,11 @@ public class OperariosVincularTests
 
     public OperariosVincularTests(PostgresContainerFixture pg) => _pg = pg;
 
-    private WebApplicationFactory<Program> CrearFactory()
-    {
-        var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Development");
-                builder.UseSetting("ConnectionStrings:Default", _pg.ConnectionString);
-                builder.ConfigureLogging(logging =>
-                {
-                    logging.ClearProviders();
-                    logging.AddConsole();
-                });
-            });
+    private WebApplicationFactory<Program> CrearFactory() => _pg.Factory;
 
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
-        db.Database.Migrate();
-
-        return factory;
-    }
+    private const string PasswordPrueba = "Test1234!";
+    // Hash BCrypt (work factor 4 para velocidad en tests) de "Test1234!"
+    private static readonly string HashPrueba = BCrypt.Net.BCrypt.HashPassword(PasswordPrueba, workFactor: 4);
 
     private async Task<Operario> InsertarOperario(IServiceScope scope, string cedula, string email, string? dispositivoId = null)
     {
@@ -52,7 +35,7 @@ public class OperariosVincularTests
             NumeroCedula = cedula,
             Nombre = "Operario Vincular",
             Email = email,
-            PasswordHash = "$2b$10$hashhashhashhashhashhauABCDEFGHIJKLMNOPQRSTUVWXYZ01",
+            PasswordHash = HashPrueba,
             Rol = "operario",
             Estado = "activo",
             DispositivoId = dispositivoId,
@@ -68,7 +51,7 @@ public class OperariosVincularTests
     [Fact]
     public async Task Patch_VincularDispositivoNuevo_Devuelve200_YActualizaDB()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         Operario op;
@@ -77,7 +60,7 @@ public class OperariosVincularTests
 
         var client = factory.CreateClient();
         var deviceId = $"device-{prefix}-A";
-        var payload = new { cedula = op.NumeroCedula, dispositivoId = deviceId };
+        var payload = new { cedula = op.NumeroCedula, password = PasswordPrueba, dispositivoId = deviceId };
         var resp = await client.PatchAsJsonAsync("/api/v1/operarios/vincular-dispositivo", payload);
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
@@ -94,7 +77,7 @@ public class OperariosVincularTests
     [Fact]
     public async Task Patch_MismoDispositivoMismoOperario_EsIdempotente_Devuelve200()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         var deviceId = $"device-{prefix}-B";
@@ -103,7 +86,7 @@ public class OperariosVincularTests
             op = await InsertarOperario(scope, $"9{prefix}2", $"v2_{prefix}@test.com", deviceId);
 
         var client = factory.CreateClient();
-        var payload = new { cedula = op.NumeroCedula, dispositivoId = deviceId };
+        var payload = new { cedula = op.NumeroCedula, password = PasswordPrueba, dispositivoId = deviceId };
 
         // Primera llamada
         var resp1 = await client.PatchAsJsonAsync("/api/v1/operarios/vincular-dispositivo", payload);
@@ -119,7 +102,7 @@ public class OperariosVincularTests
     [Fact]
     public async Task Patch_DispositivoYaEnOtroOperario_Devuelve409()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         var deviceId = $"device-{prefix}-C";
@@ -132,7 +115,7 @@ public class OperariosVincularTests
 
         var client = factory.CreateClient();
         // Intentar vincular el mismo device a op2
-        var payload = new { cedula = op2.NumeroCedula, dispositivoId = deviceId };
+        var payload = new { cedula = op2.NumeroCedula, password = PasswordPrueba, dispositivoId = deviceId };
         var resp = await client.PatchAsJsonAsync("/api/v1/operarios/vincular-dispositivo", payload);
 
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
@@ -143,10 +126,10 @@ public class OperariosVincularTests
     [Fact]
     public async Task Patch_CedulaInexistente_Devuelve404()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
-        var payload = new { cedula = "000000", dispositivoId = "device-inexistente" };
+        var payload = new { cedula = "000000", password = "cualquiera", dispositivoId = "device-inexistente" };
         var resp = await client.PatchAsJsonAsync("/api/v1/operarios/vincular-dispositivo", payload);
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);

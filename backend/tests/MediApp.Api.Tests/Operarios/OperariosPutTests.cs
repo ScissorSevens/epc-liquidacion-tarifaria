@@ -4,11 +4,9 @@ using System.Text.Json;
 using MediApp.Api.Persistence;
 using MediApp.Api.Persistence.Entities;
 using MediApp.Api.Tests.Fixtures;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace MediApp.Api.Tests.Operarios;
 
@@ -24,26 +22,7 @@ public class OperariosPutTests
 
     public OperariosPutTests(PostgresContainerFixture pg) => _pg = pg;
 
-    private WebApplicationFactory<Program> CrearFactory()
-    {
-        var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Development");
-                builder.UseSetting("ConnectionStrings:Default", _pg.ConnectionString);
-                builder.ConfigureLogging(logging =>
-                {
-                    logging.ClearProviders();
-                    logging.AddConsole();
-                });
-            });
-
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
-        db.Database.Migrate();
-
-        return factory;
-    }
+    private WebApplicationFactory<Program> CrearFactory() => _pg.Factory;
 
     private async Task<Operario> InsertarOperario(IServiceScope scope, string cedula, string email, string estado = "activo")
     {
@@ -68,7 +47,7 @@ public class OperariosPutTests
     [Fact]
     public async Task Put_EstadoInactivo_Devuelve200_YOperarioEsInactivoEnDB()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         Operario op;
@@ -93,7 +72,7 @@ public class OperariosPutTests
     [Fact]
     public async Task Put_IdInexistente_Devuelve404()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
         var client = factory.CreateClient();
 
         var resp = await client.PutAsJsonAsync("/api/v1/operarios/99999999", new { nombre = "X" });
@@ -106,7 +85,7 @@ public class OperariosPutTests
     [Fact]
     public async Task Put_EmailDuplicadoConOtroOperario_Devuelve409()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         Operario op1, op2;
@@ -129,7 +108,7 @@ public class OperariosPutTests
     [Fact]
     public async Task Put_NumeroCedulaEnPayload_EsIgnorado_YCedulaNoCambia()
     {
-        await using var factory = CrearFactory();
+        var factory = CrearFactory();
 
         var prefix = Random.Shared.Next(10000, 99999).ToString();
         var cedulaOriginal = $"8{prefix}1";
