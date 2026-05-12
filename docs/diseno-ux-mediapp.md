@@ -1,6 +1,7 @@
-# Diseño UX — MediApp (Sistema EPC Lecturas Rurales)
+ñ# Diseño UX — MediApp (Sistema EPC Lecturas Rurales)
 
 > **Documento dual-propósito**:
+>
 > 1. **Para Stitch / generadores text-to-UI**: cada pantalla incluye descripción narrativa rica + bullets estructurados de componentes para inferencia precisa de wireframes.
 > 2. **Para presentación académica**: cuenta la historia completa desde el problema hasta la pantalla, en orden Persona → Journey → Flow → Wireframes.
 
@@ -10,11 +11,12 @@
 
 En Colombia, los **prestadores rurales de servicios públicos de acueducto** atienden a poblaciones dispersas, con conectividad intermitente o inexistente, y operan con recursos limitados frente a la regulación tarifaria de la **Comisión de Regulación de Agua Potable y Saneamiento Básico (CRA)**.
 
-**Diagnóstico del anteproyecto** *("Desarrollo de un sistema de liquidación tarifaria y validación fotográfica basado en una aplicación móvil y un backend institucional para prestadores rurales de servicios públicos vinculados a EPC")*:
+**Diagnóstico del anteproyecto** _("Desarrollo de un sistema de liquidación tarifaria y validación fotográfica basado en una aplicación móvil y un backend institucional para prestadores rurales de servicios públicos vinculados a EPC")_:
 
 > Solo el **17.03 % de los prestadores rurales** aplica correctamente la metodología CRA al momento de liquidar las tarifas mensuales.
 
 Las consecuencias directas son:
+
 - Cobros incorrectos a los suscriptores (sub o sobre-facturación).
 - Pérdida de confianza de la comunidad en el prestador.
 - Falta de evidencia auditable de las lecturas tomadas en terreno.
@@ -29,32 +31,38 @@ Las consecuencias directas son:
 ### 2.1 Don Hernán — Operario rural (usuario primario)
 
 **Perfil**:
+
 - 47 años, vive en la vereda **El Manzano** (municipio de Cundinamarca).
 - Estudió hasta noveno grado. Lee y escribe con fluidez, pero no está familiarizado con software complejo.
 - Lleva **11 años** trabajando con el prestador EPC. Conoce a cada suscriptor por nombre.
 
 **Contexto operativo**:
+
 - Recorre **45 a 60 medidores por día**, distribuidos en un radio de 8 km, en moto.
 - Salida típica: 6:30 AM. Regreso a la oficina del prestador: 1:00 - 2:00 PM.
 - **Conectividad**: WiFi solo en la oficina del prestador (al inicio y al final del día). En ruta, **no hay señal celular** en la mayoría de los predios.
 
 **Dispositivo**:
+
 - Smartphone Android de gama media-baja (típicamente Xiaomi Redmi o similar, 4 GB RAM, Android 11-14).
 - Pantalla de 6.5", uso con **una sola mano** mientras sostiene la moto, casco o linterna.
 - Batería crítica: el día empieza al 100 % y debe terminar con carga suficiente para no perder datos.
 
 **Objetivos**:
+
 - Capturar las lecturas del día sin omitir ningún suscriptor de la ruta.
 - Tener evidencia fotográfica de cada lectura para resolver reclamos posteriores.
 - Llegar a la oficina y que la sincronización sea **automática y rápida**, sin tener que rehacer datos.
 
 **Frustraciones (pain points reales)**:
+
 - Hoy usa una **planilla de papel** que se moja con la lluvia o se pierde.
 - Cuando hay un reclamo del suscriptor 3 días después, no puede demostrar la lectura tomada.
 - Calcula las tarifas en una calculadora física al volver a la oficina, **se equivoca con frecuencia** porque la fórmula CRA tiene varios tramos y subsidios.
 - Si su jefe le pide el "histórico" de un suscriptor, tiene que revisar planillas físicas de meses anteriores.
 
 **Citas representativas** (estilo persona research):
+
 > "Yo a la gente la conozco, pero acordarme cuánto consumieron el mes pasado, eso ya no."
 > "Si la lluvia me moja la planilla, ese día se pierde y toca volver a la casa del señor."
 > "Las cuentas las hago acá [señala calculadora], pero a veces me sale distinto que al patrón."
@@ -62,11 +70,13 @@ Las consecuencias directas son:
 ### 2.2 Marta — Administrativa del prestador EPC (usuaria secundaria, web)
 
 **Perfil**:
+
 - 38 años, técnica en sistemas, oficina del prestador.
 - Recibe los datos sincronizados de los operarios al final del día.
 - Genera reportes mensuales para la junta del acueducto y la Superintendencia.
 
 **Objetivos**:
+
 - Validar que todas las lecturas del día llegaron al servidor.
 - Identificar suscriptores con consumos anómalos (fugas, fraude).
 - Imprimir facturas para entrega física al mes siguiente.
@@ -77,18 +87,18 @@ Las consecuencias directas son:
 
 ## 3. Journey Map — Día típico de Don Hernán
 
-| # | Fase | Acción de Don Hernán | Lo que piensa | Pain point actual (sin MediApp) | Oportunidad MediApp |
-|---|------|---------------------|---------------|---------------------------------|---------------------|
-| 1 | **6:00 AM — Oficina** | Llega, agarra la planilla impresa con la ruta del día (40-60 suscriptores). Toma un tinto. | "A ver hoy a quién me toca." | Planilla en papel, una sola copia, se moja, se pierde. | Abre MediApp en oficina (con WiFi), **ve la lista de suscriptores precargados** ordenada por ruta. |
-| 2 | **6:30 AM — Salida moto** | Sale a la primera vereda. **Sin señal celular** desde acá hasta el regreso. | "Ojalá no llueva." | App tradicional moriría sin señal. | **Offline-first**: todo funciona local, SQLite del celular. |
-| 3 | **7:00 AM — Casa del primer suscriptor** | Saluda, va al medidor, anota lectura en planilla. Usa lápiz para no borrarse con humedad. | "1247 metros cúbicos." | Anotación a mano: errores de transcripción, ilegible si la mano tiembla. | Abre detalle del suscriptor, ingresa lectura en teclado numérico grande. |
-| 4 | **7:02 AM — Misma casa** | Mira el medidor pero no tiene cómo "demostrar" la lectura si después hay reclamo. | "Si me dice que no consumió tanto, qué le muestro." | **Cero evidencia visual.** | **Toma foto del medidor** desde la app, con timestamp + hash de integridad. |
-| 5 | **7:05 AM — Misma casa** | Antes el cálculo lo hacía en la oficina. | "¿Cuánto le tocará pagar?" | Cálculo postergado, suscriptor no sabe el monto en el momento. | App calcula la **liquidación CRA al instante** con la fórmula correcta y muestra el total estimado. |
-| 6 | **7:10 - 12:30 PM — Ruta** | Repite el ciclo en 40-60 casas. Hace dos descansos. | "Llevo 27, me faltan 18." | No hay forma de saber **cuántas lleva** sin contar planilla. | Pantalla **Home muestra contador**: "27 capturadas / 60 ruta". |
-| 7 | **11:00 AM — Casa atípica** | Suscriptor pregunta: "¿el mes pasado qué pagué?" | "Mmm, no me acuerdo." | Sin acceso al histórico en terreno. | Pantalla **Historial del suscriptor**: últimos 6 meses con lectura, consumo, total. |
-| 8 | **1:00 PM — Vuelta a oficina** | Llega, deja la moto, prende el WiFi del celu. | "Ahora a pasar todo al sistema." | **2 - 3 horas** de transcripción manual + cálculos. | App **detecta WiFi y sincroniza automáticamente** las 60 lecturas + fotos al backend. |
-| 9 | **1:15 PM — Pantalla sync** | Ve barra de progreso, espera. | "Que no se trabe." | N/A | Pantalla **Sincronizar** muestra: "Subiendo 60 lecturas / 60 fotos. Pendientes: 23". Reintentos automáticos. |
-| 10 | **1:30 PM — Cierre** | Confirma que todo subió, apaga el celu, va a almorzar. | "Listo, hoy sí está completo." | A veces se da cuenta días después que faltó un suscriptor. | Pantalla final muestra **"Sincronización completa: 60/60"** con check verde, o lista de errores específicos a resolver. |
+| #   | Fase                                     | Acción de Don Hernán                                                                       | Lo que piensa                                       | Pain point actual (sin MediApp)                                          | Oportunidad MediApp                                                                                                     |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 1   | **6:00 AM — Oficina**                    | Llega, agarra la planilla impresa con la ruta del día (40-60 suscriptores). Toma un tinto. | "A ver hoy a quién me toca."                        | Planilla en papel, una sola copia, se moja, se pierde.                   | Abre MediApp en oficina (con WiFi), **ve la lista de suscriptores precargados** ordenada por ruta.                      |
+| 2   | **6:30 AM — Salida moto**                | Sale a la primera vereda. **Sin señal celular** desde acá hasta el regreso.                | "Ojalá no llueva."                                  | App tradicional moriría sin señal.                                       | **Offline-first**: todo funciona local, SQLite del celular.                                                             |
+| 3   | **7:00 AM — Casa del primer suscriptor** | Saluda, va al medidor, anota lectura en planilla. Usa lápiz para no borrarse con humedad.  | "1247 metros cúbicos."                              | Anotación a mano: errores de transcripción, ilegible si la mano tiembla. | Abre detalle del suscriptor, ingresa lectura en teclado numérico grande.                                                |
+| 4   | **7:02 AM — Misma casa**                 | Mira el medidor pero no tiene cómo "demostrar" la lectura si después hay reclamo.          | "Si me dice que no consumió tanto, qué le muestro." | **Cero evidencia visual.**                                               | **Toma foto del medidor** desde la app, con timestamp + hash de integridad.                                             |
+| 5   | **7:05 AM — Misma casa**                 | Antes el cálculo lo hacía en la oficina.                                                   | "¿Cuánto le tocará pagar?"                          | Cálculo postergado, suscriptor no sabe el monto en el momento.           | App calcula la **liquidación CRA al instante** con la fórmula correcta y muestra el total estimado.                     |
+| 6   | **7:10 - 12:30 PM — Ruta**               | Repite el ciclo en 40-60 casas. Hace dos descansos.                                        | "Llevo 27, me faltan 18."                           | No hay forma de saber **cuántas lleva** sin contar planilla.             | Pantalla **Home muestra contador**: "27 capturadas / 60 ruta".                                                          |
+| 7   | **11:00 AM — Casa atípica**              | Suscriptor pregunta: "¿el mes pasado qué pagué?"                                           | "Mmm, no me acuerdo."                               | Sin acceso al histórico en terreno.                                      | Pantalla **Historial del suscriptor**: últimos 6 meses con lectura, consumo, total.                                     |
+| 8   | **1:00 PM — Vuelta a oficina**           | Llega, deja la moto, prende el WiFi del celu.                                              | "Ahora a pasar todo al sistema."                    | **2 - 3 horas** de transcripción manual + cálculos.                      | App **detecta WiFi y sincroniza automáticamente** las 60 lecturas + fotos al backend.                                   |
+| 9   | **1:15 PM — Pantalla sync**              | Ve barra de progreso, espera.                                                              | "Que no se trabe."                                  | N/A                                                                      | Pantalla **Sincronizar** muestra: "Subiendo 60 lecturas / 60 fotos. Pendientes: 23". Reintentos automáticos.            |
+| 10  | **1:30 PM — Cierre**                     | Confirma que todo subió, apaga el celu, va a almorzar.                                     | "Listo, hoy sí está completo."                      | A veces se da cuenta días después que faltó un suscriptor.               | Pantalla final muestra **"Sincronización completa: 60/60"** con check verde, o lista de errores específicos a resolver. |
 
 ### Insights del journey map
 
@@ -148,17 +158,17 @@ flowchart TD
 
 ### 5.2 Paleta de colores
 
-| Token | Hex aprox | Uso |
-|-------|-----------|-----|
-| `primary` | `#0A6E8C` (azul agua profundo) | Acciones principales, header. |
-| `primary-light` | `#4FB3D9` | Highlights, links. |
-| `success` | `#2E8B57` | Lecturas guardadas, sync OK. |
-| `warning` | `#E8A547` | Pendientes, conexión inestable. |
-| `error` | `#C8434E` | Validaciones, fallos sync. |
-| `neutral-900` | `#1A1A1A` | Texto principal. |
-| `neutral-600` | `#666666` | Texto secundario. |
-| `neutral-200` | `#E5E5E5` | Bordes, separadores. |
-| `neutral-50` | `#F8F8F8` | Fondo. |
+| Token           | Hex aprox                      | Uso                             |
+| --------------- | ------------------------------ | ------------------------------- |
+| `primary`       | `#0A6E8C` (azul agua profundo) | Acciones principales, header.   |
+| `primary-light` | `#4FB3D9`                      | Highlights, links.              |
+| `success`       | `#2E8B57`                      | Lecturas guardadas, sync OK.    |
+| `warning`       | `#E8A547`                      | Pendientes, conexión inestable. |
+| `error`         | `#C8434E`                      | Validaciones, fallos sync.      |
+| `neutral-900`   | `#1A1A1A`                      | Texto principal.                |
+| `neutral-600`   | `#666666`                      | Texto secundario.               |
+| `neutral-200`   | `#E5E5E5`                      | Bordes, separadores.            |
+| `neutral-50`    | `#F8F8F8`                      | Fondo.                          |
 
 **Razón de la paleta**: azul "agua" refuerza el dominio (acueducto rural). Contrastes WCAG AA+ para legibilidad bajo sol.
 
@@ -180,6 +190,7 @@ Escala de 4: `4, 8, 12, 16, 24, 32, 48, 64`. Padding base de pantalla: `16dp` la
 ### 5.5 Iconografía
 
 Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
+
 - `home`, `user`, `camera`, `cloud-upload`, `wifi-off`, `check-circle`, `alert-triangle`, `chevron-right`, `history`.
 
 ---
@@ -211,6 +222,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
 - Footer fijo abajo: "MediApp v0.1 · EPC Acueducto Manzano", `Caption` neutral-600.
 
 **Estados**:
+
 - Sin selección → botón deshabilitado, opacidad 50 %.
 - Con selección → botón activo, color primary, ripple en tap.
 
@@ -247,6 +259,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
   - `BotonSecundario` outlined full-width: "Sincronizar (23 pendientes)" (estado normal) / "✓ Todo sincronizado" (estado sin pendientes, verde).
 
 **Estados**:
+
 - **Offline**: banner amarillo visible.
 - **Online sin pendientes**: footer verde "✓ Todo sincronizado".
 - **Sincronización en progreso**: footer cambia a barra de progreso "Sincronizando 12 / 23...".
@@ -296,6 +309,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
   - `BotonPrincipal` "Guardar y calcular" (2/3 ancho), deshabilitado sin lectura+foto.
 
 **Estados**:
+
 - **Sin datos**: input vacío, botón foto vacío, guardar deshabilitado.
 - **Lectura ingresada sin foto**: input lleno, botón foto vacío, guardar deshabilitado.
 - **Todo completo**: guardar habilitado, color primary brillante.
@@ -349,6 +363,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
   - `BotonPrincipal` "Volver a la ruta" (1/2).
 
 **Estados**:
+
 - **Cálculo OK**: como descrito.
 - **Cálculo con advertencia** (subsidio no aplicable, consumo anormal): banner amarillo encima del total.
 - **Acordeón cerrado por defecto** (un tap para expandir).
@@ -387,6 +402,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
   - `BotonPrincipal` full-width "Volver".
 
 **Estados**:
+
 - **Suscriptor con historial completo**: como descrito.
 - **Suscriptor nuevo (< 3 meses)**: muestra solo lo que hay con mensaje "Histórico limitado. Necesita más períodos para ver tendencias."
 - **Tap en fila**: navega a Pantalla 4 (Ver Factura) en modo solo-lectura para ese período.
@@ -432,6 +448,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
   - **Con errores**: `BotonSecundario` "Volver" + `BotonPrincipal` "Reintentar fallidos".
 
 **Estados**:
+
 - **Inicial (no se ha sincronizado nunca)**: hero gris con ícono de nube neutra, mensaje "23 lecturas listas para enviar", botón "Iniciar sincronización".
 - **En progreso**: barra moviéndose, botón pausar disponible.
 - **Pausada**: barra estática, botón "Reanudar".
@@ -480,6 +497,7 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
   - `BotonSecundario` outlined error full-width: "Cambiar de operario".
 
 **Estados**:
+
 - Pantalla solo-lectura. Único interactivo: switches (persistentes localmente) y botón cambiar operario (vuelve a Pantalla 1).
 
 ---
@@ -488,15 +506,15 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
 
 ### 7.1 Stack
 
-| Capa | Tecnología | Razón |
-|------|-----------|-------|
-| App móvil | React Native + Expo SDK 54 | Cross-platform, dev rápido, un solo codebase. |
-| Lenguaje | TypeScript 5.9 strict | Tipado fuerte, refactor seguro. |
-| Persistencia local | SQLite vía `expo-sqlite` | Offline-first, transaccional, embebido. |
-| Dominio puro | TypeScript modular hexagonal | Lógica testeable, agnóstica de I/O. |
-| Testing | Jest + ts-jest, 500 tests verde | TDD estricto en lógica de negocio. |
-| Backend | (a definir, ver tabla de decisiones) | Solo persiste, no recalcula. |
-| Sincronización | PUSH-only desde móvil | Simplifica conflictos, fuente de verdad clara. |
+| Capa               | Tecnología                           | Razón                                          |
+| ------------------ | ------------------------------------ | ---------------------------------------------- |
+| App móvil          | React Native + Expo SDK 54           | Cross-platform, dev rápido, un solo codebase.  |
+| Lenguaje           | TypeScript 5.9 strict                | Tipado fuerte, refactor seguro.                |
+| Persistencia local | SQLite vía `expo-sqlite`             | Offline-first, transaccional, embebido.        |
+| Dominio puro       | TypeScript modular hexagonal         | Lógica testeable, agnóstica de I/O.            |
+| Testing            | Jest + ts-jest, 500 tests verde      | TDD estricto en lógica de negocio.             |
+| Backend            | (a definir, ver tabla de decisiones) | Solo persiste, no recalcula.                   |
+| Sincronización     | PUSH-only desde móvil                | Simplifica conflictos, fuente de verdad clara. |
 
 ### 7.2 Decisiones arquitectónicas clave
 
@@ -520,16 +538,16 @@ Iconos line-style 24dp (sugerencia: **Lucide** o **Phosphor**). Iconos clave:
 
 ## 8. Glosario rápido
 
-| Término | Significado |
-|---------|-------------|
-| **CRA** | Comisión de Regulación de Agua Potable y Saneamiento Básico. |
-| **EPC** | Empresa Prestadora Comunitaria (acueducto rural). |
-| **Suscriptor** | Persona o predio que recibe el servicio de acueducto. |
-| **Liquidación** | Cálculo del monto a cobrar por el período. |
-| **Estrato** | Clasificación socioeconómica colombiana (1-6) que afecta subsidios. |
-| **Vereda** | Subdivisión rural más pequeña que el municipio. |
-| **Offline-first** | Patrón de diseño donde la app funciona completamente sin conexión y sincroniza después. |
-| **Hash de integridad** | Huella criptográfica (SHA-256) que demuestra que un dato no fue alterado. |
+| Término                | Significado                                                                             |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| **CRA**                | Comisión de Regulación de Agua Potable y Saneamiento Básico.                            |
+| **EPC**                | Empresa Prestadora Comunitaria (acueducto rural).                                       |
+| **Suscriptor**         | Persona o predio que recibe el servicio de acueducto.                                   |
+| **Liquidación**        | Cálculo del monto a cobrar por el período.                                              |
+| **Estrato**            | Clasificación socioeconómica colombiana (1-6) que afecta subsidios.                     |
+| **Vereda**             | Subdivisión rural más pequeña que el municipio.                                         |
+| **Offline-first**      | Patrón de diseño donde la app funciona completamente sin conexión y sincroniza después. |
+| **Hash de integridad** | Huella criptográfica (SHA-256) que demuestra que un dato no fue alterado.               |
 
 ---
 

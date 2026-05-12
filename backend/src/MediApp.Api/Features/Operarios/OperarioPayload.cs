@@ -38,12 +38,17 @@ public class OperarioPayload
 }
 
 /// <summary>
-/// Payload para vincular un dispositivo móvil a un operario por número de cédula.
+/// Payload para vincular un dispositivo móvil a un operario.
+/// Requiere cédula + contraseña en claro para verificar identidad antes de vincular.
 /// </summary>
 public class VincularDispositivoPayload
 {
     [JsonPropertyName("cedula")]
     public string Cedula { get; set; } = string.Empty;
+
+    /// <summary>Contraseña en claro. Se verifica contra el hash bcrypt almacenado.</summary>
+    [JsonPropertyName("password")]
+    public string Password { get; set; } = string.Empty;
 
     [JsonPropertyName("dispositivoId")]
     public string DispositivoId { get; set; } = string.Empty;

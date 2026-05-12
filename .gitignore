@@ -3,7 +3,7 @@ dist/
 coverage/
 *.js.map
 
-# SDD artifacts (local-only, no van a GitHub)
+# SDD artifacts 
 .atl/
 openspec/
 
@@ -12,3 +12,11 @@ mobile/node_modules/
 mobile/.expo/
 mobile/dist/
 mobile/web-build/
+
+#docs
+docs/
+
+#documentacion
+DOCUMENTACION_TECNICA.md
+MANUAL_DE_USUARIO.md
+

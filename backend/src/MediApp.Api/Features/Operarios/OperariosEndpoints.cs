@@ -126,7 +126,12 @@ public static class OperariosEndpoints
             var entidad = await db.Operarios
                 .FirstOrDefaultAsync(o => o.NumeroCedula == payload.Cedula, ct);
             if (entidad is null)
-                return Results.NotFound(new { error = $"No existe un operario con NumeroCedula '{payload.Cedula}'." });
+                return Results.NotFound(new { error = $"No existe un operario con cédula '{payload.Cedula}'." });
+
+            // Verificar contraseña
+            bool passwordValida = BCrypt.Net.BCrypt.Verify(payload.Password, entidad.PasswordHash);
+            if (!passwordValida)
+                return Results.Json(new { error = "Cédula o contraseña incorrectos." }, statusCode: 401);
 
             // Si el mismo operario ya tiene ese DispositivoId → idempotente, retornar 200
             if (entidad.DispositivoId == payload.DispositivoId)

@@ -66,6 +66,10 @@ namespace MediApp.Api.Persistence.Migrations
                 column: "numero_cedula",
                 unique: true);
 
+            // Limpiar id_operario huérfanos antes de crear la FK
+            // (lecturas existentes pueden tener id_operario con valores que no existen en operarios)
+            migrationBuilder.Sql("UPDATE lecturas SET id_operario = NULL WHERE id_operario IS NOT NULL");
+
             migrationBuilder.AddForeignKey(
                 name: "fk_lecturas_operarios_id_operario",
                 table: "lecturas",

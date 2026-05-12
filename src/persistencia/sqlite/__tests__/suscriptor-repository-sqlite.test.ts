@@ -17,6 +17,7 @@ function suscriptorBase(overrides: Partial<SuscriptorBorrador> = {}): Suscriptor
     nombre_apellidos: 'Juan Perez',
     direccion: 'Calle Falsa 123',
     estrato: 3,
+    aplica_subsidio: false,
     estado: 'activo',
     ...overrides,
   };

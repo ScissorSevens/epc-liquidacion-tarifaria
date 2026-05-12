@@ -40,6 +40,7 @@ interface SuscriptorRow {
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
   readonly numero_catastral: string | null;
+  readonly aplica_subsidio: number;
   readonly estado: string;
   readonly created_at: string;
 }
@@ -51,6 +52,7 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     nombre_apellidos: row.nombre_apellidos,
     direccion: row.direccion,
     estrato: row.estrato as Suscriptor['estrato'],
+    aplica_subsidio: row.aplica_subsidio === 1,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
     ...(row.matricula_inmobiliaria !== null && {

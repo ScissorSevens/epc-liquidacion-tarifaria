@@ -50,6 +50,7 @@ function suscriptorBase(): Suscriptor {
     nombre_apellidos: 'María López',
     direccion: 'Calle 5 #2-10',
     estrato: 2,
+    aplica_subsidio: false,
     estado: 'activo',
     created_at: '2026-01-01T00:00:00.000Z',
   };

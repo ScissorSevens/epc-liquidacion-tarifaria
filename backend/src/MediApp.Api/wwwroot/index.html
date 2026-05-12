@@ -4,10 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MediApp — Dashboard</title>
+  <script src="/bcrypt.min.js"></script>
+  <script>var bcrypt = dcodeIO.bcrypt;</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     * { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
@@ -705,7 +706,7 @@ async function guardarOperario() {
       await fetch(`${API}/operarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numeroCedula: cedula, nombre, email, rol, estado: 'activo', passwordHash })
+        body: JSON.stringify({ numeroCedula: cedula, nombre, email, rol, estado: 'activo', passwordHash, createdAt: new Date().toISOString() })
       }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); });
     } else {
       // EDITAR
