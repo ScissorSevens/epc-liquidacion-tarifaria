@@ -215,6 +215,7 @@ export default function Configuracion({ navigation }: Props) {
     );
   }
 
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -259,6 +260,7 @@ export default function Configuracion({ navigation }: Props) {
           <Text style={[TYPOGRAPHY.bodyMd, styles.itemValor]}>1.0.0</Text>
         </View>
       </View>
+
 
       {/* Sección: Mi perfil */}
       <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>MI PERFIL</Text>

@@ -1,46 +1,56 @@
-// Resolucion de la URL base del backend MediApp.
+// Resolución de la URL base del backend MediApp.
 //
-// Lee de `expo.extra` en `app.json` via `expo-constants`. Mantenemos dos
-// claves para tener flexibilidad futura sin recompilar:
-//   - `apiBaseUrl`     -> default emulador Android (`10.0.2.2:5080`).
-//   - `apiBaseUrlLan`  -> IP LAN del host Windows (`172.100.7.217:5080`),
-//                          que es lo que necesita un celu fisico de la EPC
-//                          conectado a la misma red WiFi.
+// Estrategia de resolución (en orden de prioridad):
 //
-// Decision para este sprint (dia 3): devolvemos SIEMPRE `apiBaseUrlLan`.
-// Justificacion: el target real son las tablets/celus de la EPC en LAN.
-// El emulador Android tambien resuelve la IP LAN si la maquina host esta
-// en la misma red, asi que sirve para ambos escenarios sin branching.
+//   1. `expo.extra.apiBaseUrl` en app.json  →  override manual explícito.
+//      Usalo solo si necesitás apuntar a un servidor fijo (producción, staging).
+//      Si está definida, se usa siempre sin importar nada más.
 //
-// Para apuntar a otra IP (cambio de red, otro host) se edita
-// `app.json` -> `expo.extra.apiBaseUrlLan` y se reinicia Expo.
+//   2. `Constants.expoConfig.hostUri`  →  resolución AUTOMÁTICA durante desarrollo.
+//      Expo expone la IP del host que está corriendo Metro (ej. "192.168.1.70:8081").
+//      Extraemos la IP de ahí y la combinamos con PUERTO_BACKEND.
+//      Esto funciona en celular físico Y emulador sin tocar nada cuando cambia la red.
 //
-// TODO post-sprint: detectar si estamos en emulador (ej. via
-// `expo-device`/`Device.isDevice === false`) para elegir `apiBaseUrl`
-// automaticamente. Por ahora, decision manual en el config.
+//   3. Fallback `10.0.2.2:PUERTO_BACKEND`  →  emulador Android sin hostUri.
+//
+// Para desarrollo: no hace falta tocar app.json nunca más.
+// Para producción: definir `expo.extra.apiBaseUrl` con la URL fija del servidor.
 
 import Constants from 'expo-constants';
 
+/** Puerto donde escucha MediApp.Api. Cambiar solo si se reconfigura el backend. */
+const PUERTO_BACKEND = 5180;
+
 interface ExtraConfig {
   apiBaseUrl?: string;
-  apiBaseUrlLan?: string;
 }
 
 /**
- * URL base del backend MediApp para esta build.
- * Lanza si la config no esta presente — preferimos fallar temprano
- * a sincronizar contra una URL placeholder.
+ * URL base del backend MediApp para esta sesión de Expo.
+ *
+ * En desarrollo resuelve automáticamente la IP del host desde `hostUri`,
+ * por lo que funciona sin cambios al moverse entre redes.
+ *
+ * Lanza si no puede determinar ninguna URL válida.
  */
 export function obtenerApiBaseUrl(): string {
   const extra = (Constants.expoConfig?.extra ?? {}) as ExtraConfig;
-  const lan = extra.apiBaseUrlLan;
-  const fallback = extra.apiBaseUrl;
 
-  const elegida = lan ?? fallback;
-  if (!elegida) {
-    throw new Error(
-      'apiBaseUrl no configurada. Definir expo.extra.apiBaseUrlLan en app.json.',
-    );
+  // 1. Override manual explícito (producción / staging)
+  if (extra.apiBaseUrl) {
+    return extra.apiBaseUrl;
   }
-  return elegida;
+
+  // 2. Resolución automática desde hostUri de Expo
+  //    hostUri tiene la forma "192.168.x.x:8081" (ip:puertoMetro)
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    if (ip) {
+      return `http://${ip}:${PUERTO_BACKEND}`;
+    }
+  }
+
+  // 3. Fallback emulador Android (host = 10.0.2.2)
+  return `http://10.0.2.2:${PUERTO_BACKEND}`;
 }
