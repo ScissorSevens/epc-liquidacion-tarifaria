@@ -1,10 +1,25 @@
 using FluentValidation;
+using MediApp.Api.Aplicacion.Lecturas;
+using MediApp.Api.Aplicacion.Liquidaciones;
+using MediApp.Api.Aplicacion.Medidores;
+using MediApp.Api.Aplicacion.Operarios;
+using MediApp.Api.Aplicacion.Suscriptores;
+using MediApp.Api.API.Features.Lecturas;
+using MediApp.Api.API.Features.Liquidaciones;
+using MediApp.Api.API.Features.Medidores;
+using MediApp.Api.API.Features.Operarios;
+using MediApp.Api.API.Features.Suscriptores;
+using MediApp.Api.Common;
+using MediApp.Api.Dominio.Entidades;
+using MediApp.Api.Dominio.Puertos;
 using MediApp.Api.Features.Lecturas;
 using MediApp.Api.Features.Liquidaciones;
 using MediApp.Api.Features.Medidores;
 using MediApp.Api.Features.Operarios;
 using MediApp.Api.Features.Suscriptores;
-using MediApp.Api.Infrastructure.Almacen;
+using MediApp.Api.Infraestructura;
+using MediApp.Api.Infraestructura.Almacen;
+using MediApp.Api.Infraestructura.Repositorios;
 using MediApp.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -48,6 +63,33 @@ try
 
     // Almacén de evidencias fotográficas (Lectura). Singleton: stateless, lee config en el ctor.
     builder.Services.AddSingleton<IAlmacenEvidencias, AlmacenLocal>();
+
+    // Repositorios de infraestructura (implementaciones EF Core de los puertos del dominio).
+    builder.Services.AddScoped<IRepositorioSuscriptor, RepositorioSuscriptorEF>();
+    builder.Services.AddScoped<IRepositorioMedidor, RepositorioMedidorEF>();
+    builder.Services.AddScoped<IRepositorioLectura, RepositorioLecturaEF>();
+    builder.Services.AddScoped<IRepositorioLiquidacion, RepositorioLiquidacionEF>();
+    builder.Services.AddScoped<IRepositorioOperario, RepositorioOperarioEF>();
+    builder.Services.AddScoped<IRepositorioSyncRegistro, RepositorioSyncRegistroEF>();
+
+    // Repositorios genéricos para SyncHandler (uno por entidad sincronizable).
+    builder.Services.AddScoped<IRepositorioEntidad<Suscriptor>, RepositorioEntidadEF<Suscriptor>>();
+    builder.Services.AddScoped<IRepositorioEntidad<Medidor>, RepositorioEntidadEF<Medidor>>();
+    builder.Services.AddScoped<IRepositorioEntidad<Lectura>, RepositorioEntidadEF<Lectura>>();
+    builder.Services.AddScoped<IRepositorioEntidad<Liquidacion>, RepositorioEntidadEF<Liquidacion>>();
+
+    // Unidad de trabajo — gestión de transacciones para SyncHandler.
+    builder.Services.AddScoped<IUnitOfWork, UnitOfWorkEF>();
+
+    // Handler de sincronización genérico (protocolo #213).
+    builder.Services.AddScoped<SyncHandler>();
+
+    // Servicios de aplicación.
+    builder.Services.AddScoped<IServicioSuscriptores, ServicioSuscriptores>();
+    builder.Services.AddScoped<IServicioMedidores, ServicioMedidores>();
+    builder.Services.AddScoped<IServicioLecturas, ServicioLecturas>();
+    builder.Services.AddScoped<IServicioLiquidaciones, ServicioLiquidaciones>();
+    builder.Services.AddScoped<IServicioOperarios, ServicioOperarios>();
 
     // Healthcheck con ping a la DB (reemplaza el handler manual mínimo del Día 1).
     builder.Services.AddHealthChecks().AddDbContextCheck<MediAppDbContext>("postgres");

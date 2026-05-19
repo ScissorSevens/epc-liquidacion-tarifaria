@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using MediApp.Api.Persistence;
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
 using MediApp.Api.Tests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

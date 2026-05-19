@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MediApp.Api.Persistence.Entities;
+namespace MediApp.Api.Dominio.Entidades;
 
 /// <summary>
 /// Medidor fisico de agua asociado a un Suscriptor. Espejo de la entidad del dominio

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace MediApp.Api.Persistence.Entities;
+namespace MediApp.Api.Dominio.Entidades;
 
 /// <summary>
 /// Suscriptor de servicios. Espejo de la entidad del dominio mobile

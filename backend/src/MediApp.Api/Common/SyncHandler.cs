@@ -1,8 +1,7 @@
 using FluentValidation;
-using MediApp.Api.Persistence;
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
+using MediApp.Api.Dominio.Puertos;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace MediApp.Api.Common;
@@ -12,12 +11,22 @@ namespace MediApp.Api.Common;
 /// Encapsula la lógica de idempotencia por (idCliente, tipo) + hash, transacción atómica
 /// que toca entidad de negocio + sync_registros, y manejo de FK orphan.
 /// </summary>
-public static class SyncHandler
+public class SyncHandler
 {
+    private readonly IRepositorioSyncRegistro _syncRegistros;
+    private readonly IUnitOfWork _uow;
+
+    public SyncHandler(IRepositorioSyncRegistro syncRegistros, IUnitOfWork uow)
+    {
+        _syncRegistros = syncRegistros;
+        _uow = uow;
+    }
+
     /// <param name="req">Sobre completo del mobile.</param>
     /// <param name="validator">Validator de FluentValidation para el payload.</param>
+    /// <param name="repositorio">Repositorio genérico de la entidad concreta (INSERT/FindAsync).</param>
     /// <param name="mapToEntity">Crea la entidad nueva a partir del payload (para INSERT).</param>
-    /// <param name="applyToEntity">Aplica los cambios del payload a una entidad existente (para sobrescritura). Recibe la entidad cargada.</param>
+    /// <param name="applyToEntity">Aplica los cambios del payload a una entidad existente (para sobrescritura).</param>
     /// <param name="idGetter">Devuelve el Id server post-save.</param>
     /// <param name="fkExistsCheck">Si no es null, valida que las FKs existan; falso => 404.</param>
     /// <param name="tipo">Etiqueta corta para sync_registros (ej. "suscriptor").</param>
@@ -25,18 +34,17 @@ public static class SyncHandler
     /// Hook opcional ejecutado DESPUÉS de validar/FK-check y ANTES de mapear a entidad. Sirve para
     /// efectos colaterales que requieran I/O (ej. Lectura: persistir foto en filesystem y mutar
     /// el payload para inyectar la ruta resuelta). Solo se llama cuando hay INSERT real (caso A)
-    /// o UPDATE forzado (caso C). NO se llama en el caso 200 idempotente porque no hay cambio
-    /// efectivo en DB y por lo tanto no debe haber side-effect (evita re-guardar foto idéntica).
+    /// o UPDATE forzado (caso C). NO se llama en el caso 200 idempotente.
     /// </param>
-    public static async Task<IResult> Handle<TPayload, TEntity>(
+    public async Task<IResult> HandleAsync<TPayload, TEntity>(
         SyncRequest<TPayload> req,
         IValidator<TPayload> validator,
+        IRepositorioEntidad<TEntity> repositorio,
         Func<TPayload, TEntity> mapToEntity,
         Action<TPayload, TEntity> applyToEntity,
         Func<TEntity, int> idGetter,
         Func<TPayload, Task<(bool Ok, string Detail)>>? fkExistsCheck,
         string tipo,
-        MediAppDbContext db,
         ILogger logger,
         CancellationToken ct,
         Func<TPayload, CancellationToken, Task>? preProcess = null)
@@ -71,42 +79,36 @@ public static class SyncHandler
         {
             var (ok, detail) = await fkExistsCheck(req.Payload);
             if (!ok)
-            {
                 return ProblemDetailsExtensions.NotFound404(detail);
-            }
         }
 
         // 5. Buscar SyncRegistro existente por (idCliente, tipo).
-        var registro = await db.SyncRegistros
-            .FirstOrDefaultAsync(sr => sr.IdCliente == req.IdCliente && sr.Tipo == tipo, ct);
+        var registro = await _syncRegistros.BuscarPorClienteYTipoAsync(req.IdCliente, tipo, ct);
 
         if (registro is null)
         {
             // Caso A: NUEVO. INSERT entidad + INSERT sync_registro en una transacción.
-            // preProcess corre acá: hay cambio efectivo en DB, los side-effects son válidos.
             if (preProcess is not null)
-            {
                 await preProcess(req.Payload, ct);
-            }
 
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await using var tx = await _uow.BeginTransactionAsync(ct);
             try
             {
                 var entidad = mapToEntity(req.Payload);
-                db.Set<TEntity>().Add(entidad);
-                await db.SaveChangesAsync(ct);
+                repositorio.Agregar(entidad);
+                await _uow.GuardarCambiosAsync(ct);
 
                 var idServer = idGetter(entidad);
 
-                db.SyncRegistros.Add(new SyncRegistro
+                await _syncRegistros.AgregarAsync(new SyncRegistro
                 {
                     IdCliente = req.IdCliente,
                     Tipo = tipo,
                     HashServer = req.HashLocal,
                     IdEntidad = idServer,
                     FechaSync = DateTimeOffset.UtcNow
-                });
-                await db.SaveChangesAsync(ct);
+                }, ct);
+                await _uow.GuardarCambiosAsync(ct);
 
                 await tx.CommitAsync(ct);
                 return Results.Created($"/api/v1/{tipo}s/{idServer}", new SyncResponse(idServer, req.HashLocal));
@@ -118,12 +120,9 @@ public static class SyncHandler
             }
         }
 
-        // Caso B: ya hay registro previo.
+        // Caso B: ya hay registro previo — mismo hash → idempotente.
         if (registro.HashServer == req.HashLocal)
-        {
-            // Idempotente: mismo cliente, mismo hash. Sin tocar DB.
             return Results.Ok(new SyncResponse(registro.IdEntidad, registro.HashServer));
-        }
 
         // Hashes distintos.
         if (!req.ForzarSobrescribir)
@@ -134,18 +133,15 @@ public static class SyncHandler
                 "Reintentá con forzarSobrescribir=true para pisar la versión del server.");
         }
 
-        // Sobrescritura forzada.
-        // preProcess corre acá también: vamos a UPDATE real, side-effects válidos.
+        // Caso C: sobrescritura forzada.
         if (preProcess is not null)
-        {
             await preProcess(req.Payload, ct);
-        }
 
-        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        await using (var tx = await _uow.BeginTransactionAsync(ct))
         {
             try
             {
-                var entidad = await db.Set<TEntity>().FindAsync(new object?[] { registro.IdEntidad }, ct);
+                var entidad = await repositorio.BuscarPorIdAsync(registro.IdEntidad, ct);
                 if (entidad is null)
                 {
                     logger.LogCritical(
@@ -159,11 +155,11 @@ public static class SyncHandler
                 }
 
                 applyToEntity(req.Payload, entidad);
-                await db.SaveChangesAsync(ct);
+                await _uow.GuardarCambiosAsync(ct);
 
                 registro.HashServer = req.HashLocal;
                 registro.FechaSync = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(ct);
+                await _uow.GuardarCambiosAsync(ct);
 
                 await tx.CommitAsync(ct);
                 return Results.Ok(new SyncResponse(registro.IdEntidad, registro.HashServer));

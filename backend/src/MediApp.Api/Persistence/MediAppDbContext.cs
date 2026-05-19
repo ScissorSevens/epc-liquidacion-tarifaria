@@ -1,4 +1,4 @@
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
 using Microsoft.EntityFrameworkCore;
 
 namespace MediApp.Api.Persistence;

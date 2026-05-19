@@ -1,4 +1,4 @@
-namespace MediApp.Api.Infrastructure.Almacen;
+namespace MediApp.Api.Infraestructura.Almacen;
 
 /// <summary>
 /// Impl por defecto del almacén de evidencias: escribe a filesystem local en

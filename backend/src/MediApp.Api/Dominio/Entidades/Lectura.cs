@@ -1,11 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MediApp.Api.Persistence.Entities;
+namespace MediApp.Api.Dominio.Entidades;
 
 /// <summary>
 /// Lectura tomada de un medidor en un período (YYYYMM). Puede tener evidencia fotográfica
-/// asociada, persistida vía <see cref="Infrastructure.Almacen.IAlmacenEvidencias"/>.
+/// asociada, persistida vía IAlmacenEvidencias.
 /// </summary>
 public class Lectura
 {

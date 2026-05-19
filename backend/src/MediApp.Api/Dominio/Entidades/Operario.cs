@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace MediApp.Api.Persistence.Entities;
+namespace MediApp.Api.Dominio.Entidades;
 
 /// <summary>
 /// Operario del sistema. Espejo de src/operarios/types.ts.

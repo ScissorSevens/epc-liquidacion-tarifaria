@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace MediApp.Api.Persistence.Entities;
+namespace MediApp.Api.Dominio.Entidades;
 
 /// <summary>
 /// Registro auxiliar de sincronización. Sirve para idempotencia y detección de conflicto

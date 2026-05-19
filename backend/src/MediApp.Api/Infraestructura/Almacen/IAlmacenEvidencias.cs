@@ -1,4 +1,4 @@
-namespace MediApp.Api.Infrastructure.Almacen;
+namespace MediApp.Api.Infraestructura.Almacen;
 
 /// <summary>
 /// Abstracción para persistir evidencias fotográficas (jpeg/png) que vienen embebidas

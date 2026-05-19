@@ -1,4 +1,4 @@
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
 
 namespace MediApp.Api.Features.Lecturas;
 
