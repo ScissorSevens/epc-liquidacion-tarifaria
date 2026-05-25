@@ -49,4 +49,7 @@ export interface LecturaRepository {
 
   /** Verifica si existe lectura para un medidor en un periodo (clave única compuesta) */
   existeLectura(idMedidor: number, idPeriodo: string): Promise<boolean>;
+
+  /** Lista las últimas lecturas de un medidor (máx 20), más recientes primero */
+  listarPorMedidor(idMedidor: number): Promise<Lectura[]>;
 }

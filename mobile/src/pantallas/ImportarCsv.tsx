@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   metricValorOk: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
-  metricValorWarn: { ...TYPOGRAPHY.headlineSm, color: '#ef6c00' },
+  metricValorWarn: { ...TYPOGRAPHY.headlineSm, color: COLORS.warning },
   metricValorErr: { ...TYPOGRAPHY.headlineSm, color: COLORS.error },
 
   // Error card

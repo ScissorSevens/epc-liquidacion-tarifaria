@@ -91,6 +91,7 @@ const SQL_SELECT_BY_ID = `SELECT * FROM lectura WHERE id_lectura = ?`;
 const SQL_SELECT_BY_PERIODO = `SELECT * FROM lectura WHERE id_periodo = ? ORDER BY id_lectura`;
 const SQL_SELECT_PENDIENTES_SYNC = `SELECT * FROM lectura WHERE estado_sync = 'pendiente' ORDER BY id_lectura`;
 const SQL_EXISTE = `SELECT 1 FROM lectura WHERE id_medidor = ? AND id_periodo = ? LIMIT 1`;
+const SQL_LIST_BY_MEDIDOR = `SELECT * FROM lectura WHERE id_medidor = ? ORDER BY timestamp_captura DESC LIMIT 20`;
 const SQL_UPDATE_SYNC = `
   UPDATE lectura SET estado_sync = @estado_sync, timestamp_sync = @timestamp_sync
   WHERE id_lectura = @id_lectura
@@ -176,6 +177,7 @@ export function crearLecturaRepositorySqlite(db: DatabaseType): LecturaRepositor
   const stmtSelectByPeriodo = db.prepare(SQL_SELECT_BY_PERIODO);
   const stmtSelectPendientesSync = db.prepare(SQL_SELECT_PENDIENTES_SYNC);
   const stmtExiste = db.prepare(SQL_EXISTE);
+  const stmtListByMedidor = db.prepare(SQL_LIST_BY_MEDIDOR);
   const stmtUpdateSync = db.prepare(SQL_UPDATE_SYNC);
   const stmtUpdateValidacion = db.prepare(SQL_UPDATE_VALIDACION);
 
@@ -271,6 +273,11 @@ export function crearLecturaRepositorySqlite(db: DatabaseType): LecturaRepositor
     async existeLectura(idMedidor: number, idPeriodo: string): Promise<boolean> {
       const row = stmtExiste.get(idMedidor, idPeriodo);
       return row !== undefined;
+    },
+
+    async listarPorMedidor(idMedidor: number): Promise<Lectura[]> {
+      const rows = stmtListByMedidor.all(idMedidor) as LecturaRow[];
+      return rows.map(fromRow);
     },
 
     cerrar(): void {

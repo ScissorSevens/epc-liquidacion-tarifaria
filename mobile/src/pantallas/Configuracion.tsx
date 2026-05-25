@@ -277,7 +277,7 @@ export default function Configuracion({ navigation }: Props) {
         {/* ERROR */}
         {perfil.tipo === 'error' && (
           <View style={styles.item}>
-            <MaterialIcons name="error" size={24} color={COLORS.error ?? '#B00020'} />
+            <MaterialIcons name="error" size={24} color={COLORS.error} />
             <Text style={[TYPOGRAPHY.bodySm, styles.itemValor]} numberOfLines={2}>
               {perfil.mensaje}
             </Text>
@@ -370,7 +370,7 @@ export default function Configuracion({ navigation }: Props) {
               style={({ pressed }) => [styles.botonDesasignar, pressed && styles.botonDesasignarPressed]}
               onPress={desasignarOperario}
             >
-              <MaterialIcons name="logout" size={18} color={COLORS.error ?? '#B00020'} />
+              <MaterialIcons name="logout" size={18} color={COLORS.error} />
               <Text style={styles.botonDesasignarTexto}>Desasignar este dispositivo</Text>
             </Pressable>
           </>
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceLight,
   },
   botonDesasignarTexto: {
-    color: COLORS.error ?? '#B00020',
+    color: COLORS.error,
     ...(TYPOGRAPHY.bodySm as object),
   },
 });

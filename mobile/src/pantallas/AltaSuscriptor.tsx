@@ -678,9 +678,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     gap: SPACING.sm,
   },
-  snackOk: { backgroundColor: '#2e7d32' },
-  snackWarning: { backgroundColor: '#ef6c00' },
-  snackError: { backgroundColor: '#c62828' },
+  snackOk: { backgroundColor: COLORS.secondary },
+  snackWarning: { backgroundColor: COLORS.warning },
+  snackError: { backgroundColor: COLORS.error },
   snackText: {
     flex: 1,
     ...TYPOGRAPHY.bodySm,

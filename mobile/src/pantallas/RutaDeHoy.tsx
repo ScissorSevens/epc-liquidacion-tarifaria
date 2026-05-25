@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
@@ -37,13 +38,18 @@ export default function RutaDeHoy({ navigation }: Props) {
   const [capturasHoy, setCapturasHoy] = useState(0);
   const [pendientesCola, setPendientesCola] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [recargando, setRecargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capturadosHoy, setCapturadosHoy] = useState<Map<number, boolean>>(new Map());
 
   const { isConnected } = useNetInfo();
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
+  const cargar = useCallback(async (esPrimeraCarga = false) => {
+    if (esPrimeraCarga) {
+      setLoading(true);
+    } else {
+      setRecargando(true);
+    }
     setError(null);
     try {
       const bootstrap = await getBootstrap();
@@ -92,12 +98,14 @@ export default function RutaDeHoy({ navigation }: Props) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setRecargando(false);
     }
   }, []);
 
-  useEffect(() => {
-    void cargar();
-  }, [cargar]);
+  // Primera carga al montar
+  useEffect(() => { void cargar(true); }, [cargar]);
+  // Re-carga silenciosa al enfocar tab
+  useFocusEffect(useCallback(() => { void cargar(false); }, [cargar]));
 
   const fechaHoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long',
@@ -138,7 +146,11 @@ export default function RutaDeHoy({ navigation }: Props) {
             <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>RUTA DE HOY</Text>
             <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>{fechaHoy}</Text>
           </View>
-          <MaterialIcons name="account-circle" size={28} color={COLORS.primary} />
+          {recargando ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <MaterialIcons name="account-circle" size={28} color={COLORS.primary} />
+          )}
         </View>
       </View>
 

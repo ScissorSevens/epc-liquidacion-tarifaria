@@ -16,6 +16,7 @@ import {
 } from '../adapters/foto-evidencia';
 import { photoCaptureStore } from '../composition/photo-capture-store';
 import type { LecturasStackScreenProps } from '../navegacion/types';
+import { COLORS, RADIUS, SPACING } from '../theme/skeletal-tokens';
 
 type Props = LecturasStackScreenProps<'CapturarFoto'>;
 
@@ -205,24 +206,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: SPACING.margin,
   },
-  surface: { padding: 16, borderRadius: 8, width: '100%' },
-  titulo: { marginBottom: 8 },
-  mensaje: { marginBottom: 12, textAlign: 'center' },
-  boton: { marginTop: 8 },
+  surface: { padding: SPACING.margin, borderRadius: RADIUS.default, width: '100%' },
+  titulo: { marginBottom: SPACING.sm },
+  mensaje: { marginBottom: SPACING.md, textAlign: 'center' },
+  boton: { marginTop: SPACING.sm },
   camera: { flex: 1 },
   barraInferior: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: SPACING.margin,
+    paddingBottom: SPACING.xl,
   },
-  botonCapturar: { paddingVertical: 4 },
+  botonCapturar: { paddingVertical: SPACING.xs },
   loaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: SPACING.md,
   },
-  loaderText: { marginLeft: 8 },
-  snackError: { backgroundColor: '#c62828' },
+  loaderText: { marginLeft: SPACING.sm },
+  snackError: { backgroundColor: COLORS.error },
 });

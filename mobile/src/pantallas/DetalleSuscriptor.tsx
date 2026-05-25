@@ -8,12 +8,207 @@ import {
   Text,
   View,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { Medidor } from '@dominio/medidores/types';
+import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+
+// ─── Constantes de historial ────────────────────────────────────────────────
+
+const HISTORIAL_PERIODOS_VISIBLES = 2;
+
+function calcularPeriodos() {
+  const ahora = new Date();
+  const year = ahora.getFullYear();
+  const month = ahora.getMonth();
+  const actual = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const prevDate = month === 0 ? new Date(year - 1, 11) : new Date(year, month - 1);
+  const anterior = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+  return { actual, anterior };
+}
+
+// ─── Componente interno: HistorialLecturas ───────────────────────────────────
+
+interface HistorialLecturasProps {
+  lecturas: Lectura[];
+  periodoActual: string;   // 'YYYY-MM'
+  periodoAnterior: string; // 'YYYY-MM'
+  loading: boolean;
+}
+
+function badgeColorSync(estado: string): { bg: string; text: string } {
+  switch (estado) {
+    case 'sincronizado':
+      return { bg: COLORS.primaryContainer, text: COLORS.onPrimaryContainer };
+    case 'error':
+      return { bg: COLORS.errorContainer, text: COLORS.onErrorContainer };
+    default: // pendiente
+      return { bg: COLORS.secondary, text: COLORS.onPrimary };
+  }
+}
+
+function HistorialLecturas({ lecturas, periodoActual, periodoAnterior, loading }: HistorialLecturasProps) {
+  const [expandido, setExpandido] = useState(true);
+
+  const lPeriodos = [periodoActual, periodoAnterior].slice(0, HISTORIAL_PERIODOS_VISIBLES);
+  const tieneActual = lecturas.some((l) => l.id_periodo === periodoActual);
+
+  if (loading) {
+    return (
+      <View style={stylesHistorial.container}>
+        <ActivityIndicator size="small" color={COLORS.secondary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={stylesHistorial.container}>
+      {/* Header con toggle */}
+      <Pressable
+        onPress={() => setExpandido((v) => !v)}
+        style={stylesHistorial.headerRow}
+      >
+        <View style={stylesHistorial.headerLeft}>
+          <Text style={stylesHistorial.titulo}>HISTORIAL</Text>
+          {tieneActual && (
+            <View style={stylesHistorial.badgeActual}>
+              <Text style={stylesHistorial.badgeActualText}>mes actual</Text>
+            </View>
+          )}
+        </View>
+        <MaterialIcons
+          name={expandido ? 'expand-less' : 'expand-more'}
+          size={20}
+          color={COLORS.secondary}
+        />
+      </Pressable>
+
+      {expandido && (
+        <View style={stylesHistorial.body}>
+          {lPeriodos.map((periodo) => {
+            const lectura = lecturas.find((l) => l.id_periodo === periodo);
+            return (
+              <View key={periodo} style={stylesHistorial.fila}>
+                <View style={stylesHistorial.filaDatos}>
+                  <Text style={stylesHistorial.filaPeriodo}>{periodo}</Text>
+                  {lectura ? (
+                    <>
+                      <Text style={stylesHistorial.filaValor}>
+                        {lectura.lectura_actual} m³
+                      </Text>
+                      <Text style={stylesHistorial.filaFecha}>
+                        {new Date(lectura.timestamp_captura).toLocaleDateString('es-CO', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={stylesHistorial.sinRegistro}>Sin registro</Text>
+                  )}
+                </View>
+                {lectura && (
+                  <View style={[stylesHistorial.badgeSync, { backgroundColor: badgeColorSync(lectura.estado_sync).bg }]}>
+                    <Text style={[stylesHistorial.badgeSyncText, { color: badgeColorSync(lectura.estado_sync).text }]}>
+                      {lectura.estado_sync.toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const stylesHistorial = StyleSheet.create({
+  container: {
+    marginTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    paddingTop: SPACING.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  titulo: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.secondary,
+    letterSpacing: 1.5,
+    fontWeight: '600',
+  },
+  badgeActual: {
+    backgroundColor: COLORS.secondaryContainer,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  badgeActualText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSecondaryContainer,
+    fontSize: 9,
+  },
+  body: {
+    gap: SPACING.xs,
+    paddingTop: SPACING.xs,
+  },
+  fila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  filaDatos: {
+    flex: 1,
+    gap: 2,
+  },
+  filaPeriodo: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
+    letterSpacing: 0.5,
+  },
+  filaValor: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
+    fontWeight: '600',
+  },
+  filaFecha: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+  },
+  sinRegistro: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  badgeSync: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.sm,
+    marginLeft: SPACING.sm,
+  },
+  badgeSyncText: {
+    ...TYPOGRAPHY.labelSm,
+    letterSpacing: 0.5,
+  },
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 
 type Props = LecturasStackScreenProps<'DetalleSuscriptor'>;
 
@@ -42,6 +237,8 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
   const [medidores, setMedidores] = useState<Medidor[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [guardandoSubsidio, setGuardandoSubsidio] = useState(false);
+  const [historialMap, setHistorialMap] = useState<Map<number, Lectura[]>>(new Map());
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -54,6 +251,8 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
       ]);
       setSuscriptor(s);
       setMedidores(m);
+      // Cargar historial de lecturas para cada medidor
+      void cargarHistorialDeMedidores(m);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[DetalleSuscriptor] error al cargar:', e);
@@ -62,6 +261,27 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
       setLoading(false);
     }
   }, [id_suscriptor]);
+
+  const cargarHistorial = useCallback(async (idMedidor: number) => {
+    try {
+      const { lecturaRepo } = await getBootstrap();
+      const lecturas = await lecturaRepo.listarPorMedidor(idMedidor);
+      setHistorialMap(prev => new Map(prev).set(idMedidor, lecturas));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[DetalleSuscriptor] error al cargar historial:', e);
+    }
+  }, []);
+
+  const cargarHistorialDeMedidores = useCallback(async (lista: Medidor[]) => {
+    if (lista.length === 0) return;
+    setLoadingHistorial(true);
+    try {
+      await Promise.all(lista.map((m) => cargarHistorial(m.id_medidor)));
+    } finally {
+      setLoadingHistorial(false);
+    }
+  }, [cargarHistorial]);
 
   useEffect(() => {
     void cargar();
@@ -239,6 +459,12 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                     >
                       <Text style={styles.btnCapturarText}>CAPTURAR LECTURA</Text>
                     </Pressable>
+                    <HistorialLecturas
+                      lecturas={historialMap.get(m.id_medidor) ?? []}
+                      periodoActual={calcularPeriodos().actual}
+                      periodoAnterior={calcularPeriodos().anterior}
+                      loading={loadingHistorial && !historialMap.has(m.id_medidor)}
+                    />
                   </View>
                 </View>
               ))

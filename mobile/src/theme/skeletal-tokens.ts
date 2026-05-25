@@ -19,24 +19,41 @@
 
 export const COLORS = {
   // Capa de fondo — el lienzo "papel".
-  background: '#FFFFFF',
+  background: '#F8F9FF',
   // Superficies elevadas (cards, inputs activos en hover).
-  surfaceLight: '#F2F2F2',
-  // Superficie ligera para footers metadata (zinc-100/200 del Tailwind ref).
-  surfaceMuted: '#F4F4F5',
+  surfaceLight: '#EFF4FF',
+  // Superficie ligera para footers metadata.
+  surfaceMuted: '#E5EEFF',
   surfaceMuted2: '#E4E4E7',
   // Tinta primaria — bordes, texto principal, botones primarios.
-  primary: '#000000',
+  primary: '#031632',
   onPrimary: '#FFFFFF',
+  // Contenedor primario y sobre contenedor primario.
+  primaryContainer: '#1A2B48',
+  onPrimaryContainer: '#8293B5',
+  // Color secundario (teal).
+  secondary: '#00677F',
+  secondaryContainer: '#00CCF9',
+  onSecondaryContainer: '#005266',
+  // Superficies de contenedor.
+  surfaceContainerLowest: '#FFFFFF',
+  surfaceContainerHigh: '#DCE9FF',
+  surface: '#F8F9FF',
+  // Sobre superficie.
+  onSurface: '#0B1C30',
+  onSurfaceVariant: '#44474D',
   // Texto secundario / iconografía secundaria.
-  textSecondary: '#5d5f5f',
+  textSecondary: '#44474D',
   textTertiary: '#808080',
-  // Borde estándar — siempre 1px black.
+  // Bordes.
   outline: '#000000',
+  outlineVariant: '#C5C6CE',
   // Divisores internos en cards (zinc-300).
   divider: '#D4D4D8',
   // Placeholder en inputs (zinc-300/400).
   placeholder: '#D4D4D8',
+  // Advertencia.
+  warning: '#EF6C00',
   // Estados de error (heredados del DESIGN.md).
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',
@@ -64,7 +81,8 @@ export const SPACING = {
 export const RADIUS = {
   none: 0,
   sm: 4,
-  default: 8,
+  default: 12,
+  card: 16,
   md: 12,
   lg: 16,
   xl: 24,

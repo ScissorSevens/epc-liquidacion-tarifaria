@@ -608,9 +608,9 @@ function colorPorTipo(tipo: EventoLog['tipo']): { color: string } {
       tipo === 'error'
         ? COLORS.error
         : tipo === 'sync'
-        ? '#16a34a'
+        ? COLORS.secondary
         : tipo === 'health'
-        ? '#1d4ed8'
+        ? COLORS.primary
         : COLORS.textSecondary,
   };
 }

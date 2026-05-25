@@ -107,4 +107,12 @@ export class LecturaRepositoryMemoria implements LecturaRepository {
       l => l.id_medidor === idMedidor && l.id_periodo === idPeriodo,
     );
   }
+
+  async listarPorMedidor(idMedidor: number): Promise<Lectura[]> {
+    return this.lecturas
+      .filter(l => l.id_medidor === idMedidor)
+      .sort((a, b) => b.timestamp_captura.localeCompare(a.timestamp_captura))
+      .slice(0, 20)
+      .map(l => ({ ...l }));
+  }
 }

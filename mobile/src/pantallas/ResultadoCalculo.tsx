@@ -581,15 +581,15 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     padding: SPACING.sm,
-    backgroundColor: '#FEE',
+    backgroundColor: COLORS.errorContainer,
     borderWidth: 1,
-    borderColor: '#C33',
+    borderColor: COLORS.error,
     borderRadius: RADIUS.sm,
     marginBottom: SPACING.xs,
   },
   errorText: {
     ...TYPOGRAPHY.bodySm,
-    color: '#900',
+    color: COLORS.error,
   },
 
   // Metadata
