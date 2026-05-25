@@ -8,15 +8,13 @@
       "android": {
         "buildType": "apk"
       },
-      "node": "20.19.4",
-      "prebuildCommand": "cp -r ../src ./dominio"
+      "node": "20.19.4"
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
-      "node": "20.19.4",
-      "prebuildCommand": "cp -r ../src ./dominio"
+      "node": "20.19.4"
     }
   }
 }
