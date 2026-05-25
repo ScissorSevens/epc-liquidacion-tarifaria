@@ -248,6 +248,58 @@ describe('Motor Tarifario CRA', () => {
     });
   });
 
+  describe('aplicaSubsidio flag', () => {
+    it('aplicaSubsidio false en estrato 1 no aplica subsidio', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 1,
+        aplicaSubsidio: false,
+      };
+
+      const resultado = calcularLiquidacion(entrada);
+
+      expect(resultado.subsidio).toBe(0);
+      expect(resultado.contribucion).toBe(0);
+      expect(resultado.total).toBe(17000); // sin descuento
+    });
+
+    it('aplicaSubsidio false en estrato 5 no aplica contribucion', () => {
+      const entrada: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 5,
+        aplicaSubsidio: false,
+      };
+
+      const resultado = calcularLiquidacion(entrada);
+
+      expect(resultado.subsidio).toBe(0);
+      expect(resultado.contribucion).toBe(0);
+      expect(resultado.total).toBe(17000); // sin recargo
+    });
+
+    it('aplicaSubsidio true es equivalente a no pasar el flag', () => {
+      const conFlag: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 2,
+        aplicaSubsidio: true,
+      };
+      const sinFlag: EntradaCalculo = {
+        lecturaAnterior: 100,
+        lecturaActual: 115,
+        parametros: parametrosBase,
+        estrato: 2,
+      };
+
+      expect(calcularLiquidacion(conFlag)).toEqual(calcularLiquidacion(sinFlag));
+    });
+  });
+
   describe('periodo de facturacion', () => {
     it('incluye periodo en el resultado cuando se proporciona en la entrada', () => {
       const entrada: EntradaCalculo = {

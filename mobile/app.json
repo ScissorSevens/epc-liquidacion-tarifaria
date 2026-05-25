@@ -16,12 +16,16 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.ikhthys.mediapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,6 +41,10 @@
       ]
     ],
     "extra": {
-    }
+      "eas": {
+        "projectId": "c3075f06-b9f1-45e2-8a8a-8e4825dcd7c0"
+      }
+    },
+    "owner": "ikhthys"
   }
 }

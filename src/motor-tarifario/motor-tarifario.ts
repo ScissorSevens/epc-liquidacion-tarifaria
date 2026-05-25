@@ -82,7 +82,7 @@ export function calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo {
   const subsidio = Math.round(factor < 0 ? Math.abs(factor) * baseSubsidio : 0);
   const contribucion = Math.round(factor > 0 ? factor * baseContribucion : 0);
 
-  const total = cargoFijo + cargoConsumoTotal - subsidio + contribucion;
+  const total = Math.round(cargoFijo + cargoConsumoTotal - subsidio + contribucion);
 
   return { consumo, consumoBasico, consumoExcedente, cargoFijo, cargoConsumo, cargoExcedente, subsidio, contribucion, total, periodo: entrada.periodo };
 }
