@@ -144,12 +144,12 @@ export default function RutaDeHoy({ navigation }: Props) {
         <View style={styles.headerRow}>
           <View style={styles.headerTexts}>
             <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>RUTA DE HOY</Text>
-            <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>{fechaHoy}</Text>
+            <Text style={[TYPOGRAPHY.bodySm, styles.fechaHeader]}>{fechaHoy}</Text>
           </View>
           {recargando ? (
-            <ActivityIndicator size="small" color={COLORS.primary} />
+            <ActivityIndicator size="small" color={COLORS.onPrimary} />
           ) : (
-            <MaterialIcons name="account-circle" size={28} color={COLORS.primary} />
+            <MaterialIcons name="account-circle" size={28} color={COLORS.onPrimary} />
           )}
         </View>
       </View>
@@ -250,6 +250,11 @@ export default function RutaDeHoy({ navigation }: Props) {
           </Pressable>
         </View>
       )}
+
+      {/* Footer global */}
+      <View style={styles.footer}>
+        <Text style={[TYPOGRAPHY.bodySm, styles.footerText]}>MediApp — EPC</Text>
+      </View>
     </View>
   );
 }
@@ -271,7 +276,7 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.primary,
   },
   headerRow: {
     flexDirection: 'row',
@@ -282,7 +287,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titulo: {
-    color: COLORS.primary,
+    color: COLORS.onPrimary,
+  },
+  fechaHeader: {
+    color: COLORS.onPrimary,
+    opacity: 0.8,
   },
   muted: {
     color: COLORS.textSecondary,
@@ -296,17 +305,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.errorContainer,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    ...BORDERS.thin,
+    ...BORDERS.error,
     marginHorizontal: SPACING.margin,
     marginTop: SPACING.lg,
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.sm,
   },
   bannerText: {
-    color: COLORS.primary,
+    color: COLORS.error,
     flex: 1,
   },
   progresoSection: {
@@ -329,7 +338,7 @@ const styles = StyleSheet.create({
   },
   barraFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondary,
   },
   lista: {
     paddingHorizontal: SPACING.margin,
@@ -404,5 +413,17 @@ const styles = StyleSheet.create({
   },
   btnRetryText: {
     color: COLORS.onPrimary,
+  },
+  footer: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.margin,
+    backgroundColor: COLORS.surfaceContainer,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outline,
+  },
+  footerText: {
+    color: COLORS.onBackground,
+    opacity: 0.6,
   },
 });

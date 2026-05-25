@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import PeriodoPicker from '../components/PeriodoPicker';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   Image,
   KeyboardAvoidingView,
@@ -141,6 +142,8 @@ export default function CapturarLectura({ navigation, route }: Props) {
     mensaje: '',
     tipo: 'ok',
   });
+  // Campo activo para focus state visual.
+  const [campoFocal, setCampoFocal] = useState<CampoForm | null>(null);
   // Datos del suscriptor para mostrar en la card superior. Se carga via
   // `suscriptorRepo.buscarPorId`. Si falla, queda undefined y mostramos "—".
   const [suscriptor, setSuscriptor] = useState<Suscriptor | undefined>(
@@ -333,7 +336,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           ]}
           accessibilityLabel="Volver"
         >
-          <Text style={styles.headerIcon}>‹</Text>
+          <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>CAPTURAR LECTURA</Text>
         <Pressable
@@ -346,7 +349,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           ]}
           accessibilityLabel="Cuenta"
         >
-          <Text style={styles.headerIcon}>◉</Text>
+          <MaterialIcons name="radio-button-checked" size={24} color={COLORS.primary} />
         </Pressable>
       </View>
 
@@ -374,13 +377,15 @@ export default function CapturarLectura({ navigation, route }: Props) {
               </View>
             </View>
             <View style={styles.cardSuscriptorRow}>
+              <MaterialIcons name="location-on" size={14} color={COLORS.textSecondary} style={styles.cardRowIcon} />
               <Text style={styles.cardSuscriptorLine} numberOfLines={2}>
-                ◎  {direccionSuscriptor}
+                {direccionSuscriptor}
               </Text>
             </View>
             <View style={styles.cardSuscriptorRow}>
+              <MaterialIcons name="grid-on" size={14} color={COLORS.textSecondary} style={styles.cardRowIcon} />
               <Text style={styles.cardSuscriptorLine}>
-                ▦  Categoría: Estrato {suscriptor?.estrato ?? '—'}
+                Categoría: Estrato {suscriptor?.estrato ?? '—'}
               </Text>
             </View>
             <Text style={styles.subtituloMeta}>{subtitulo}</Text>
@@ -404,13 +409,15 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <TextInput
               value={form.lectura_actual}
               onChangeText={(v) => setCampo('lectura_actual', v)}
-              onBlur={() => onBlur('lectura_actual')}
+              onFocus={() => setCampoFocal('lectura_actual')}
+              onBlur={() => { setCampoFocal(null); onBlur('lectura_actual'); }}
               placeholder="0000"
               placeholderTextColor={COLORS.placeholder}
               keyboardType="decimal-pad"
               editable={!calculando}
               style={[
                 styles.inputBig,
+                campoFocal === 'lectura_actual' && styles.inputFocused,
                 errores.lectura_actual !== undefined && styles.inputError,
               ]}
             />
@@ -425,13 +432,15 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <TextInput
               value={form.lectura_anterior}
               onChangeText={(v) => setCampo('lectura_anterior', v)}
-              onBlur={() => onBlur('lectura_anterior')}
+              onFocus={() => setCampoFocal('lectura_anterior')}
+              onBlur={() => { setCampoFocal(null); onBlur('lectura_anterior'); }}
               placeholder="0000"
               placeholderTextColor={COLORS.placeholder}
               keyboardType="decimal-pad"
               editable={!calculando && !cargandoPrefill}
               style={[
                 styles.input,
+                campoFocal === 'lectura_anterior' && styles.inputFocused,
                 errores.lectura_anterior !== undefined && styles.inputError,
               ]}
             />
@@ -460,7 +469,8 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <TextInput
               value={form.observaciones}
               onChangeText={(v) => setCampo('observaciones', v)}
-              onBlur={() => onBlur('observaciones')}
+              onFocus={() => setCampoFocal('observaciones')}
+              onBlur={() => { setCampoFocal(null); onBlur('observaciones'); }}
               placeholder="Notas opcionales sobre la lectura"
               placeholderTextColor={COLORS.placeholder}
               multiline
@@ -470,6 +480,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
               textAlignVertical="top"
               style={[
                 styles.inputMulti,
+                campoFocal === 'observaciones' && styles.inputFocused,
                 errores.observaciones !== undefined && styles.inputError,
               ]}
             />
@@ -490,7 +501,9 @@ export default function CapturarLectura({ navigation, route }: Props) {
                   pressed && styles.pressedLight,
                 ]}
               >
-                <Text style={styles.camIcon}>▣</Text>
+                <View style={styles.camCirculo}>
+                  <MaterialIcons name="camera-alt" size={36} color={COLORS.onPrimary} />
+                </View>
                 <Text style={styles.camLabel}>TOMAR FOTO DEL MEDIDOR</Text>
               </Pressable>
               <Text style={styles.camHint}>
@@ -504,7 +517,10 @@ export default function CapturarLectura({ navigation, route }: Props) {
                 style={styles.evidenciaThumb}
               />
               <View style={styles.evidenciaInfo}>
-                <Text style={styles.evidenciaOk}>✓ FOTO CAPTURADA</Text>
+                <View style={styles.evidenciaOkRow}>
+                  <MaterialIcons name="check-circle" size={16} color={COLORS.secondary} />
+                  <Text style={styles.evidenciaOk}>FOTO CAPTURADA</Text>
+                </View>
                 {evidencia.foto_hash !== undefined && (
                   <Text style={styles.evidenciaHash}>
                     {evidencia.foto_hash.substring(0, 8)}…
@@ -656,7 +672,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
   },
   badgeText: {
     ...TYPOGRAPHY.labelSm,
@@ -668,6 +684,10 @@ const styles = StyleSheet.create({
   cardSuscriptorRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  cardRowIcon: {
+    marginRight: 2,
   },
   cardSuscriptorLine: {
     ...TYPOGRAPHY.bodySm,
@@ -728,7 +748,7 @@ const styles = StyleSheet.create({
     height: 48,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     color: COLORS.primary,
     ...TYPOGRAPHY.bodyMd,
@@ -738,7 +758,7 @@ const styles = StyleSheet.create({
     height: 64,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     color: COLORS.primary,
     ...TYPOGRAPHY.headlineMd,
@@ -748,10 +768,13 @@ const styles = StyleSheet.create({
     minHeight: 96,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
     color: COLORS.primary,
     ...TYPOGRAPHY.bodyMd,
+  },
+  inputFocused: {
+    ...BORDERS.focused,
   },
   inputError: {
     borderColor: COLORS.error,
@@ -774,9 +797,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
   },
-  camIcon: {
-    fontSize: 36,
-    color: COLORS.primary,
+  camCirculo: {
+    width: 80,
+    height: 80,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   camLabel: {
     ...TYPOGRAPHY.labelLg,
@@ -810,6 +837,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingVertical: 2,
+  },
+  evidenciaOkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
   evidenciaOk: {
     ...TYPOGRAPHY.labelLg,
@@ -896,6 +928,7 @@ const styles = StyleSheet.create({
     height: 56,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
+    borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -909,6 +942,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
   },

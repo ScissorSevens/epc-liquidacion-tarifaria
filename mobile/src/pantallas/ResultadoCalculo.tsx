@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   Platform,
   Pressable,
@@ -120,7 +121,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
           ]}
           accessibilityLabel="Volver"
         >
-          <Text style={styles.headerIcon}>‹</Text>
+          <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>FACTURA CALCULADA</Text>
         <Pressable
@@ -133,15 +134,15 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
           ]}
           accessibilityLabel="Cuenta"
         >
-          <Text style={styles.headerIcon}>◉</Text>
+          <MaterialIcons name="radio-button-checked" size={24} color={COLORS.primary} />
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Status: círculo + título + subtítulo */}
         <View style={styles.statusBlock}>
-          <View style={styles.checkCircle}>
-            <Text style={styles.checkMark}>✓</Text>
+          <View style={styles.checkCircleContainer}>
+            <MaterialIcons name="check-circle" size={56} color={COLORS.onPrimary} />
           </View>
           <Text style={styles.statusTitle}>Lectura registrada</Text>
           <Text style={styles.statusSub}>
@@ -151,9 +152,9 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         </View>
 
         {/* Bento grid: total + anterior/actual + consumo */}
-        <View style={styles.bentoColFull}>
-          <Text style={styles.bentoLabel}>MONTO TOTAL</Text>
-          <Text style={styles.bentoTotal}>{formatearCOP(resultado.total)}</Text>
+        <View style={[styles.bentoColFull, styles.bentoColFullTotal]}>
+          <Text style={[styles.bentoLabel, styles.bentoLabelTotal]}>MONTO TOTAL</Text>
+          <Text style={[styles.bentoTotal, styles.bentoTotalBlanco]}>{formatearCOP(resultado.total)}</Text>
         </View>
         <View style={styles.bentoRow}>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>
@@ -173,7 +174,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         </View>
         <View style={styles.bentoColFullWhite}>
           <View style={styles.bentoConsumoLeft}>
-            <Text style={styles.bentoConsumoIcon}>◷</Text>
+            <MaterialIcons name="schedule" size={20} color={COLORS.primary} />
             <Text style={styles.bentoConsumoLabel}>Consumo del Periodo</Text>
           </View>
           <Text style={styles.bentoConsumoVal}>{resultado.consumo} m³</Text>
@@ -189,9 +190,11 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             ]}
           >
             <Text style={styles.detalleTitulo}>Detalle de cálculo</Text>
-            <Text style={styles.detalleChevron}>
-              {detalleAbierto ? '▲' : '▼'}
-            </Text>
+            <MaterialIcons
+              name={detalleAbierto ? 'expand-less' : 'expand-more'}
+              size={20}
+              color={COLORS.primary}
+            />
           </Pressable>
           {detalleAbierto && (
             <View style={styles.detalleBody}>
@@ -371,21 +374,17 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg,
     gap: SPACING.xs,
   },
-  checkCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    ...BORDERS.thick,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+  checkCircleIcon: {
     marginBottom: SPACING.sm,
   },
-  checkMark: {
-    fontSize: 32,
-    color: COLORS.primary,
-    fontWeight: '700',
-    lineHeight: 36,
+  checkCircleContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.secondaryContainer,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
   },
   statusTitle: {
     ...TYPOGRAPHY.headlineMd,
@@ -417,6 +416,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 120,
   },
+  bentoColFullTotal: {
+    backgroundColor: COLORS.primaryContainer,
+    borderColor: COLORS.primaryContainer,
+  },
   bentoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
@@ -424,12 +427,18 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginBottom: SPACING.xs,
   },
+  bentoLabelTotal: {
+    color: COLORS.onPrimaryContainer,
+  },
   bentoTotal: {
     fontSize: 40,
     fontWeight: '900',
     color: COLORS.primary,
     letterSpacing: -1.5,
     lineHeight: 44,
+  },
+  bentoTotalBlanco: {
+    color: COLORS.onPrimary,
   },
   bentoRow: {
     flexDirection: 'row',
@@ -476,10 +485,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  bentoConsumoIcon: {
-    fontSize: 20,
-    color: COLORS.primary,
-  },
   bentoConsumoLabel: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
@@ -511,10 +516,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
     fontWeight: '700',
-  },
-  detalleChevron: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
   },
   detalleBody: {
     padding: SPACING.md,
@@ -553,6 +554,7 @@ const styles = StyleSheet.create({
     height: 48,
     backgroundColor: COLORS.primary,
     ...BORDERS.thin,
+    borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -567,6 +569,7 @@ const styles = StyleSheet.create({
     height: 48,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
+    borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
   },

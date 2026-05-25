@@ -46,12 +46,19 @@ export const COLORS = {
   textSecondary: '#44474D',
   textTertiary: '#808080',
   // Bordes.
-  outline: '#000000',
+  outline: '#75777E',
   outlineVariant: '#C5C6CE',
   // Divisores internos en cards (zinc-300).
   divider: '#D4D4D8',
   // Placeholder en inputs (zinc-300/400).
   placeholder: '#D4D4D8',
+  // Colores de superficie adicionales.
+  onBackground: '#0B1C30',
+  surfaceContainer: '#E5EEFF',
+  surfaceVariant: '#D3E4FE',
+  surfaceDim: '#CBDBF5',
+  inverseSurface: '#213145',
+  inverseOnSurface: '#EAF1FF',
   // Advertencia.
   warning: '#EF6C00',
   // Estados de error (heredados del DESIGN.md).
@@ -71,6 +78,7 @@ export const SPACING = {
   md: 16,
   lg: 24,
   xl: 32,
+  xxl: 48,
   margin: 20,
 } as const;
 
@@ -168,5 +176,28 @@ export const BORDERS = {
     borderWidth: 1,
     borderColor: COLORS.outline,
     borderStyle: 'dashed' as const,
+  },
+  focused: { borderWidth: 2, borderColor: COLORS.secondary },
+  error: { borderWidth: 2, borderColor: COLORS.error },
+} as const;
+
+/**
+ * Sombras para elevación. `card` es para cards normales, `float` para FABs
+ * o modales flotantes.
+ */
+export const SHADOWS = {
+  card: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  float: {
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
   },
 } as const;

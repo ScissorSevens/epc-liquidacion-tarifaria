@@ -253,7 +253,7 @@ export default function Sincronizacion(_props: Props) {
           <>
             {/* Ícono central */}
             <View style={styles.iconoCirculo}>
-              <MaterialIcons name="cloud-upload" size={48} color={COLORS.primary} />
+              <MaterialIcons name="sync" size={48} color={COLORS.onPrimary} />
             </View>
 
             {/* Estado textual */}
@@ -403,6 +403,19 @@ export default function Sincronizacion(_props: Props) {
           </View>
         )}
       />
+
+      {/* Footer consistente */}
+      <View style={styles.footer}>
+        <Text style={styles.footerBrand}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+        <View style={styles.footerLinks}>
+          <Pressable onPress={() => { /* Soporte: pendiente */ }}>
+            <Text style={styles.footerLink}>SOPORTE</Text>
+          </Pressable>
+          <Pressable onPress={() => { /* Cerrar sesión: requiere auth */ }}>
+            <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -457,7 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: SPACING.xl,
     marginBottom: SPACING.lg,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.primaryContainer,
   },
   estadoTextos: {
     alignItems: 'center',
@@ -597,6 +610,34 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: COLORS.textSecondary,
+  },
+  footer: {
+    backgroundColor: COLORS.surfaceContainer,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outline,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.margin,
+    alignItems: 'center',
+    gap: 2,
+  },
+  footerBrand: {
+    fontSize: 10,
+    lineHeight: 12,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginTop: 2,
+  },
+  footerLink: {
+    fontSize: 10,
+    lineHeight: 12,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
 });
 

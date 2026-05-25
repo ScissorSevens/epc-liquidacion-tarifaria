@@ -156,7 +156,7 @@ const stylesHistorial = StyleSheet.create({
     backgroundColor: COLORS.secondaryContainer,
     paddingHorizontal: SPACING.xs,
     paddingVertical: 2,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
   },
   badgeActualText: {
     ...TYPOGRAPHY.labelSm,
@@ -199,7 +199,7 @@ const stylesHistorial = StyleSheet.create({
   badgeSync: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
     marginLeft: SPACING.sm,
   },
   badgeSyncText: {
@@ -315,7 +315,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
         >
-          <Text style={styles.headerIcon}>‹</Text>
+          <MaterialIcons name="arrow-back" size={24} color={COLORS.onPrimary} />
         </Pressable>
         <Text style={styles.headerTitle}>DETALLE SUSCRIPTOR</Text>
         <View style={styles.headerBtn} />
@@ -487,6 +487,14 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           >
             <Text style={styles.btnVolverText}>VOLVER</Text>
           </Pressable>
+          <View style={styles.footerLinks}>
+            <Pressable onPress={() => { /* Soporte: pendiente */ }}>
+              <Text style={styles.footerLink}>SOPORTE</Text>
+            </Pressable>
+            <Pressable onPress={() => { /* Cerrar sesión: requiere auth */ }}>
+              <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
+            </Pressable>
+          </View>
         </View>
       )}
     </View>
@@ -581,7 +589,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
   },
   badgeEstadoText: {
     ...TYPOGRAPHY.labelSm,
@@ -595,7 +603,7 @@ const styles = StyleSheet.create({
     ...BORDERS.thin,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
   },
   chipEstratoText: {
     ...TYPOGRAPHY.labelSm,
@@ -698,11 +706,12 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainer,
     ...BORDERS.thin,
     borderBottomWidth: 0,
     borderLeftWidth: 0,
     borderRightWidth: 0,
+    gap: SPACING.xs,
   },
   btnVolver: {
     ...BORDERS.thin,
@@ -714,6 +723,18 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
     letterSpacing: 2,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.lg,
+    paddingTop: SPACING.xs,
+  },
+  footerLink: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
 
   /* ── Pressed states ── */
