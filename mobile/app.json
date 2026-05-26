@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MediApp",
-    "slug": "mediapp",
+    "name": "AquaRuta",
+    "slug": "aquaruta",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.ikhthys.mediapp",
+      "package": "com.ikhthys.aquaruta",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -35,7 +35,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "MediApp necesita la camara para registrar la evidencia fotografica del medidor.",
+          "cameraPermission": "AquaRuta necesita la camara para registrar la evidencia fotografica del medidor.",
           "recordAudioAndroid": false
         }
       ]

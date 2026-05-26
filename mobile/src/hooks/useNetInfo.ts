@@ -5,7 +5,7 @@
  * este proyecto. Este hook retorna siempre `{ isConnected: false }`, lo que
  * hace que el banner "Sin conexión" en RutaDeHoy sea siempre visible.
  *
- * Esto es correcto para el comportamiento offline-first de MediApp: los datos
+ * Esto es correcto para el comportamiento offline-first de AquaRuta: los datos
  * siempre se guardan localmente y se sincronizan manualmente desde el tab
  * SINCRONIZACIÓN.
  *

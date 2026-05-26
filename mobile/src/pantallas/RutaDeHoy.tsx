@@ -31,7 +31,7 @@ type Props = InicioStackScreenProps<'RutaDeHoy'>;
  * Carga suscriptores y calcula el progreso de lecturas capturadas hoy.
  * El banner offline es SIEMPRE visible porque useNetInfo() usa un shim
  * que retorna { isConnected: false } — comportamiento intencional para
- * el flujo offline-first de MediApp. Ver src/hooks/useNetInfo.ts.
+ * el flujo offline-first de AquaRuta. Ver src/hooks/useNetInfo.ts.
  */
 export default function RutaDeHoy({ navigation }: Props) {
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
@@ -253,7 +253,7 @@ export default function RutaDeHoy({ navigation }: Props) {
 
       {/* Footer global */}
       <View style={styles.footer}>
-        <Text style={[TYPOGRAPHY.bodySm, styles.footerText]}>MediApp — EPC</Text>
+        <Text style={[TYPOGRAPHY.bodySm, styles.footerText]}>AquaRuta — EPC</Text>
       </View>
     </View>
   );

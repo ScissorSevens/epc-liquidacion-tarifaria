@@ -41,7 +41,7 @@ const formatHora = (d: Date): string =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 
 /**
- * Pantalla de sincronizacion manual con el backend MediApp.
+ * Pantalla de sincronizacion manual con el backend AquaRuta.
  *
  * Permite al operario:
  *  - Probar la conectividad contra `${baseUrl}/health`.
