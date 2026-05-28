@@ -39,14 +39,14 @@ interface TabIconProps {
 
 function TabIcon({ name, label, focused }: TabIconProps) {
   // Controla cuánto "sube" el píldora con el ícono
-  const translateY = useRef(new Animated.Value(focused ? -16 : 0)).current;
+  const translateY = useRef(new Animated.Value(focused ? -8 : 0)).current;
   // Escala del círculo: aparece grande cuando activo
   const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(translateY, {
-        toValue: focused ? -16 : 0,
+        toValue: focused ? -8 : 0,
         useNativeDriver: true,
         tension: 120,
         friction: 8,
@@ -79,6 +79,7 @@ function TabIcon({ name, label, focused }: TabIconProps) {
 
       {/* Etiqueta */}
       <Text
+        numberOfLines={1}
         style={[
           tabIconStyles.label,
           focused ? tabIconStyles.labelActiva : tabIconStyles.labelInactiva,
@@ -118,6 +119,7 @@ const tabIconStyles = StyleSheet.create({
   },
   label: {
     ...TYPOGRAPHY.labelSm,
+    fontSize: 9,
     marginTop: 2,
   },
   labelActiva: {
