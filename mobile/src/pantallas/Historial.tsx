@@ -10,7 +10,6 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { Lectura } from '@dominio/captura-lecturas/types';
-import type { Medidor } from '@dominio/medidores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -18,29 +17,36 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
 type Props = LecturasStackScreenProps<'Historial'>;
 
-function badgeSyncColor(estado: string): { bg: string; text: string } {
-  switch (estado) {
-    case 'sincronizado':
-      return { bg: COLORS.primaryContainer, text: COLORS.onPrimaryContainer };
-    case 'error':
-      return { bg: COLORS.errorContainer, text: COLORS.onErrorContainer };
-    default:
-      return { bg: COLORS.secondary, text: COLORS.onPrimary };
-  }
+/** Convierte 'YYYY-MM' a etiqueta corta: 'ENE', 'FEB', etc. */
+function mesCorto(periodo: string): string {
+  const meses = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  const mes = parseInt(periodo.split('-')[1] ?? '1', 10) - 1;
+  return meses[mes] ?? periodo;
+}
+
+/** Convierte 'YYYY-MM' a label legible: 'Junio 2024' */
+function mesLargo(periodo: string): string {
+  const meses = [
+    'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+  ];
+  const [year, mm] = periodo.split('-');
+  const mes = parseInt(mm ?? '1', 10) - 1;
+  return `${meses[mes] ?? periodo} ${year ?? ''}`;
 }
 
 /**
- * Pantalla de historial completo de lecturas de un suscriptor.
+ * Pantalla de historial de consumo de un suscriptor.
  *
- * - Carga los medidores del suscriptor y luego todas sus lecturas.
- * - Agrupa las lecturas por medidor, ordenadas por fecha descendente.
- * - Solo lectura — no permite editar ni capturar.
+ * Muestra:
+ * - KPIs: promedio, pico y total de consumo (m³) sobre todas las lecturas
+ * - Gráfico de barras de los últimos 6 meses
+ * - Lista de facturación: una fila por período, con fecha y valor en m³
  */
 export default function Historial({ navigation, route }: Props) {
   const { id_suscriptor, nombre } = route.params;
 
-  const [medidores, setMedidores] = useState<Medidor[]>([]);
-  const [lecturasPorMedidor, setLecturasPorMedidor] = useState<Map<number, Lectura[]>>(new Map());
+  const [lecturas, setLecturas] = useState<Lectura[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,25 +55,16 @@ export default function Historial({ navigation, route }: Props) {
     setError(null);
     try {
       const { medidorRepo, lecturaRepo } = await getBootstrap();
-      const lista = await medidorRepo.listarPorSuscriptor(id_suscriptor);
-      setMedidores(lista);
-
-      const mapa = new Map<number, Lectura[]>();
-      await Promise.all(
-        lista.map(async (m) => {
-          const lecturas = await lecturaRepo.listarPorMedidor(m.id_medidor);
-          // Orden descendente por timestamp
-          const ordenadas = [...lecturas].sort(
-            (a, b) =>
-              new Date(b.timestamp_captura).getTime() -
-              new Date(a.timestamp_captura).getTime(),
-          );
-          mapa.set(m.id_medidor, ordenadas);
-        }),
+      const medidores = await medidorRepo.listarPorSuscriptor(id_suscriptor);
+      const todasLecturas = (
+        await Promise.all(medidores.map((m) => lecturaRepo.listarPorMedidor(m.id_medidor)))
+      ).flat();
+      // Orden descendente por timestamp
+      todasLecturas.sort(
+        (a, b) => new Date(b.timestamp_captura).getTime() - new Date(a.timestamp_captura).getTime(),
       );
-      setLecturasPorMedidor(mapa);
+      setLecturas(todasLecturas);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('[Historial] error al cargar:', e);
       setError('No se pudo cargar el historial. Intentar de nuevo.');
     } finally {
@@ -79,10 +76,19 @@ export default function Historial({ navigation, route }: Props) {
     void cargar();
   }, [cargar]);
 
-  const totalLecturas = [...lecturasPorMedidor.values()].reduce(
-    (acc, l) => acc + l.length,
-    0,
-  );
+  // ── KPIs ────────────────────────────────────────────────────────────────────
+  const valores = lecturas.map((l) => l.lectura_actual);
+  const total = valores.reduce((a, b) => a + b, 0);
+  const promedio = valores.length > 0 ? total / valores.length : 0;
+  const pico = valores.length > 0 ? Math.max(...valores) : 0;
+
+  // ── Últimos 6 períodos para el gráfico ──────────────────────────────────────
+  const periodosUnicos = [...new Set(lecturas.map((l) => l.id_periodo))].slice(0, 6).reverse();
+  const consumoPorPeriodo = periodosUnicos.map((p) => ({
+    periodo: p,
+    valor: lecturas.filter((l) => l.id_periodo === p).reduce((a, l) => a + l.lectura_actual, 0),
+  }));
+  const maxConsumo = Math.max(...consumoPorPeriodo.map((c) => c.valor), 1);
 
   return (
     <View style={styles.raiz}>
@@ -92,15 +98,11 @@ export default function Historial({ navigation, route }: Props) {
           <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
             <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
           </Pressable>
-          <View>
-            <Text style={styles.topBarTitulo}>HISTORIAL</Text>
-            <Text style={styles.topBarSub} numberOfLines={1}>{nombre}</Text>
-          </View>
+          <Text style={styles.topBarNombre} numberOfLines={1}>{nombre}</Text>
         </View>
-        <MaterialIcons name="history" size={24} color={COLORS.primary} />
+        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
-      {/* Contenido */}
       {loading ? (
         <View style={styles.centrado}>
           <ActivityIndicator size="large" color={COLORS.secondary} />
@@ -119,90 +121,103 @@ export default function Historial({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
-          {/* Resumen */}
-          <View style={styles.resumenCard}>
-            <View style={styles.resumenItem}>
-              <Text style={styles.resumenValor}>{medidores.length}</Text>
-              <Text style={styles.resumenEtiqueta}>MEDIDORES</Text>
-            </View>
-            <View style={styles.resumenDivider} />
-            <View style={styles.resumenItem}>
-              <Text style={styles.resumenValor}>{totalLecturas}</Text>
-              <Text style={styles.resumenEtiqueta}>LECTURAS</Text>
+
+          {/* ── KPI Card ── */}
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiTitulo}>MÉTRICAS GENERALES</Text>
+            <View style={styles.kpiFila}>
+              <View style={styles.kpiItem}>
+                <Text style={styles.kpiEtiqueta}>PROMEDIO</Text>
+                <Text style={styles.kpiValor}>{promedio.toFixed(1)}</Text>
+                <Text style={styles.kpiUnidad}>m³</Text>
+              </View>
+              <View style={[styles.kpiItem, styles.kpiItemBordes]}>
+                <Text style={styles.kpiEtiqueta}>PICO</Text>
+                <Text style={styles.kpiValor}>{pico.toFixed(1)}</Text>
+                <Text style={styles.kpiUnidad}>m³</Text>
+              </View>
+              <View style={styles.kpiItem}>
+                <Text style={styles.kpiEtiqueta}>TOTAL</Text>
+                <Text style={styles.kpiValor}>{total.toFixed(0)}</Text>
+                <Text style={styles.kpiUnidad}>m³</Text>
+              </View>
             </View>
           </View>
 
-          {medidores.length === 0 ? (
-            <View style={styles.vacio}>
-              <MaterialIcons name="sensors-off" size={40} color={COLORS.onSurfaceVariant} />
-              <Text style={styles.vacioTexto}>Sin medidores registrados</Text>
+          {/* ── Gráfico de barras ── */}
+          <View style={styles.graficoCard}>
+            <View style={styles.graficoHeader}>
+              <View>
+                <Text style={styles.graficoTitulo}>Últimos 6 meses</Text>
+                <Text style={styles.graficoSubtitulo}>Consumo registrado</Text>
+              </View>
+              <MaterialIcons name="bar-chart" size={24} color={COLORS.secondary} />
             </View>
-          ) : (
-            medidores.map((m) => {
-              const lecturas = lecturasPorMedidor.get(m.id_medidor) ?? [];
-              return (
-                <View key={m.id_medidor} style={styles.medidorCard}>
-                  {/* Cabecera medidor */}
-                  <View style={styles.medidorHeader}>
-                    <View style={styles.medidorHeaderIzq}>
-                      <MaterialIcons name="speed" size={18} color={COLORS.secondary} />
-                      <Text style={styles.medidorNumero}>N° {m.numero_medidor}</Text>
-                    </View>
-                    <View style={styles.badgeCantidad}>
-                      <Text style={styles.badgeCantidadTexto}>
-                        {lecturas.length} lectura{lecturas.length !== 1 ? 's' : ''}
+            {consumoPorPeriodo.length === 0 ? (
+              <View style={styles.sinDatos}>
+                <Text style={styles.sinDatosTexto}>Sin datos aún</Text>
+              </View>
+            ) : (
+              <View style={styles.barras}>
+                {consumoPorPeriodo.map((c, idx) => {
+                  const esUltimo = idx === consumoPorPeriodo.length - 1;
+                  const altura = Math.max((c.valor / maxConsumo) * 140, 4);
+                  return (
+                    <View key={c.periodo} style={styles.barraCol}>
+                      <View
+                        style={[
+                          styles.barra,
+                          { height: altura },
+                          esUltimo ? styles.barraActiva : styles.barraInactiva,
+                        ]}
+                      />
+                      <Text style={[styles.barraEtiqueta, esUltimo && styles.barraEtiquetaActiva]}>
+                        {mesCorto(c.periodo)}
                       </Text>
                     </View>
-                  </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
 
-                  {lecturas.length === 0 ? (
-                    <View style={styles.sinLecturas}>
-                      <Text style={styles.sinLecturasTexto}>Sin lecturas registradas</Text>
-                    </View>
-                  ) : (
-                    lecturas.map((l, idx) => (
-                      <View
-                        key={l.id_lectura}
-                        style={[
-                          styles.filaLectura,
-                          idx < lecturas.length - 1 && styles.filaLecturaBorde,
-                        ]}
-                      >
-                        <View style={styles.filaLecturaIzq}>
-                          <Text style={styles.filaPeriodo}>{l.id_periodo}</Text>
-                          <Text style={styles.filaFecha}>
-                            {new Date(l.timestamp_captura).toLocaleDateString('es-CO', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </Text>
-                        </View>
-                        <View style={styles.filaLecturaDer}>
-                          <Text style={styles.filaValor}>{l.lectura_actual} m³</Text>
-                          <View
-                            style={[
-                              styles.badgeSync,
-                              { backgroundColor: badgeSyncColor(l.estado_sync).bg },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.badgeSyncTexto,
-                                { color: badgeSyncColor(l.estado_sync).text },
-                              ]}
-                            >
-                              {l.estado_sync.toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))
-                  )}
+          {/* ── Historial de lecturas ── */}
+          <Text style={styles.seccionTitulo}>Historial de Lecturas</Text>
+          <View style={styles.listaCard}>
+            {lecturas.length === 0 ? (
+              <View style={styles.sinDatos}>
+                <Text style={styles.sinDatosTexto}>Sin lecturas registradas</Text>
+              </View>
+            ) : (
+              lecturas.map((l, idx) => (
+                <View
+                  key={l.id_lectura}
+                  style={[styles.filaItem, idx < lecturas.length - 1 && styles.filaItemBorde]}
+                >
+                  <View>
+                    <Text style={styles.filaMes}>{mesLargo(l.id_periodo)}</Text>
+                    <Text style={styles.filaFecha}>
+                      {new Date(l.timestamp_captura).toLocaleDateString('es-CO', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      }).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.filaValor}>{l.lectura_actual} m³</Text>
                 </View>
-              );
-            })
-          )}
+              ))
+            )}
+          </View>
+
+          {/* ── Botón volver ── */}
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={({ pressed }) => [styles.btnVolver, pressed && { opacity: 0.85 }]}
+          >
+            <MaterialIcons name="arrow-back" size={20} color={COLORS.onPrimary} />
+            <Text style={styles.btnVolverTexto}>VOLVER</Text>
+          </Pressable>
 
           <FooterApp />
         </ScrollView>
@@ -212,10 +227,7 @@ export default function Historial({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  raiz: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  raiz: { flex: 1, backgroundColor: COLORS.background },
 
   // Top Bar
   topBar: {
@@ -231,18 +243,14 @@ const styles = StyleSheet.create({
   topBarIzq: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: SPACING.sm + 4,
     flex: 1,
   },
-  topBarTitulo: {
+  topBarNombre: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
-    letterSpacing: 1.2,
-  },
-  topBarSub: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.onSurfaceVariant,
-    maxWidth: 220,
+    letterSpacing: 0.5,
+    flex: 1,
   },
 
   // Estados
@@ -253,15 +261,8 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     padding: SPACING.margin,
   },
-  cargandoTexto: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.onSurfaceVariant,
-  },
-  errorTexto: {
-    ...TYPOGRAPHY.bodyMd,
-    color: COLORS.error,
-    textAlign: 'center',
-  },
+  cargandoTexto: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
+  errorTexto: { ...TYPOGRAPHY.bodyMd, color: COLORS.error, textAlign: 'center' },
   btnReintentar: {
     marginTop: SPACING.sm,
     paddingVertical: SPACING.sm,
@@ -269,148 +270,127 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryContainer,
     borderRadius: RADIUS.lg,
   },
-  btnReintentarTexto: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-    letterSpacing: 0.8,
-  },
+  btnReintentarTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onPrimary, letterSpacing: 0.8 },
 
   // Scroll
   scroll: {
     padding: SPACING.margin,
     paddingBottom: SPACING.xxl,
-    gap: SPACING.md,
+    gap: SPACING.lg,
   },
 
-  // Resumen
-  resumenCard: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
-  },
-  resumenItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-    gap: SPACING.xs,
-  },
-  resumenValor: {
-    ...TYPOGRAPHY.headlineMd,
-    color: COLORS.primary,
-  },
-  resumenEtiqueta: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.8,
-  },
-  resumenDivider: {
-    width: 1,
-    backgroundColor: COLORS.outlineVariant,
-    marginVertical: SPACING.md,
-  },
-
-  // Vacío
-  vacio: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xxl,
-    gap: SPACING.md,
-  },
-  vacioTexto: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.onSurfaceVariant,
-  },
-
-  // Card por medidor
-  medidorCard: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
-  },
-  medidorHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm + 4,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+  // KPI Card
+  kpiCard: {
     backgroundColor: COLORS.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
   },
-  medidorHeaderIzq: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  medidorNumero: {
+  kpiTitulo: {
     ...TYPOGRAPHY.labelMd,
-    color: COLORS.primary,
+    color: COLORS.onSurfaceVariant,
+    textAlign: 'center',
+    letterSpacing: 0.8,
+    marginBottom: SPACING.lg,
+  },
+  kpiFila: { flexDirection: 'row' },
+  kpiItem: { flex: 1, alignItems: 'center', gap: 2 },
+  kpiItemBordes: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: COLORS.outlineVariant,
+  },
+  kpiEtiqueta: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.onSurfaceVariant,
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  badgeCantidad: {
-    backgroundColor: COLORS.surfaceVariant,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-  },
-  badgeCantidadTexto: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.onSurfaceVariant,
-  },
+  kpiValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, fontWeight: '700' },
+  kpiUnidad: { fontSize: 10, color: COLORS.onSurfaceVariant, fontWeight: '500' },
 
-  // Sin lecturas
-  sinLecturas: {
+  // Gráfico
+  graficoCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     padding: SPACING.lg,
-    alignItems: 'center',
   },
-  sinLecturasTexto: {
-    ...TYPOGRAPHY.bodySm,
+  graficoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.lg,
+  },
+  graficoTitulo: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+  graficoSubtitulo: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
+  barras: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 160,
+    gap: SPACING.sm,
+    paddingHorizontal: 4,
+  },
+  barraCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  barra: { width: '100%', borderRadius: 2 },
+  barraInactiva: { backgroundColor: COLORS.surfaceDim },
+  barraActiva: { backgroundColor: COLORS.primary },
+  barraEtiqueta: {
+    fontSize: 10,
+    fontWeight: '700',
     color: COLORS.onSurfaceVariant,
+    marginTop: SPACING.xs,
   },
+  barraEtiquetaActiva: { color: COLORS.primary },
 
-  // Filas de lectura
-  filaLectura: {
+  // Sección lista
+  seccionTitulo: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    paddingHorizontal: 4,
+  },
+  listaCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
+  },
+  sinDatos: { padding: SPACING.lg, alignItems: 'center' },
+  sinDatosTexto: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
+  filaItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm + 4,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md + 4,
   },
-  filaLecturaBorde: {
+  filaItemBorde: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outlineVariant,
   },
-  filaLecturaIzq: {
-    gap: 2,
+  filaMes: { ...TYPOGRAPHY.headlineSm, fontSize: 16, color: COLORS.primary },
+  filaFecha: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant, fontWeight: '400' },
+  filaValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+
+  // Botón volver
+  btnVolver: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    height: 56,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.xl,
   },
-  filaPeriodo: {
-    ...TYPOGRAPHY.bodyMd,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  filaFecha: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.onSurfaceVariant,
-  },
-  filaLecturaDer: {
-    alignItems: 'flex-end',
-    gap: SPACING.xs,
-  },
-  filaValor: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
-  badgeSync: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-  },
-  badgeSyncTexto: {
-    ...TYPOGRAPHY.labelSm,
-    letterSpacing: 0.4,
+  btnVolverTexto: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.onPrimary,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 });
