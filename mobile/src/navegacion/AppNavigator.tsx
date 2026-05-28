@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS } from '../theme/skeletal-tokens';
@@ -23,21 +24,20 @@ const TAB_ICONS: Record<keyof TabParamList, IconName> = {
 };
 
 // ── Componente de ícono animado ────────────────────────────────────────────────
+// Usa useIsFocused() directamente para garantizar que las animaciones corran
+// cuando React Navigation cambia el tab activo.
 
 interface TabIconProps {
   name: IconName;
-  focused: boolean;
 }
 
-function TabIcon({ name, focused }: TabIconProps) {
-  // translateY: burbuja sube suavemente
-  const translateY = useRef(new Animated.Value(focused ? -6 : 0)).current;
-  // scale: burbuja crece/decrece
-  const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  // opacidad burbuja (activo → 1, inactivo → 0)
+function TabIcon({ name }: TabIconProps) {
+  const focused = useIsFocused();
+
+  const translateY    = useRef(new Animated.Value(focused ? -6 : 0)).current;
+  const scale         = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
   const bubbleOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  // opacidad ícono plano (activo → 0, inactivo → 1)
-  const iconOpacity = useRef(new Animated.Value(focused ? 0 : 1)).current;
+  const iconOpacity   = useRef(new Animated.Value(focused ? 0 : 1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -68,12 +68,12 @@ function TabIcon({ name, focused }: TabIconProps) {
 
   return (
     <View style={tabIconStyles.wrapper}>
-      {/* Ícono plano — visible cuando inactivo, se desvanece al activar */}
+      {/* Ícono plano — visible cuando inactivo */}
       <Animated.View style={[tabIconStyles.iconPlano, { opacity: iconOpacity }]}>
         <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
       </Animated.View>
 
-      {/* Burbuja activa — aparece con fade+scale+translateY */}
+      {/* Burbuja activa — fade + scale + translateY */}
       <Animated.View
         style={[
           tabIconStyles.bubble,
@@ -96,7 +96,6 @@ const tabIconStyles = StyleSheet.create({
     height: 72,
     paddingBottom: 14,
   },
-  // Ícono plano: posición absoluta para que burbuja y plano compartan el mismo espacio
   iconPlano: {
     position: 'absolute',
     bottom: 14,
@@ -122,36 +121,42 @@ export default function AppNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="Inicio"
-      screenOptions={({ route }) => {
-        const routeName = route.name as keyof TabParamList;
-        const iconName = TAB_ICONS[routeName] ?? 'circle';
-
-        return {
-          headerShown: false,
-          // Transición suave entre pantallas
-          animation: 'fade',
-          tabBarStyle: {
-            backgroundColor: COLORS.surfaceContainerLowest,
-            borderTopWidth: 1,
-            borderTopColor: COLORS.outlineVariant,
-            height: 72,
-            paddingBottom: 0,
-            paddingTop: 0,
-          },
-          tabBarShowLabel: false,
-          tabBarItemStyle: {
-            paddingVertical: 0,
-          },
-          tabBarIcon: ({ focused }: { focused: boolean }) => (
-            <TabIcon name={iconName} focused={focused} />
-          ),
-        };
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: COLORS.surfaceContainerLowest,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.outlineVariant,
+          height: 72,
+          paddingBottom: 0,
+          paddingTop: 0,
+        },
+        tabBarShowLabel: false,
+        tabBarItemStyle: {
+          paddingVertical: 0,
+        },
       }}
     >
-      <Tab.Screen name="Inicio" component={InicioStack} />
-      <Tab.Screen name="Lecturas" component={LecturasStack} />
-      <Tab.Screen name="Sincronizacion" component={SyncStack} />
-      <Tab.Screen name="Config" component={ConfigStack} />
+      <Tab.Screen
+        name="Inicio"
+        component={InicioStack}
+        options={{ tabBarIcon: () => <TabIcon name="home" /> }}
+      />
+      <Tab.Screen
+        name="Lecturas"
+        component={LecturasStack}
+        options={{ tabBarIcon: () => <TabIcon name="edit-note" /> }}
+      />
+      <Tab.Screen
+        name="Sincronizacion"
+        component={SyncStack}
+        options={{ tabBarIcon: () => <TabIcon name="sync" /> }}
+      />
+      <Tab.Screen
+        name="Config"
+        component={ConfigStack}
+        options={{ tabBarIcon: () => <TabIcon name="settings" /> }}
+      />
     </Tab.Navigator>
   );
 }
