@@ -30,6 +30,7 @@ export type InicioStackParamList = {
 export type LecturasStackParamList = {
   ListaSuscriptores: undefined;
   DetalleSuscriptor: { id_suscriptor: number };
+  Historial: { id_suscriptor: number; nombre: string };
   CapturarLectura: { id_medidor: number; id_suscriptor: number };
   CapturarFoto: { id_medidor: number; id_periodo: string; id_suscriptor: number };
   ResultadoCalculo: {

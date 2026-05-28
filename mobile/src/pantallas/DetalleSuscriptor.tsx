@@ -468,6 +468,23 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                       periodoAnterior={calcularPeriodos().anterior}
                       loading={loadingHistorial && !historialMap.has(m.id_medidor)}
                     />
+                    {/* Botón historial completo */}
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate('Historial', {
+                          id_suscriptor,
+                          nombre: suscriptor?.nombre_apellidos ?? '',
+                        })
+                      }
+                      style={({ pressed }) => [
+                        styles.btnHistorial,
+                        pressed && styles.pressedLight,
+                      ]}
+                    >
+                      <MaterialIcons name="history" size={18} color={COLORS.primary} />
+                      <Text style={styles.btnHistorialText}>VER HISTORIAL COMPLETO</Text>
+                      <MaterialIcons name="chevron-right" size={18} color={COLORS.onSurfaceVariant} />
+                    </Pressable>
                   </View>
                 </View>
               ))
@@ -789,5 +806,23 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textAlign: 'center',
     paddingTop: SPACING.sm,
+  },
+
+  /* ── Botón historial completo ── */
+  btnHistorial: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm + 4,
+    paddingHorizontal: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+  },
+  btnHistorialText: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+    flex: 1,
+    letterSpacing: 0.5,
   },
 });
