@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 
+import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
@@ -43,6 +45,11 @@ export default function ListaSuscriptores({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [fabAbierto, setFabAbierto] = useState(false);
+
+  // ── Selector de medidor ───────────────────────────────────────────────────
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [medidoresSelector, setMedidoresSelector] = useState<Medidor[]>([]);
+  const [suscriptorSelector, setSuscriptorSelector] = useState<{ id: number; nombre: string } | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -85,12 +92,16 @@ export default function ListaSuscriptores({ navigation }: Props) {
       try {
         const { medidorRepo } = await getBootstrap();
         const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
-        const medidor = medidores[0];
-        if (medidor) {
+        if (medidores.length === 0) return;
+        if (medidores.length === 1 && medidores[0]) {
           navigation.navigate('CapturarLectura', {
-            id_medidor: medidor.id_medidor,
+            id_medidor: medidores[0].id_medidor,
             id_suscriptor: item.id_suscriptor,
           });
+        } else {
+          setMedidoresSelector(medidores);
+          setSuscriptorSelector({ id: item.id_suscriptor, nombre: item.nombre_apellidos });
+          setSelectorVisible(true);
         }
       } catch (e) {
         console.warn('[ListaSuscriptores] error navegando a CapturarLectura:', e);
@@ -293,6 +304,52 @@ export default function ListaSuscriptores({ navigation }: Props) {
           color={COLORS.onPrimary}
         />
       </Pressable>
+
+      {/* ── Modal selector de medidor ───────────────────────────────────────── */}
+      <Modal
+        visible={selectorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectorVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setSelectorVisible(false)}>
+          <Pressable style={styles.bottomSheet} onPress={() => {}}>
+            <View style={styles.handleBar} />
+            <Text style={styles.sheetTitulo}>Seleccionar medidor</Text>
+            {suscriptorSelector && (
+              <Text style={styles.sheetSubtitulo}>{suscriptorSelector.nombre}</Text>
+            )}
+            {medidoresSelector.map((med) => (
+              <Pressable
+                key={med.id_medidor}
+                style={({ pressed }) => [styles.medidorItem, pressed && styles.medidorItemPressed]}
+                onPress={() => {
+                  setSelectorVisible(false);
+                  if (suscriptorSelector) {
+                    navigation.navigate('CapturarLectura', {
+                      id_medidor: med.id_medidor,
+                      id_suscriptor: suscriptorSelector.id,
+                    });
+                  }
+                }}
+              >
+                <MaterialIcons name="speed" size={20} color={COLORS.secondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.medidorNro}>Medidor #{med.id_medidor}</Text>
+                  <Text style={styles.medidorSerie}>{med.numero_medidor}</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color={COLORS.onSurfaceVariant} />
+              </Pressable>
+            ))}
+            <Pressable
+              style={({ pressed }) => [styles.btnCancelar, pressed && { opacity: 0.6 }]}
+              onPress={() => setSelectorVisible(false)}
+            >
+              <Text style={styles.btnCancelarTexto}>CANCELAR</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -564,5 +621,69 @@ const styles = StyleSheet.create({
   // ── Util ───────────────────────────────────────────────────────────────────
   pressed: {
     opacity: 0.7,
+  },
+
+  // ── Modal selector de medidor ─────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.full,
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sheetTitulo: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    marginBottom: SPACING.xs,
+  },
+  sheetSubtitulo: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: SPACING.lg,
+  },
+  medidorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    marginBottom: SPACING.sm,
+  },
+  medidorItemPressed: {
+    backgroundColor: COLORS.surfaceContainer,
+  },
+  medidorNro: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  medidorSerie: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+  },
+  btnCancelar: {
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  btnCancelarTexto: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onSurfaceVariant,
+    letterSpacing: 0.5,
   },
 });
