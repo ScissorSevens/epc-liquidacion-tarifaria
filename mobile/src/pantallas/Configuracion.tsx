@@ -21,6 +21,7 @@ import {
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import { obtenerApiBaseUrl } from '../config/api';
 import { getBootstrap } from '../composition/get-bootstrap';
 import {
@@ -218,15 +219,13 @@ export default function Configuracion({ navigation }: Props) {
 
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>CONFIGURACIÓN</Text>
-      </View>
+    <View style={styles.container}>
+      <TopBar titulo="Configuración" />
+      <ScrollView contentContainerStyle={styles.content}>
 
       {/* Sección: Gestión de suscriptores */}
       <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>
-        GESTIÓN DE SUSCRIPTORES
+        Gestión de suscriptores
       </Text>
 
       <View style={styles.seccion}>
@@ -252,7 +251,7 @@ export default function Configuracion({ navigation }: Props) {
       </View>
 
       {/* Sección: Sistema */}
-      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>SISTEMA</Text>
+      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>Sistema</Text>
 
       <View style={styles.seccion}>
         <View style={styles.item}>
@@ -264,7 +263,7 @@ export default function Configuracion({ navigation }: Props) {
 
 
       {/* Sección: Mi perfil */}
-      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>MI PERFIL</Text>
+      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>Mi perfil</Text>
 
       <View style={styles.seccion}>
         {/* CARGANDO */}
@@ -378,7 +377,8 @@ export default function Configuracion({ navigation }: Props) {
         )}
       </View>
       <FooterApp />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -388,18 +388,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   content: {
+    paddingTop: SPACING.lg,
     paddingBottom: SPACING.xl,
-  },
-  header: {
-    paddingTop: SPACING.xl,
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    marginBottom: SPACING.lg,
-  },
-  titulo: {
-    color: COLORS.primary,
   },
   seccionLabel: {
     color: COLORS.textSecondary,
