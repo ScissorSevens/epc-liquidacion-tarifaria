@@ -103,45 +103,36 @@ export default function ListaSuscriptores({ navigation }: Props) {
   const renderItem = useCallback(
     ({ item }: { item: Suscriptor }) => (
       <View style={styles.card}>
-        {/* Fila superior: ID */}
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderTextos}>
-            <Text style={styles.cardCodigo}>SUSCRIPTOR #{item.codigo.toUpperCase()}</Text>
-            <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
-              {item.nombre_apellidos}
-            </Text>
-          </View>
-        </View>
+        {/* Código + Nombre */}
+        <Text style={styles.cardCodigo}>#{item.codigo}</Text>
+        <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]} numberOfLines={1}>
+          {item.nombre_apellidos}
+        </Text>
 
         {/* Dirección */}
         {item.direccion !== '' && (
           <View style={styles.cardDireccionRow}>
-            <MaterialIcons name="location-on" size={16} color={COLORS.onSurfaceVariant} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.cardDireccion]}>
+            <MaterialIcons name="location-on" size={14} color={COLORS.onSurfaceVariant} />
+            <Text style={[TYPOGRAPHY.labelMd, styles.cardDireccion]} numberOfLines={1}>
               {item.direccion}
             </Text>
           </View>
         )}
 
-        {/* Botón ficha suscriptor */}
-        <Pressable
-          style={({ pressed }) => [styles.btnFicha, pressed && styles.pressed]}
-          onPress={() =>
-            navigation.navigate('DetalleSuscriptor', {
-              id_suscriptor: item.id_suscriptor,
-            })
-          }
-        >
-          <MaterialIcons name="info-outline" size={16} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.labelLg, styles.btnFichaTexto]}>FICHA SUSCRIPTOR</Text>
-        </Pressable>
+        {/* Acciones: Ficha (ghost) + Tomar lectura (pill) */}
+        <View style={styles.cardAcciones}>
+          <Pressable
+            style={({ pressed }) => [styles.btnFicha, pressed && styles.pressed]}
+            onPress={() =>
+              navigation.navigate('DetalleSuscriptor', {
+                id_suscriptor: item.id_suscriptor,
+              })
+            }
+          >
+            <MaterialIcons name="info-outline" size={14} color={COLORS.secondary} />
+            <Text style={[TYPOGRAPHY.labelMd, styles.btnFichaTexto]}>Ver ficha</Text>
+          </Pressable>
 
-        {/* Fila inferior: cámara + botón tomar lectura */}
-        <View style={styles.cardFooter}>
-          <View style={styles.cardFooterIzq}>
-            <MaterialIcons name="photo-camera" size={20} color={COLORS.onSurfaceVariant} />
-            <Text style={[TYPOGRAPHY.labelMd, styles.cardFooterLabel]}>Requiere foto</Text>
-          </View>
           <Pressable
             style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
             onPress={() => { void navegarACapturar(item); }}
@@ -349,14 +340,13 @@ const styles = StyleSheet.create({
   buscadorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
+    height: 48,
     paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.surfaceContainerLowest,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.xl,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.card,
+    borderRadius: RADIUS.full,
+    marginBottom: SPACING.md,
   },
   buscadorIcono: {
     marginRight: SPACING.sm,
@@ -369,81 +359,57 @@ const styles = StyleSheet.create({
 
   // ── Cards ─────────────────────────────────────────────────────────────────
   lista: {
-    gap: SPACING.md,
+    gap: SPACING.sm + 4,
   },
   card: {
     backgroundColor: COLORS.surfaceContainerLowest,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    padding: SPACING.margin,
-    gap: SPACING.md,
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm + 4,
+    gap: SPACING.xs,
     ...SHADOWS.card,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardHeaderTextos: {
-    flex: 1,
-    gap: SPACING.xs,
-  },
   cardCodigo: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
-    opacity: 0.6,
-    letterSpacing: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.secondary,
+    letterSpacing: 0.5,
+    opacity: 0.8,
   },
   cardNombre: {
     color: COLORS.primary,
+    marginBottom: SPACING.xs,
   },
   cardDireccionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
+    gap: 4,
+    marginBottom: SPACING.xs,
   },
   cardDireccion: {
     color: COLORS.onSurfaceVariant,
     flex: 1,
   },
 
-  // ── Botón Ficha Suscriptor ─────────────────────────────────────────────────
-  btnFicha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderRadius: RADIUS.lg,
-  },
-  btnFichaTexto: {
-    color: COLORS.primary,
-  },
-
-  // ── Card Footer ────────────────────────────────────────────────────────────
-  cardFooter: {
+  // ── Acciones en una sola fila ──────────────────────────────────────────────
+  cardAcciones: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceContainer,
-    marginTop: SPACING.xs,
+    marginTop: SPACING.xs + 2,
   },
-  cardFooterIzq: {
+  btnFicha: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    opacity: 0.7,
+    gap: 4,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.xs,
   },
-  cardFooterLabel: {
-    color: COLORS.onSurfaceVariant,
+  btnFichaTexto: {
+    color: COLORS.secondary,
   },
   btnTomarLectura: {
     flexDirection: 'row',
@@ -452,10 +418,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.full,
   },
   btnTomarLecturaTexto: {
     color: COLORS.onPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   // ── Estados centro ─────────────────────────────────────────────────────────
@@ -477,7 +446,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.float,
