@@ -66,7 +66,15 @@ export default function Historial({ navigation, route }: Props) {
       todasLecturas.sort(
         (a, b) => new Date(b.timestamp_captura).getTime() - new Date(a.timestamp_captura).getTime(),
       );
-      setLecturas(todasLecturas);
+      // Deduplicar por período: si hay varios medidores con lectura en el mismo mes,
+      // conservar solo la más reciente (ya están ordenadas desc por timestamp).
+      const vistoPeriodo = new Set<string>();
+      const sinDuplicados = todasLecturas.filter((l) => {
+        if (vistoPeriodo.has(l.id_periodo)) return false;
+        vistoPeriodo.add(l.id_periodo);
+        return true;
+      });
+      setLecturas(sinDuplicados);
     } catch (e) {
       console.warn('[Historial] error al cargar:', e);
       setError('No se pudo cargar el historial. Intentar de nuevo.');

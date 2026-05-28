@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { COLORS, RADIUS, SPACING } from '../theme/skeletal-tokens';
 
@@ -12,8 +13,9 @@ interface TopBarProps {
 }
 
 export function TopBar({ titulo, onBack, accionDerecha }: TopBarProps) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.topBar}>
+    <View style={[styles.topBar, { paddingTop: insets.top }]}>
       <View style={styles.izq}>
         {onBack && (
           <Pressable
@@ -37,9 +39,10 @@ const styles = StyleSheet.create({
   topBar: {
     height: TOPBAR_HEIGHT,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',  // alinear al fondo del área, encima del inset
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.margin,
+    paddingBottom: SPACING.sm + 2,
     backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outlineVariant,

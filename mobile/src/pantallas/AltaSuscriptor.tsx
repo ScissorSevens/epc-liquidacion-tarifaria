@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FechaPicker from '../components/FechaPicker';
 import {
   ActivityIndicator,
@@ -141,6 +142,7 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
  * AGENTS.md). Validacion manual: ver checklist al final del PR.
  */
 export default function AltaSuscriptor({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
   const [errores, setErrores] = useState<Errores>({});
   const [enviando, setEnviando] = useState(false);
@@ -509,7 +511,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
       )}
 
       {/* Bottom bar fijo */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom || SPACING.md }]}>
         <Pressable
           onPress={() => navigation.goBack()}
           disabled={enviando}
@@ -744,10 +746,11 @@ const styles = StyleSheet.create({
 
   // ── Bottom bar ─────────────────────────────────────────────────────────────
   bottomBar: {
-    height: BOTTOM_HEIGHT,
+    minHeight: BOTTOM_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.sm,
     gap: SPACING.md,
     backgroundColor: COLORS.surfaceContainerLowest,
     borderTopWidth: 1,
