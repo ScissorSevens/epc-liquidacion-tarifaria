@@ -39,14 +39,14 @@ interface TabIconProps {
 
 function TabIcon({ name, label, focused }: TabIconProps) {
   // Controla cuánto "sube" el píldora con el ícono
-  const translateY = useRef(new Animated.Value(focused ? -8 : 0)).current;
+  const translateY = useRef(new Animated.Value(focused ? -6 : 0)).current;
   // Escala del círculo: aparece grande cuando activo
   const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(translateY, {
-        toValue: focused ? -8 : 0,
+        toValue: focused ? -6 : 0,
         useNativeDriver: true,
         tension: 120,
         friction: 8,
@@ -62,18 +62,16 @@ function TabIcon({ name, label, focused }: TabIconProps) {
 
   return (
     <View style={tabIconStyles.wrapper}>
-      {/* Píldora / burbuja activa (círculo oscuro que sube) */}
-      <Animated.View
-        style={[
-          tabIconStyles.bubble,
-          { transform: [{ translateY }, { scale }] },
-        ]}
-      >
-        <MaterialIcons name={name} size={24} color={COLORS.onPrimary} />
-      </Animated.View>
-
-      {/* Ícono inactivo (siempre visible debajo, pero se oculta cuando la burbuja lo cubre) */}
-      {!focused && (
+      {focused ? (
+        <Animated.View
+          style={[
+            tabIconStyles.bubble,
+            { transform: [{ translateY }, { scale }] },
+          ]}
+        >
+          <MaterialIcons name={name} size={22} color={COLORS.onPrimary} />
+        </Animated.View>
+      ) : (
         <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
       )}
     </View>
@@ -83,24 +81,22 @@ function TabIcon({ name, label, focused }: TabIconProps) {
 const tabIconStyles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 64,
+    justifyContent: 'flex-end',
+    height: 72,
+    paddingBottom: 14,
   },
   bubble: {
-    position: 'absolute',
-    top: 0,
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: RADIUS.full,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    // Sombra para dar sensación de "elevación"
-    elevation: 6,
+    elevation: 4,
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
   label: {
     ...TYPOGRAPHY.labelSm,
