@@ -1,10 +1,10 @@
 import type { ComponentProps } from 'react';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { COLORS, RADIUS, TYPOGRAPHY } from '../theme/skeletal-tokens';
+import { COLORS, RADIUS } from '../theme/skeletal-tokens';
 import type { TabParamList } from './types';
 import ConfigStack from './stacks/ConfigStack';
 import InicioStack from './stacks/InicioStack';
@@ -22,26 +22,22 @@ const TAB_ICONS: Record<keyof TabParamList, IconName> = {
   Config: 'settings',
 };
 
-const TAB_LABELS: Record<keyof TabParamList, string> = {
-  Inicio: 'INICIO',
-  Lecturas: 'LECTURAS',
-  Sincronizacion: 'SINCRO',
-  Config: 'CONFIG',
-};
-
 // ── Componente de ícono animado ────────────────────────────────────────────────
 
 interface TabIconProps {
   name: IconName;
-  label: string;
   focused: boolean;
 }
 
-function TabIcon({ name, label, focused }: TabIconProps) {
-  // Controla cuánto "sube" el píldora con el ícono
+function TabIcon({ name, focused }: TabIconProps) {
+  // translateY: burbuja sube suavemente
   const translateY = useRef(new Animated.Value(focused ? -6 : 0)).current;
-  // Escala del círculo: aparece grande cuando activo
+  // scale: burbuja crece/decrece
   const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  // opacidad burbuja (activo → 1, inactivo → 0)
+  const bubbleOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  // opacidad ícono plano (activo → 0, inactivo → 1)
+  const iconOpacity = useRef(new Animated.Value(focused ? 0 : 1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -49,31 +45,46 @@ function TabIcon({ name, label, focused }: TabIconProps) {
         toValue: focused ? -6 : 0,
         useNativeDriver: true,
         tension: 120,
-        friction: 8,
+        friction: 9,
       }),
       Animated.spring(scale, {
-        toValue: focused ? 1 : 0,
+        toValue: focused ? 1 : 0.6,
         useNativeDriver: true,
         tension: 120,
-        friction: 8,
+        friction: 9,
+      }),
+      Animated.timing(bubbleOpacity, {
+        toValue: focused ? 1 : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(iconOpacity, {
+        toValue: focused ? 0 : 1,
+        duration: 180,
+        useNativeDriver: true,
       }),
     ]).start();
-  }, [focused, translateY, scale]);
+  }, [focused, translateY, scale, bubbleOpacity, iconOpacity]);
 
   return (
     <View style={tabIconStyles.wrapper}>
-      {focused ? (
-        <Animated.View
-          style={[
-            tabIconStyles.bubble,
-            { transform: [{ translateY }, { scale }] },
-          ]}
-        >
-          <MaterialIcons name={name} size={22} color={COLORS.onPrimary} />
-        </Animated.View>
-      ) : (
+      {/* Ícono plano — visible cuando inactivo, se desvanece al activar */}
+      <Animated.View style={[tabIconStyles.iconPlano, { opacity: iconOpacity }]}>
         <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
-      )}
+      </Animated.View>
+
+      {/* Burbuja activa — aparece con fade+scale+translateY */}
+      <Animated.View
+        style={[
+          tabIconStyles.bubble,
+          {
+            opacity: bubbleOpacity,
+            transform: [{ translateY }, { scale }],
+          },
+        ]}
+      >
+        <MaterialIcons name={name} size={22} color={COLORS.onPrimary} />
+      </Animated.View>
     </View>
   );
 }
@@ -84,6 +95,11 @@ const tabIconStyles = StyleSheet.create({
     justifyContent: 'flex-end',
     height: 72,
     paddingBottom: 14,
+  },
+  // Ícono plano: posición absoluta para que burbuja y plano compartan el mismo espacio
+  iconPlano: {
+    position: 'absolute',
+    bottom: 14,
   },
   bubble: {
     width: 44,
@@ -98,25 +114,6 @@ const tabIconStyles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
-  label: {
-    ...TYPOGRAPHY.labelSm,
-    fontSize: 9,
-    marginTop: 2,
-  },
-  labelActiva: {
-    color: COLORS.primary,
-    fontWeight: '700',
-  },
-  labelInactiva: {
-    color: COLORS.onSurfaceVariant,
-  },
-  indicador: {
-    height: 2,
-    width: 20,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
-    marginTop: 2,
-  },
 });
 
 // ── Navigator ─────────────────────────────────────────────────────────────────
@@ -128,10 +125,11 @@ export default function AppNavigator() {
       screenOptions={({ route }) => {
         const routeName = route.name as keyof TabParamList;
         const iconName = TAB_ICONS[routeName] ?? 'circle';
-        const label = TAB_LABELS[routeName] ?? routeName;
 
         return {
           headerShown: false,
+          // Transición suave entre pantallas
+          animation: 'fade',
           tabBarStyle: {
             backgroundColor: COLORS.surfaceContainerLowest,
             borderTopWidth: 1,
@@ -140,13 +138,12 @@ export default function AppNavigator() {
             paddingBottom: 0,
             paddingTop: 0,
           },
-          // Ocultamos label y background nativos — todo lo maneja TabIcon
           tabBarShowLabel: false,
           tabBarItemStyle: {
             paddingVertical: 0,
           },
           tabBarIcon: ({ focused }: { focused: boolean }) => (
-            <TabIcon name={iconName} label={label} focused={focused} />
+            <TabIcon name={iconName} focused={focused} />
           ),
         };
       }}
