@@ -337,7 +337,6 @@ const styles = StyleSheet.create({
   subtituloMeta: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 1,
     textAlign: 'center',
     marginTop: SPACING.sm,
@@ -361,7 +360,6 @@ const styles = StyleSheet.create({
   bentoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 2,
     marginBottom: SPACING.xs,
   },
@@ -392,7 +390,6 @@ const styles = StyleSheet.create({
   bentoLabelSm: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
     marginBottom: SPACING.xs,
     letterSpacing: 1,
   },
@@ -579,7 +576,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: COLORS.onSurfaceVariant,
-    textTransform: 'uppercase',
     letterSpacing: 1,
   },
   metaVal: {

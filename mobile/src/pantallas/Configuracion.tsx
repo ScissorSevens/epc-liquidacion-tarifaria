@@ -405,7 +405,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     paddingHorizontal: SPACING.margin,
     marginBottom: SPACING.sm,
-    textTransform: 'uppercase',
   },
   seccion: {
     marginHorizontal: SPACING.margin,

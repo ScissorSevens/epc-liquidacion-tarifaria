@@ -290,7 +290,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.onSurfaceVariant,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   kpiValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, fontWeight: '700' },

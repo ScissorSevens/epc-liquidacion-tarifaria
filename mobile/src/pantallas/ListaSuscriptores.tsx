@@ -395,7 +395,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     opacity: 0.6,
     letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   cardNombre: {
     color: COLORS.primary,

@@ -554,7 +554,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
 

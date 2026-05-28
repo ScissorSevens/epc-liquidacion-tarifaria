@@ -639,7 +639,6 @@ const styles = StyleSheet.create({
   abonadoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 1.5,
   },
   abonadoNombre: {
@@ -657,7 +656,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     color: COLORS.onPrimary,
     fontWeight: '700',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   cardSuscriptorRow: {
@@ -677,7 +675,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
-    textTransform: 'uppercase',
     letterSpacing: 1,
   },
 
@@ -827,7 +824,6 @@ const styles = StyleSheet.create({
   evidenciaOk: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
   },
   evidenciaHash: {
     ...TYPOGRAPHY.labelMd,
@@ -882,7 +878,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     fontSize: 8,
     color: COLORS.textTertiary,
-    textTransform: 'uppercase',
     letterSpacing: 2,
     textAlign: 'center',
     marginTop: SPACING.lg,

@@ -20,6 +20,7 @@ import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encol
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
   COLORS,
@@ -268,25 +269,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* TopAppBar — blanco + borde inferior */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            disabled={enviando}
-            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
-          </Pressable>
-          <Text style={[TYPOGRAPHY.labelLg, styles.topBarTitle]}>NUEVO SUSCRIPTOR</Text>
-        </View>
-        <View style={styles.topBarRight}>
-          <Text style={[TYPOGRAPHY.headlineSm, styles.topBarBrand]}>AquaRuta</Text>
-          <Pressable style={styles.iconBtn}>
-            <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-          </Pressable>
-        </View>
-      </View>
+      <TopBar titulo="Nuevo suscriptor" onBack={() => navigation.goBack()} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -546,51 +529,6 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
 
-  // ── TopAppBar ──────────────────────────────────────────────────────────────
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.margin,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    flex: 1,
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  topBarTitle: {
-    color: COLORS.primary,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  topBarBrand: {
-    color: COLORS.primary,
-    fontWeight: '900',
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.full,
-  },
-
   // ── Scroll ─────────────────────────────────────────────────────────────────
   scroll: {
     paddingHorizontal: SPACING.margin,
@@ -647,7 +585,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
     letterSpacing: 0.8,
-    textTransform: 'uppercase',
   },
   input: {
     height: 48,

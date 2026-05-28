@@ -412,7 +412,6 @@ const styles = StyleSheet.create({
   },
   progresoLabel: {
     color: COLORS.onSurfaceVariant,
-    textTransform: 'uppercase',
     letterSpacing: 1,
   },
   progresoNumero: {
@@ -446,7 +445,6 @@ const styles = StyleSheet.create({
   },
   grupoTitulo: {
     color: COLORS.secondary,
-    textTransform: 'uppercase',
     letterSpacing: 1.5,
     fontWeight: '700',
   },

@@ -463,7 +463,6 @@ const styles = StyleSheet.create({
   },
   estadoPillText: {
     color: COLORS.secondary,
-    textTransform: 'uppercase',
     letterSpacing: 1.5,
   },
 
@@ -489,7 +488,6 @@ const styles = StyleSheet.create({
   },
   progresoLabel: {
     color: COLORS.onSurfaceVariant,
-    textTransform: 'uppercase',
   },
   progresoNum: {
     color: COLORS.primary,
@@ -531,14 +529,12 @@ const styles = StyleSheet.create({
   statLabel: {
     color: COLORS.onSurfaceVariant,
     fontSize: 10,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   statLabelError: {
     color: COLORS.error,
     fontSize: 10,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
@@ -579,7 +575,6 @@ const styles = StyleSheet.create({
   conexionLabel: {
     color: COLORS.onSurfaceVariant,
     fontSize: 10,
-    textTransform: 'uppercase',
   },
   conexionValor: {
     color: COLORS.primary,
@@ -617,7 +612,6 @@ const styles = StyleSheet.create({
   },
   fallidosLabel: {
     color: COLORS.error,
-    textTransform: 'uppercase',
   },
   fallidosNum: {
     color: COLORS.error,

@@ -633,7 +633,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
-    textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
 
@@ -652,7 +651,6 @@ const styles = StyleSheet.create({
   cardTitulo: {
     ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: SPACING.sm,
   },
@@ -771,7 +769,6 @@ const styles = StyleSheet.create({
   metricLabel: {
     ...TYPOGRAPHY.bodySm,
     color: COLORS.onSurfaceVariant,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   metricValorOk: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
@@ -790,7 +787,6 @@ const styles = StyleSheet.create({
   errorTitulo: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.error,
-    textTransform: 'uppercase',
     marginBottom: SPACING.sm,
   },
   errorBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.error },
@@ -821,7 +817,6 @@ const styles = StyleSheet.create({
   modalTitulo: {
     ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    textTransform: 'uppercase',
   },
   modalScroll: {
     padding: SPACING.lg,

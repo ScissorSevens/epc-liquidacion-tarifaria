@@ -152,7 +152,7 @@ const estilos = StyleSheet.create({
   },
   avatarSeccion: {
     alignItems: 'center',
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.md,
     paddingBottom: SPACING.lg,
     paddingHorizontal: SPACING.margin,
   },
