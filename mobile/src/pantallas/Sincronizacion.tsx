@@ -12,6 +12,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { BootstrapApp, ResultadoSync } from '../composition/bootstrap';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { SyncStackScreenProps } from '../navegacion/types';
 import {
   COLORS,
@@ -223,17 +224,12 @@ export default function Sincronizacion(_props: Props) {
   const porcentajeProgreso =
     totalConocido > 0
       ? Math.round((contadores.exitosos / totalConocido) * 100)
-      : sincronizando ? 50 : 0;
+      : sincronizando ? 0 : 0;
 
   return (
     <View style={styles.container}>
-      {/* TopAppBar — blanco + borde surface-variant */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <Text style={[TYPOGRAPHY.headlineSm, styles.topBarTitle]}>AquaRuta</Text>
-        </View>
-        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-      </View>
+      {/* TopAppBar */}
+      <TopBar titulo="AquaRuta" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -398,32 +394,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.error,
     textAlign: 'center',
-  },
-
-  // ── TopAppBar ─────────────────────────────────────────────────────────────
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.margin,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.surfaceVariant,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  topBarTitle: {
-    color: COLORS.primary,
   },
 
   // ── Scroll ────────────────────────────────────────────────────────────────

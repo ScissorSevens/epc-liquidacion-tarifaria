@@ -15,6 +15,7 @@ import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
@@ -310,19 +311,11 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* ── TopAppBar — blanco + borde inferior ── */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
-          </Pressable>
-          <Text style={styles.headerTitle}>DETALLE SUSCRIPTOR</Text>
-        </View>
-        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-      </View>
+      {/* ── TopAppBar ── */}
+      <TopBar
+        titulo="Detalle Suscriptor"
+        onBack={() => navigation.goBack()}
+      />
 
       {/* ── Snack inline de error ── */}
       {error !== null && (
@@ -512,48 +505,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  /* ── Header ── */
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.margin,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    flex: 1,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.full,
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineLg,
-    color: COLORS.primary,
-    lineHeight: 36,
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-
   /* ── Scroll ── */
   center: {
     flex: 1,
@@ -570,7 +521,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   scroll: {
-    padding: SPACING.gutter,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.gutter,
     paddingBottom: 100,
     gap: SPACING.gutter,
   },
@@ -700,7 +652,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     alignItems: 'center',
   },
   btnCapturarText: {
@@ -713,7 +665,7 @@ const styles = StyleSheet.create({
   btnPrimary: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     alignItems: 'center',
   },

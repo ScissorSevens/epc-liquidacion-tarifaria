@@ -24,6 +24,7 @@ import {
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 
 type Props = InicioStackScreenProps<'RutaDeHoy'>;
 
@@ -162,19 +163,17 @@ export default function RutaDeHoy({ navigation }: Props) {
   return (
     <View style={styles.container}>
       {/* TopAppBar */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <Text style={[TYPOGRAPHY.headlineSm, styles.topBarTitle]}>Ruta de hoy</Text>
-        </View>
-        <View style={styles.topBarRight}>
+      <TopBar
+        titulo="Ruta de hoy"
+        accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
             onPress={() => navigation.navigate('Lecturas', { screen: 'MiPerfil' })}
           >
             <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
           </Pressable>
-        </View>
-      </View>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -234,7 +233,7 @@ export default function RutaDeHoy({ navigation }: Props) {
                   <View style={styles.cardContent}>
                     <View style={styles.cardInfo}>
                       {/* ID */}
-                      <Text style={[TYPOGRAPHY.labelSm, styles.cardCodigo]}>
+                      <Text style={[TYPOGRAPHY.labelMd, styles.cardCodigo]}>
                         ID: {item.codigo.toUpperCase()}
                       </Text>
                       {/* Nombre */}
@@ -354,26 +353,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
 
-  // ── TopAppBar ─────────────────────────────────────────────────────────────
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.surfaceContainerLowest,
-    paddingHorizontal: SPACING.margin,
-    height: 64,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
+  // ── TopAppBar (accionDerecha) ──────────────────────────────────────────────
   topBarBtn: {
     width: 40,
     height: 40,
@@ -383,12 +363,6 @@ const styles = StyleSheet.create({
   },
   topBarBtnPressed: {
     backgroundColor: 'rgba(0,0,0,0.06)',
-  },
-  topBarTitle: {
-    color: COLORS.primary,
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: -0.5,
   },
 
   // ── ScrollView ────────────────────────────────────────────────────────────
@@ -522,7 +496,6 @@ const styles = StyleSheet.create({
   },
   cardNombreCapturado: {
     color: COLORS.onSurfaceVariant,
-    textDecorationLine: 'line-through',
   },
   statusRow: {
     flexDirection: 'row',

@@ -17,6 +17,7 @@ import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   COLORS,
@@ -27,8 +28,6 @@ import {
 } from '../theme/skeletal-tokens';
 
 type Props = LecturasStackScreenProps<'ListaSuscriptores'>;
-
-type Filtro = 'todas' | 'pendientes' | 'capturadas';
 
 /**
  * Listado de suscriptores con cards verticales enriquecidas (wireframe v3.0).
@@ -43,7 +42,6 @@ export default function ListaSuscriptores({ navigation }: Props) {
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<Filtro>('todas');
   const [fabAbierto, setFabAbierto] = useState(false);
 
   // ── Selector de medidor ───────────────────────────────────────────────────
@@ -71,20 +69,12 @@ export default function ListaSuscriptores({ navigation }: Props) {
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let lista = suscriptores;
-
-    if (q !== '') {
-      lista = lista.filter(
-        (s) =>
-          s.codigo.toLowerCase().includes(q) ||
-          s.nombre_apellidos.toLowerCase().includes(q),
-      );
-    }
-
-    // Por ahora todos los suscriptores se consideran "pendientes" si no tienen
-    // lectura registrada — la lógica real de estado viene del dominio.
-    // El filtro visual se aplica pero no filtra datos hasta que haya campo estado.
-    return lista;
+    if (q === '') return suscriptores;
+    return suscriptores.filter(
+      (s) =>
+        s.codigo.toLowerCase().includes(q) ||
+        s.nombre_apellidos.toLowerCase().includes(q),
+    );
   }, [suscriptores, query]);
 
   const navegarACapturar = useCallback(
@@ -113,16 +103,13 @@ export default function ListaSuscriptores({ navigation }: Props) {
   const renderItem = useCallback(
     ({ item }: { item: Suscriptor }) => (
       <View style={styles.card}>
-        {/* Fila superior: ID + badge estado */}
+        {/* Fila superior: ID */}
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderTextos}>
             <Text style={styles.cardCodigo}>SUSCRIPTOR #{item.codigo.toUpperCase()}</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
               {item.nombre_apellidos}
             </Text>
-          </View>
-          <View style={styles.badgePendiente}>
-            <Text style={styles.badgePendienteTexto}>PENDIENTE</Text>
           </View>
         </View>
 
@@ -171,19 +158,17 @@ export default function ListaSuscriptores({ navigation }: Props) {
   return (
     <View style={styles.container}>
       {/* TopAppBar */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarIzq}>
-          <Text style={styles.topBarTitulo}>Lecturas</Text>
-        </View>
-        <View style={styles.topBarDer}>
+      <TopBar
+        titulo="Lecturas"
+        accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
             onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
           >
             <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
           </Pressable>
-        </View>
-      </View>
+        }
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -203,21 +188,6 @@ export default function ListaSuscriptores({ navigation }: Props) {
               autoCorrect={false}
             />
           </View>
-
-        {/* Chips de filtro */}
-        <View style={styles.filtrosRow}>
-          {(['todas', 'pendientes', 'capturadas'] as Filtro[]).map((f) => (
-            <Pressable
-              key={f}
-              style={[styles.chip, filtro === f && styles.chipActivo]}
-              onPress={() => setFiltro(f)}
-            >
-              <Text style={[styles.chipTexto, filtro === f && styles.chipTextoActivo]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
 
         {/* Contenido */}
         {loading ? (
@@ -360,34 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  // ── TopAppBar ──────────────────────────────────────────────────────────────
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 64,
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  topBarIzq: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  topBarDer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  topBarTitulo: {
-    fontFamily: undefined,
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    color: COLORS.primary,
-  },
+  // ── TopAppBar (accionDerecha) ──────────────────────────────────────────────
   topBarIconBtn: {
     padding: SPACING.xs,
   },
@@ -424,35 +367,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  // ── Chips filtro ───────────────────────────────────────────────────────────
-  filtrosRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
-  chip: {
-    paddingHorizontal: SPACING.md + SPACING.sm,
-    paddingVertical: SPACING.sm + 2,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  chipActivo: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  chipTexto: {
-    fontFamily: undefined,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    color: COLORS.onSurface,
-  },
-  chipTextoActivo: {
-    color: COLORS.onPrimary,
-  },
-
   // ── Cards ─────────────────────────────────────────────────────────────────
   lista: {
     gap: SPACING.md,
@@ -476,7 +390,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   cardCodigo: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
     opacity: 0.6,
@@ -485,19 +399,6 @@ const styles = StyleSheet.create({
   },
   cardNombre: {
     color: COLORS.primary,
-  },
-  badgePendiente: {
-    paddingHorizontal: SPACING.sm + SPACING.xs,
-    paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.errorContainer,
-    borderRadius: RADIUS.full,
-  },
-  badgePendienteTexto: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.onErrorContainer,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
   cardDireccionRow: {
     flexDirection: 'row',

@@ -12,6 +12,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { Lectura } from '@dominio/captura-lecturas/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
@@ -98,15 +99,10 @@ export default function Historial({ navigation, route }: Props) {
   return (
     <View style={styles.raiz}>
       {/* Top App Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarIzq}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
-          </Pressable>
-          <Text style={styles.topBarNombre} numberOfLines={1}>{nombre}</Text>
-        </View>
-        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-      </View>
+      <TopBar
+        titulo={nombre}
+        onBack={() => navigation.goBack()}
+      />
 
       {loading ? (
         <View style={styles.centrado}>
@@ -233,30 +229,6 @@ export default function Historial({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: COLORS.background },
-
-  // Top Bar
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 64,
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  topBarIzq: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm + 4,
-    flex: 1,
-  },
-  topBarNombre: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.primary,
-    letterSpacing: 0.5,
-    flex: 1,
-  },
 
   // Estados
   centrado: {

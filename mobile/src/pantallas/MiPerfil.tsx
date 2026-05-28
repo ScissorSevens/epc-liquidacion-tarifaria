@@ -3,6 +3,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { CommonActions } from '@react-navigation/native';
 
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import {
   COLORS,
   RADIUS,
@@ -28,18 +29,19 @@ const PERFIL = {
 };
 
 export default function MiPerfil({ navigation }: Props) {
+  const [toastVisible, setToastVisible] = useState(false);
+
+  function mostrarToast() {
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 2500);
+  }
   return (
     <View style={estilos.raiz}>
       {/* Top App Bar */}
-      <View style={estilos.topBar}>
-        <View style={estilos.topBarIzq}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-            <MaterialIcons name="close" size={24} color={COLORS.primary} />
-          </Pressable>
-          <Text style={estilos.topBarTitulo}>MI PERFIL</Text>
-        </View>
-        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-      </View>
+      <TopBar
+        titulo="Mi Perfil"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={estilos.scroll}>
         {/* Avatar */}
@@ -78,14 +80,16 @@ export default function MiPerfil({ navigation }: Props) {
         <Text style={estilos.seccionTitulo}>CONFIGURACIÓN</Text>
         <View style={estilos.listaCard}>
           <View style={estilos.filaConfig}>
-            <View style={estilos.filaConfigIzq}>
+            <Pressable style={estilos.filaConfigIzq} onPress={mostrarToast} accessibilityLabel="Notificaciones — próximamente">
               <MaterialIcons name="notifications" size={20} color={COLORS.primary} />
               <Text style={estilos.filaConfigTexto}>Notificaciones</Text>
-            </View>
+            </Pressable>
             {/* Toggle visual estático — funcionalidad futura */}
-            <View style={estilos.toggleOff}>
-              <View style={estilos.toggleThumb} />
-            </View>
+            <Pressable onPress={mostrarToast} accessibilityLabel="Activar notificaciones">
+              <View style={estilos.toggleOff}>
+                <View style={estilos.toggleThumb} />
+              </View>
+            </Pressable>
           </View>
         </View>
 
@@ -111,6 +115,12 @@ export default function MiPerfil({ navigation }: Props) {
 
         <FooterApp />
       </ScrollView>
+
+      {toastVisible && (
+        <View style={estilos.toast}>
+          <Text style={estilos.toastTexto}>Próximamente disponible</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -136,27 +146,6 @@ const estilos = StyleSheet.create({
   raiz: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 64,
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-    ...SHADOWS.card,
-  },
-  topBarIzq: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  topBarTitulo: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.primary,
-    letterSpacing: 1.2,
   },
   scroll: {
     paddingBottom: SPACING.xxl,
@@ -206,7 +195,7 @@ const estilos = StyleSheet.create({
     marginHorizontal: SPACING.margin,
   },
   gridCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: COLORS.surfaceContainerLowest,
     borderRadius: RADIUS.xl,
     ...BORDERS.thin,
     padding: SPACING.md,
@@ -305,5 +294,19 @@ const estilos = StyleSheet.create({
     ...TYPOGRAPHY.labelLg,
     color: COLORS.error,
     letterSpacing: 0.8,
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 90,
+    alignSelf: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm + 4,
+    borderRadius: RADIUS.full,
+  },
+  toastTexto: {
+    color: COLORS.onPrimary,
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

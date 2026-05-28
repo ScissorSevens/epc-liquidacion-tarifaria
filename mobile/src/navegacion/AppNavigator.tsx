@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useIsFocused } from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -29,9 +29,10 @@ const TAB_ICONS: Record<keyof TabParamList, IconName> = {
 
 interface TabIconProps {
   name: IconName;
+  label: string;
 }
 
-function TabIcon({ name }: TabIconProps) {
+function TabIcon({ name, label }: TabIconProps) {
   const focused = useIsFocused();
 
   const translateY    = useRef(new Animated.Value(focused ? -6 : 0)).current;
@@ -71,6 +72,7 @@ function TabIcon({ name }: TabIconProps) {
       {/* Ícono plano — visible cuando inactivo */}
       <Animated.View style={[tabIconStyles.iconPlano, { opacity: iconOpacity }]}>
         <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
+        <Text style={tabIconStyles.label} numberOfLines={1}>{label}</Text>
       </Animated.View>
 
       {/* Burbuja activa — fade + scale + translateY */}
@@ -85,6 +87,14 @@ function TabIcon({ name }: TabIconProps) {
       >
         <MaterialIcons name={name} size={22} color={COLORS.onPrimary} />
       </Animated.View>
+
+      {/* Label bajo la burbuja cuando activo */}
+      <Animated.Text
+        style={[tabIconStyles.label, tabIconStyles.labelFocused, { opacity: bubbleOpacity }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Animated.Text>
     </View>
   );
 }
@@ -93,12 +103,13 @@ const tabIconStyles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'flex-end',
-    height: 72,
-    paddingBottom: 14,
+    height: 80,
+    paddingBottom: 10,
   },
   iconPlano: {
     position: 'absolute',
-    bottom: 14,
+    bottom: 10,
+    alignItems: 'center',
   },
   bubble: {
     width: 44,
@@ -112,6 +123,17 @@ const tabIconStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: COLORS.onSurfaceVariant,
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  labelFocused: {
+    color: COLORS.primary,
+    fontWeight: '700',
   },
 });
 
@@ -127,7 +149,7 @@ export default function AppNavigator() {
           backgroundColor: COLORS.surfaceContainerLowest,
           borderTopWidth: 1,
           borderTopColor: COLORS.outlineVariant,
-          height: 72,
+          height: 80,
           paddingBottom: 0,
           paddingTop: 0,
         },
@@ -140,22 +162,22 @@ export default function AppNavigator() {
       <Tab.Screen
         name="Inicio"
         component={InicioStack}
-        options={{ tabBarIcon: () => <TabIcon name="home" /> }}
+        options={{ tabBarIcon: () => <TabIcon name="home" label="Inicio" /> }}
       />
       <Tab.Screen
         name="Lecturas"
         component={LecturasStack}
-        options={{ tabBarIcon: () => <TabIcon name="edit-note" /> }}
+        options={{ tabBarIcon: () => <TabIcon name="edit-note" label="Lecturas" /> }}
       />
       <Tab.Screen
         name="Sincronizacion"
         component={SyncStack}
-        options={{ tabBarIcon: () => <TabIcon name="sync" /> }}
+        options={{ tabBarIcon: () => <TabIcon name="sync" label="Sincro" /> }}
       />
       <Tab.Screen
         name="Config"
         component={ConfigStack}
-        options={{ tabBarIcon: () => <TabIcon name="settings" /> }}
+        options={{ tabBarIcon: () => <TabIcon name="settings" label="Config" /> }}
       />
     </Tab.Navigator>
   );

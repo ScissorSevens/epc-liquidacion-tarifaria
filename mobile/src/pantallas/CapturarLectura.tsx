@@ -29,6 +29,7 @@ import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectur
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import { photoCaptureStore } from '../composition/photo-capture-store';
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -336,33 +337,11 @@ export default function CapturarLectura({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist: back + título capitalizado + account icon */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          disabled={calculando}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Volver"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Capturar lectura</Text>
-        <Pressable
-          onPress={() => {
-            // Perfil: requiere módulo de autenticación.
-          }}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Cuenta"
-        >
-          <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-        </Pressable>
-      </View>
+      {/* Header */}
+      <TopBar
+        titulo="Capturar lectura"
+        onBack={() => navigation.goBack()}
+      />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -511,8 +490,8 @@ export default function CapturarLectura({ navigation, route }: Props) {
                 <MaterialIcons name="warning" size={22} color={COLORS.error} />
               </View>
               <View style={styles.warningTexts}>
-                <Text style={[TYPOGRAPHY.bodyMd, styles.warningTitle]}>Consumo inusual detectado</Text>
-                <Text style={[TYPOGRAPHY.bodySm, styles.warningDesc]}>
+                <Text style={styles.warningTitle}>Consumo inusual detectado</Text>
+                <Text style={styles.warningDesc}>
                   El incremento es superior al 40% del promedio histórico del suscriptor.
                 </Text>
               </View>
@@ -625,7 +604,6 @@ export default function CapturarLectura({ navigation, route }: Props) {
   );
 }
 
-const HEADER_HEIGHT = 56;
 const BOTTOM_HEIGHT = 88;
 
 const styles = StyleSheet.create({
@@ -634,32 +612,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   flex: { flex: 1 },
-
-  // Header — fondo blanco con borde gris claro (wireframe: surface-container-lowest + outline-variant)
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
 
   // Scroll
   scroll: {
@@ -1019,9 +971,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SPACING.md,
-    backgroundColor: 'rgba(255,218,214,0.5)',
+    backgroundColor: COLORS.errorContainer,
     borderWidth: 1,
-    borderColor: 'rgba(186,26,26,0.2)',
+    borderColor: COLORS.outlineVariant,
     borderRadius: RADIUS.xl,
     padding: SPACING.md,
   },
@@ -1037,12 +989,13 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   warningTitle: {
+    ...TYPOGRAPHY.bodyMd,
     color: COLORS.onErrorContainer,
     fontWeight: '600',
-    fontSize: 16,
   },
   warningDesc: {
-    color: 'rgba(147,0,10,0.8)',
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onErrorContainer,
     lineHeight: 20,
   },
 });

@@ -37,6 +37,7 @@ export const COLORS = {
   onSecondaryContainer: '#005266',
   // Superficies de contenedor.
   surfaceContainerLowest: '#FFFFFF',
+  surfaceContainerLow: '#EFF4FF',   // equivalente a surfaceLight, alias para M3
   surfaceContainerHigh: '#DCE9FF',
   surface: '#F8F9FF',
   // Sobre superficie.
@@ -157,6 +158,13 @@ export const TYPOGRAPHY = {
     fontSize: 10,
     fontWeight: '500' as const,
     lineHeight: 14,
+  },
+  displayLg: {
+    fontFamily: undefined,
+    fontSize: 40,
+    fontWeight: '700' as const,
+    lineHeight: 44,
+    letterSpacing: -1.5,
   },
 } as const;
 

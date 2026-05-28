@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -112,32 +113,11 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.popToTop()}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Volver"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Factura calculada</Text>
-        <Pressable
-          onPress={() => {
-            // Perfil: requiere módulo de autenticación.
-          }}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Cuenta"
-        >
-          <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
-        </Pressable>
-      </View>
+      {/* Header */}
+      <TopBar
+        titulo="Factura calculada"
+        onBack={() => navigation.popToTop()}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Status: círculo + título + subtítulo */}
@@ -310,43 +290,12 @@ function FilaDetalle({
   );
 }
 
-const HEADER_HEIGHT = 56;
 const FOOTER_HEIGHT = 48;
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-
-  // Header — fondo surface-container + borde outline-variant (wireframe)
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceContainer,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.full,
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    fontSize: 13,
   },
 
   // Scroll
@@ -420,11 +369,8 @@ const styles = StyleSheet.create({
     color: COLORS.onPrimaryContainer,
   },
   bentoTotal: {
-    fontSize: 40,
-    fontWeight: '900',
+    ...TYPOGRAPHY.displayLg,
     color: COLORS.primary,
-    letterSpacing: -1.5,
-    lineHeight: 44,
   },
   bentoTotalBlanco: {
     color: COLORS.onPrimary,
@@ -482,7 +428,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   bentoConsumoIconBox: {
-    backgroundColor: '#B7EAFF', // secondary-fixed
+    backgroundColor: COLORS.surfaceContainerHigh,
     borderRadius: RADIUS.default,
     padding: SPACING.sm,
     alignItems: 'center',
