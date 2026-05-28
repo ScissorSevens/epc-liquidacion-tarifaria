@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -278,25 +279,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer fijo */}
-      <View style={styles.footer}>
-        <Text style={styles.footerBrand}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
-        <View style={styles.footerLinks}>
-          <Pressable
-            onPress={() => {
-              // Soporte: pendiente de implementación.
-            }}
-          >
-            <Text style={styles.footerLink}>SOPORTE</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              // Cerrar sesión: requiere módulo de autenticación.
-            }}
-          >
-            <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
-          </Pressable>
-        </View>
-      </View>
+      <FooterApp />
     </View>
   );
 }
@@ -635,42 +618,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceMuted2,
     padding: SPACING.sm,
     ...BORDERS.dashed,
-  },
-
-  // Footer
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: FOOTER_HEIGHT,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceMuted,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  footerBrand: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    marginTop: 2,
-  },
-  footerLink: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
 
   // Pressed states

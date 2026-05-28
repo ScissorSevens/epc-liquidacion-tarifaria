@@ -15,6 +15,7 @@ import {
   persistirFoto,
 } from '../adapters/foto-evidencia';
 import { photoCaptureStore } from '../composition/photo-capture-store';
+import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { COLORS, RADIUS, SPACING } from '../theme/skeletal-tokens';
 
@@ -195,6 +196,8 @@ export default function CapturarFoto({ navigation, route }: Props) {
       >
         {snack.mensaje}
       </Snackbar>
+
+      <FooterApp />
     </View>
   );
 }

@@ -14,6 +14,7 @@ import type { Medidor } from '@dominio/medidores/types';
 import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
@@ -472,9 +473,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           </View>
 
           {/* Brand footer */}
-          <Text style={styles.brandFooter}>
-            MEDIAPP V1.0.4 - MODO OFFLINE
-          </Text>
+          <FooterApp />
         </ScrollView>
       )}
 

@@ -28,6 +28,7 @@ import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
 import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import { photoCaptureStore } from '../composition/photo-capture-store';
+import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -366,7 +367,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <View style={styles.cardSuscriptorTop}>
               <View style={styles.flex}>
                 <Text style={styles.abonadoLabel}>
-                  ABONADO #{id_suscriptor}
+                  SUSCRIPTOR #{id_suscriptor}
                 </Text>
                 <Text style={styles.abonadoNombre} numberOfLines={1}>
                   {nombreSuscriptor}
@@ -562,7 +563,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           )}
 
           {/* Footer de marca dentro del scroll para que no tape */}
-          <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+          <FooterApp />
         </ScrollView>
       </KeyboardAvoidingView>
 

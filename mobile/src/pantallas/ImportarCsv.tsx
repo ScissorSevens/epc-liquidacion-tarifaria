@@ -22,6 +22,7 @@ import type {
 } from '@dominio/importacion/types';
 import { persistirYEncolarImportacion } from '../adapters/persistir-y-encolar-importacion';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { FooterApp } from '../componentes/FooterApp';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -243,7 +244,7 @@ export default function ImportarCsv({ navigation }: Props) {
           <RenderError mensaje={estado.mensaje} onReintentar={reset} />
         )}
 
-        <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+        <FooterApp />
       </ScrollView>
 
       {/* Dialog: formato esperado */}

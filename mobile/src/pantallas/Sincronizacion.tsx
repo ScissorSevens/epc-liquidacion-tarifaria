@@ -11,6 +11,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { BootstrapApp, ResultadoSync } from '../composition/bootstrap';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { FooterApp } from '../componentes/FooterApp';
 import type { SyncStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -405,17 +406,7 @@ export default function Sincronizacion(_props: Props) {
       />
 
       {/* Footer consistente */}
-      <View style={styles.footer}>
-        <Text style={styles.footerBrand}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
-        <View style={styles.footerLinks}>
-          <Pressable onPress={() => { /* Soporte: pendiente */ }}>
-            <Text style={styles.footerLink}>SOPORTE</Text>
-          </Pressable>
-          <Pressable onPress={() => { /* Cerrar sesión: requiere auth */ }}>
-            <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
-          </Pressable>
-        </View>
-      </View>
+      <FooterApp />
     </View>
   );
 }
@@ -610,34 +601,6 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: COLORS.textSecondary,
-  },
-  footer: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.margin,
-    alignItems: 'center',
-    gap: 2,
-  },
-  footerBrand: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    marginTop: 2,
-  },
-  footerLink: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
 });
 

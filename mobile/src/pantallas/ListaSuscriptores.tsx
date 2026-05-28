@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -190,6 +191,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           contentContainerStyle={styles.lista}
         />
       )}
+      <FooterApp />
     </View>
   );
 }

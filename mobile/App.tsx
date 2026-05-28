@@ -2,13 +2,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 
-import AppNavigator from './src/navegacion/AppNavigator';
+import RootNavigator from './src/navegacion/RootNavigator';
 
 export default function App() {
   return (
     <PaperProvider>
       <NavigationContainer>
-        <AppNavigator />
+        <RootNavigator />
         <StatusBar style="auto" />
       </NavigationContainer>
     </PaperProvider>

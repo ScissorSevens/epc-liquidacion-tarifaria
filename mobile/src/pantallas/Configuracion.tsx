@@ -20,6 +20,7 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+import { FooterApp } from '../componentes/FooterApp';
 import { obtenerApiBaseUrl } from '../config/api';
 import { getBootstrap } from '../composition/get-bootstrap';
 import {
@@ -376,6 +377,7 @@ export default function Configuracion({ navigation }: Props) {
           </>
         )}
       </View>
+      <FooterApp />
     </ScrollView>
   );
 }

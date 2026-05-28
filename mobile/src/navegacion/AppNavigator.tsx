@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { BORDERS, COLORS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 import type { TabParamList } from './types';
 import ConfigStack from './stacks/ConfigStack';
 import InicioStack from './stacks/InicioStack';
@@ -36,20 +36,23 @@ export default function AppNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: COLORS.background,
+          backgroundColor: COLORS.primaryContainer,
           borderTopWidth: BORDERS.thin.borderWidth,
           borderTopColor: BORDERS.thin.borderColor,
           height: 64,
-          paddingBottom: SPACING.sm,
-          paddingTop: SPACING.xs,
+          paddingBottom: 8,
+          paddingTop: 4,
         },
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textSecondary,
+        tabBarActiveTintColor: COLORS.onSecondaryContainer,
+        tabBarInactiveTintColor: COLORS.onSurfaceVariant,
+        tabBarActiveBackgroundColor: COLORS.secondaryContainer,
+        tabBarItemStyle: {
+          borderRadius: RADIUS.full,
+          marginHorizontal: 4,
+          marginVertical: 4,
+        },
         tabBarLabelStyle: {
           ...TYPOGRAPHY.labelSm,
-        },
-        tabBarActiveTabStyle: {
-          fontWeight: '700',
         },
         tabBarLabel: TAB_LABELS[route.name as keyof TabParamList] ?? route.name,
         tabBarIcon: ({ color, size }: { color: string; size: number }) => (

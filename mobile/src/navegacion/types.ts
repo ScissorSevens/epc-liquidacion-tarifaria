@@ -18,6 +18,11 @@ import type {
 
 // ── Stacks ────────────────────────────────────────────────────────────────────
 
+export type RootStackParamList = {
+  Login: undefined;
+  Main: NavigatorScreenParams<TabParamList>;
+};
+
 export type InicioStackParamList = {
   RutaDeHoy: undefined;
 };
@@ -44,6 +49,7 @@ export type ConfigStackParamList = {
   Configuracion: undefined;
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
+  MiPerfil: undefined;
 };
 
 // ── Tab raíz ──────────────────────────────────────────────────────────────────
@@ -92,3 +98,7 @@ export type ConfigStackScreenProps<T extends keyof ConfigStackParamList> =
     NativeStackScreenProps<ConfigStackParamList, T>,
     BottomTabScreenProps<TabParamList>
   >;
+
+/** Props para pantallas dentro del RootStack (Login, etc.). */
+export type RootStackScreenProps<T extends keyof RootStackParamList> =
+  NativeStackScreenProps<RootStackParamList, T>;

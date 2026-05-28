@@ -22,6 +22,7 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+import { FooterApp } from '../componentes/FooterApp';
 
 type Props = InicioStackScreenProps<'RutaDeHoy'>;
 
@@ -252,9 +253,7 @@ export default function RutaDeHoy({ navigation }: Props) {
       )}
 
       {/* Footer global */}
-      <View style={styles.footer}>
-        <Text style={[TYPOGRAPHY.bodySm, styles.footerText]}>AquaRuta — EPC</Text>
-      </View>
+      <FooterApp />
     </View>
   );
 }
@@ -413,17 +412,5 @@ const styles = StyleSheet.create({
   },
   btnRetryText: {
     color: COLORS.onPrimary,
-  },
-  footer: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceContainer,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
-  },
-  footerText: {
-    color: COLORS.onBackground,
-    opacity: 0.6,
   },
 });

@@ -16,6 +16,7 @@ import { crearSuscriptor } from '@dominio/suscriptores';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
+import { FooterApp } from '../componentes/FooterApp';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -363,14 +364,14 @@ export default function AltaSuscriptor({ navigation }: Props) {
             onPress={() => setCampo('aplica_subsidio', !form.aplica_subsidio)}
             style={styles.toggleRow}
           >
-            <View style={[styles.toggleBox, form.aplica_subsidio && styles.toggleBoxOn]}>
-              {form.aplica_subsidio && <Text style={styles.toggleCheck}>✓</Text>}
-            </View>
             <View style={styles.toggleTexts}>
               <Text style={styles.toggleLabel}>APLICA SUBSIDIO</Text>
               <Text style={styles.toggleHint}>
                 El suscriptor se acoge al subsidio por estrato
               </Text>
+            </View>
+            <View style={[styles.togglePill, form.aplica_subsidio && styles.togglePillOn]}>
+              <View style={[styles.toggleThumb, form.aplica_subsidio && styles.toggleThumbOn]} />
             </View>
           </Pressable>
 
@@ -447,7 +448,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             )}
           </View>
 
-          <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+          <FooterApp />
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -622,27 +623,10 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: SPACING.md,
     paddingVertical: SPACING.sm,
     marginBottom: SPACING.md,
-  },
-  toggleBox: {
-    width: 24,
-    height: 24,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.background,
-  },
-  toggleBoxOn: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  toggleCheck: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-    fontWeight: '700',
   },
   toggleTexts: { flex: 1 },
   toggleLabel: {
@@ -653,6 +637,33 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodySm,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  togglePill: {
+    width: 44,
+    height: 24,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceMuted2,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  togglePillOn: {
+    backgroundColor: COLORS.primaryContainer,
+  },
+  toggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    alignSelf: 'flex-start',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
+    backgroundColor: COLORS.onPrimaryContainer,
   },
 
   // Brand footer
