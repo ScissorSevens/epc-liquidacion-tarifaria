@@ -43,7 +43,6 @@ export default function ListaSuscriptores({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [fabAbierto, setFabAbierto] = useState(false);
-  const [buscadorVisible, setBuscadorVisible] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -80,6 +79,25 @@ export default function ListaSuscriptores({ navigation }: Props) {
     // El filtro visual se aplica pero no filtra datos hasta que haya campo estado.
     return lista;
   }, [suscriptores, query]);
+
+  const navegarACapturar = useCallback(
+    async (item: Suscriptor) => {
+      try {
+        const { medidorRepo } = await getBootstrap();
+        const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
+        const medidor = medidores[0];
+        if (medidor) {
+          navigation.navigate('CapturarLectura', {
+            id_medidor: medidor.id_medidor,
+            id_suscriptor: item.id_suscriptor,
+          });
+        }
+      } catch (e) {
+        console.warn('[ListaSuscriptores] error navegando a CapturarLectura:', e);
+      }
+    },
+    [navigation],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: Suscriptor }) => (
@@ -128,11 +146,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           </View>
           <Pressable
             style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
-            onPress={() =>
-              navigation.navigate('DetalleSuscriptor', {
-                id_suscriptor: item.id_suscriptor,
-              })
-            }
+            onPress={() => { void navegarACapturar(item); }}
           >
             <MaterialIcons name="add-a-photo" size={14} color={COLORS.onPrimary} />
             <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>TOMAR LECTURA</Text>
@@ -140,7 +154,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
         </View>
       </View>
     ),
-    [navigation],
+    [navigation, navegarACapturar],
   );
 
   return (
@@ -148,21 +162,9 @@ export default function ListaSuscriptores({ navigation }: Props) {
       {/* TopAppBar */}
       <View style={styles.topBar}>
         <View style={styles.topBarIzq}>
-          <Pressable
-            style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
-          </Pressable>
           <Text style={styles.topBarTitulo}>Lecturas</Text>
         </View>
         <View style={styles.topBarDer}>
-          <Pressable
-            style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
-            onPress={() => setBuscadorVisible((v) => !v)}
-          >
-            <MaterialIcons name="search" size={24} color={COLORS.primary} />
-          </Pressable>
           <Pressable
             style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
             onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
@@ -177,9 +179,8 @@ export default function ListaSuscriptores({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Buscador (visible al tocar el ícono search) */}
-        {buscadorVisible && (
-          <View style={styles.buscadorContainer}>
+        {/* Buscador (siempre visible) */}
+        <View style={styles.buscadorContainer}>
             <MaterialIcons name="search" size={20} color={COLORS.outline} style={styles.buscadorIcono} />
             <TextInput
               style={[TYPOGRAPHY.bodyMd, styles.buscador]}
@@ -189,10 +190,8 @@ export default function ListaSuscriptores({ navigation }: Props) {
               placeholderTextColor={COLORS.outline}
               autoCapitalize="none"
               autoCorrect={false}
-              autoFocus
             />
           </View>
-        )}
 
         {/* Chips de filtro */}
         <View style={styles.filtrosRow}>
@@ -313,7 +312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.margin,
     backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
+    borderBottomColor: COLORS.outlineVariant,
   },
   topBarIzq: {
     flexDirection: 'row',

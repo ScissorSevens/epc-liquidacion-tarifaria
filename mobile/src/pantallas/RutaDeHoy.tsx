@@ -138,38 +138,14 @@ export default function RutaDeHoy({ navigation }: Props) {
       {/* TopAppBar */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
-          <Pressable
-            style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.onPrimary} />
-          </Pressable>
           <Text style={[TYPOGRAPHY.headlineSm, styles.topBarTitle]}>Ruta de hoy</Text>
         </View>
         <View style={styles.topBarRight}>
-          {/* Icono sync con badge de pendientes */}
-          <View style={styles.badgeWrapper}>
-            {recargando ? (
-              <ActivityIndicator size="small" color={COLORS.onPrimary} style={styles.topBarBtn} />
-            ) : (
-              <Pressable
-                style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
-                onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
-              >
-                <MaterialIcons name="cloud-sync" size={24} color={COLORS.onPrimary} />
-              </Pressable>
-            )}
-            {pendientesCola > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{pendientesCola}</Text>
-              </View>
-            )}
-          </View>
           <Pressable
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
             onPress={() => navigation.navigate('Lecturas', { screen: 'MiPerfil' })}
           >
-            <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
+            <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
           </Pressable>
         </View>
       </View>
@@ -226,12 +202,21 @@ export default function RutaDeHoy({ navigation }: Props) {
                     capturado && styles.cardCapturada,
                     pressed && !capturado && styles.cardPressed,
                   ]}
-                  onPress={() =>
-                    navigation.navigate('Lecturas', {
-                      screen: 'DetalleSuscriptor',
-                      params: { id_suscriptor: item.id_suscriptor },
-                    })
-                  }
+                  onPress={async () => {
+                    try {
+                      const { medidorRepo } = await getBootstrap();
+                      const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
+                      const medidor = medidores[0];
+                      if (medidor) {
+                        navigation.navigate('Lecturas', {
+                          screen: 'CapturarLectura',
+                          params: { id_medidor: medidor.id_medidor, id_suscriptor: item.id_suscriptor },
+                        });
+                      }
+                    } catch (e) {
+                      console.warn('[RutaDeHoy] error al navegar:', e);
+                    }
+                  }}
                   disabled={capturado}
                 >
                   <View style={styles.cardContent}>
@@ -284,22 +269,6 @@ export default function RutaDeHoy({ navigation }: Props) {
 
         <FooterApp />
       </ScrollView>
-
-      {/* Botón sticky — siempre visible (wireframe lo muestra siempre) */}
-      <View style={styles.stickyFooter}>
-        <Pressable
-          style={({ pressed }) => [styles.btnSync, pressed && styles.btnSyncPressed]}
-          onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
-        >
-          <MaterialIcons name="sync" size={22} color={COLORS.onPrimary} />
-          <Text style={[TYPOGRAPHY.headlineSm, styles.btnSyncText]}>Sincronizar</Text>
-          {pendientesCola > 0 && (
-            <View style={styles.btnBadge}>
-              <Text style={styles.btnBadgeText}>({pendientesCola})</Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -329,20 +298,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    paddingHorizontal: SPACING.margin,
+    height: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
   topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
   },
   topBarRight: {
     flexDirection: 'row',
@@ -357,33 +321,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   topBarBtnPressed: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(0,0,0,0.06)',
   },
   topBarTitle: {
-    color: COLORS.onPrimary,
-  },
-  badgeWrapper: {
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: COLORS.error,
-    borderRadius: RADIUS.full,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  badgeText: {
-    color: COLORS.onPrimary,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    color: COLORS.primary,
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.5,
   },
 
   // ── ScrollView ────────────────────────────────────────────────────────────
@@ -544,47 +488,6 @@ const styles = StyleSheet.create({
   emptyBox: {
     alignItems: 'center',
     paddingVertical: SPACING.xl,
-  },
-
-  // ── Sticky footer ─────────────────────────────────────────────────────────
-  stickyFooter: {
-    position: 'absolute',
-    bottom: 72, // sobre el BottomNav
-    left: SPACING.md,
-    right: SPACING.md,
-    zIndex: 40,
-  },
-  btnSync: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-  },
-  btnSyncPressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.9,
-  },
-  btnSyncText: {
-    color: COLORS.onPrimary,
-  },
-  btnBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-  },
-  btnBadgeText: {
-    color: COLORS.onPrimary,
-    fontSize: 13,
-    fontWeight: '500',
   },
 
   // ── Error / Retry ─────────────────────────────────────────────────────────

@@ -17,22 +17,24 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
 type Props = LecturasStackScreenProps<'Historial'>;
 
-/** Convierte 'YYYY-MM' a etiqueta corta: 'ENE', 'FEB', etc. */
+/** Convierte 'YYYYMM' o 'YYYY-MM' a etiqueta corta: 'ENE', 'FEB', etc. */
 function mesCorto(periodo: string): string {
   const meses = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
-  const mes = parseInt(periodo.split('-')[1] ?? '1', 10) - 1;
+  const raw = periodo.replace('-', '');
+  const mes = parseInt(raw.slice(4, 6), 10) - 1;
   return meses[mes] ?? periodo;
 }
 
-/** Convierte 'YYYY-MM' a label legible: 'Junio 2024' */
+/** Convierte 'YYYYMM' o 'YYYY-MM' a label legible: 'Junio 2024' */
 function mesLargo(periodo: string): string {
   const meses = [
     'Enero','Febrero','Marzo','Abril','Mayo','Junio',
     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
   ];
-  const [year, mm] = periodo.split('-');
-  const mes = parseInt(mm ?? '1', 10) - 1;
-  return `${meses[mes] ?? periodo} ${year ?? ''}`;
+  const raw = periodo.replace('-', '');
+  const year = raw.slice(0, 4);
+  const mes = parseInt(raw.slice(4, 6), 10) - 1;
+  return `${meses[mes] ?? periodo} ${year}`;
 }
 
 /**
@@ -83,7 +85,10 @@ export default function Historial({ navigation, route }: Props) {
   const pico = valores.length > 0 ? Math.max(...valores) : 0;
 
   // ── Últimos 6 períodos para el gráfico ──────────────────────────────────────
-  const periodosUnicos = [...new Set(lecturas.map((l) => l.id_periodo))].slice(0, 6).reverse();
+  const periodosUnicos = [...new Set(lecturas.map((l) => l.id_periodo))]
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, 6)
+    .reverse();
   const consumoPorPeriodo = periodosUnicos.map((p) => ({
     periodo: p,
     valor: lecturas.filter((l) => l.id_periodo === p).reduce((a, l) => a + l.lectura_actual, 0),
