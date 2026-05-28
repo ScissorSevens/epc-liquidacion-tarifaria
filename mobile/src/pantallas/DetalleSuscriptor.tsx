@@ -462,12 +462,6 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                     >
                       <Text style={styles.btnCapturarText}>CAPTURAR LECTURA</Text>
                     </Pressable>
-                    <HistorialLecturas
-                      lecturas={historialMap.get(m.id_medidor) ?? []}
-                      periodoActual={calcularPeriodos().actual}
-                      periodoAnterior={calcularPeriodos().anterior}
-                      loading={loadingHistorial && !historialMap.has(m.id_medidor)}
-                    />
                     {/* Botón historial completo */}
                     <Pressable
                       onPress={() =>
