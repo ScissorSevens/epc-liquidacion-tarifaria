@@ -76,20 +76,6 @@ function TabIcon({ name, label, focused }: TabIconProps) {
       {!focused && (
         <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
       )}
-
-      {/* Etiqueta */}
-      <Text
-        numberOfLines={1}
-        style={[
-          tabIconStyles.label,
-          focused ? tabIconStyles.labelActiva : tabIconStyles.labelInactiva,
-        ]}
-      >
-        {label}
-      </Text>
-
-      {/* Línea indicadora debajo de la etiqueta activa */}
-      {focused && <View style={tabIconStyles.indicador} />}
     </View>
   );
 }
@@ -97,9 +83,8 @@ function TabIcon({ name, label, focused }: TabIconProps) {
 const tabIconStyles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     height: 64,
-    paddingBottom: 8,
   },
   bubble: {
     position: 'absolute',
