@@ -170,7 +170,7 @@ export default function RutaDeHoy({ navigation }: Props) {
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
             onPress={() => navigation.navigate('Lecturas', { screen: 'MiPerfil' })}
           >
-            <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
+            <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
           </Pressable>
         }
       />

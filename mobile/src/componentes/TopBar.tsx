@@ -2,32 +2,61 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { COLORS, RADIUS, SPACING } from '../theme/skeletal-tokens';
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
-export const TOPBAR_HEIGHT = 64;
+/**
+ * Altura base del área de contenido (sin contar el inset del sistema).
+ * Las pantallas que necesiten compensar el espacio del TopBar usan
+ * TOPBAR_HEIGHT + insets.top — o simplemente dejan flex:1 en el contenido.
+ */
+export const TOPBAR_HEIGHT = 56;
 
 interface TopBarProps {
   titulo: string;
-  onBack?: () => void;          // si se pasa → muestra flecha atrás
+  subtitulo?: string;           // línea secundaria bajo el título (pantallas de detalle)
+  onBack?: () => void;          // si se pasa → modo "detalle": título más pequeño + flecha
   accionDerecha?: ReactNode;    // slot libre para iconos derecha
 }
 
-export function TopBar({ titulo, onBack, accionDerecha }: TopBarProps) {
+export function TopBar({ titulo, subtitulo, onBack, accionDerecha }: TopBarProps) {
   const insets = useSafeAreaInsets();
+  const esDetalle = Boolean(onBack);
+
   return (
-    <View style={[styles.topBar, { paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.topBar,
+        esDetalle ? styles.topBarDetalle : styles.topBarRaiz,
+        { paddingTop: insets.top + SPACING.sm },
+      ]}
+    >
       <View style={styles.izq}>
         {onBack && (
           <Pressable
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             onPress={onBack}
-            hitSlop={8}
+            hitSlop={12}
           >
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+            <MaterialIcons
+              name="arrow-back"
+              size={22}
+              color={esDetalle ? COLORS.primary : COLORS.onPrimary}
+            />
           </Pressable>
         )}
-        <Text style={styles.titulo} numberOfLines={1}>{titulo}</Text>
+        <View style={styles.titulos}>
+          <Text
+            style={[esDetalle ? styles.tituloDetalle : styles.tituloRaiz]}
+            numberOfLines={1}
+          >
+            {titulo}
+          </Text>
+          {subtitulo !== undefined && subtitulo !== '' && (
+            <Text style={styles.subtitulo} numberOfLines={1}>{subtitulo}</Text>
+          )}
+        </View>
       </View>
+
       {accionDerecha && (
         <View style={styles.der}>{accionDerecha}</View>
       )}
@@ -37,42 +66,71 @@ export function TopBar({ titulo, onBack, accionDerecha }: TopBarProps) {
 
 const styles = StyleSheet.create({
   topBar: {
-    height: TOPBAR_HEIGHT,
     flexDirection: 'row',
-    alignItems: 'flex-end',  // alinear al fondo del área, encima del inset
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.sm + 2,
+    paddingBottom: SPACING.sm + 4,
+  },
+
+  // ── Variante raíz: fondo primario, título blanco, sin flecha ──────────────
+  topBarRaiz: {
+    backgroundColor: COLORS.primary,
+  },
+
+  // ── Variante detalle: fondo claro, título oscuro, con flecha ─────────────
+  topBarDetalle: {
     backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.outlineVariant,
   },
+
+  // ── Contenido ─────────────────────────────────────────────────────────────
   izq: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm + 4,
+    gap: SPACING.sm,
     flex: 1,
   },
   der: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
+    paddingBottom: 2,
   },
-  titulo: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    color: COLORS.primary,
+  titulos: {
     flex: 1,
+    gap: 1,
   },
+
+  // ── Título raíz: grande, blanco ───────────────────────────────────────────
+  tituloRaiz: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.onPrimary,
+    letterSpacing: -0.3,
+  },
+
+  // ── Título detalle: mediano, oscuro ───────────────────────────────────────
+  tituloDetalle: {
+    ...TYPOGRAPHY.bodyLg,
+    fontWeight: '600' as const,
+    color: COLORS.primary,
+    letterSpacing: -0.2,
+  },
+
+  subtitulo: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.onSurfaceVariant,
+  },
+
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.full,
   },
   iconBtnPressed: {
-    backgroundColor: 'rgba(3,22,50,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 });

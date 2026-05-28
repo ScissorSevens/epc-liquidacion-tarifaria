@@ -156,7 +156,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
             style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
             onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
           >
-            <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
+            <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
           </Pressable>
         }
       />
