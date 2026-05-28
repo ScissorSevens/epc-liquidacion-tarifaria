@@ -1,8 +1,10 @@
 import type { ComponentProps } from 'react';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+import { COLORS, RADIUS, TYPOGRAPHY } from '../theme/skeletal-tokens';
 import type { TabParamList } from './types';
 import ConfigStack from './stacks/ConfigStack';
 import InicioStack from './stacks/InicioStack';
@@ -13,56 +15,158 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 type IconName = ComponentProps<typeof MaterialIcons>['name'];
 
-// Mapa de íconos MaterialIcons por nombre de tab
 const TAB_ICONS: Record<keyof TabParamList, IconName> = {
   Inicio: 'home',
-  Lecturas: 'menu-book',
+  Lecturas: 'edit-note',
   Sincronizacion: 'sync',
   Config: 'settings',
 };
 
-// Etiquetas visibles en la tab bar
 const TAB_LABELS: Record<keyof TabParamList, string> = {
   Inicio: 'INICIO',
   Lecturas: 'LECTURAS',
-  Sincronizacion: 'SYNC',
+  Sincronizacion: 'SINCRO',
   Config: 'CONFIG',
 };
+
+// ── Componente de ícono animado ────────────────────────────────────────────────
+
+interface TabIconProps {
+  name: IconName;
+  label: string;
+  focused: boolean;
+}
+
+function TabIcon({ name, label, focused }: TabIconProps) {
+  // Controla cuánto "sube" el píldora con el ícono
+  const translateY = useRef(new Animated.Value(focused ? -16 : 0)).current;
+  // Escala del círculo: aparece grande cuando activo
+  const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: focused ? -16 : 0,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 8,
+      }),
+      Animated.spring(scale, {
+        toValue: focused ? 1 : 0,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 8,
+      }),
+    ]).start();
+  }, [focused, translateY, scale]);
+
+  return (
+    <View style={tabIconStyles.wrapper}>
+      {/* Píldora / burbuja activa (círculo oscuro que sube) */}
+      <Animated.View
+        style={[
+          tabIconStyles.bubble,
+          { transform: [{ translateY }, { scale }] },
+        ]}
+      >
+        <MaterialIcons name={name} size={24} color={COLORS.onPrimary} />
+      </Animated.View>
+
+      {/* Ícono inactivo (siempre visible debajo, pero se oculta cuando la burbuja lo cubre) */}
+      {!focused && (
+        <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
+      )}
+
+      {/* Etiqueta */}
+      <Text
+        style={[
+          tabIconStyles.label,
+          focused ? tabIconStyles.labelActiva : tabIconStyles.labelInactiva,
+        ]}
+      >
+        {label}
+      </Text>
+
+      {/* Línea indicadora debajo de la etiqueta activa */}
+      {focused && <View style={tabIconStyles.indicador} />}
+    </View>
+  );
+}
+
+const tabIconStyles = StyleSheet.create({
+  wrapper: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: 64,
+    paddingBottom: 8,
+  },
+  bubble: {
+    position: 'absolute',
+    top: 0,
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Sombra para dar sensación de "elevación"
+    elevation: 6,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  label: {
+    ...TYPOGRAPHY.labelSm,
+    marginTop: 2,
+  },
+  labelActiva: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  labelInactiva: {
+    color: COLORS.onSurfaceVariant,
+  },
+  indicador: {
+    height: 2,
+    width: 20,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.full,
+    marginTop: 2,
+  },
+});
+
+// ── Navigator ─────────────────────────────────────────────────────────────────
 
 export default function AppNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="Inicio"
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: COLORS.primaryContainer,
-          borderTopWidth: BORDERS.thin.borderWidth,
-          borderTopColor: BORDERS.thin.borderColor,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 4,
-        },
-        tabBarActiveTintColor: COLORS.onSecondaryContainer,
-        tabBarInactiveTintColor: COLORS.onSurfaceVariant,
-        tabBarActiveBackgroundColor: COLORS.secondaryContainer,
-        tabBarItemStyle: {
-          borderRadius: RADIUS.full,
-          marginHorizontal: 4,
-          marginVertical: 4,
-        },
-        tabBarLabelStyle: {
-          ...TYPOGRAPHY.labelSm,
-        },
-        tabBarLabel: TAB_LABELS[route.name as keyof TabParamList] ?? route.name,
-        tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-          <MaterialIcons
-            name={TAB_ICONS[route.name as keyof TabParamList] ?? 'circle'}
-            size={size}
-            color={color}
-          />
-        ),
-      })}
+      screenOptions={({ route }) => {
+        const routeName = route.name as keyof TabParamList;
+        const iconName = TAB_ICONS[routeName] ?? 'circle';
+        const label = TAB_LABELS[routeName] ?? routeName;
+
+        return {
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: COLORS.surfaceContainerLowest,
+            borderTopWidth: 1,
+            borderTopColor: COLORS.outlineVariant,
+            height: 72,
+            paddingBottom: 0,
+            paddingTop: 0,
+          },
+          // Ocultamos label y background nativos — todo lo maneja TabIcon
+          tabBarShowLabel: false,
+          tabBarItemStyle: {
+            paddingVertical: 0,
+          },
+          tabBarIcon: ({ focused }: { focused: boolean }) => (
+            <TabIcon name={iconName} label={label} focused={focused} />
+          ),
+        };
+      }}
     >
       <Tab.Screen name="Inicio" component={InicioStack} />
       <Tab.Screen name="Lecturas" component={LecturasStack} />
