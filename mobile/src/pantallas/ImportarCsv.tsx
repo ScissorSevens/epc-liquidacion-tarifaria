@@ -25,7 +25,6 @@ import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
@@ -196,17 +195,20 @@ export default function ImportarCsv({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist */}
+      {/* Top App Bar */}
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
-          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>IMPORTAR CSV</Text>
-        <View style={styles.headerBtn} />
+        <View style={styles.headerIzq}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
+            hitSlop={8}
+            style={({ pressed }) => [pressed && styles.pressedDark]}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>IMPORTAR CSV</Text>
+        </View>
+        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -256,26 +258,35 @@ export default function ImportarCsv({ navigation }: Props) {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setDialogFormatoVisible(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitulo}>FORMATO ESPERADO</Text>
-            <Text style={styles.modalBody}>
-              El archivo debe ser un CSV (separado por comas) con{'\n'}
-              <Text style={{ fontWeight: '700' }}>7 columnas</Text> en este orden:
-            </Text>
-            <Text style={styles.modalCode}>{HEADER_ESPERADO_TXT}</Text>
-            <Text style={styles.modalBody}>
-              • Código y número de medidor se asignan automáticamente.{'\n'}
-              • Encoding: UTF-8.{'\n'}
-              • Estrato: entero entre 1 y 6.{'\n'}
-              • Fecha de instalación: formato YYYY-MM-DD.{'\n'}
-              • Campos opcionales (matrícula, catastral, observaciones) pueden venir vacíos.{'\n'}
-              • También acepta el formato legado de 9 columnas con código y número de medidor.
-            </Text>
-            <Pressable
-              onPress={() => setDialogFormatoVisible(false)}
-              style={styles.modalBtn}
-            >
-              <Text style={styles.modalBtnText}>ENTENDIDO</Text>
-            </Pressable>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>FORMATO ESPERADO</Text>
+              <Pressable onPress={() => setDialogFormatoVisible(false)} hitSlop={8}>
+                <MaterialIcons name="close" size={20} color={COLORS.primary} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalBody}>
+                El archivo debe ser un CSV (separado por comas) con{'\n'}
+                <Text style={{ fontWeight: '700' }}>7 columnas</Text> en este orden:
+              </Text>
+              <Text style={styles.modalCode}>{HEADER_ESPERADO_TXT}</Text>
+              <Text style={styles.modalBody}>
+                • Código y número de medidor se asignan automáticamente.{'\n'}
+                • Encoding: UTF-8.{'\n'}
+                • Estrato: entero entre 1 y 6.{'\n'}
+                • Fecha de instalación: formato YYYY-MM-DD.{'\n'}
+                • Campos opcionales (matrícula, catastral, observaciones) pueden venir vacíos.{'\n'}
+                • También acepta el formato legado de 9 columnas con código y número de medidor.
+              </Text>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <Pressable
+                onPress={() => setDialogFormatoVisible(false)}
+                style={styles.modalBtn}
+              >
+                <Text style={styles.modalBtnText}>ENTENDIDO</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -333,28 +344,37 @@ function RenderIdle({
   onVerFormato: () => void;
 }) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitulo}>IMPORTAR SUSCRIPTORES DESDE CSV</Text>
-      <Text style={styles.cardBody}>
-        Cargá un archivo .csv con tus suscriptores y medidores. El sistema
-        valida cada fila y reporta duplicados y errores sin abortar el lote.
-      </Text>
-      <Text style={styles.cardHint}>7 columnas separadas por coma · UTF-8</Text>
-      <View style={styles.separador} />
-      <Pressable
-        onPress={onSeleccionar}
-        style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-      >
-        <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
-        <Text style={styles.btnPrimaryText}>SELECCIONAR ARCHIVO CSV</Text>
-      </Pressable>
-      <Pressable
-        onPress={onVerFormato}
-        style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
-      >
-        <Text style={styles.btnSecondaryText}>VER FORMATO ESPERADO</Text>
-      </Pressable>
-    </View>
+    <>
+      <View style={styles.card}>
+        <Text style={styles.cardTitulo}>IMPORTAR SUSCRIPTORES DESDE CSV</Text>
+        <Text style={styles.cardBody}>
+          Cargá un archivo .csv con tus suscriptores y medidores. El sistema
+          valida cada fila y reporta duplicados y errores sin abortar el lote.
+        </Text>
+        <View style={styles.cardHint}>
+          <MaterialIcons name="info" size={16} color={COLORS.secondary} />
+          <Text style={styles.cardHintTexto}>7 columnas separadas por coma · UTF-8</Text>
+        </View>
+        <Pressable
+          onPress={onSeleccionar}
+          style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
+        >
+          <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
+          <Text style={styles.btnPrimaryText}>SELECCIONAR ARCHIVO CSV</Text>
+        </Pressable>
+        <Pressable
+          onPress={onVerFormato}
+          style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
+        >
+          <Text style={styles.btnSecondaryText}>VER FORMATO ESPERADO</Text>
+        </Pressable>
+      </View>
+      {/* Status placeholder */}
+      <View style={styles.statusPlaceholder}>
+        <MaterialIcons name="cloud-upload" size={40} color={COLORS.primary} />
+        <Text style={styles.statusPlaceholderTexto}>Esperando carga de datos...</Text>
+      </View>
+    </>
   );
 }
 
@@ -596,22 +616,25 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    height: 56,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
+    borderBottomColor: COLORS.outlineVariant,
   },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerIcon: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+  headerIzq: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
   headerTitle: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
     textTransform: 'uppercase',
-    letterSpacing: -0.2,
+    letterSpacing: 1.2,
   },
 
   // Scroll
@@ -619,21 +642,31 @@ const styles = StyleSheet.create({
 
   // Card
   card: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     padding: SPACING.lg,
-    backgroundColor: COLORS.background,
     marginBottom: SPACING.md,
   },
   cardTitulo: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: SPACING.sm,
   },
-  cardBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.textSecondary, marginBottom: SPACING.sm },
-  cardHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, opacity: 0.7 },
+  cardBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.onSurfaceVariant, marginBottom: SPACING.sm },
+  cardHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  cardHintTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
   bold: { fontWeight: '700' },
   bigCount: {
     ...TYPOGRAPHY.headlineSm,
@@ -643,7 +676,7 @@ const styles = StyleSheet.create({
   },
 
   // Separador
-  separador: { height: 1, backgroundColor: COLORS.outline, marginVertical: SPACING.md },
+  separador: { height: 1, backgroundColor: COLORS.outlineVariant, marginVertical: SPACING.md },
 
   // Botones
   btnPrimary: {
@@ -651,12 +684,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primaryContainer,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
-    minHeight: 48,
-    marginTop: SPACING.md,
+    borderRadius: RADIUS.lg,
+    minHeight: 52,
+    marginTop: SPACING.sm,
   },
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
@@ -669,12 +702,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    ...BORDERS.thin,
+    borderWidth: 2,
+    borderColor: COLORS.outlineVariant,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
+    borderRadius: RADIUS.lg,
     marginTop: SPACING.sm,
-    minHeight: 44,
+    minHeight: 48,
   },
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
@@ -682,9 +716,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  btnDisabled: { backgroundColor: COLORS.textSecondary },
+  btnDisabled: { backgroundColor: COLORS.onSurfaceVariant, opacity: 0.4 },
   botonesRow: { flexDirection: 'row', gap: SPACING.sm },
   flex1: { flex: 1 },
+
+  // Status placeholder
+  statusPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
+    opacity: 0.4,
+    gap: SPACING.sm,
+  },
+  statusPlaceholderTexto: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+  },
 
   // Loading
   center: {
@@ -697,21 +744,22 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...TYPOGRAPHY.bodyMd,
-    color: COLORS.textSecondary,
+    color: COLORS.onSurfaceVariant,
     textAlign: 'center',
     marginTop: SPACING.md,
   },
 
   // Warning box
   warningBox: {
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
     padding: SPACING.md,
     gap: SPACING.xs,
     marginVertical: SPACING.sm,
   },
-  warningText: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary },
+  warningText: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
 
   // Métricas
   metricRow: {
@@ -722,7 +770,7 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     ...TYPOGRAPHY.bodySm,
-    color: COLORS.textSecondary,
+    color: COLORS.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -732,11 +780,11 @@ const styles = StyleSheet.create({
 
   // Error card
   errorCard: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    borderRadius: RADIUS.xl,
     padding: SPACING.lg,
     backgroundColor: COLORS.errorContainer,
-    borderColor: COLORS.error,
     marginBottom: SPACING.md,
   },
   errorTitulo: {
@@ -750,47 +798,66 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: SPACING.margin,
   },
   modalCard: {
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl * 2,
     width: '100%',
-    gap: SPACING.md,
+    overflow: 'hidden',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
   modalTitulo: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
+  },
+  modalScroll: {
+    padding: SPACING.lg,
+    maxHeight: 320,
   },
   modalCode: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.primary,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.surfaceContainerLow,
     padding: SPACING.md,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
     fontFamily: 'monospace',
+    marginVertical: SPACING.md,
   },
-  modalBody: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, lineHeight: 20 },
+  modalBody: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, lineHeight: 20 },
+  modalFooter: {
+    padding: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+  },
   modalBtn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.primaryContainer,
+    paddingVertical: SPACING.sm + 4,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
+    borderRadius: RADIUS.lg,
     alignItems: 'center',
-    marginTop: SPACING.sm,
     flex: 1,
   },
   modalBtnText: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary, textTransform: 'uppercase' },
   modalBtnSecondary: {
     backgroundColor: 'transparent',
-    ...BORDERS.thin,
+    borderWidth: 2,
+    borderColor: COLORS.outlineVariant,
   },
   modalBtnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
@@ -798,17 +865,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   modalBtnsRow: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
-
-  // Brand footer
-  brandFooter: {
-    ...TYPOGRAPHY.labelSm,
-    fontSize: 8,
-    color: COLORS.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    textAlign: 'center',
-    marginTop: SPACING.lg,
-  },
 
   // Press states
   pressedLight: { opacity: 0.7 },

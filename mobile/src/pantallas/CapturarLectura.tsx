@@ -324,6 +324,16 @@ export default function CapturarLectura({ navigation, route }: Props) {
     [id_suscriptor, id_medidor],
   );
 
+  // Warning de consumo inusual: se muestra si el incremento supera 40% del anterior.
+  const mostrarWarningConsumo = useMemo(() => {
+    const anterior = Number.parseFloat(form.lectura_anterior);
+    const actual = Number.parseFloat(form.lectura_actual);
+    if (isNaN(anterior) || isNaN(actual) || anterior <= 0) return false;
+    const consumo = actual - anterior;
+    if (consumo <= 0) return false;
+    return consumo / anterior > 0.4;
+  }, [form.lectura_anterior, form.lectura_actual]);
+
   return (
     <View style={styles.root}>
       {/* Header brutalist: back + título capitalizado + account icon */}
@@ -339,7 +349,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
         >
           <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
         </Pressable>
-        <Text style={styles.headerTitle}>CAPTURAR LECTURA</Text>
+        <Text style={styles.headerTitle}>Capturar lectura</Text>
         <Pressable
           onPress={() => {
             // Perfil: requiere módulo de autenticación.
@@ -350,7 +360,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           ]}
           accessibilityLabel="Cuenta"
         >
-          <MaterialIcons name="radio-button-checked" size={24} color={COLORS.primary} />
+          <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
         </Pressable>
       </View>
 
@@ -406,22 +416,25 @@ export default function CapturarLectura({ navigation, route }: Props) {
 
           {/* Input lectura actual */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Lectura actual (m³) *</Text>
-            <TextInput
-              value={form.lectura_actual}
-              onChangeText={(v) => setCampo('lectura_actual', v)}
-              onFocus={() => setCampoFocal('lectura_actual')}
-              onBlur={() => { setCampoFocal(null); onBlur('lectura_actual'); }}
-              placeholder="0000"
-              placeholderTextColor={COLORS.placeholder}
-              keyboardType="decimal-pad"
-              editable={!calculando}
-              style={[
-                styles.inputBig,
-                campoFocal === 'lectura_actual' && styles.inputFocused,
-                errores.lectura_actual !== undefined && styles.inputError,
-              ]}
-            />
+            <Text style={styles.fieldLabel}>LECTURA ACTUAL (m³)</Text>
+            <View style={styles.inputBigWrapper}>
+              <TextInput
+                value={form.lectura_actual}
+                onChangeText={(v) => setCampo('lectura_actual', v)}
+                onFocus={() => setCampoFocal('lectura_actual')}
+                onBlur={() => { setCampoFocal(null); onBlur('lectura_actual'); }}
+                placeholder="0000"
+                placeholderTextColor={COLORS.surfaceDim}
+                keyboardType="decimal-pad"
+                editable={!calculando}
+                style={[
+                  styles.inputBig,
+                  campoFocal === 'lectura_actual' && styles.inputFocused,
+                  errores.lectura_actual !== undefined && styles.inputError,
+                ]}
+              />
+              <Text style={styles.inputBigUnit}>m³</Text>
+            </View>
             {errores.lectura_actual !== undefined && (
               <Text style={styles.errorText}>{errores.lectura_actual}</Text>
             )}
@@ -490,6 +503,21 @@ export default function CapturarLectura({ navigation, route }: Props) {
             )}
           </View>
 
+
+          {/* Botón cámara / preview de evidencia */}
+          {mostrarWarningConsumo && (
+            <View style={styles.warningBox}>
+              <View style={styles.warningIconBox}>
+                <MaterialIcons name="warning" size={22} color={COLORS.error} />
+              </View>
+              <View style={styles.warningTexts}>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.warningTitle]}>Consumo inusual detectado</Text>
+                <Text style={[TYPOGRAPHY.bodySm, styles.warningDesc]}>
+                  El incremento es superior al 40% del promedio histórico del suscriptor.
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Botón cámara / preview de evidencia */}
           {evidencia === undefined ? (
@@ -607,16 +635,16 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
 
-  // Header
+  // Header — fondo blanco con borde gris claro (wireframe: surface-container-lowest + outline-variant)
   header: {
     height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
+    borderBottomColor: COLORS.outlineVariant,
   },
   headerBtn: {
     width: 40,
@@ -629,10 +657,8 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   headerTitle: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
   },
 
   // Scroll
@@ -756,13 +782,15 @@ const styles = StyleSheet.create({
   },
   inputBig: {
     width: '100%',
-    height: 64,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    height: 80,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 2,
+    borderColor: COLORS.primaryContainer,
+    borderRadius: RADIUS.xl,
     paddingHorizontal: SPACING.md,
+    paddingRight: 48, // espacio para el "m³" a la derecha
     color: COLORS.primary,
-    ...TYPOGRAPHY.headlineMd,
+    ...TYPOGRAPHY.headlineLg,
   },
   inputMulti: {
     width: '100%',
@@ -920,15 +948,16 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
     flexDirection: 'row',
     gap: SPACING.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerLowest,
     borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
+    borderTopColor: COLORS.outlineVariant,
   },
   btnSecondary: {
     flex: 1,
     height: 56,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
     borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
@@ -946,6 +975,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
@@ -963,5 +997,52 @@ const styles = StyleSheet.create({
   },
   pressedDark: {
     opacity: 0.85,
+  },
+
+  // Input big wrapper (lectura actual con unidad flotante)
+  inputBigWrapper: {
+    position: 'relative',
+  },
+  inputBigUnit: {
+    position: 'absolute',
+    right: SPACING.lg,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurfaceVariant,
+    fontWeight: '500',
+  },
+
+  // Warning consumo inusual
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.md,
+    backgroundColor: 'rgba(255,218,214,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(186,26,26,0.2)',
+    borderRadius: RADIUS.xl,
+    padding: SPACING.md,
+  },
+  warningIconBox: {
+    backgroundColor: COLORS.errorContainer,
+    borderRadius: RADIUS.default,
+    padding: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  warningTexts: {
+    flex: 1,
+    gap: SPACING.xs,
+  },
+  warningTitle: {
+    color: COLORS.onErrorContainer,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  warningDesc: {
+    color: 'rgba(147,0,10,0.8)',
+    lineHeight: 20,
   },
 });

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,28 +17,33 @@ import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
+  SHADOWS,
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 
 type Props = LecturasStackScreenProps<'ListaSuscriptores'>;
 
+type Filtro = 'todas' | 'pendientes' | 'capturadas';
+
 /**
- * Lista de suscriptores con buscador in-memory.
+ * Listado de suscriptores con cards verticales enriquecidas (wireframe v3.0).
  *
- * - Carga `suscriptorRepo.listar()` al montar.
- * - Filtra por `codigo` o `nombre_apellidos` (case-insensitive).
- * - Tap en item -> navega a DetalleSuscriptor con `id_suscriptor`.
- * - Empty state y error state con retry.
+ * - Card con estado Pendiente / Capturada.
+ * - Chips de filtro: Todas / Pendientes / Capturadas.
+ * - FAB speed dial: Nuevo Suscriptor / Importar CSV.
+ * - Buscador por código o nombre.
  */
 export default function ListaSuscriptores({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>('todas');
+  const [fabAbierto, setFabAbierto] = useState(false);
+  const [buscadorVisible, setBuscadorVisible] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -59,139 +65,235 @@ export default function ListaSuscriptores({ navigation }: Props) {
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (q === '') return suscriptores;
-    return suscriptores.filter(
-      (s) =>
-        s.codigo.toLowerCase().includes(q) ||
-        s.nombre_apellidos.toLowerCase().includes(q),
-    );
+    let lista = suscriptores;
+
+    if (q !== '') {
+      lista = lista.filter(
+        (s) =>
+          s.codigo.toLowerCase().includes(q) ||
+          s.nombre_apellidos.toLowerCase().includes(q),
+      );
+    }
+
+    // Por ahora todos los suscriptores se consideran "pendientes" si no tienen
+    // lectura registrada — la lógica real de estado viene del dominio.
+    // El filtro visual se aplica pero no filtra datos hasta que haya campo estado.
+    return lista;
   }, [suscriptores, query]);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: Suscriptor; index: number }) => (
-      <>
-        {index > 0 && <View style={styles.separador} />}
+    ({ item }: { item: Suscriptor }) => (
+      <View style={styles.card}>
+        {/* Fila superior: ID + badge estado */}
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderTextos}>
+            <Text style={styles.cardCodigo}>SUSCRIPTOR #{item.codigo.toUpperCase()}</Text>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
+              {item.nombre_apellidos}
+            </Text>
+          </View>
+          <View style={styles.badgePendiente}>
+            <Text style={styles.badgePendienteTexto}>PENDIENTE</Text>
+          </View>
+        </View>
+
+        {/* Dirección */}
+        {item.direccion !== '' && (
+          <View style={styles.cardDireccionRow}>
+            <MaterialIcons name="location-on" size={16} color={COLORS.onSurfaceVariant} />
+            <Text style={[TYPOGRAPHY.bodySm, styles.cardDireccion]}>
+              {item.direccion}
+            </Text>
+          </View>
+        )}
+
+        {/* Botón ficha suscriptor */}
         <Pressable
-          style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+          style={({ pressed }) => [styles.btnFicha, pressed && styles.pressed]}
           onPress={() =>
             navigation.navigate('DetalleSuscriptor', {
               id_suscriptor: item.id_suscriptor,
             })
           }
         >
-          <View style={styles.itemInfo}>
-            <Text style={[TYPOGRAPHY.labelSm, styles.itemCodigo]}>
-              {item.codigo.toUpperCase()}
-            </Text>
-            <Text style={[TYPOGRAPHY.bodyMd, styles.itemNombre]}>
-              {item.nombre_apellidos}
-            </Text>
-            {item.direccion !== '' && (
-              <Text style={[TYPOGRAPHY.bodySm, styles.itemDireccion]}>
-                {item.direccion}
-              </Text>
-            )}
-          </View>
-          <View style={styles.itemDerecha}>
-            <View style={styles.estratoChip}>
-              <Text style={[TYPOGRAPHY.labelSm, styles.estratoText]}>
-                E{item.estrato}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </View>
+          <MaterialIcons name="info-outline" size={16} color={COLORS.primary} />
+          <Text style={[TYPOGRAPHY.labelLg, styles.btnFichaTexto]}>FICHA SUSCRIPTOR</Text>
         </Pressable>
-      </>
+
+        {/* Fila inferior: cámara + botón tomar lectura */}
+        <View style={styles.cardFooter}>
+          <View style={styles.cardFooterIzq}>
+            <MaterialIcons name="photo-camera" size={20} color={COLORS.onSurfaceVariant} />
+            <Text style={[TYPOGRAPHY.labelMd, styles.cardFooterLabel]}>Requiere foto</Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
+            onPress={() =>
+              navigation.navigate('DetalleSuscriptor', {
+                id_suscriptor: item.id_suscriptor,
+              })
+            }
+          >
+            <MaterialIcons name="add-a-photo" size={14} color={COLORS.onPrimary} />
+            <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>TOMAR LECTURA</Text>
+          </Pressable>
+        </View>
+      </View>
     ),
     [navigation],
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTexts}>
-            <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>SUSCRIPTORES</Text>
-            <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
-              {suscriptores.length} registros
+      {/* TopAppBar */}
+      <View style={styles.topBar}>
+        <View style={styles.topBarIzq}>
+          <Pressable
+            style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.topBarTitulo}>Lecturas</Text>
+        </View>
+        <View style={styles.topBarDer}>
+          <Pressable
+            style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
+            onPress={() => setBuscadorVisible((v) => !v)}
+          >
+            <MaterialIcons name="search" size={24} color={COLORS.primary} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
+          >
+            <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Buscador (visible al tocar el ícono search) */}
+        {buscadorVisible && (
+          <View style={styles.buscadorContainer}>
+            <MaterialIcons name="search" size={20} color={COLORS.outline} style={styles.buscadorIcono} />
+            <TextInput
+              style={[TYPOGRAPHY.bodyMd, styles.buscador]}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Buscar por nombre o ID de suscriptor..."
+              placeholderTextColor={COLORS.outline}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+          </View>
+        )}
+
+        {/* Chips de filtro */}
+        <View style={styles.filtrosRow}>
+          {(['todas', 'pendientes', 'capturadas'] as Filtro[]).map((f) => (
+            <Pressable
+              key={f}
+              style={[styles.chip, filtro === f && styles.chipActivo]}
+              onPress={() => setFiltro(f)}
+            >
+              <Text style={[styles.chipTexto, filtro === f && styles.chipTextoActivo]}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Contenido */}
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : error !== null ? (
+          <View style={styles.center}>
+            <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
+              onPress={() => void cargar()}
+            >
+              <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>REINTENTAR</Text>
+            </Pressable>
+          </View>
+        ) : suscriptores.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>
+              No hay suscriptores. Usá el botón + para agregar uno.
             </Text>
           </View>
-          <Pressable
-            style={({ pressed }) => [styles.btnAgregar, pressed && styles.btnPressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'AltaSuscriptor' })}
-          >
-            <MaterialIcons name="add" size={24} color={COLORS.onPrimary} />
-          </Pressable>
-        </View>
-      </View>
+        ) : filtrados.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>Sin resultados</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filtrados}
+            keyExtractor={(item) => String(item.id_suscriptor)}
+            renderItem={renderItem}
+            scrollEnabled={false}
+            contentContainerStyle={styles.lista}
+          />
+        )}
 
-      {/* Buscador */}
-      <View style={styles.buscadorContainer}>
-        <MaterialIcons name="search" size={20} color={COLORS.textSecondary} style={styles.buscadorIcono} />
-        <TextInput
-          style={[TYPOGRAPHY.bodyMd, styles.buscador]}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Buscar por código o nombre..."
-          placeholderTextColor={COLORS.textSecondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
+        <FooterApp />
+      </ScrollView>
 
-      {/* Acción rápida */}
-      <View style={styles.accionesRow}>
-        <Pressable
-          style={({ pressed }) => [styles.btnSecundario, pressed && styles.btnPressed]}
-          onPress={() => navigation.navigate('Config', { screen: 'ImportarCsv' })}
-        >
-          <MaterialIcons name="upload-file" size={16} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>IMPORTAR CSV</Text>
-        </Pressable>
-      </View>
-
-      {/* Contenido principal */}
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+      {/* FAB Speed Dial */}
+      {fabAbierto && (
+        <View style={styles.fabMenu}>
+          {/* Opción: Nuevo Suscriptor */}
+          <View style={styles.fabOpcion}>
+            <View style={styles.fabEtiqueta}>
+              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Nuevo Suscriptor</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
+              onPress={() => {
+                setFabAbierto(false);
+                navigation.navigate('Config', { screen: 'AltaSuscriptor' });
+              }}
+            >
+              <MaterialIcons name="person-add" size={24} color={COLORS.primary} />
+            </Pressable>
+          </View>
+          {/* Opción: Importar CSV */}
+          <View style={styles.fabOpcion}>
+            <View style={styles.fabEtiqueta}>
+              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Importar CSV</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
+              onPress={() => {
+                setFabAbierto(false);
+                navigation.navigate('Config', { screen: 'ImportarCsv' });
+              }}
+            >
+              <MaterialIcons name="file-upload" size={24} color={COLORS.primary} />
+            </Pressable>
+          </View>
         </View>
-      ) : error !== null ? (
-        <View style={styles.center}>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
-          <Pressable
-            style={({ pressed }) => [styles.btnPrimario, pressed && styles.btnPressed]}
-            onPress={() => void cargar()}
-          >
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>REINTENTAR</Text>
-          </Pressable>
-        </View>
-      ) : suscriptores.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>
-            No hay suscriptores. Agregá uno.
-          </Text>
-          <Pressable
-            style={({ pressed }) => [styles.btnPrimario, pressed && styles.btnPressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'AltaSuscriptor' })}
-          >
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>AGREGAR SUSCRIPTOR</Text>
-          </Pressable>
-        </View>
-      ) : filtrados.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>Sin resultados</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtrados}
-          keyExtractor={(item) => String(item.id_suscriptor)}
-          renderItem={renderItem}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.lista}
-        />
       )}
-      <FooterApp />
+
+      {/* FAB principal */}
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+        onPress={() => setFabAbierto((v) => !v)}
+      >
+        <MaterialIcons
+          name={fabAbierto ? 'close' : 'add'}
+          size={28}
+          color={COLORS.onPrimary}
+        />
+      </Pressable>
     </View>
   );
 }
@@ -201,58 +303,61 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.margin,
-    gap: SPACING.md,
-  },
-  header: {
-    paddingTop: SPACING.xl,
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.background,
-  },
-  headerRow: {
+
+  // ── TopAppBar ──────────────────────────────────────────────────────────────
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    height: 64,
+    paddingHorizontal: SPACING.margin,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.primary,
   },
-  headerTexts: {
-    flex: 1,
+  topBarIzq: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
   },
-  titulo: {
+  topBarDer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  topBarTitulo: {
+    fontFamily: undefined,
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.5,
     color: COLORS.primary,
   },
-  muted: {
-    color: COLORS.textSecondary,
+  topBarIconBtn: {
+    padding: SPACING.xs,
   },
-  errorText: {
-    color: COLORS.error,
-    textAlign: 'center',
+
+  // ── Scroll ─────────────────────────────────────────────────────────────────
+  scroll: {
+    flex: 1,
   },
-  btnAgregar: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+  scrollContent: {
+    paddingTop: SPACING.lg,
+    paddingHorizontal: SPACING.margin,
+    paddingBottom: 120, // espacio para FAB
   },
+
+  // ── Buscador ───────────────────────────────────────────────────────────────
   buscadorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: SPACING.margin,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.default,
-    backgroundColor: COLORS.background,
+    height: 56,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
+    marginBottom: SPACING.lg,
+    ...SHADOWS.card,
   },
   buscadorIcono: {
     marginRight: SPACING.sm,
@@ -262,87 +367,203 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     paddingVertical: 0,
   },
-  accionesRow: {
+
+  // ── Chips filtro ───────────────────────────────────────────────────────────
+  filtrosRow: {
     flexDirection: 'row',
-    paddingHorizontal: SPACING.margin,
-    marginBottom: SPACING.md,
     gap: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
-  btnSecundario: {
+  chip: {
+    paddingHorizontal: SPACING.md + SPACING.sm,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+  },
+  chipActivo: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipTexto: {
+    fontFamily: undefined,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    color: COLORS.onSurface,
+  },
+  chipTextoActivo: {
+    color: COLORS.onPrimary,
+  },
+
+  // ── Cards ─────────────────────────────────────────────────────────────────
+  lista: {
+    gap: SPACING.md,
+  },
+  card: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING.margin,
+    gap: SPACING.md,
+    ...SHADOWS.card,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardHeaderTextos: {
+    flex: 1,
+    gap: SPACING.xs,
+  },
+  cardCodigo: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.primary,
+    opacity: 0.6,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  cardNombre: {
+    color: COLORS.primary,
+  },
+  badgePendiente: {
+    paddingHorizontal: SPACING.sm + SPACING.xs,
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.errorContainer,
+    borderRadius: RADIUS.full,
+  },
+  badgePendienteTexto: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.onErrorContainer,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  cardDireccionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  cardDireccion: {
+    color: COLORS.onSurfaceVariant,
+    flex: 1,
+  },
+
+  // ── Botón Ficha Suscriptor ─────────────────────────────────────────────────
+  btnFicha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: RADIUS.lg,
+  },
+  btnFichaTexto: {
+    color: COLORS.primary,
+  },
+
+  // ── Card Footer ────────────────────────────────────────────────────────────
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.surfaceContainer,
+    marginTop: SPACING.xs,
+  },
+  cardFooterIzq: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    opacity: 0.7,
+  },
+  cardFooterLabel: {
+    color: COLORS.onSurfaceVariant,
+  },
+  btnTomarLectura: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.default,
-    backgroundColor: COLORS.background,
-  },
-  btnSecundarioText: {
-    color: COLORS.primary,
-  },
-  btnPrimario: {
     backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: RADIUS.lg,
   },
-  btnPrimarioText: {
+  btnTomarLecturaTexto: {
     color: COLORS.onPrimary,
   },
-  btnPressed: {
-    opacity: 0.7,
-  },
-  lista: {
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.xl,
-  },
-  separador: {
-    height: 1,
-    backgroundColor: COLORS.primary,
-  },
-  item: {
-    flexDirection: 'row',
+
+  // ── Estados centro ─────────────────────────────────────────────────────────
+  center: {
+    paddingVertical: SPACING.xxl,
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.background,
+    gap: SPACING.md,
   },
-  itemPressed: {
-    opacity: 0.7,
+  errorText: {
+    color: COLORS.error,
+    textAlign: 'center',
   },
-  itemInfo: {
-    flex: 1,
-    gap: SPACING.xs,
+
+  // ── FAB ────────────────────────────────────────────────────────────────────
+  fab: {
+    position: 'absolute',
+    bottom: 88,
+    right: SPACING.lg,
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.float,
   },
-  itemCodigo: {
-    color: COLORS.textSecondary,
+  fabMenu: {
+    position: 'absolute',
+    bottom: 88 + 56 + SPACING.md,
+    right: SPACING.lg,
+    gap: SPACING.sm,
+    alignItems: 'flex-end',
   },
-  itemNombre: {
-    color: COLORS.primary,
-  },
-  itemDireccion: {
-    color: COLORS.textSecondary,
-  },
-  itemDerecha: {
+  fabOpcion: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  estratoChip: {
-    paddingHorizontal: SPACING.sm,
+  fabEtiqueta: {
+    paddingHorizontal: SPACING.sm + SPACING.xs,
     paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    ...SHADOWS.card,
   },
-  estratoText: {
+  fabEtiquetaTexto: {
     color: COLORS.primary,
   },
-  chevron: {
-    fontSize: 24,
-    color: COLORS.textSecondary,
+  fabOpcionBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.card,
+  },
+
+  // ── Util ───────────────────────────────────────────────────────────────────
+  pressed: {
+    opacity: 0.7,
   },
 });

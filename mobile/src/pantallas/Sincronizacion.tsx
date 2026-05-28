@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,7 +14,6 @@ import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
 import type { SyncStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
@@ -160,7 +159,6 @@ export default function Sincronizacion(_props: Props) {
         return;
       }
 
-      // Resumen agregado por estado.
       const porEstado = items.reduce<Record<string, number>>((acc, it) => {
         acc[it.estado] = (acc[it.estado] ?? 0) + 1;
         return acc;
@@ -178,23 +176,6 @@ export default function Sincronizacion(_props: Props) {
         fallidos: fallidosCount,
         pendientes: pendientesCount,
       });
-
-      const itemsActivos = items.filter((i) => i.estado !== 'EXITOSO');
-      if (itemsActivos.length === 0) {
-        agregarEvento('cola', 'Todos los items sincronizados ✓');
-        return;
-      }
-      for (const it of itemsActivos) {
-        const detalles: Record<string, string | number> = {
-          tipo_item: it.tipo,
-          estado: it.estado,
-          intentos: it.intentos,
-        };
-        if (it.ultimoError) {
-          detalles.error = it.ultimoError.slice(0, 40);
-        }
-        agregarEvento('cola', it.tipo, undefined, detalles);
-      }
     } catch (e) {
       agregarEvento(
         'error',
@@ -223,190 +204,177 @@ export default function Sincronizacion(_props: Props) {
   }
 
   const sincronizando = cargando === 'sync';
+
   const estadoTitulo = sincronizando
-    ? 'Sincronizando...'
+    ? 'Sincronizando datos...'
     : eventos.some((e) => e.tipo === 'sync')
     ? 'Sync completado'
     : 'Listo para sincronizar';
 
   const estadoConexionTexto =
     estadoConexion === 'stable'
-      ? 'Conexión estable'
+      ? 'Conexión Estable'
       : estadoConexion === 'offline'
-      ? 'Sin conexión'
-      : 'Estado desconocido';
+      ? 'Sin Conexión'
+      : 'Estado Desconocido';
+
+  // Progreso aproximado basado en exitosos vs total conocido
+  const totalConocido = contadores.exitosos + contadores.fallidos + contadores.pendientes;
+  const porcentajeProgreso =
+    totalConocido > 0
+      ? Math.round((contadores.exitosos / totalConocido) * 100)
+      : sincronizando ? 50 : 0;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text style={[TYPOGRAPHY.headlineMd, styles.title]}>SINCRONIZACIÓN</Text>
-          <MaterialIcons name="account-circle" size={28} color={COLORS.primary} />
+      {/* TopAppBar — blanco + borde surface-variant */}
+      <View style={styles.topBar}>
+        <View style={styles.topBarLeft}>
+          <Text style={[TYPOGRAPHY.headlineSm, styles.topBarTitle]}>AquaRuta</Text>
         </View>
+        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
-      <FlatList
-        data={eventos}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
-        ListHeaderComponent={
-          <>
-            {/* Ícono central */}
-            <View style={styles.iconoCirculo}>
-              <MaterialIcons name="sync" size={48} color={COLORS.onPrimary} />
-            </View>
-
-            {/* Estado textual */}
-            <View style={styles.estadoTextos}>
-              <Text style={[TYPOGRAPHY.headlineSm, styles.estadoTitulo]}>
-                {estadoTitulo}
-              </Text>
-              <Text style={[TYPOGRAPHY.labelMd, styles.estadoSubtitulo]}>
-                OPERACIÓN {sincronizando ? 'EN CURSO' : 'EN ESPERA'}
-              </Text>
-            </View>
-
-            {/* Indicador de progreso — solo visible mientras sincroniza */}
-            {sincronizando && (
-              <View style={styles.progresoSection}>
-                <View style={styles.progresoRow}>
-                  <Text style={[TYPOGRAPHY.labelLg]}>Progreso total</Text>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
-              </View>
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Ícono central animado */}
+        <View style={styles.iconoWrapper}>
+          <View style={styles.iconoCirculo}>
+            <MaterialIcons name="cloud-upload" size={56} color={COLORS.onPrimary} />
+          </View>
+          {/* Badge sync */}
+          <View style={styles.iconoBadge}>
+            {sincronizando ? (
+              <ActivityIndicator size="small" color={COLORS.onSecondaryContainer} />
+            ) : (
+              <MaterialIcons name="sync" size={20} color={COLORS.onSecondaryContainer} />
             )}
+          </View>
+        </View>
 
-            {/* Grid bento 2x2 */}
-            <View style={styles.bentoGrid}>
-              {/* ESTADO — col-span-2 */}
-              <View style={[styles.bentoCard, styles.bentoCardFullWidth]}>
-                <Text style={[TYPOGRAPHY.labelSm, styles.bentoLabel]}>ESTADO</Text>
-                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
-                  {estadoConexionTexto}
-                </Text>
-              </View>
-
-              {/* EXITOSOS */}
-              <View style={styles.bentoCard}>
-                <MaterialIcons name="description" size={24} color={COLORS.primary} />
-                <Text style={[TYPOGRAPHY.labelSm, styles.bentoLabel]}>EXITOSOS</Text>
-                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
-                  {contadores.exitosos}
-                </Text>
-              </View>
-
-              {/* FALLIDOS */}
-              <View style={[
-                styles.bentoCard,
-                contadores.fallidos > 0 && styles.bentoDashed,
-              ]}>
-                <MaterialIcons name="error" size={24} color={COLORS.error} />
-                <Text style={[TYPOGRAPHY.labelSm, styles.bentoLabelError]}>FALLIDOS</Text>
-                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombreError]}>
-                  {contadores.fallidos}
-                </Text>
-              </View>
-
-              {/* PENDIENTES — col-span-2 */}
-              <View style={[styles.bentoCard, styles.bentoCardFullWidth]}>
-                <MaterialIcons name="hourglass-empty" size={24} color={COLORS.primary} />
-                <Text style={[TYPOGRAPHY.labelSm, styles.bentoLabel]}>PENDIENTES</Text>
-                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
-                  {contadores.pendientes}
-                </Text>
-              </View>
-            </View>
-
-            {/* Botones */}
-            <View style={styles.botones}>
-              <Pressable
-                onPress={sincronizar}
-                disabled={cargando !== null}
-                style={({ pressed }) => [
-                  styles.btnPrimario,
-                  pressed && styles.btnPressed,
-                  cargando !== null && styles.btnDisabled,
-                ]}
-              >
-                <MaterialIcons name="sync" size={20} color={COLORS.onPrimary} />
-                <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>
-                  {cargando === 'sync' ? 'SINCRONIZANDO…' : 'SINCRONIZAR AHORA'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={probarConexion}
-                disabled={cargando !== null}
-                style={({ pressed }) => [
-                  styles.btnSecundario,
-                  pressed && styles.btnPressed,
-                  cargando !== null && styles.btnDisabled,
-                ]}
-              >
-                <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>
-                  {cargando === 'health' ? 'PROBANDO…' : 'PROBAR CONEXIÓN'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={verCola}
-                disabled={cargando !== null}
-                style={({ pressed }) => [
-                  styles.btnSecundario,
-                  pressed && styles.btnPressed,
-                  cargando !== null && styles.btnDisabled,
-                ]}
-              >
-                <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>
-                  {cargando === 'cola' ? 'LEYENDO…' : 'VER COLA'}
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Log header */}
-            <View style={styles.logHeader}>
-              <Text style={TYPOGRAPHY.labelLg}>EVENTOS</Text>
-              <Text style={[TYPOGRAPHY.labelMd, styles.muted]}>
-                {eventos.length === 0 ? 'sin eventos' : `${eventos.length} eventos`}
-              </Text>
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          <View style={styles.logEmpty}>
-            <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
-              Tocá un botón para empezar.
+        {/* Estado textual */}
+        <View style={styles.estadoTextos}>
+          <Text style={[TYPOGRAPHY.headlineMd, styles.estadoTitulo]}>
+            {estadoTitulo}
+          </Text>
+          <View style={styles.estadoPill}>
+            <Text style={[TYPOGRAPHY.labelLg, styles.estadoPillText]}>
+              OPERACIÓN {sincronizando ? 'EN CURSO' : 'EN ESPERA'}
             </Text>
           </View>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.logItem}>
-            <View style={styles.logItemHeader}>
-              <Text style={[TYPOGRAPHY.labelMd, colorPorTipo(item.tipo)]}>
-                {item.tipo.toUpperCase()}
-              </Text>
-              <Text style={[TYPOGRAPHY.labelMd, styles.muted]}>
-                {item.timestamp}
-                {item.status ? ` · ${item.status}` : ''}
-              </Text>
-            </View>
-            <Text style={TYPOGRAPHY.bodySm}>{item.mensaje}</Text>
-            {item.detalles && (
-              <View style={styles.chipsRow}>
-                {Object.entries(item.detalles).map(([k, v]) => (
-                  <View key={k} style={styles.chip}>
-                    <Text style={[TYPOGRAPHY.labelSm, styles.chipText]}>{k}: {v}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-      />
+        </View>
 
-      {/* Footer consistente */}
-      <FooterApp />
+        {/* Sección de progreso */}
+        <View style={styles.progresoCard}>
+          <View style={styles.progresoRow}>
+            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>Progreso total</Text>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNum]}>{porcentajeProgreso}%</Text>
+          </View>
+          <View style={styles.barraContainer}>
+            <View style={[styles.barraFill, { width: `${porcentajeProgreso}%` as `${number}%` }]} />
+          </View>
+        </View>
+
+        {/* Stats grid 3-col */}
+        <View style={styles.statsGrid}>
+          {/* Exitosos */}
+          <View style={styles.statCard}>
+            <MaterialIcons name="check-circle" size={22} color={COLORS.secondary} />
+            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>EXITOSOS</Text>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.exitosos}</Text>
+          </View>
+          {/* Fallidos */}
+          <View style={styles.statCard}>
+            <MaterialIcons name="error" size={22} color={COLORS.error} />
+            <Text style={[TYPOGRAPHY.labelLg, styles.statLabelError]}>FALLIDOS</Text>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.statValorError]}>{contadores.fallidos}</Text>
+          </View>
+          {/* Pendientes */}
+          <View style={styles.statCard}>
+            <MaterialIcons name="pending" size={22} color={COLORS.onSurfaceVariant} />
+            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>PENDIENTE</Text>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.pendientes}</Text>
+          </View>
+        </View>
+
+        {/* Tarjeta estado conexión */}
+        <View style={styles.conexionCard}>
+          <View style={styles.conexionIconBox}>
+            <MaterialIcons name="wifi" size={22} color={COLORS.primary} />
+          </View>
+          <View style={styles.conexionTexts}>
+            <Text style={[TYPOGRAPHY.labelLg, styles.conexionLabel]}>Estado del Proceso</Text>
+            <Text style={[TYPOGRAPHY.bodyMd, styles.conexionValor]}>{estadoConexionTexto}</Text>
+          </View>
+        </View>
+
+        {/* Tarjeta archivos fallidos */}
+        <View style={[styles.fallidosCard, contadores.fallidos > 0 && styles.fallidosCardActiva]}>
+          <View style={styles.fallidosLeft}>
+            <View style={styles.fallidosIconBox}>
+              <MaterialIcons name="warning" size={20} color={COLORS.error} />
+            </View>
+            <Text style={[TYPOGRAPHY.labelLg, styles.fallidosLabel]}>Archivos Fallidos</Text>
+          </View>
+          <Text style={[TYPOGRAPHY.headlineSm, styles.fallidosNum]}>{contadores.fallidos}</Text>
+        </View>
+
+        {/* Botones */}
+        <View style={styles.botones}>
+          {/* Sincronizar ahora — full width */}
+          <Pressable
+            onPress={sincronizar}
+            disabled={cargando !== null}
+            style={({ pressed }) => [
+              styles.btnPrimario,
+              pressed && styles.btnPressed,
+              cargando !== null && styles.btnDisabled,
+            ]}
+          >
+            <MaterialIcons name="sync" size={22} color={COLORS.onPrimary} />
+            <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>
+              {sincronizando ? 'SINCRONIZANDO…' : 'SINCRONIZAR AHORA'}
+            </Text>
+          </Pressable>
+
+          {/* Grid 2-col */}
+          <View style={styles.btnGrid}>
+            <Pressable
+              onPress={probarConexion}
+              disabled={cargando !== null}
+              style={({ pressed }) => [
+                styles.btnSecundario,
+                pressed && styles.btnPressed,
+                cargando !== null && styles.btnDisabled,
+              ]}
+            >
+              <MaterialIcons name="signal-cellular-alt" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>
+                {cargando === 'health' ? 'PROBANDO…' : 'PROBAR CONEXIÓN'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={verCola}
+              disabled={cargando !== null}
+              style={({ pressed }) => [
+                styles.btnSecundario,
+                pressed && styles.btnPressed,
+                cargando !== null && styles.btnDisabled,
+              ]}
+            >
+              <MaterialIcons name="list-alt" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>
+                {cargando === 'cola' ? 'LEYENDO…' : 'VER COLA'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <FooterApp />
+      </ScrollView>
     </View>
   );
 }
@@ -423,22 +391,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     padding: SPACING.margin,
   },
-  header: {
-    paddingTop: SPACING.xl,
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.background,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    color: COLORS.primary,
-  },
   muted: {
     color: COLORS.textSecondary,
   },
@@ -447,114 +399,307 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
   },
+
+  // ── TopAppBar ─────────────────────────────────────────────────────────────
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceVariant,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  topBarTitle: {
+    color: COLORS.primary,
+  },
+
+  // ── Scroll ────────────────────────────────────────────────────────────────
   scrollContent: {
     paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xl * 2,
+    gap: SPACING.md,
+    alignItems: 'center',
+  },
+
+  // ── Ícono central ─────────────────────────────────────────────────────────
+  iconoWrapper: {
+    position: 'relative',
+    width: 128,
+    height: 128,
+    marginBottom: SPACING.sm,
   },
   iconoCirculo: {
-    width: 96,
-    height: 96,
+    width: 128,
+    height: 128,
     borderRadius: RADIUS.full,
-    ...BORDERS.thick,
-    alignSelf: 'center',
+    backgroundColor: COLORS.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.lg,
-    backgroundColor: COLORS.primaryContainer,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
+  iconoBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: COLORS.background,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+
+  // ── Estado textual ────────────────────────────────────────────────────────
   estadoTextos: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
-    gap: SPACING.xs,
+    gap: SPACING.sm,
+    width: '100%',
   },
   estadoTitulo: {
     color: COLORS.primary,
     textAlign: 'center',
+    lineHeight: 32,
   },
-  estadoSubtitulo: {
-    color: COLORS.textSecondary,
-    textAlign: 'center',
+  estadoPill: {
+    backgroundColor: 'rgba(0,204,249,0.15)', // secondaryContainer/20
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
   },
-  progresoSection: {
+  estadoPillText: {
+    color: COLORS.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+
+  // ── Progreso ──────────────────────────────────────────────────────────────
+  progresoCard: {
+    width: '100%',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
     gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   progresoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
-  bentoGrid: {
+  progresoLabel: {
+    color: COLORS.onSurfaceVariant,
+    textTransform: 'uppercase',
+  },
+  progresoNum: {
+    color: COLORS.primary,
+  },
+  barraContainer: {
+    height: 12,
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  barraFill: {
+    height: '100%',
+    backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.full,
+  },
+
+  // ── Stats 3-col ───────────────────────────────────────────────────────────
+  statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.gutter,
-    marginBottom: SPACING.lg,
+    gap: SPACING.sm,
+    width: '100%',
   },
-  bentoCard: {
+  statCard: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
-  bentoCardFullWidth: {
-    flexBasis: '100%',
-    flex: 0,
-    width: '100%',
-  },
-  bentoDashed: {
-    borderStyle: 'dashed',
-  },
-  bentoLabel: {
-    color: COLORS.textSecondary,
+  statLabel: {
+    color: COLORS.onSurfaceVariant,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
-  bentoLabelError: {
+  statLabelError: {
     color: COLORS.error,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
-  cardNombre: {
+  statValor: {
     color: COLORS.primary,
     textAlign: 'center',
   },
-  cardNombreError: {
+  statValorError: {
     color: COLORS.error,
     textAlign: 'center',
   },
+
+  // ── Conexión ──────────────────────────────────────────────────────────────
+  conexionCard: {
+    width: '100%',
+    backgroundColor: COLORS.surfaceLight, // surface-container-low
+    borderRadius: RADIUS.xl,
+    padding: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+  },
+  conexionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+  },
+  conexionTexts: {
+    flex: 1,
+  },
+  conexionLabel: {
+    color: COLORS.onSurfaceVariant,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  conexionValor: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+
+  // ── Fallidos ──────────────────────────────────────────────────────────────
+  fallidosCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255,218,214,0.1)', // error-container/10
+    borderRadius: RADIUS.xl,
+    padding: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(186,26,26,0.3)', // error/30
+  },
+  fallidosCardActiva: {
+    backgroundColor: 'rgba(255,218,214,0.3)',
+  },
+  fallidosLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  fallidosIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.errorContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallidosLabel: {
+    color: COLORS.error,
+    textTransform: 'uppercase',
+  },
+  fallidosNum: {
+    color: COLORS.error,
+  },
+
+  // ── Botones ───────────────────────────────────────────────────────────────
   botones: {
-    gap: SPACING.gutter,
-    marginBottom: SPACING.lg,
+    width: '100%',
+    gap: SPACING.sm,
   },
   btnPrimario: {
+    width: '100%',
+    height: 56,
     backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    borderRadius: RADIUS.default,
-    ...BORDERS.thin,
+    borderRadius: RADIUS.xl,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    minHeight: 48,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
   },
   btnPrimarioText: {
     color: COLORS.onPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  btnGrid: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
   },
   btnSecundario: {
-    backgroundColor: COLORS.background,
-    paddingVertical: SPACING.md,
+    flex: 1,
+    height: 48,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: RADIUS.default,
-    ...BORDERS.thin,
-    minHeight: 48,
     justifyContent: 'center',
+    gap: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
   },
   btnSecundarioText: {
     color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   btnPressed: {
     opacity: 0.7,
@@ -562,50 +707,9 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.5,
   },
-  logHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: SPACING.sm,
-  },
-  logEmpty: {
-    paddingVertical: SPACING.lg,
-    alignItems: 'center',
-  },
-  logItem: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.gutter,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-  },
-  logItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.xs,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-    marginTop: SPACING.xs,
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    backgroundColor: COLORS.surfaceLight,
-  },
-  chipText: {
-    color: COLORS.textSecondary,
-  },
 });
 
-// Helper de color por tipo de evento. Vive fuera de StyleSheet.create
-// porque devuelve un estilo dinamico (no admite functions el create).
+// Helper de color por tipo de evento — se mantiene por si se reactiva el log.
 function colorPorTipo(tipo: EventoLog['tipo']): { color: string } {
   return {
     color:
@@ -618,3 +722,5 @@ function colorPorTipo(tipo: EventoLog['tipo']): { color: string } {
         : COLORS.textSecondary,
   };
 }
+// Suprimir warnings de variables no usadas (lógica preservada para futura reactivación)
+void colorPorTipo;

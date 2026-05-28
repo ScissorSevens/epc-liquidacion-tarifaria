@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { CommonActions } from '@react-navigation/native';
 
 import { FooterApp } from '../componentes/FooterApp';
@@ -34,11 +34,11 @@ export default function MiPerfil({ navigation }: Props) {
       <View style={estilos.topBar}>
         <View style={estilos.topBarIzq}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-            <Ionicons name="close-outline" size={24} color={COLORS.primary} />
+            <MaterialIcons name="close" size={24} color={COLORS.primary} />
           </Pressable>
           <Text style={estilos.topBarTitulo}>MI PERFIL</Text>
         </View>
-        <Ionicons name="person-circle-outline" size={24} color={COLORS.primary} />
+        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
       <ScrollView contentContainerStyle={estilos.scroll}>
@@ -55,12 +55,12 @@ export default function MiPerfil({ navigation }: Props) {
         <Text style={estilos.seccionTitulo}>ACTIVIDAD RECIENTE</Text>
         <View style={estilos.gridFila}>
           <View style={[estilos.gridCard, estilos.gridCardMitad]}>
-            <Ionicons name="create-outline" size={24} color={COLORS.secondary} />
+            <MaterialIcons name="edit-note" size={24} color={COLORS.secondary} />
             <Text style={estilos.gridEtiqueta}>LECTURAS</Text>
             <Text style={estilos.gridValor}>{PERFIL.lecturas}</Text>
           </View>
           <View style={[estilos.gridCard, estilos.gridCardMitad]}>
-            <Ionicons name="sync-outline" size={24} color={COLORS.secondary} />
+            <MaterialIcons name="sync" size={24} color={COLORS.secondary} />
             <Text style={estilos.gridEtiqueta}>SINCRO</Text>
             <Text style={estilos.gridValor}>{PERFIL.ultimaSincro}</Text>
           </View>
@@ -79,7 +79,7 @@ export default function MiPerfil({ navigation }: Props) {
         <View style={estilos.listaCard}>
           <View style={estilos.filaConfig}>
             <View style={estilos.filaConfigIzq}>
-              <Ionicons name="notifications-outline" size={20} color={COLORS.primary} />
+              <MaterialIcons name="notifications" size={20} color={COLORS.primary} />
               <Text style={estilos.filaConfigTexto}>Notificaciones</Text>
             </View>
             {/* Toggle visual estático — funcionalidad futura */}
@@ -105,7 +105,7 @@ export default function MiPerfil({ navigation }: Props) {
             );
           }}
         >
-          <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+          <MaterialIcons name="logout" size={20} color={COLORS.error} />
           <Text style={estilos.botonCerrarTexto}>CAMBIAR DE OPERARIO</Text>
         </Pressable>
 
@@ -206,7 +206,7 @@ const estilos = StyleSheet.create({
     marginHorizontal: SPACING.margin,
   },
   gridCard: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.surfaceContainerLow,
     borderRadius: RADIUS.xl,
     ...BORDERS.thin,
     padding: SPACING.md,

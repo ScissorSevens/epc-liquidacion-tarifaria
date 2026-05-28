@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { FooterApp } from '../componentes/FooterApp';
 import { BORDERS, COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
@@ -61,9 +61,9 @@ export default function Login({ navigation }: Props) {
           {/* Campo Cédula */}
           <View style={estilos.campoContenedor}>
             <Text style={estilos.etiqueta}>CÉDULA</Text>
-            <View style={[estilos.inputFila, { borderColor: errores.cedula ? COLORS.error : COLORS.outline }]}>
-              <Ionicons
-                name="card-outline"
+            <View style={[estilos.inputFila, { borderColor: errores.cedula ? COLORS.error : COLORS.outlineVariant }]}>
+              <MaterialIcons
+                name="badge"
                 size={20}
                 color={COLORS.outline}
                 style={estilos.icono}
@@ -84,9 +84,9 @@ export default function Login({ navigation }: Props) {
           {/* Campo Contraseña */}
           <View style={estilos.campoContenedor}>
             <Text style={estilos.etiqueta}>CONTRASEÑA</Text>
-            <View style={[estilos.inputFila, { borderColor: errores.contrasena ? COLORS.error : COLORS.outline }]}>
-              <Ionicons
-                name="lock-closed-outline"
+            <View style={[estilos.inputFila, { borderColor: errores.contrasena ? COLORS.error : COLORS.outlineVariant }]}>
+              <MaterialIcons
+                name="lock"
                 size={20}
                 color={COLORS.outline}
                 style={estilos.icono}
@@ -106,8 +106,8 @@ export default function Login({ navigation }: Props) {
                 style={estilos.botonVerContrasena}
                 hitSlop={8}
               >
-                <Ionicons
-                  name={verContrasena ? 'eye-off-outline' : 'eye-outline'}
+                <MaterialIcons
+                  name={verContrasena ? 'visibility-off' : 'visibility'}
                   size={20}
                   color={COLORS.outline}
                 />
@@ -121,7 +121,7 @@ export default function Login({ navigation }: Props) {
             onPress={handleIngresar}
           >
             <Text style={estilos.textoBoton}>Ingresar</Text>
-            <Ionicons name="log-in-outline" size={20} color={COLORS.onPrimary} />
+            <MaterialIcons name="login" size={20} color={COLORS.onPrimary} />
           </Pressable>
         </View>
 
@@ -137,7 +137,7 @@ export default function Login({ navigation }: Props) {
 const estilos = StyleSheet.create({
   raiz: {
     flex: 1,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.surfaceContainerLow,
   },
   scroll: {
     flexGrow: 1,

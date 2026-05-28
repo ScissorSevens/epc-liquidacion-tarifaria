@@ -7,10 +7,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { crearSuscriptor } from '@dominio/suscriptores';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
@@ -19,7 +21,6 @@ import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar
 import { FooterApp } from '../componentes/FooterApp';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
@@ -73,8 +74,7 @@ const ESTADO_INICIAL: FormState = {
 
 const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-const HEADER_HEIGHT = 56;
-const BOTTOM_HEIGHT = 88;
+const BOTTOM_HEIGHT = 80;
 
 function validarCampo(nombre: CampoForm, valor: string | boolean): string | undefined {
   if (nombre === 'aplica_subsidio') return undefined;
@@ -266,17 +266,24 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          disabled={enviando}
-          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>NUEVO SUSCRIPTOR</Text>
-        <View style={styles.headerBtn} />
+      {/* TopAppBar — blanco + borde inferior */}
+      <View style={styles.topBar}>
+        <View style={styles.topBarLeft}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            disabled={enviando}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+          </Pressable>
+          <Text style={[TYPOGRAPHY.labelLg, styles.topBarTitle]}>NUEVO SUSCRIPTOR</Text>
+        </View>
+        <View style={styles.topBarRight}>
+          <Text style={[TYPOGRAPHY.headlineSm, styles.topBarBrand]}>AquaRuta</Text>
+          <Pressable style={styles.iconBtn}>
+            <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
+          </Pressable>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -286,166 +293,195 @@ export default function AltaSuscriptor({ navigation }: Props) {
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Sección 1 — Datos del Suscriptor */}
-          <Text style={styles.seccionTitulo}>DATOS DEL SUSCRIPTOR</Text>
-
-          <Text style={styles.autoGenInfo}>
-            Código y número de medidor se asignan automáticamente.
-          </Text>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>NOMBRE Y APELLIDOS *</Text>
-            <TextInput
-              style={[styles.input, errores.nombre_apellidos !== undefined && styles.inputError]}
-              value={form.nombre_apellidos}
-              onChangeText={(v) => setCampo('nombre_apellidos', v)}
-              onBlur={() => onBlur('nombre_apellidos')}
-              maxLength={150}
-              editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
-            />
-            {errores.nombre_apellidos !== undefined && (
-              <Text style={styles.errorText}>{errores.nombre_apellidos}</Text>
-            )}
+          {/* Intro */}
+          <View style={styles.intro}>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.introTitulo]}>Registro de Usuario</Text>
+            <Text style={[TYPOGRAPHY.bodySm, styles.introSub]}>
+              Complete los datos requeridos para vincular un nuevo predio al sistema.
+            </Text>
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>DIRECCIÓN *</Text>
-            <TextInput
-              style={[styles.input, errores.direccion !== undefined && styles.inputError]}
-              value={form.direccion}
-              onChangeText={(v) => setCampo('direccion', v)}
-              onBlur={() => onBlur('direccion')}
-              maxLength={200}
-              editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
-            />
-            {errores.direccion !== undefined && (
-              <Text style={styles.errorText}>{errores.direccion}</Text>
-            )}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>ESTRATO *</Text>
-            <View style={styles.chipsRow}>
-              {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
-                <Pressable
-                  key={e}
-                  onPress={() => {
-                    setCampo('estrato', e);
-                    const msg = validarCampo('estrato', e);
-                    setErrores((prev) => {
-                      const next = { ...prev };
-                      if (msg === undefined) delete next.estrato;
-                      else next.estrato = msg;
-                      return next;
-                    });
-                  }}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    form.estrato === e && styles.chipSel,
-                    pressed && styles.pressedLight,
-                  ]}
-                >
-                  <Text style={[styles.chipText, form.estrato === e && styles.chipTextSel]}>
-                    {e}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {errores.estrato !== undefined && (
-              <Text style={styles.errorText}>{errores.estrato}</Text>
-            )}
-          </View>
-
-          {/* Toggle aplica_subsidio */}
-          <Pressable
-            onPress={() => setCampo('aplica_subsidio', !form.aplica_subsidio)}
-            style={styles.toggleRow}
-          >
-            <View style={styles.toggleTexts}>
-              <Text style={styles.toggleLabel}>APLICA SUBSIDIO</Text>
-              <Text style={styles.toggleHint}>
-                El suscriptor se acoge al subsidio por estrato
+          {/* ── Sección 1: Información Personal ── */}
+          <View style={styles.seccion}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="person" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>
+                Información Personal
               </Text>
             </View>
-            <View style={[styles.togglePill, form.aplica_subsidio && styles.togglePillOn]}>
-              <View style={[styles.toggleThumb, form.aplica_subsidio && styles.toggleThumbOn]} />
+
+            {/* Nombre */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>NOMBRE Y APELLIDOS</Text>
+              <TextInput
+                style={[styles.input, errores.nombre_apellidos !== undefined && styles.inputError]}
+                value={form.nombre_apellidos}
+                onChangeText={(v) => setCampo('nombre_apellidos', v)}
+                onBlur={() => onBlur('nombre_apellidos')}
+                placeholder="Ej: Juan Pérez"
+                maxLength={150}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.nombre_apellidos !== undefined && (
+                <Text style={styles.errorText}>{errores.nombre_apellidos}</Text>
+              )}
             </View>
-          </Pressable>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>MATRÍCULA INMOBILIARIA</Text>
-            <TextInput
-              style={[styles.input, errores.matricula_inmobiliaria !== undefined && styles.inputError]}
-              value={form.matricula_inmobiliaria}
-              onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
-              onBlur={() => onBlur('matricula_inmobiliaria')}
-              maxLength={50}
-              editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
-            />
-            {errores.matricula_inmobiliaria !== undefined && (
-              <Text style={styles.errorText}>{errores.matricula_inmobiliaria}</Text>
-            )}
+            {/* Dirección */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>DIRECCIÓN</Text>
+              <TextInput
+                style={[styles.input, errores.direccion !== undefined && styles.inputError]}
+                value={form.direccion}
+                onChangeText={(v) => setCampo('direccion', v)}
+                onBlur={() => onBlur('direccion')}
+                placeholder="Calle, Carrera, Vereda o Sector"
+                maxLength={200}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.direccion !== undefined && (
+                <Text style={styles.errorText}>{errores.direccion}</Text>
+              )}
+            </View>
+
+            {/* Estrato */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>ESTRATO</Text>
+              <View style={styles.chipsRow}>
+                {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => {
+                      setCampo('estrato', e);
+                      setErrores((prev) => {
+                        const next = { ...prev };
+                        delete next.estrato;
+                        return next;
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      form.estrato === e && styles.chipSel,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.chipText, form.estrato === e && styles.chipTextSel]}>
+                      {e}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {errores.estrato !== undefined && (
+                <Text style={styles.errorText}>{errores.estrato}</Text>
+              )}
+            </View>
+
+            {/* Toggle subsidio */}
+            <View style={styles.toggleRow}>
+              <Text style={[TYPOGRAPHY.bodyMd, styles.toggleLabel]}>¿Aplica subsidio?</Text>
+              <Switch
+                value={form.aplica_subsidio}
+                onValueChange={(v) => setCampo('aplica_subsidio', v)}
+                trackColor={{ false: COLORS.surfaceVariant, true: COLORS.secondaryContainer }}
+                thumbColor={COLORS.surfaceContainerLowest}
+                disabled={enviando}
+              />
+            </View>
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>NÚMERO CATASTRAL</Text>
-            <TextInput
-              style={[styles.input, errores.numero_catastral !== undefined && styles.inputError]}
-              value={form.numero_catastral}
-              onChangeText={(v) => setCampo('numero_catastral', v)}
-              onBlur={() => onBlur('numero_catastral')}
-              maxLength={50}
-              editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
-            />
-            {errores.numero_catastral !== undefined && (
-              <Text style={styles.errorText}>{errores.numero_catastral}</Text>
-            )}
+          {/* ── Sección 2: Datos Legales ── */}
+          <View style={[styles.seccion, styles.seccionLow]}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="gavel" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Datos Legales</Text>
+            </View>
+
+            {/* Matrícula */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>MATRÍCULA INMOBILIARIA</Text>
+              <TextInput
+                style={[styles.input, errores.matricula_inmobiliaria !== undefined && styles.inputError]}
+                value={form.matricula_inmobiliaria}
+                onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
+                onBlur={() => onBlur('matricula_inmobiliaria')}
+                maxLength={50}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.matricula_inmobiliaria !== undefined && (
+                <Text style={styles.errorText}>{errores.matricula_inmobiliaria}</Text>
+              )}
+            </View>
+
+            {/* Catastral */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>NÚMERO CATASTRAL</Text>
+              <TextInput
+                style={[styles.input, errores.numero_catastral !== undefined && styles.inputError]}
+                value={form.numero_catastral}
+                onChangeText={(v) => setCampo('numero_catastral', v)}
+                onBlur={() => onBlur('numero_catastral')}
+                maxLength={50}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.numero_catastral !== undefined && (
+                <Text style={styles.errorText}>{errores.numero_catastral}</Text>
+              )}
+            </View>
           </View>
 
-          <View style={styles.separador} />
+          {/* ── Sección 3: Información del Medidor ── */}
+          <View style={styles.seccion}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="speed" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>
+                Información del Medidor
+              </Text>
+            </View>
 
-          {/* Sección 2 — Datos del Medidor */}
-          <Text style={styles.seccionTitulo}>DATOS DEL MEDIDOR</Text>
+            {/* Fecha instalación */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>FECHA DE INSTALACIÓN</Text>
+              <FechaPicker
+                value={form.fecha_instalacion}
+                onChange={(v) => setCampo('fecha_instalacion', v)}
+                disabled={enviando}
+                error={errores.fecha_instalacion !== undefined}
+                maxDate={new Date().toISOString().slice(0, 10)}
+              />
+              {errores.fecha_instalacion !== undefined && (
+                <Text style={styles.errorText}>{errores.fecha_instalacion}</Text>
+              )}
+            </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>FECHA DE INSTALACIÓN *</Text>
-            <FechaPicker
-              value={form.fecha_instalacion}
-              onChange={(v) => setCampo('fecha_instalacion', v)}
-              disabled={enviando}
-              error={errores.fecha_instalacion !== undefined}
-              maxDate={new Date().toISOString().slice(0, 10)}
-            />
-            {errores.fecha_instalacion !== undefined && (
-              <Text style={styles.errorText}>{errores.fecha_instalacion}</Text>
-            )}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>OBSERVACIONES DEL MEDIDOR</Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.inputMultiline,
-                errores.observaciones_medidor !== undefined && styles.inputError,
-              ]}
-              value={form.observaciones_medidor}
-              onChangeText={(v) => setCampo('observaciones_medidor', v)}
-              onBlur={() => onBlur('observaciones_medidor')}
-              multiline
-              numberOfLines={3}
-              maxLength={500}
-              editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
-            />
-            {errores.observaciones_medidor !== undefined && (
-              <Text style={styles.errorText}>{errores.observaciones_medidor}</Text>
-            )}
+            {/* Observaciones */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>OBSERVACIONES DEL MEDIDOR</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.inputMultiline,
+                  errores.observaciones_medidor !== undefined && styles.inputError,
+                ]}
+                value={form.observaciones_medidor}
+                onChangeText={(v) => setCampo('observaciones_medidor', v)}
+                onBlur={() => onBlur('observaciones_medidor')}
+                placeholder="Detalles técnicos, estado inicial o ubicación específica..."
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.observaciones_medidor !== undefined && (
+                <Text style={styles.errorText}>{errores.observaciones_medidor}</Text>
+              )}
+            </View>
           </View>
 
           <FooterApp />
@@ -461,13 +497,11 @@ export default function AltaSuscriptor({ navigation }: Props) {
             snack.tipo === 'error'
               ? styles.snackError
               : snack.tipo === 'warning'
-                ? styles.snackWarning
-                : styles.snackOk,
+              ? styles.snackWarning
+              : styles.snackOk,
           ]}
         >
-          <Text
-            style={[styles.snackText, snack.tipo === 'error' && styles.snackTextError]}
-          >
+          <Text style={[styles.snackText, snack.tipo === 'error' && styles.snackTextError]}>
             {snack.mensaje}
           </Text>
           <Text style={styles.snackClose}>×</Text>
@@ -479,23 +513,23 @@ export default function AltaSuscriptor({ navigation }: Props) {
         <Pressable
           onPress={() => navigation.goBack()}
           disabled={enviando}
-          style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
+          style={({ pressed }) => [styles.btnCancelar, pressed && styles.pressed]}
         >
-          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+          <Text style={styles.btnCancelarText}>CANCELAR</Text>
         </Pressable>
         <Pressable
           onPress={() => void onSubmit()}
           disabled={enviando}
           style={({ pressed }) => [
-            styles.btnPrimary,
+            styles.btnGuardar,
             enviando && styles.btnDisabled,
-            pressed && styles.pressedDark,
+            pressed && styles.pressed,
           ]}
         >
           {enviando ? (
             <ActivityIndicator color={COLORS.onPrimary} size="small" />
           ) : (
-            <Text style={styles.btnPrimaryText}>GUARDAR</Text>
+            <Text style={styles.btnGuardarText}>GUARDAR</Text>
           )}
         </Pressable>
       </View>
@@ -504,190 +538,195 @@ export default function AltaSuscriptor({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
-  flex: { flex: 1 },
-
-  // Header
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...BORDERS.thick,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+  root: {
+    flex: 1,
     backgroundColor: COLORS.background,
   },
-  headerBtn: {
-    width: HEADER_HEIGHT,
-    height: HEADER_HEIGHT,
+  flex: { flex: 1 },
+
+  // ── TopAppBar ──────────────────────────────────────────────────────────────
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  topBarTitle: {
+    color: COLORS.primary,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  topBarBrand: {
+    color: COLORS.primary,
+    fontWeight: '900',
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineLg,
-    color: COLORS.primary,
-    lineHeight: HEADER_HEIGHT,
-  },
-  headerTitle: {
-    flex: 1,
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    textAlign: 'center',
-    letterSpacing: 2,
+    borderRadius: RADIUS.full,
   },
 
-  // Scroll
+  // ── Scroll ─────────────────────────────────────────────────────────────────
   scroll: {
-    padding: SPACING.md,
-    paddingBottom: BOTTOM_HEIGHT + SPACING.lg,
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.lg,
+    paddingBottom: BOTTOM_HEIGHT + SPACING.xl,
+    gap: SPACING.md,
   },
 
-  // Sección título
+  // ── Intro ──────────────────────────────────────────────────────────────────
+  intro: {
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  introTitulo: {
+    color: COLORS.primary,
+  },
+  introSub: {
+    color: COLORS.onSurfaceVariant,
+    lineHeight: 20,
+  },
+
+  // ── Secciones ──────────────────────────────────────────────────────────────
+  seccion: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    gap: SPACING.md,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+  },
+  seccionLow: {
+    backgroundColor: COLORS.surfaceLight, // surface-container-low
+  },
+  seccionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
   seccionTitulo: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.textSecondary,
-    letterSpacing: 2,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.lg,
+    color: COLORS.primary,
   },
 
-  // Separador
-  separador: {
-    height: 1,
-    backgroundColor: COLORS.outline,
-    marginVertical: SPACING.lg,
-  },
-
-  // Campos
-  fieldGroup: { marginBottom: SPACING.md },
-  autoGenInfo: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
+  // ── Campos ─────────────────────────────────────────────────────────────────
+  fieldGroup: {
+    gap: 6,
   },
   fieldLabel: {
     ...TYPOGRAPHY.labelMd,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-    letterSpacing: 1,
+    color: COLORS.onSurfaceVariant,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   input: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
-    padding: SPACING.sm,
+    height: 48,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.primary,
-    backgroundColor: COLORS.background,
   },
   inputMultiline: {
-    minHeight: 72,
+    height: undefined,
+    minHeight: 96,
+    paddingTop: SPACING.md,
     textAlignVertical: 'top',
   },
   inputError: {
     borderColor: COLORS.error,
+    borderWidth: 2,
   },
   errorText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.error,
-    marginTop: SPACING.xs,
   },
 
-  // Chips estrato
+  // ── Chips estrato ──────────────────────────────────────────────────────────
   chipsRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
   },
   chip: {
     flex: 1,
-    paddingVertical: SPACING.sm,
+    height: 40,
     alignItems: 'center',
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
-    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.surfaceContainerLowest,
   },
   chipSel: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondaryContainer,
+    borderColor: COLORS.secondaryContainer,
   },
   chipText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
   },
   chipTextSel: {
-    color: COLORS.onPrimary,
+    color: COLORS.primary,
+    fontWeight: '700',
   },
 
-  // Toggle
+  // ── Toggle subsidio ────────────────────────────────────────────────────────
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
+    paddingVertical: SPACING.xs,
   },
-  toggleTexts: { flex: 1 },
   toggleLabel: {
-    ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
   },
-  toggleHint: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  togglePill: {
-    width: 44,
-    height: 24,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surfaceMuted2,
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  togglePillOn: {
-    backgroundColor: COLORS.primaryContainer,
-  },
-  toggleThumb: {
-    width: 18,
-    height: 18,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    alignSelf: 'flex-start',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-  },
-  toggleThumbOn: {
-    alignSelf: 'flex-end',
-    backgroundColor: COLORS.onPrimaryContainer,
-  },
 
-  // Brand footer
-  brandFooter: {
-    ...TYPOGRAPHY.labelSm,
-    fontSize: 8,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: SPACING.lg,
-  },
-
-  // Snack inline
+  // ── Snack ──────────────────────────────────────────────────────────────────
   snackBox: {
     position: 'absolute',
     bottom: BOTTOM_HEIGHT + SPACING.md,
-    left: SPACING.md,
-    right: SPACING.md,
+    left: SPACING.margin,
+    right: SPACING.margin,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.sm,
-    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
     gap: SPACING.sm,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   snackOk: { backgroundColor: COLORS.secondary },
   snackWarning: { backgroundColor: COLORS.warning },
@@ -703,48 +742,62 @@ const styles = StyleSheet.create({
     color: COLORS.onPrimary,
   },
 
-  // Bottom bar
+  // ── Bottom bar ─────────────────────────────────────────────────────────────
   bottomBar: {
     height: BOTTOM_HEIGHT,
     flexDirection: 'row',
-    ...BORDERS.thick,
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    paddingHorizontal: SPACING.margin,
     gap: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    alignItems: 'center',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
-  btnSecondary: {
+  btnCancelar: {
     flex: 1,
-    paddingVertical: SPACING.sm,
+    height: 48,
     alignItems: 'center',
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    backgroundColor: 'transparent',
   },
-  btnSecondaryText: {
+  btnCancelarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  btnPrimary: {
-    flex: 2,
-    paddingVertical: SPACING.sm,
+  btnGuardar: {
+    flex: 1,
+    height: 48,
     alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.none,
+    justifyContent: 'center',
+    backgroundColor: COLORS.primaryContainer,
+    borderRadius: RADIUS.lg,
+    elevation: 4,
+    shadowColor: COLORS.primaryContainer,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  btnPrimaryText: {
+  btnGuardarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   btnDisabled: {
-    backgroundColor: COLORS.textSecondary,
+    backgroundColor: COLORS.onSurfaceVariant,
+    opacity: 0.5,
+    elevation: 0,
   },
 
-  // Press states
-  pressedLight: { opacity: 0.6 },
-  pressedDark: { opacity: 0.75 },
+  pressed: { opacity: 0.7 },
 });

@@ -310,16 +310,18 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* ── Header brutalist ── */}
+      {/* ── TopAppBar — blanco + borde inferior ── */}
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={COLORS.onPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>DETALLE SUSCRIPTOR</Text>
-        <View style={styles.headerBtn} />
+        <View style={styles.headerLeft}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>DETALLE SUSCRIPTOR</Text>
+        </View>
+        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
       {/* ── Snack inline de error ── */}
@@ -405,8 +407,8 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                 value={suscriptor.aplica_subsidio}
                 onValueChange={(v) => { void onToggleSubsidio(v); }}
                 disabled={guardandoSubsidio}
-                trackColor={{ false: COLORS.outline, true: COLORS.primary }}
-                thumbColor={COLORS.onPrimary}
+                trackColor={{ false: COLORS.surfaceVariant, true: COLORS.secondaryContainer }}
+                thumbColor={COLORS.surfaceContainerLowest}
               />
             </View>
           </View>
@@ -486,14 +488,6 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           >
             <Text style={styles.btnVolverText}>VOLVER</Text>
           </Pressable>
-          <View style={styles.footerLinks}>
-            <Pressable onPress={() => { /* Soporte: pendiente */ }}>
-              <Text style={styles.footerLink}>SOPORTE</Text>
-            </Pressable>
-            <Pressable onPress={() => { /* Cerrar sesión: requiere auth */ }}>
-              <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
-            </Pressable>
-          </View>
         </View>
       )}
     </View>
@@ -512,19 +506,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
   },
   headerBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: RADIUS.full,
   },
   headerIcon: {
     ...TYPOGRAPHY.headlineLg,
@@ -534,7 +539,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 2,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 
   /* ── Scroll ── */
@@ -560,16 +566,22 @@ const styles = StyleSheet.create({
 
   /* ── Cards ── */
   card: {
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   cardHeaderBadges: {
     flexDirection: 'row',
@@ -577,10 +589,10 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   cardTitle: {
-    ...TYPOGRAPHY.labelMd,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    letterSpacing: 1.5,
-    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   /* ── Badge estado ── */
@@ -598,17 +610,16 @@ const styles = StyleSheet.create({
 
   /* ── Chip estrato ── */
   chipEstrato: {
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.sm,
   },
   chipEstratoText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.primary,
-    letterSpacing: 1,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   /* ── Toggle subsidio ── */
@@ -646,8 +657,8 @@ const styles = StyleSheet.create({
   /* ── Dividers ── */
   divider: {
     height: 1,
-    backgroundColor: COLORS.outline,
-    opacity: 0.12,
+    backgroundColor: COLORS.outlineVariant,
+    opacity: 0.6,
   },
   medidorSeparator: {
     height: 1,
@@ -703,37 +714,29 @@ const styles = StyleSheet.create({
 
   /* ── Bottom bar ── */
   bottomBar: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.surfaceContainer,
-    ...BORDERS.thin,
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    gap: SPACING.xs,
+    paddingHorizontal: SPACING.margin,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   btnVolver: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
+    borderWidth: 2,
+    borderColor: COLORS.primaryContainer,
+    borderRadius: RADIUS.full,
+    paddingVertical: SPACING.md,
     alignItems: 'center',
   },
   btnVolverText: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primaryContainer,
     letterSpacing: 2,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.lg,
-    paddingTop: SPACING.xs,
-  },
-  footerLink: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
 
   /* ── Pressed states ── */

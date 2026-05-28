@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -108,12 +108,6 @@ export default function RutaDeHoy({ navigation }: Props) {
   // Re-carga silenciosa al enfocar tab
   useFocusEffect(useCallback(() => { void cargar(false); }, [cargar]));
 
-  const fechaHoy = new Date().toLocaleDateString('es-CO', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -137,123 +131,175 @@ export default function RutaDeHoy({ navigation }: Props) {
   }
 
   const progreso = suscriptores.length > 0 ? capturasHoy / suscriptores.length : 0;
+  const porcentaje = Math.round(progreso * 100);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTexts}>
-            <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>RUTA DE HOY</Text>
-            <Text style={[TYPOGRAPHY.bodySm, styles.fechaHeader]}>{fechaHoy}</Text>
+      {/* TopAppBar */}
+      <View style={styles.topBar}>
+        <View style={styles.topBarLeft}>
+          <Pressable
+            style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={COLORS.onPrimary} />
+          </Pressable>
+          <Text style={[TYPOGRAPHY.headlineSm, styles.topBarTitle]}>Ruta de hoy</Text>
+        </View>
+        <View style={styles.topBarRight}>
+          {/* Icono sync con badge de pendientes */}
+          <View style={styles.badgeWrapper}>
+            {recargando ? (
+              <ActivityIndicator size="small" color={COLORS.onPrimary} style={styles.topBarBtn} />
+            ) : (
+              <Pressable
+                style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
+                onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
+              >
+                <MaterialIcons name="cloud-sync" size={24} color={COLORS.onPrimary} />
+              </Pressable>
+            )}
+            {pendientesCola > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{pendientesCola}</Text>
+              </View>
+            )}
           </View>
-          {recargando ? (
-            <ActivityIndicator size="small" color={COLORS.onPrimary} />
-          ) : (
-            <MaterialIcons name="account-circle" size={28} color={COLORS.onPrimary} />
-          )}
+          <Pressable
+            style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
+            onPress={() => navigation.navigate('Lecturas', { screen: 'MiPerfil' })}
+          >
+            <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
+          </Pressable>
         </View>
       </View>
 
-      <FlatList
-        data={suscriptores}
-        keyExtractor={(item) => String(item.id_suscriptor)}
-        contentContainerStyle={
-          suscriptores.length === 0 ? styles.listaVaciaContainer : styles.lista
-        }
-        ListHeaderComponent={
-          <>
-            {/* Banner offline */}
-            {isConnected === false && (
-              <View style={styles.banner}>
-                <MaterialIcons name="cloud-off" size={20} color={COLORS.primary} />
-                <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
-                  Sin conexión — los datos se guardarán acá
-                </Text>
-              </View>
-            )}
-
-            {/* Progreso */}
-            <View style={styles.progresoSection}>
-              <View style={styles.progresoRow}>
-                <Text style={[TYPOGRAPHY.labelLg]}>Progreso de lectura</Text>
-                <Text style={[TYPOGRAPHY.labelLg]}>
-                  {capturasHoy} / {suscriptores.length} capturadas
-                </Text>
-              </View>
-              <View style={styles.barraContainer}>
-                <View
-                  style={[
-                    styles.barraFill,
-                    { width: `${Math.round(progreso * 100)}%` },
-                  ]}
-                />
-              </View>
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>
-              Sin suscriptores cargados
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Banner offline */}
+        {isConnected === false && (
+          <View style={styles.banner}>
+            <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
+            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText]}>
+              Sin conexión — los datos se guardarán localmente
             </Text>
           </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() =>
-              navigation.navigate('Lecturas', {
-                screen: 'DetalleSuscriptor',
-                params: { id_suscriptor: item.id_suscriptor },
-              })
-            }
-          >
-            <View style={styles.cardContent}>
-              <View style={styles.cardInfo}>
-                <Text style={[TYPOGRAPHY.labelSm, styles.cardCodigo]}>
-                  {item.codigo.toUpperCase()}
-                </Text>
-                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
-                  {item.nombre_apellidos}
-                </Text>
-                {capturadosHoy.get(item.id_suscriptor) === true ? (
-                  <View style={styles.statusRow}>
-                    <MaterialIcons name="check-circle" size={14} color={COLORS.primary} />
-                    <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>Capturada hoy</Text>
-                  </View>
-                ) : (
-                  <View style={styles.statusRow}>
-                    <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>Pendiente</Text>
-                  </View>
-                )}
-              </View>
-              <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
-            </View>
-          </Pressable>
         )}
-      />
 
-      {/* Botón sticky — solo visible si hay pendientes en cola */}
-      {pendientesCola > 0 && (
-        <View style={styles.stickyFooter}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.btnSync,
-              pressed && styles.btnSyncPressed,
-            ]}
-            onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
-          >
-            <MaterialIcons name="sync" size={20} color={COLORS.onPrimary} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnSyncText]}>
-              SINCRONIZAR ({pendientesCola} pendientes)
+        {/* Sección de progreso */}
+        <View style={styles.progresoCard}>
+          <View style={styles.progresoRow}>
+            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>PROGRESO DE LECTURA</Text>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNumero]}>
+              {capturasHoy}{' '}
+              <Text style={[TYPOGRAPHY.bodySm, styles.progresoTotal]}>/ {suscriptores.length}</Text>
             </Text>
-          </Pressable>
+          </View>
+          <View style={styles.barraContainer}>
+            <View style={[styles.barraFill, { width: `${porcentaje}%` as `${number}%` }]} />
+          </View>
         </View>
-      )}
 
-      {/* Footer global */}
-      <FooterApp />
+        {/* Lista de suscriptores (un solo grupo sin sector en datos reales) */}
+        {suscriptores.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>Sin suscriptores cargados</Text>
+          </View>
+        ) : (
+          <View style={styles.grupo}>
+            <View style={styles.grupoHeader}>
+              <Text style={[TYPOGRAPHY.labelLg, styles.grupoTitulo]}>
+                Suscriptores asignados
+              </Text>
+              <View style={styles.grupoDivisor} />
+            </View>
+
+            {suscriptores.map((item) => {
+              const capturado = capturadosHoy.get(item.id_suscriptor) === true;
+              return (
+                <Pressable
+                  key={item.id_suscriptor}
+                  style={({ pressed }) => [
+                    styles.card,
+                    capturado && styles.cardCapturada,
+                    pressed && !capturado && styles.cardPressed,
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('Lecturas', {
+                      screen: 'DetalleSuscriptor',
+                      params: { id_suscriptor: item.id_suscriptor },
+                    })
+                  }
+                  disabled={capturado}
+                >
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardInfo}>
+                      {/* ID */}
+                      <Text style={[TYPOGRAPHY.labelSm, styles.cardCodigo]}>
+                        ID: {item.codigo.toUpperCase()}
+                      </Text>
+                      {/* Nombre */}
+                      <Text
+                        style={[
+                          TYPOGRAPHY.headlineSm,
+                          capturado ? styles.cardNombreCapturado : styles.cardNombre,
+                        ]}
+                      >
+                        {item.nombre_apellidos}
+                      </Text>
+                      {/* Estado */}
+                      {capturado ? (
+                        <View style={styles.statusRow}>
+                          <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
+                          <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
+                            Capturado hoy
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.statusRow}>
+                          <MaterialIcons name="schedule" size={14} color={COLORS.onSurfaceVariant} />
+                          <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>
+                            Lectura pendiente
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Icono derecho */}
+                    {capturado ? (
+                      <View style={styles.iconCircleCheck}>
+                        <MaterialIcons name="task-alt" size={22} color={COLORS.secondary} />
+                      </View>
+                    ) : (
+                      <MaterialIcons name="chevron-right" size={24} color={COLORS.onSurfaceVariant} />
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        <FooterApp />
+      </ScrollView>
+
+      {/* Botón sticky — siempre visible (wireframe lo muestra siempre) */}
+      <View style={styles.stickyFooter}>
+        <Pressable
+          style={({ pressed }) => [styles.btnSync, pressed && styles.btnSyncPressed]}
+          onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
+        >
+          <MaterialIcons name="sync" size={22} color={COLORS.onPrimary} />
+          <Text style={[TYPOGRAPHY.headlineSm, styles.btnSyncText]}>Sincronizar</Text>
+          {pendientesCola > 0 && (
+            <View style={styles.btnBadge}>
+              <Text style={styles.btnBadgeText}>({pendientesCola})</Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -269,29 +315,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.margin,
   },
-  header: {
-    paddingTop: SPACING.xl,
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.primary,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTexts: {
-    flex: 1,
-  },
-  titulo: {
-    color: COLORS.onPrimary,
-  },
-  fechaHeader: {
-    color: COLORS.onPrimary,
-    opacity: 0.8,
-  },
   muted: {
     color: COLORS.textSecondary,
   },
@@ -300,6 +323,78 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
+
+  // ── TopAppBar ─────────────────────────────────────────────────────────────
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  topBarBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.full,
+  },
+  topBarBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  topBarTitle: {
+    color: COLORS.onPrimary,
+  },
+  badgeWrapper: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: COLORS.error,
+    borderRadius: RADIUS.full,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  badgeText: {
+    color: COLORS.onPrimary,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+
+  // ── ScrollView ────────────────────────────────────────────────────────────
+  scrollContent: {
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xl * 3, // espacio para el sticky + footer nav
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.lg,
+  },
+
+  // ── Banner offline ────────────────────────────────────────────────────────
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,69 +402,122 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.errorContainer,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    ...BORDERS.error,
-    marginHorizontal: SPACING.margin,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(186,26,26,0.1)',
   },
   bannerText: {
-    color: COLORS.error,
+    color: COLORS.onErrorContainer,
     flex: 1,
+    fontWeight: '500',
   },
-  progresoSection: {
-    paddingHorizontal: SPACING.margin,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.lg,
+
+  // ── Progreso ──────────────────────────────────────────────────────────────
+  progresoCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
     gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(197,198,206,0.3)',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
   },
   progresoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+  },
+  progresoLabel: {
+    color: COLORS.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  progresoNumero: {
+    color: COLORS.primary,
+  },
+  progresoTotal: {
+    color: COLORS.onSurfaceVariant,
+    fontWeight: '400',
   },
   barraContainer: {
-    height: 8,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
+    height: 12,
+    backgroundColor: COLORS.surfaceContainer,
     borderRadius: RADIUS.full,
     overflow: 'hidden',
   },
   barraFill: {
     height: '100%',
     backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.full,
   },
-  lista: {
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.xl,
+
+  // ── Grupo / Sector ────────────────────────────────────────────────────────
+  grupo: {
+    gap: SPACING.sm,
   },
-  listaVaciaContainer: {
+  grupoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  grupoTitulo: {
+    color: COLORS.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontWeight: '700',
+  },
+  grupoDivisor: {
     flex: 1,
+    height: 1,
+    backgroundColor: COLORS.surfaceDim,
   },
+
+  // ── Cards ─────────────────────────────────────────────────────────────────
   card: {
     backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.default,
-    marginBottom: SPACING.sm,
-    ...BORDERS.thin,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(197,198,206,0.2)',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  cardCapturada: {
+    backgroundColor: 'rgba(211,228,254,0.3)',
+    borderColor: 'rgba(197,198,206,0.1)',
+    opacity: 0.8,
   },
   cardPressed: {
-    opacity: 0.7,
+    backgroundColor: COLORS.surfaceContainer,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
   },
   cardInfo: {
     flex: 1,
     gap: SPACING.xs,
   },
   cardCodigo: {
-    color: COLORS.textSecondary,
+    color: COLORS.secondary,
+    letterSpacing: -0.5,
   },
   cardNombre: {
-    color: COLORS.primary,
+    color: COLORS.onSurface,
+  },
+  cardNombreCapturado: {
+    color: COLORS.onSurfaceVariant,
+    textDecorationLine: 'line-through',
   },
   statusRow: {
     flexDirection: 'row',
@@ -377,38 +525,74 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   statusCapturada: {
-    color: COLORS.primary,
+    color: COLORS.secondary,
+    fontWeight: '500',
   },
   statusPendiente: {
-    color: COLORS.textSecondary,
+    color: COLORS.onSurfaceVariant,
   },
+  iconCircleCheck: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    backgroundColor: 'rgba(0,103,127,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Empty ─────────────────────────────────────────────────────────────────
+  emptyBox: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+  },
+
+  // ── Sticky footer ─────────────────────────────────────────────────────────
   stickyFooter: {
-    paddingHorizontal: SPACING.margin,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.background,
+    position: 'absolute',
+    bottom: 72, // sobre el BottomNav
+    left: SPACING.md,
+    right: SPACING.md,
+    zIndex: 40,
   },
   btnSync: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
-    alignItems: 'center',
-    borderRadius: RADIUS.default,
+    borderRadius: RADIUS.xl,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    minHeight: 48,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   btnSyncPressed: {
-    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
   },
   btnSyncText: {
     color: COLORS.onPrimary,
   },
+  btnBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  btnBadgeText: {
+    color: COLORS.onPrimary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // ── Error / Retry ─────────────────────────────────────────────────────────
   btnRetry: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.default,
-    ...BORDERS.thin,
   },
   btnRetryText: {
     color: COLORS.onPrimary,

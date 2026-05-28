@@ -124,7 +124,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         >
           <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
         </Pressable>
-        <Text style={styles.headerTitle}>FACTURA CALCULADA</Text>
+        <Text style={styles.headerTitle}>Factura calculada</Text>
         <Pressable
           onPress={() => {
             // Perfil: requiere módulo de autenticación.
@@ -135,7 +135,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
           ]}
           accessibilityLabel="Cuenta"
         >
-          <MaterialIcons name="radio-button-checked" size={24} color={COLORS.primary} />
+          <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
         </Pressable>
       </View>
 
@@ -175,7 +175,9 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         </View>
         <View style={styles.bentoColFullWhite}>
           <View style={styles.bentoConsumoLeft}>
-            <MaterialIcons name="schedule" size={20} color={COLORS.primary} />
+            <View style={styles.bentoConsumoIconBox}>
+              <MaterialIcons name="speed" size={22} color={COLORS.onSurface} />
+            </View>
             <Text style={styles.bentoConsumoLabel}>Consumo del Periodo</Text>
           </View>
           <Text style={styles.bentoConsumoVal}>{resultado.consumo} m³</Text>
@@ -240,6 +242,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             onPress={() => navigation.popToTop()}
             style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
           >
+            <MaterialIcons name="history" size={20} color={COLORS.onPrimary} />
             <Text style={styles.btnPrimaryText}>VER HISTORIAL</Text>
           </Pressable>
           <Pressable
@@ -251,6 +254,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             }
             style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
           >
+            <MaterialIcons name="map" size={20} color={COLORS.primary} />
             <Text style={styles.btnSecondaryText}>VOLVER A LA RUTA</Text>
           </Pressable>
         </View>
@@ -315,22 +319,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  // Header
+  // Header — fondo surface-container + borde outline-variant (wireframe)
   header: {
     height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainer,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
+    borderBottomColor: COLORS.outlineVariant,
   },
   headerBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: RADIUS.full,
   },
   headerIcon: {
     ...TYPOGRAPHY.headlineSm,
@@ -340,7 +345,8 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
     textTransform: 'uppercase',
-    letterSpacing: -0.2,
+    letterSpacing: 1.5,
+    fontSize: 13,
   },
 
   // Scroll
@@ -429,9 +435,10 @@ const styles = StyleSheet.create({
   },
   bentoColHalf: {
     flex: 1,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: 'rgba(197,198,206,0.3)',
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
     minHeight: 80,
   },
@@ -455,33 +462,48 @@ const styles = StyleSheet.create({
   },
   bentoColFullWhite: {
     width: '100%',
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   bentoConsumoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
+  bentoConsumoIconBox: {
+    backgroundColor: '#B7EAFF', // secondary-fixed
+    borderRadius: RADIUS.default,
+    padding: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bentoConsumoLabel: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
+    fontWeight: '600',
   },
   bentoConsumoVal: {
     ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
+    color: COLORS.secondary,
     fontWeight: '700',
   },
 
   // Detalle colapsable
   detalleWrap: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     overflow: 'hidden',
     backgroundColor: COLORS.surfaceLight,
     marginTop: SPACING.sm,
@@ -491,13 +513,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: SPACING.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerHigh,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
+    borderBottomColor: COLORS.outlineVariant,
   },
   detalleTitulo: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
     fontWeight: '700',
   },
   detalleBody: {
@@ -510,16 +532,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.xs,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    borderBottomColor: 'rgba(197,198,206,0.4)',
   },
   filaDetalleLabel: {
     ...TYPOGRAPHY.bodySm,
-    color: COLORS.primary,
+    color: COLORS.onSurfaceVariant,
     flex: 1,
   },
   filaDetalleValor: {
     ...TYPOGRAPHY.bodySm,
-    color: COLORS.primary,
+    color: COLORS.onSurface,
+    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   filaMeta: {
@@ -534,12 +557,18 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     width: '100%',
-    height: 48,
+    height: 56,
     backgroundColor: COLORS.primary,
-    ...BORDERS.thin,
     borderRadius: RADIUS.default,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
   },
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
@@ -549,12 +578,20 @@ const styles = StyleSheet.create({
   },
   btnSecondary: {
     width: '100%',
-    height: 48,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
+    height: 56,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: 'rgba(3,22,50,0.2)', // primary/20
     borderRadius: RADIUS.default,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING.sm,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 1,
   },
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
@@ -583,7 +620,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
     paddingTop: SPACING.lg,
     borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
+    borderTopColor: COLORS.outlineVariant,
     gap: SPACING.xs,
   },
   metaRow: {
@@ -593,14 +630,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   metaLabel: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   metaVal: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurface,
     fontWeight: '700',
   },
   metaCol: {
@@ -610,14 +648,16 @@ const styles = StyleSheet.create({
   },
   metaHash: {
     fontSize: 10,
-    lineHeight: 14,
-    color: COLORS.primary,
-    // Fuente monoespaciada por plataforma. iOS = Menlo (sistema), Android =
-    // 'monospace' (alias garantizado de Roboto Mono / Droid Sans Mono).
+    lineHeight: 16,
+    color: COLORS.onSurfaceVariant,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    backgroundColor: COLORS.surfaceMuted2,
+    backgroundColor: 'rgba(203,219,245,0.4)', // surface-dim/40
     padding: SPACING.sm,
-    ...BORDERS.dashed,
+    borderRadius: RADIUS.default,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: COLORS.outline,
+    letterSpacing: 0.3,
   },
 
   // Pressed states
