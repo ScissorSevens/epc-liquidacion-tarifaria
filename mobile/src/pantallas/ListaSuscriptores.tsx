@@ -154,7 +154,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
         accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
+            onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
           >
             <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
           </Pressable>
@@ -230,7 +230,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
               style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
               onPress={() => {
                 setFabAbierto(false);
-                navigation.navigate('Config', { screen: 'AltaSuscriptor' });
+                navigation.navigate('AltaSuscriptor');
               }}
             >
               <MaterialIcons name="person-add" size={24} color={COLORS.primary} />
@@ -245,7 +245,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
               style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
               onPress={() => {
                 setFabAbierto(false);
-                navigation.navigate('Config', { screen: 'ImportarCsv' });
+                navigation.navigate('ImportarCsv');
               }}
             >
               <MaterialIcons name="file-upload" size={24} color={COLORS.primary} />

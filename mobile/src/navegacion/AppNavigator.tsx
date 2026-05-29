@@ -177,7 +177,7 @@ export default function AppNavigator() {
       <Tab.Screen
         name="Config"
         component={ConfigStack}
-        options={{ tabBarIcon: () => <TabIcon name="settings" label="Config" /> }}
+        options={{ tabBarIcon: () => <TabIcon name="person" label="Perfil" /> }}
       />
     </Tab.Navigator>
   );

@@ -25,6 +25,15 @@ export type RootStackParamList = {
 
 export type InicioStackParamList = {
   RutaDeHoy: undefined;
+  CapturarLectura: { id_medidor: number; id_suscriptor: number };
+  CapturarFoto: { id_medidor: number; id_periodo: string; id_suscriptor: number };
+  ResultadoCalculo: {
+    lectura: Lectura;
+    resultado: ResultadoCalculoTipo;
+    parametros: ParametrosTarifa;
+    estrato: Estrato;
+    id_suscriptor: number;
+  };
 };
 
 export type LecturasStackParamList = {
@@ -40,6 +49,8 @@ export type LecturasStackParamList = {
     estrato: Estrato;
     id_suscriptor: number;
   };
+  AltaSuscriptor: undefined;
+  ImportarCsv: undefined;
 };
 
 export type SyncStackParamList = {

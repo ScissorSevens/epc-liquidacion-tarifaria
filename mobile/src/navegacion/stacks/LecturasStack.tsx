@@ -1,9 +1,11 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import AltaSuscriptor from '../../pantallas/AltaSuscriptor';
 import CapturarFoto from '../../pantallas/CapturarFoto';
 import CapturarLectura from '../../pantallas/CapturarLectura';
 import DetalleSuscriptor from '../../pantallas/DetalleSuscriptor';
 import Historial from '../../pantallas/Historial';
+import ImportarCsv from '../../pantallas/ImportarCsv';
 import ListaSuscriptores from '../../pantallas/ListaSuscriptores';
 import ResultadoCalculo from '../../pantallas/ResultadoCalculo';
 import type { LecturasStackParamList } from '../types';
@@ -19,6 +21,8 @@ export default function LecturasStack() {
       <Stack.Screen name="CapturarLectura" component={CapturarLectura} />
       <Stack.Screen name="CapturarFoto" component={CapturarFoto} />
       <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
+      <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />
+      <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
     </Stack.Navigator>
   );
 }

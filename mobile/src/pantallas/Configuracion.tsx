@@ -51,6 +51,16 @@ async function obtenerOCrearDeviceId(): Promise<string> {
   return nuevo;
 }
 
+/** Extrae las iniciales del nombre (hasta 2 letras). */
+function obtenerIniciales(nombre: string): string {
+  return nombre
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 type EstadoPerfil =
   | { tipo: 'cargando' }
   | { tipo: 'sin-operario' }
@@ -59,7 +69,7 @@ type EstadoPerfil =
   | { tipo: 'error'; mensaje: string };
 
 /**
- * Pantalla de configuración — menú de acciones directas + perfil del operario.
+ * Pantalla de perfil — datos del operario + acciones de gestión.
  */
 export default function Configuracion({ navigation }: Props) {
   const [perfil, setPerfil] = useState<EstadoPerfil>({ tipo: 'cargando' });
@@ -78,7 +88,6 @@ export default function Configuracion({ navigation }: Props) {
 
       const deviceId = await obtenerOCrearDeviceId();
 
-      // Buscar en repo local primero (funciona sin red)
       const bootstrap = await getBootstrap();
       const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
       await repo.inicializar();
@@ -89,7 +98,6 @@ export default function Configuracion({ navigation }: Props) {
         return;
       }
 
-      // Sin datos locales → buscar en backend por cédula (ya fue vinculado previamente)
       try {
         const baseUrl = obtenerApiBaseUrl();
         const resp = await fetch(`${baseUrl}/api/v1/operarios`);
@@ -113,14 +121,13 @@ export default function Configuracion({ navigation }: Props) {
               dispositivo_id: encontrado.dispositivoId,
               created_at: encontrado.createdAt,
             };
-            // Cachear en SQLite para próximas cargas sin red
             await repo.guardar(operario);
             setPerfil({ tipo: 'operario', operario });
             return;
           }
         }
       } catch {
-        // Sin red: mostramos sin-operario para que pueda reintentar
+        // Sin red
       }
 
       setPerfil({ tipo: 'sin-operario' });
@@ -163,32 +170,25 @@ export default function Configuracion({ navigation }: Props) {
         Alert.alert('Error', 'Cédula o contraseña incorrectos.');
         return;
       }
-
       if (resp.status === 409) {
         Alert.alert('Dispositivo ocupado', 'Este dispositivo ya está vinculado a otro operario. Contactá al administrador.');
         return;
       }
-
       if (!resp.ok) {
         Alert.alert('Error', `No se pudo asignar el operario (${resp.status}).`);
         return;
       }
 
       const operario = (await resp.json()) as Operario;
-
-      // Guardar cédula localmente para futuras cargas
       await AsyncStorage.setItem(CLAVE_CEDULA, cedula.trim());
 
-      // Persistir operario en SQLite para que funcione sin red
       const bootstrap = await getBootstrap();
       const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
       await repo.inicializar();
       await repo.guardar(operario);
 
-      // Limpiar formulario
       setCedula('');
       setPassword('');
-
       setPerfil({ tipo: 'operario', operario });
     } catch {
       Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
@@ -199,12 +199,12 @@ export default function Configuracion({ navigation }: Props) {
 
   async function desasignarOperario(): Promise<void> {
     Alert.alert(
-      'Desasignar operario',
+      'Cambiar de operario',
       '¿Seguro que querés desasignar este dispositivo? Necesitarás conexión para volver a asignarlo.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Desasignar',
+          text: 'Cambiar',
           style: 'destructive',
           onPress: async () => {
             await AsyncStorage.removeItem(CLAVE_CEDULA);
@@ -217,166 +217,176 @@ export default function Configuracion({ navigation }: Props) {
     );
   }
 
-
   return (
     <View style={styles.container}>
-      <TopBar titulo="Configuración" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <TopBar titulo="Mi perfil" />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
 
-      {/* Sección: Gestión de suscriptores */}
-      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>
-        Gestión de suscriptores
-      </Text>
-
-      <View style={styles.seccion}>
-        <Pressable
-          style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-          onPress={() => navigation.navigate('AltaSuscriptor')}
-        >
-          <MaterialIcons name="person-add" size={24} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.bodyMd, styles.itemText]}>Agregar suscriptor</Text>
-          <MaterialIcons name="chevron-right" size={24} color={COLORS.textSecondary} />
-        </Pressable>
-
-        <View style={styles.separador} />
-
-        <Pressable
-          style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-          onPress={() => navigation.navigate('ImportarCsv')}
-        >
-          <MaterialIcons name="upload-file" size={24} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.bodyMd, styles.itemText]}>Importar desde CSV</Text>
-          <MaterialIcons name="chevron-right" size={24} color={COLORS.textSecondary} />
-        </Pressable>
-      </View>
-
-      {/* Sección: Sistema */}
-      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>Sistema</Text>
-
-      <View style={styles.seccion}>
-        <View style={styles.item}>
-          <MaterialIcons name="info" size={24} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.bodyMd, styles.itemText]}>Versión de la app</Text>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.itemValor]}>1.0.0</Text>
-        </View>
-      </View>
-
-
-      {/* Sección: Mi perfil */}
-      <Text style={[TYPOGRAPHY.labelLg, styles.seccionLabel]}>Mi perfil</Text>
-
-      <View style={styles.seccion}>
-        {/* CARGANDO */}
+        {/* ── Estado: cargando ──────────────────────────────────────── */}
         {perfil.tipo === 'cargando' && (
-          <View style={styles.perfilCargando}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.itemValor]}>Cargando perfil…</Text>
+          <View style={styles.cargandoWrap}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
         )}
 
-        {/* ERROR */}
+        {/* ── Estado: error ─────────────────────────────────────────── */}
         {perfil.tipo === 'error' && (
-          <View style={styles.item}>
-            <MaterialIcons name="error" size={24} color={COLORS.error} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.itemValor]} numberOfLines={2}>
-              {perfil.mensaje}
-            </Text>
-          </View>
-        )}
-
-        {/* SIN OPERARIO → formulario de asignación */}
-        {perfil.tipo === 'sin-operario' && (
-          <View style={styles.formulario}>
-            <View style={styles.formularioHeader}>
-              <MaterialIcons name="person-off" size={24} color={COLORS.textSecondary} />
-              <Text style={[TYPOGRAPHY.bodyMd, styles.itemValor]}>
-                Sin operario asignado
-              </Text>
-            </View>
-
-            <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CÉDULA</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Número de cédula"
-              placeholderTextColor={COLORS.textSecondary}
-              value={cedula}
-              onChangeText={setCedula}
-              keyboardType="numeric"
-              autoCapitalize="none"
-              editable={!asignando}
-            />
-
-            <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CONTRASEÑA</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Contraseña"
-              placeholderTextColor={COLORS.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              editable={!asignando}
-            />
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.botonAsignar,
-                pressed && styles.botonAsignarPressed,
-                asignando && styles.botonAsignarDisabled,
-              ]}
-              onPress={asignarOperario}
-              disabled={asignando}
-            >
-              {asignando
-                ? <ActivityIndicator size="small" color={COLORS.background} />
-                : <Text style={styles.botonAsignarTexto}>ASIGNAR OPERARIO</Text>
-              }
+          <View style={styles.errorWrap}>
+            <MaterialIcons name="error-outline" size={32} color={COLORS.error} />
+            <Text style={[TYPOGRAPHY.bodyMd, styles.errorTexto]}>{perfil.mensaje}</Text>
+            <Pressable style={styles.botonReintentar} onPress={cargarPerfil}>
+              <Text style={styles.botonReintentarTexto}>REINTENTAR</Text>
             </Pressable>
           </View>
         )}
 
-        {/* CON OPERARIO → datos + botón desasignar */}
+        {/* ── Estado: sin operario → formulario de asignación ──────── */}
+        {(perfil.tipo === 'sin-operario' || perfil.tipo === 'asignando') && (
+          <View style={styles.formularioWrap}>
+            {/* Ilustración */}
+            <View style={styles.avatarVacio}>
+              <MaterialIcons name="person-off" size={40} color={COLORS.outline} />
+            </View>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.formularioTitulo]}>
+              Sin operario asignado
+            </Text>
+            <Text style={[TYPOGRAPHY.bodySm, styles.formularioSubtitulo]}>
+              Ingresá tus credenciales para vincular este dispositivo
+            </Text>
+
+            <View style={styles.formularioCampos}>
+              <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CÉDULA</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Número de cédula"
+                placeholderTextColor={COLORS.outline}
+                value={cedula}
+                onChangeText={setCedula}
+                keyboardType="numeric"
+                autoCapitalize="none"
+                editable={!asignando}
+              />
+
+              <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CONTRASEÑA</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Contraseña"
+                placeholderTextColor={COLORS.outline}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                editable={!asignando}
+              />
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.botonAsignar,
+                  pressed && styles.botonAsignarPressed,
+                  asignando && styles.botonAsignarDisabled,
+                ]}
+                onPress={asignarOperario}
+                disabled={asignando}
+              >
+                {asignando
+                  ? <ActivityIndicator size="small" color={COLORS.background} />
+                  : <Text style={styles.botonAsignarTexto}>ASIGNAR OPERARIO</Text>
+                }
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* ── Estado: con operario ──────────────────────────────────── */}
         {perfil.tipo === 'operario' && (
           <>
-            <View style={styles.perfilFila}>
-              <Text style={[TYPOGRAPHY.labelMd, styles.perfilEtiqueta]}>Nombre</Text>
-              <Text style={[TYPOGRAPHY.bodyMd, styles.perfilValor]}>
+            {/* Avatar + nombre + rol */}
+            <View style={styles.perfilHeader}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarIniciales}>
+                  {obtenerIniciales(perfil.operario.nombre)}
+                </Text>
+              </View>
+              <Text style={[TYPOGRAPHY.headlineMd, styles.perfilNombre]}>
                 {perfil.operario.nombre}
               </Text>
-            </View>
-            <View style={styles.separador} />
-            <View style={styles.perfilFila}>
-              <Text style={[TYPOGRAPHY.labelMd, styles.perfilEtiqueta]}>Cédula</Text>
-              <Text style={[TYPOGRAPHY.bodyMd, styles.perfilValor]}>
-                {perfil.operario.numero_cedula}
+              <Text style={[TYPOGRAPHY.bodySm, styles.perfilRol]}>
+                {perfil.operario.rol} · EPC
               </Text>
             </View>
-            <View style={styles.separador} />
-            <View style={styles.perfilFila}>
-              <Text style={[TYPOGRAPHY.labelMd, styles.perfilEtiqueta]}>Rol</Text>
-              <Text style={[TYPOGRAPHY.bodyMd, styles.perfilValor]}>
-                {perfil.operario.rol}
-              </Text>
+
+            {/* Información personal */}
+            <Text style={[TYPOGRAPHY.labelMd, styles.seccionLabel]}>
+              Información personal
+            </Text>
+            <View style={styles.tarjeta}>
+              <View style={styles.filaInfo}>
+                <Text style={[TYPOGRAPHY.bodySm, styles.filaEtiqueta]}>Cédula</Text>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.filaValor]}>
+                  {perfil.operario.numero_cedula}
+                </Text>
+              </View>
+              <View style={styles.separador} />
+              <View style={styles.filaInfo}>
+                <Text style={[TYPOGRAPHY.bodySm, styles.filaEtiqueta]}>Correo</Text>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.filaValor]} numberOfLines={1}>
+                  {perfil.operario.email}
+                </Text>
+              </View>
+              <View style={styles.separador} />
+              <View style={styles.filaInfo}>
+                <Text style={[TYPOGRAPHY.bodySm, styles.filaEtiqueta]}>Estado</Text>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.filaValor]}>
+                  {perfil.operario.estado}
+                </Text>
+              </View>
             </View>
-            <View style={styles.separador} />
-            <View style={styles.perfilFila}>
-              <Text style={[TYPOGRAPHY.labelMd, styles.perfilEtiqueta]}>Estado</Text>
-              <Text style={[TYPOGRAPHY.bodyMd, styles.perfilValor]}>
-                {perfil.operario.estado}
-              </Text>
+
+            {/* Gestión */}
+            <Text style={[TYPOGRAPHY.labelMd, styles.seccionLabel]}>
+              Gestión
+            </Text>
+            <View style={styles.tarjeta}>
+              <Pressable
+                style={({ pressed }) => [styles.itemMenu, pressed && styles.itemMenuPressed]}
+                onPress={() => navigation.navigate('AltaSuscriptor')}
+              >
+                <MaterialIcons name="person-add" size={24} color={COLORS.primary} />
+                <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuTexto]}>Agregar suscriptor</Text>
+                <MaterialIcons name="chevron-right" size={24} color={COLORS.outline} />
+              </Pressable>
+              <View style={styles.separador} />
+              <Pressable
+                style={({ pressed }) => [styles.itemMenu, pressed && styles.itemMenuPressed]}
+                onPress={() => navigation.navigate('ImportarCsv')}
+              >
+                <MaterialIcons name="upload-file" size={24} color={COLORS.primary} />
+                <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuTexto]}>Importar desde CSV</Text>
+                <MaterialIcons name="chevron-right" size={24} color={COLORS.outline} />
+              </Pressable>
+              <View style={styles.separador} />
+              <View style={styles.itemMenu}>
+                <MaterialIcons name="info" size={24} color={COLORS.primary} />
+                <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuTexto]}>Versión</Text>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuValor]}>1.0.0</Text>
+              </View>
             </View>
-            <View style={styles.separador} />
+
+            {/* Danger zone */}
             <Pressable
-              style={({ pressed }) => [styles.botonDesasignar, pressed && styles.botonDesasignarPressed]}
+              style={({ pressed }) => [styles.botonCambiar, pressed && styles.botonCambiarPressed]}
               onPress={desasignarOperario}
             >
-              <MaterialIcons name="logout" size={18} color={COLORS.error} />
-              <Text style={styles.botonDesasignarTexto}>Desasignar este dispositivo</Text>
+              <MaterialIcons name="logout" size={20} color={COLORS.error} />
+              <Text style={styles.botonCambiarTexto}>CAMBIAR DE OPERARIO</Text>
             </Pressable>
           </>
         )}
-      </View>
-      <FooterApp />
+
+        <FooterApp />
       </ScrollView>
     </View>
   );
@@ -391,87 +401,76 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.xl,
   },
-  seccionLabel: {
-    color: COLORS.textSecondary,
-    paddingHorizontal: SPACING.margin,
-    marginBottom: SPACING.sm,
-  },
-  seccion: {
-    marginHorizontal: SPACING.margin,
-    marginBottom: SPACING.lg,
-    ...BORDERS.thin,
-    borderRadius: 0,
-    backgroundColor: COLORS.background,
-  },
-  item: {
-    flexDirection: 'row',
+
+  // ── Cargando / error ────────────────────────────────────────────────
+  cargandoWrap: {
+    paddingVertical: SPACING.xl * 2,
     alignItems: 'center',
-    height: 56,
+  },
+  errorWrap: {
     paddingHorizontal: SPACING.margin,
-    gap: SPACING.md,
-    backgroundColor: COLORS.background,
-  },
-  itemPressed: {
-    backgroundColor: COLORS.surfaceLight,
-  },
-  itemText: {
-    flex: 1,
-    color: COLORS.primary,
-  },
-  itemValor: {
-    color: COLORS.textSecondary,
-  },
-  separador: {
-    height: 1,
-    backgroundColor: COLORS.primary,
-    marginHorizontal: SPACING.margin,
-  },
-  perfilCargando: {
-    flexDirection: 'row',
+    paddingVertical: SPACING.xl * 2,
     alignItems: 'center',
-    height: 56,
-    paddingHorizontal: SPACING.margin,
     gap: SPACING.md,
   },
-  perfilFila: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 48,
-    paddingHorizontal: SPACING.margin,
+  errorTexto: {
+    color: COLORS.error,
+    textAlign: 'center',
+  },
+  botonReintentar: {
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
-    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
-  perfilEtiqueta: {
-    width: 72,
-    color: COLORS.textSecondary,
-  },
-  perfilValor: {
-    flex: 1,
+  botonReintentarTexto: {
     color: COLORS.primary,
+    ...(TYPOGRAPHY.labelMd as object),
   },
-  // Formulario de asignación
-  formulario: {
-    padding: SPACING.margin,
-    gap: SPACING.sm,
-  },
-  formularioHeader: {
-    flexDirection: 'row',
+
+  // ── Formulario sin operario ─────────────────────────────────────────
+  formularioWrap: {
+    paddingHorizontal: SPACING.margin,
+    paddingVertical: SPACING.xl,
     alignItems: 'center',
-    gap: SPACING.md,
-    marginBottom: SPACING.md,
+  },
+  avatarVacio: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  formularioTitulo: {
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  formularioSubtitulo: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  formularioCampos: {
+    width: '100%',
   },
   inputLabel: {
     color: COLORS.textSecondary,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.outline,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     color: COLORS.primary,
     backgroundColor: COLORS.background,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     ...(TYPOGRAPHY.bodyMd as object),
   },
   botonAsignar: {
@@ -482,28 +481,121 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     height: 48,
   },
-  botonAsignarPressed: {
-    opacity: 0.8,
-  },
-  botonAsignarDisabled: {
-    opacity: 0.5,
-  },
+  botonAsignarPressed: { opacity: 0.8 },
+  botonAsignarDisabled: { opacity: 0.5 },
   botonAsignarTexto: {
     color: COLORS.background,
     ...(TYPOGRAPHY.labelMd as object),
   },
-  botonDesasignar: {
+
+  // ── Perfil con operario ─────────────────────────────────────────────
+  perfilHeader: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.margin,
+    marginBottom: SPACING.xl,
+  },
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  avatarIniciales: {
+    color: COLORS.primary,
+    fontSize: 32,
+    fontWeight: '700',
+    lineHeight: 40,
+  },
+  perfilNombre: {
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  perfilRol: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+
+  // ── Secciones ───────────────────────────────────────────────────────
+  seccionLabel: {
+    color: COLORS.textSecondary,
+    paddingHorizontal: SPACING.margin,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  tarjeta: {
+    marginHorizontal: SPACING.margin,
+    marginBottom: SPACING.lg,
+    ...BORDERS.thin,
+    backgroundColor: COLORS.background,
+    borderRadius: 0,
+  },
+  separador: {
+    height: 1,
+    backgroundColor: COLORS.outline,
+    marginHorizontal: SPACING.margin,
+    opacity: 0.3,
+  },
+  filaInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingHorizontal: SPACING.margin,
+    paddingVertical: SPACING.sm,
+  },
+  filaEtiqueta: {
+    color: COLORS.textSecondary,
+  },
+  filaValor: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+    marginLeft: SPACING.md,
+  },
+  itemMenu: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    height: 56,
     paddingHorizontal: SPACING.margin,
-    paddingVertical: SPACING.md,
+    gap: SPACING.md,
   },
-  botonDesasignarPressed: {
+  itemMenuPressed: {
     backgroundColor: COLORS.surfaceLight,
   },
-  botonDesasignarTexto: {
+  itemMenuTexto: {
+    flex: 1,
+    color: COLORS.primary,
+  },
+  itemMenuValor: {
+    color: COLORS.textSecondary,
+  },
+
+  // ── Danger zone ─────────────────────────────────────────────────────
+  botonCambiar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.margin,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.xl,
+    height: 52,
+    borderWidth: 2,
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.background,
+  },
+  botonCambiarPressed: {
+    backgroundColor: '#fff0f0',
+  },
+  botonCambiarTexto: {
     color: COLORS.error,
-    ...(TYPOGRAPHY.bodySm as object),
+    ...(TYPOGRAPHY.labelMd as object),
   },
 });

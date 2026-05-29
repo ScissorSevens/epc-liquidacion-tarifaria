@@ -87,22 +87,27 @@ export default function Historial({ navigation, route }: Props) {
     void cargar();
   }, [cargar]);
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
-  const valores = lecturas.map((l) => l.lectura_actual);
-  const total = valores.reduce((a, b) => a + b, 0);
-  const promedio = valores.length > 0 ? total / valores.length : 0;
-  const pico = valores.length > 0 ? Math.max(...valores) : 0;
+  // ── KPIs — calculados sobre el CONSUMO (delta) de cada período ────────────
+  const consumos = lecturas.map((l) => Math.max(l.lectura_actual - l.lectura_anterior, 0));
+  const totalConsumo = consumos.reduce((a, b) => a + b, 0);
+  const promedioConsumo = consumos.length > 0 ? totalConsumo / consumos.length : 0;
+  const picoConsumo = consumos.length > 0 ? Math.max(...consumos) : 0;
 
   // ── Últimos 6 períodos para el gráfico ──────────────────────────────────────
   const periodosUnicos = [...new Set(lecturas.map((l) => l.id_periodo))]
     .sort((a, b) => b.localeCompare(a))
     .slice(0, 6)
     .reverse();
-  const consumoPorPeriodo = periodosUnicos.map((p) => ({
-    periodo: p,
-    valor: lecturas.filter((l) => l.id_periodo === p).reduce((a, l) => a + l.lectura_actual, 0),
-  }));
-  const maxConsumo = Math.max(...consumoPorPeriodo.map((c) => c.valor), 1);
+  const consumoPorPeriodo = periodosUnicos.map((p) => {
+    const lectura = lecturas.find((l) => l.id_periodo === p);
+    const consumo = lectura ? Math.max(lectura.lectura_actual - lectura.lectura_anterior, 0) : 0;
+    return { periodo: p, valor: consumo };
+  });
+
+  // Si hay un solo dato, usamos su valor como referencia pero no lo escalamos al 100%
+  // — visualmente se fija a 60% del alto máximo para que no llene todo el gráfico.
+  const maxConsumoRaw = Math.max(...consumoPorPeriodo.map((c) => c.valor), 1);
+  const escalaMax = consumoPorPeriodo.length === 1 ? maxConsumoRaw / 0.6 : maxConsumoRaw;
 
   return (
     <View style={styles.raiz}>
@@ -137,17 +142,17 @@ export default function Historial({ navigation, route }: Props) {
             <View style={styles.kpiFila}>
               <View style={styles.kpiItem}>
                 <Text style={styles.kpiEtiqueta}>PROMEDIO</Text>
-                <Text style={styles.kpiValor}>{promedio.toFixed(1)}</Text>
+                <Text style={styles.kpiValor}>{promedioConsumo.toFixed(1)}</Text>
                 <Text style={styles.kpiUnidad}>m³</Text>
               </View>
               <View style={[styles.kpiItem, styles.kpiItemBordes]}>
                 <Text style={styles.kpiEtiqueta}>PICO</Text>
-                <Text style={styles.kpiValor}>{pico.toFixed(1)}</Text>
+                <Text style={styles.kpiValor}>{picoConsumo.toFixed(1)}</Text>
                 <Text style={styles.kpiUnidad}>m³</Text>
               </View>
               <View style={styles.kpiItem}>
                 <Text style={styles.kpiEtiqueta}>TOTAL</Text>
-                <Text style={styles.kpiValor}>{total.toFixed(0)}</Text>
+                <Text style={styles.kpiValor}>{totalConsumo.toFixed(0)}</Text>
                 <Text style={styles.kpiUnidad}>m³</Text>
               </View>
             </View>
@@ -170,7 +175,7 @@ export default function Historial({ navigation, route }: Props) {
               <View style={styles.barras}>
                 {consumoPorPeriodo.map((c, idx) => {
                   const esUltimo = idx === consumoPorPeriodo.length - 1;
-                  const altura = Math.max((c.valor / maxConsumo) * 140, 4);
+                  const altura = Math.max((c.valor / escalaMax) * 140, 4);
                   return (
                     <View key={c.periodo} style={styles.barraCol}>
                       <View
@@ -198,24 +203,30 @@ export default function Historial({ navigation, route }: Props) {
                 <Text style={styles.sinDatosTexto}>Sin lecturas registradas</Text>
               </View>
             ) : (
-              lecturas.map((l, idx) => (
-                <View
-                  key={l.id_lectura}
-                  style={[styles.filaItem, idx < lecturas.length - 1 && styles.filaItemBorde]}
-                >
-                  <View>
-                    <Text style={styles.filaMes}>{mesLargo(l.id_periodo)}</Text>
-                    <Text style={styles.filaFecha}>
-                      {new Date(l.timestamp_captura).toLocaleDateString('es-CO', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      }).toUpperCase()}
-                    </Text>
+              lecturas.map((l, idx) => {
+                const consumo = Math.max(l.lectura_actual - l.lectura_anterior, 0);
+                return (
+                  <View
+                    key={l.id_lectura}
+                    style={[styles.filaItem, idx < lecturas.length - 1 && styles.filaItemBorde]}
+                  >
+                    <View>
+                      <Text style={styles.filaMes}>{mesLargo(l.id_periodo)}</Text>
+                      <Text style={styles.filaFecha}>
+                        {new Date(l.timestamp_captura).toLocaleDateString('es-CO', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        }).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.filaValorWrap}>
+                      <Text style={styles.filaValor}>{consumo.toFixed(1)} m³</Text>
+                      <Text style={styles.filaLecturaRaw}>Lectura: {l.lectura_actual}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.filaValor}>{l.lectura_actual} m³</Text>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
 
@@ -319,8 +330,8 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingHorizontal: 4,
   },
-  barraCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  barra: { width: '100%', borderRadius: 2 },
+  barraCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', maxWidth: 48 },
+  barra: { width: '70%', borderRadius: 2 },
   barraInactiva: { backgroundColor: COLORS.surfaceDim },
   barraActiva: { backgroundColor: COLORS.primary },
   barraEtiqueta: {
@@ -359,7 +370,9 @@ const styles = StyleSheet.create({
   },
   filaMes: { ...TYPOGRAPHY.headlineSm, fontSize: 16, color: COLORS.primary },
   filaFecha: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant, fontWeight: '400' },
+  filaValorWrap: { alignItems: 'flex-end', gap: 2 },
   filaValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+  filaLecturaRaw: { fontSize: 11, color: COLORS.onSurfaceVariant, fontWeight: '400' },
 
   // Botón volver
   btnVolver: {

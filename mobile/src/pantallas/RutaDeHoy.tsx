@@ -32,9 +32,7 @@ type Props = InicioStackScreenProps<'RutaDeHoy'>;
  * Pantalla INICIO — muestra la ruta de lecturas del día.
  *
  * Carga suscriptores y calcula el progreso de lecturas capturadas hoy.
- * El banner offline es SIEMPRE visible porque useNetInfo() usa un shim
- * que retorna { isConnected: false } — comportamiento intencional para
- * el flujo offline-first de AquaRuta. Ver src/hooks/useNetInfo.ts.
+ * El banner de conectividad reacciona en tiempo real: muestra "Sin conexión"
  */
 export default function RutaDeHoy({ navigation }: Props) {
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
@@ -68,11 +66,11 @@ export default function RutaDeHoy({ navigation }: Props) {
         bootstrap.medidorRepo.listar(),
       ]);
 
-      // Contar lecturas capturadas hoy (comparar fecha ISO-8601 con fecha local)
-      const hoy = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      // Contar lecturas capturadas en el mes actual (YYYY-MM)
+      const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
       const idsConLecturaHoy = new Set(
         todasLecturas
-          .filter((l) => l.timestamp_captura.slice(0, 10) === hoy)
+          .filter((l) => l.timestamp_captura.slice(0, 7) === mesActual)
           .map((l) => l.id_medidor),
       );
 
@@ -121,9 +119,8 @@ export default function RutaDeHoy({ navigation }: Props) {
       const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
       if (medidores.length === 0) return;
       if (medidores.length === 1 && medidores[0]) {
-        navigation.navigate('Lecturas', {
-          screen: 'CapturarLectura',
-          params: { id_medidor: medidores[0].id_medidor, id_suscriptor: item.id_suscriptor },
+        navigation.navigate('CapturarLectura', {
+          id_medidor: medidores[0].id_medidor, id_suscriptor: item.id_suscriptor,
         });
       } else {
         setMedidoresSelector(medidores);
@@ -168,7 +165,7 @@ export default function RutaDeHoy({ navigation }: Props) {
         accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
-            onPress={() => navigation.navigate('Lecturas', { screen: 'MiPerfil' })}
+            onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
           >
             <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
           </Pressable>
@@ -179,12 +176,20 @@ export default function RutaDeHoy({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner offline */}
+        {/* Banner conectividad */}
         {isConnected === false && (
-          <View style={styles.banner}>
+          <View style={[styles.banner, styles.bannerOffline]}>
             <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText]}>
+            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOffline]}>
               Sin conexión — los datos se guardarán localmente
+            </Text>
+          </View>
+        )}
+        {isConnected === true && (
+          <View style={[styles.banner, styles.bannerOnline]}>
+            <MaterialIcons name="cloud-done" size={20} color={COLORS.secondary} />
+            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOnline]}>
+              Conectado — sincronización disponible
             </Text>
           </View>
         )}
@@ -192,7 +197,7 @@ export default function RutaDeHoy({ navigation }: Props) {
         {/* Sección de progreso */}
         <View style={styles.progresoCard}>
           <View style={styles.progresoRow}>
-            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>PROGRESO DE LECTURA</Text>
+            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>LECTURAS DEL MES</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNumero]}>
               {capturasHoy}{' '}
               <Text style={[TYPOGRAPHY.bodySm, styles.progresoTotal]}>/ {suscriptores.length}</Text>
@@ -249,8 +254,8 @@ export default function RutaDeHoy({ navigation }: Props) {
                       {capturado ? (
                         <View style={styles.statusRow}>
                           <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
-                          <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
-                            Capturado hoy
+                            <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
+                            Capturado este mes
                           </Text>
                         </View>
                       ) : (
@@ -302,13 +307,10 @@ export default function RutaDeHoy({ navigation }: Props) {
                 onPress={() => {
                   setSelectorVisible(false);
                   if (suscriptorSelector) {
-                    navigation.navigate('Lecturas', {
-                      screen: 'CapturarLectura',
-                      params: {
+                    navigation.navigate('CapturarLectura', {
                         id_medidor: med.id_medidor,
                         id_suscriptor: suscriptorSelector.id,
-                      },
-                    });
+                      });
                   }
                 }}
               >
@@ -373,22 +375,33 @@ const styles = StyleSheet.create({
     gap: SPACING.lg,
   },
 
-  // ── Banner offline ────────────────────────────────────────────────────────
+  // ── Banner conectividad ───────────────────────────────────────────────────
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: COLORS.errorContainer,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
+  },
+  bannerOffline: {
+    backgroundColor: COLORS.errorContainer,
     borderColor: 'rgba(186,26,26,0.1)',
   },
+  bannerOnline: {
+    backgroundColor: '#EBF7F0',
+    borderColor: 'rgba(0,103,127,0.15)',
+  },
   bannerText: {
-    color: COLORS.onErrorContainer,
     flex: 1,
     fontWeight: '500',
+  },
+  bannerTextOffline: {
+    color: COLORS.onErrorContainer,
+  },
+  bannerTextOnline: {
+    color: COLORS.secondary,
   },
 
   // ── Progreso ──────────────────────────────────────────────────────────────
