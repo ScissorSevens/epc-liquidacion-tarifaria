@@ -30,12 +30,17 @@ import { mapearErrorExpoSqlite } from './traducir-error';
 
 export interface SuscriptorRepositoryExpoSqlite extends SuscriptorRepository {
   cerrar(): Promise<void>;
+  toggleSubsidio(id: number, valor: boolean): Promise<Suscriptor>;
 }
 
 interface SuscriptorRow {
   readonly id_suscriptor: number;
   readonly codigo: string;
   readonly nombre_apellidos: string;
+  readonly cedula: string;
+  readonly municipio: string;
+  readonly sector: string | null;
+  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
@@ -50,11 +55,15 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     id_suscriptor: row.id_suscriptor,
     codigo: row.codigo,
     nombre_apellidos: row.nombre_apellidos,
+    cedula: row.cedula,
+    municipio: row.municipio,
     direccion: row.direccion,
     estrato: row.estrato as Suscriptor['estrato'],
     aplica_subsidio: row.aplica_subsidio === 1,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
+    ...(row.sector !== null && { sector: row.sector }),
+    ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
       matricula_inmobiliaria: row.matricula_inmobiliaria,
     }),
@@ -68,8 +77,9 @@ function fromRow(row: SuscriptorRow): Suscriptor {
 const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
-    matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio,
+    cedula, municipio, sector, calle
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
@@ -116,6 +126,10 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.numero_catastral ?? null,
           data.estado,
           data.aplica_subsidio ? 1 : 0,
+          data.cedula,
+          data.municipio,
+          data.sector ?? null,
+          data.calle ?? null,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });

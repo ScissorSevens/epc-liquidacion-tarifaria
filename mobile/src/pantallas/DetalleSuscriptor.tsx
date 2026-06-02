@@ -373,7 +373,15 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             <View style={styles.divider} />
             <Campo label="Nombre y apellidos" valor={suscriptor.nombre_apellidos} />
             <View style={styles.divider} />
+            <Campo label="Cédula" valor={suscriptor.cedula} />
+            <View style={styles.divider} />
             <Campo label="Dirección" valor={suscriptor.direccion} />
+            <View style={styles.divider} />
+            <Campo label="Municipio" valor={suscriptor.municipio} />
+            <View style={styles.divider} />
+            <Campo label="Sector" valor={suscriptor.sector ?? '—'} />
+            <View style={styles.divider} />
+            <Campo label="Calle" valor={suscriptor.calle ?? '—'} />
             <View style={styles.divider} />
             <Campo
               label="Matrícula inmobiliaria"

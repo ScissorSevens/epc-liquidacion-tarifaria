@@ -27,6 +27,8 @@ import type { ItemCola } from '@dominio/sincronizacion/types';
 const BORRADOR_SUS = {
   codigo: '0042',
   nombre_apellidos: 'Test User',
+  cedula: '123456789',
+  municipio: 'Bogota',
   direccion: 'Calle 1',
   estrato: 2 as const,
   aplica_subsidio: false,
@@ -44,6 +46,8 @@ function susCreado(id: number): Suscriptor {
     id_suscriptor: id,
     codigo: BORRADOR_SUS.codigo,
     nombre_apellidos: BORRADOR_SUS.nombre_apellidos,
+    cedula: BORRADOR_SUS.cedula,
+    municipio: BORRADOR_SUS.municipio,
     direccion: BORRADOR_SUS.direccion,
     estrato: BORRADOR_SUS.estrato,
     aplica_subsidio: false,

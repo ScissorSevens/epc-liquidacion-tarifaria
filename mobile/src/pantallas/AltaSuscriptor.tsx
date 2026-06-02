@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { crearSuscriptor } from '@dominio/suscriptores';
+import { crearSuscriptor, MENSAJES_ERROR_SUSCRIPTOR } from '@dominio/suscriptores';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
@@ -44,6 +44,10 @@ type EstratoStr = '' | '1' | '2' | '3' | '4' | '5' | '6';
 
 interface FormState {
   nombre_apellidos: string;
+  cedula: string;
+  municipio: string;
+  sector: string;
+  calle: string;
   direccion: string;
   estrato: EstratoStr;
   aplica_subsidio: boolean;
@@ -65,6 +69,10 @@ interface SnackState {
 
 const ESTADO_INICIAL: FormState = {
   nombre_apellidos: '',
+  cedula: '',
+  municipio: '',
+  sector: '',
+  calle: '',
   direccion: '',
   estrato: '',
   aplica_subsidio: true,
@@ -89,6 +97,28 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
       if (t.length > 150) return 'Nombre no puede superar 150 caracteres';
       return undefined;
     }
+
+    case 'cedula': {
+      const t = v.trim();
+      if (t.length === 0) return MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA;
+      if (!/^\d{6,12}$/.test(t)) return MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA;
+      return undefined;
+    }
+
+    case 'municipio': {
+      const t = v.trim();
+      if (t.length === 0) return MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_VACIO;
+      if (t.length > 100) return MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_LARGO;
+      return undefined;
+    }
+
+    case 'sector':
+      if (v.trim().length > 100) return MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO;
+      return undefined;
+
+    case 'calle':
+      if (v.trim().length > 100) return MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA;
+      return undefined;
 
     case 'direccion': {
       const t = v.trim();
@@ -206,6 +236,10 @@ export default function AltaSuscriptor({ navigation }: Props) {
       const borradorSus = crearSuscriptor({
         codigo: codigoGenerado,
         nombre_apellidos: form.nombre_apellidos.trim(),
+        cedula: form.cedula.trim(),
+        municipio: form.municipio.trim(),
+        sector: form.sector.trim() || undefined,
+        calle: form.calle.trim() || undefined,
         direccion: form.direccion.trim(),
         estrato: estratoNum,
         aplica_subsidio: form.aplica_subsidio,
@@ -315,6 +349,25 @@ export default function AltaSuscriptor({ navigation }: Props) {
               )}
             </View>
 
+            {/* Cédula */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>CÉDULA</Text>
+              <TextInput
+                style={[styles.input, errores.cedula !== undefined && styles.inputError]}
+                value={form.cedula}
+                onChangeText={(v) => setCampo('cedula', v)}
+                onBlur={() => onBlur('cedula')}
+                placeholder="6 a 12 dígitos"
+                keyboardType="numeric"
+                maxLength={12}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.cedula !== undefined && (
+                <Text style={styles.errorText}>{errores.cedula}</Text>
+              )}
+            </View>
+
             {/* Dirección */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>DIRECCIÓN</Text>
@@ -378,7 +431,69 @@ export default function AltaSuscriptor({ navigation }: Props) {
             </View>
           </View>
 
-          {/* ── Sección 2: Datos Legales ── */}
+          {/* ── Sección 2: Ubicación ── */}
+          <View style={[styles.seccion, styles.seccionLow]}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="location-on" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Ubicación</Text>
+            </View>
+
+            {/* Municipio */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>MUNICIPIO</Text>
+              <TextInput
+                style={[styles.input, errores.municipio !== undefined && styles.inputError]}
+                value={form.municipio}
+                onChangeText={(v) => setCampo('municipio', v)}
+                onBlur={() => onBlur('municipio')}
+                placeholder="Ej: Bogotá"
+                maxLength={100}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.municipio !== undefined && (
+                <Text style={styles.errorText}>{errores.municipio}</Text>
+              )}
+            </View>
+
+            {/* Sector */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>SECTOR <Text style={styles.opcional}>(opcional)</Text></Text>
+              <TextInput
+                style={[styles.input, errores.sector !== undefined && styles.inputError]}
+                value={form.sector}
+                onChangeText={(v) => setCampo('sector', v)}
+                onBlur={() => onBlur('sector')}
+                placeholder="Ej: Centro, Zona Industrial"
+                maxLength={100}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.sector !== undefined && (
+                <Text style={styles.errorText}>{errores.sector}</Text>
+              )}
+            </View>
+
+            {/* Calle */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>CALLE <Text style={styles.opcional}>(opcional)</Text></Text>
+              <TextInput
+                style={[styles.input, errores.calle !== undefined && styles.inputError]}
+                value={form.calle}
+                onChangeText={(v) => setCampo('calle', v)}
+                onBlur={() => onBlur('calle')}
+                placeholder="Ej: Cra 50 #20-30"
+                maxLength={100}
+                editable={!enviando}
+                placeholderTextColor={COLORS.onSurfaceVariant}
+              />
+              {errores.calle !== undefined && (
+                <Text style={styles.errorText}>{errores.calle}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* ── Sección 3: Datos Legales ── */}
           <View style={[styles.seccion, styles.seccionLow]}>
             <View style={styles.seccionHeader}>
               <MaterialIcons name="gavel" size={20} color={COLORS.primary} />
@@ -420,7 +535,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             </View>
           </View>
 
-          {/* ── Sección 3: Información del Medidor ── */}
+          {/* ── Sección 4: Información del Medidor ── */}
           <View style={styles.seccion}>
             <View style={styles.seccionHeader}>
               <MaterialIcons name="speed" size={20} color={COLORS.primary} />
@@ -609,6 +724,11 @@ const styles = StyleSheet.create({
   errorText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.error,
+  },
+  opcional: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
+    fontStyle: 'italic',
   },
 
   // ── Chips estrato ──────────────────────────────────────────────────────────

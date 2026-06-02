@@ -162,6 +162,13 @@ const MIGRACION_007_SUSCRIPTOR_SUBSIDIO = `
 ALTER TABLE suscriptor ADD COLUMN aplica_subsidio INTEGER NOT NULL DEFAULT 0;
 `;
 
+const MIGRACION_008_SUSCRIPTOR_CAMPOS_UBICACION = `
+ALTER TABLE suscriptor ADD COLUMN cedula TEXT NOT NULL DEFAULT '';
+ALTER TABLE suscriptor ADD COLUMN municipio TEXT NOT NULL DEFAULT '';
+ALTER TABLE suscriptor ADD COLUMN sector TEXT;
+ALTER TABLE suscriptor ADD COLUMN calle TEXT;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -170,6 +177,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 5, nombre: '005_medidor', sql: MIGRACION_005_MEDIDOR },
   { version: 6, nombre: '006_cola_sync_fix_tipo', sql: MIGRACION_006_COLA_SYNC_FIX_TIPO },
   { version: 7, nombre: '007_suscriptor_add_aplica_subsidio', sql: MIGRACION_007_SUSCRIPTOR_SUBSIDIO },
+  { version: 8, nombre: '008_suscriptor_campos_ubicacion', sql: MIGRACION_008_SUSCRIPTOR_CAMPOS_UBICACION },
 ];
 
 const SQL_TABLA_CONTROL = `

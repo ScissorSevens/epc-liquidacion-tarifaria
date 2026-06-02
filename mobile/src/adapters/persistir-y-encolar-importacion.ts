@@ -138,15 +138,17 @@ export async function persistirYEncolarImportacion(
 
     // --- SUSCRIPTOR ---
     let idItemSusEsteLote: string | undefined;
+    const codigoFila = fila.codigo;
     if (!lineasSusDuplicado.has(fila.linea)) {
       // Fila trajo suscriptor nuevo. Si ya lo encolamos en una fila
       // anterior con el mismo codigo, reutilizamos el id; sino,
       // recuperamos de repo y encolamos.
-      const yaEncolado = idItemSusPorCodigo.get(fila.codigo);
+      const yaEncolado = codigoFila !== undefined ? idItemSusPorCodigo.get(codigoFila) : undefined;
       if (yaEncolado !== undefined) {
         idItemSusEsteLote = yaEncolado;
       } else {
-        const sus = await suscriptorRepo.buscarPorCodigo(fila.codigo);
+        const codigoBusqueda = codigoFila ?? '';
+        const sus = codigoBusqueda !== '' ? await suscriptorRepo.buscarPorCodigo(codigoBusqueda) : null;
         if (sus !== null) {
           const item = construirItem(
             'SUSCRIPTOR',
@@ -156,7 +158,9 @@ export async function persistirYEncolarImportacion(
           );
           await colaRepo.guardar(item);
           itemsEncolados.push(item);
-          idItemSusPorCodigo.set(fila.codigo, item.id);
+          if (codigoFila !== undefined) {
+            idItemSusPorCodigo.set(codigoFila, item.id);
+          }
           idItemSusEsteLote = item.id;
         }
       }
@@ -165,7 +169,9 @@ export async function persistirYEncolarImportacion(
     // --- MEDIDOR ---
     if (lineasMedDuplicado.has(fila.linea)) continue;
 
-    const med = await medidorRepo.buscarPorNumero(fila.numero_medidor);
+    const numeroMedidor = fila.numero_medidor;
+    if (numeroMedidor === undefined) continue;
+    const med = await medidorRepo.buscarPorNumero(numeroMedidor);
     if (med === null) continue; // defensivo: no deberia pasar si no hubo error.
 
     // Resolver dependeDe en orden de prioridad:

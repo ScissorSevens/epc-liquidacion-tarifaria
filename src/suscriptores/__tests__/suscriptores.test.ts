@@ -9,6 +9,8 @@ import { MENSAJES_ERROR_SUSCRIPTOR } from '../types';
 const inputValido: CrearSuscriptorInput = {
   codigo: '0005',
   nombre_apellidos: 'Juan Pérez',
+  cedula: '123456789',
+  municipio: 'Bogotá',
   direccion: 'Calle 5 #10-20',
   estrato: 3,
   aplica_subsidio: false,
@@ -21,6 +23,8 @@ describe('crearSuscriptor — factory de borrador', () => {
     expect(resultado).toEqual({
       codigo: '0005',
       nombre_apellidos: 'Juan Pérez',
+      cedula: '123456789',
+      municipio: 'Bogotá',
       direccion: 'Calle 5 #10-20',
       estrato: 3,
       aplica_subsidio: false,
@@ -130,5 +134,110 @@ describe('crearSuscriptor — estrato, opcionales y estado', () => {
   it('acepta estado suspendido y lo preserva', () => {
     const resultado = crearSuscriptor({ ...inputValido, estado: 'suspendido' });
     expect(resultado.estado).toBe('suspendido');
+  });
+});
+
+describe('crearSuscriptor — cedula', () => {
+  it('rechaza cedula vacía', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA,
+    );
+  });
+
+  it('rechaza cedula con solo espacios', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '   ' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA,
+    );
+  });
+
+  it('rechaza cedula con letras', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '123abc' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA,
+    );
+  });
+
+  it('rechaza cedula de 5 dígitos (mínimo 6)', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '12345' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA,
+    );
+  });
+
+  it('rechaza cedula de 13 dígitos (máximo 12)', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '1234567890123' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA,
+    );
+  });
+
+  it('acepta cedula de 6 dígitos (mínimo válido)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456' });
+    expect(resultado.cedula).toBe('123456');
+  });
+
+  it('acepta cedula de 12 dígitos (máximo válido)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456789012' });
+    expect(resultado.cedula).toBe('123456789012');
+  });
+
+  it('elimina espacios alrededor de la cedula', () => {
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '  123456  ' });
+    expect(resultado.cedula).toBe('123456');
+  });
+});
+
+describe('crearSuscriptor — municipio', () => {
+  it('rechaza municipio vacío', () => {
+    expect(() => crearSuscriptor({ ...inputValido, municipio: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_VACIO,
+    );
+  });
+
+  it('rechaza municipio de 101 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, municipio: 'a'.repeat(101) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_LARGO);
+  });
+
+  it('acepta municipio de 100 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, municipio: 'a'.repeat(100) });
+    expect(resultado.municipio).toHaveLength(100);
+  });
+
+  it('elimina espacios alrededor del municipio', () => {
+    const resultado = crearSuscriptor({ ...inputValido, municipio: '  Bogotá  ' });
+    expect(resultado.municipio).toBe('Bogotá');
+  });
+});
+
+describe('crearSuscriptor — sector y calle (opcionales)', () => {
+  it('rechaza sector de 101 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, sector: 'a'.repeat(101) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO);
+  });
+
+  it('acepta sector de 100 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, sector: 'a'.repeat(100) });
+    expect(resultado.sector).toHaveLength(100);
+  });
+
+  it('acepta sin sector (campo opcional)', () => {
+    const resultado = crearSuscriptor(inputValido);
+    expect(resultado).not.toHaveProperty('sector');
+  });
+
+  it('rechaza calle de 101 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, calle: 'a'.repeat(101) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA);
+  });
+
+  it('acepta calle de 100 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, calle: 'a'.repeat(100) });
+    expect(resultado.calle).toHaveLength(100);
+  });
+
+  it('acepta sin calle (campo opcional)', () => {
+    const resultado = crearSuscriptor(inputValido);
+    expect(resultado).not.toHaveProperty('calle');
   });
 });

@@ -7,6 +7,7 @@ const config: Config = {
   testMatch: [
     '<rootDir>/src/**/*.test.ts',
     '<rootDir>/mobile/__tests__/**/*.test.ts',
+    '<rootDir>/mobile/dominio/**/__tests__/**/*.test.ts',
   ],
   collectCoverageFrom: ['<rootDir>/src/**/*.ts', '!<rootDir>/src/**/*.test.ts'],
   coverageDirectory: 'coverage',
