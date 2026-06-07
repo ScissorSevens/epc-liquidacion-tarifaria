@@ -59,18 +59,19 @@ export default function RutaDeHoy({ navigation }: Props) {
     setError(null);
     try {
       const bootstrap = await getBootstrap();
-      const [listaSuscriptores, todasLecturas, itemsCola, todosMedidores] = await Promise.all([
+      // Mes actual YYYY-MM — calculado ANTES del Promise.all para usarlo en la query
+      const mesActual = new Date().toISOString().slice(0, 7);
+      const [listaSuscriptores, lecturasDelMes, itemsCola, todosMedidores] = await Promise.all([
         bootstrap.suscriptorRepo.listar(),
-        bootstrap.lecturaRepo.listar(),
+        bootstrap.lecturaRepo.listarPorMes(mesActual),
         bootstrap.colaRepo.listar(),
         bootstrap.medidorRepo.listar(),
       ]);
 
-      // Contar lecturas capturadas en el mes actual (YYYY-MM)
-      const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
+      // IDs de medidores con lectura capturada este mes
       const idsConLecturaHoy = new Set(
-        todasLecturas
-          .filter((l) => l.timestamp_captura.slice(0, 7) === mesActual)
+        lecturasDelMes
+          .filter((l) => l.id_medidor != null)
           .map((l) => l.id_medidor),
       );
 
