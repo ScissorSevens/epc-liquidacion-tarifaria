@@ -173,28 +173,28 @@ export default function RutaDeHoy({ navigation }: Props) {
         }
       />
 
+      {/* Banner conectividad — sticky entre TopBar y ScrollView */}
+      {isConnected === false && (
+        <View style={[styles.banner, styles.bannerOffline]}>
+          <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
+          <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOffline]}>
+            Sin conexión — los datos se guardarán localmente
+          </Text>
+        </View>
+      )}
+      {isConnected === true && (
+        <View style={[styles.banner, styles.bannerOnline]}>
+          <MaterialIcons name="cloud-done" size={20} color={COLORS.secondary} />
+          <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOnline]}>
+            Conectado — sincronización disponible
+          </Text>
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner conectividad */}
-        {isConnected === false && (
-          <View style={[styles.banner, styles.bannerOffline]}>
-            <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOffline]}>
-              Sin conexión — los datos se guardarán localmente
-            </Text>
-          </View>
-        )}
-        {isConnected === true && (
-          <View style={[styles.banner, styles.bannerOnline]}>
-            <MaterialIcons name="cloud-done" size={20} color={COLORS.secondary} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOnline]}>
-              Conectado — sincronización disponible
-            </Text>
-          </View>
-        )}
-
         {/* Sección de progreso */}
         <View style={styles.progresoCard}>
           <View style={styles.progresoRow}>
