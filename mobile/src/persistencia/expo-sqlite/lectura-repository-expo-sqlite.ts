@@ -79,6 +79,7 @@ const SQL_UPDATE_VALIDACION = `
   UPDATE lectura SET estado_validacion = ? WHERE id_lectura = ?
 `;
 const SQL_LIST_BY_MEDIDOR = `SELECT * FROM lectura WHERE id_medidor = ? ORDER BY timestamp_captura DESC LIMIT 20`;
+const SQL_LIST_BY_MES = `SELECT * FROM lectura WHERE timestamp_captura LIKE ? ORDER BY id_lectura`;
 
 function traducirError(
   err: unknown,
@@ -153,6 +154,7 @@ function aplicarFiltros(base: string, filtros?: FiltrosLectura): SqlConParams {
 export interface LecturaRepositoryExpoSqlite extends LecturaRepository {
   cerrar(): Promise<void>;
   listarPorMedidor(idMedidor: number): Promise<Lectura[]>;
+  listarPorMes(mes: string): Promise<Lectura[]>;
 }
 
 export function crearLecturaRepositoryExpoSqlite(
@@ -257,6 +259,11 @@ export function crearLecturaRepositoryExpoSqlite(
 
     async listarPorMedidor(idMedidor: number): Promise<Lectura[]> {
       const rows = await db.getAllAsync<LecturaRow>(SQL_LIST_BY_MEDIDOR, idMedidor);
+      return rows.map(fromRow);
+    },
+
+    async listarPorMes(mes: string): Promise<Lectura[]> {
+      const rows = await db.getAllAsync<LecturaRow>(SQL_LIST_BY_MES, `${mes}%`);
       return rows.map(fromRow);
     },
   };
