@@ -194,12 +194,8 @@ export default function Configuracion({ navigation }: Props) {
       setPerfil({ tipo: 'operario', operario });
     } catch (e) {
       // El operario se vinculó en el backend pero falló la persistencia local.
-      // Igual lo mostramos en pantalla — al reiniciar la app se recupera del backend.
+      // Igual lo mostramos en pantalla sin alert — al reiniciar la app se recupera del backend.
       setPerfil({ tipo: 'operario', operario });
-      Alert.alert(
-        'Aviso',
-        'Operario vinculado correctamente. Hubo un problema guardando datos locales — reiniciá la app si algo no se ve bien.',
-      );
     } finally {
       setAsignando(false);
     }
