@@ -64,7 +64,7 @@ export default function AppNavigator() {
       <Tab.Screen name="Inicio" component={InicioStack} />
       <Tab.Screen name="Lecturas" component={LecturasStack} />
       <Tab.Screen name="Sincronizacion" component={SyncStack} />
-      <Tab.Screen name="Config" component={ConfigStack} />
+      <Tab.Screen name="Config" component={ConfigStack} options={{ unmountOnBlur: true }} />
     </Tab.Navigator>
   );
 }
