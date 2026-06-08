@@ -83,8 +83,10 @@ export default function RutaDeHoy({ navigation }: Props) {
         }),
       );
 
-      // Contar items PENDIENTE en cola para el botón sticky
-      const pendientes = itemsCola.filter((i) => i.estado === 'PENDIENTE').length;
+      // Contar suscriptores PENDIENTE en cola para el botón sticky
+      const pendientes = itemsCola.filter(
+        (i) => i.tipo === 'SUSCRIPTOR' && i.estado === 'PENDIENTE',
+      ).length;
 
       setSuscriptores(listaSuscriptores);
       setCapturasHoy(idsConLecturaHoy.size);
@@ -247,7 +249,7 @@ export default function RutaDeHoy({ navigation }: Props) {
           >
             <MaterialIcons name="sync" size={20} color={COLORS.onPrimary} />
             <Text style={[TYPOGRAPHY.labelLg, styles.btnSyncText]}>
-              SINCRONIZAR ({pendientesCola} pendientes)
+              SINCRONIZAR ({pendientesCola} {pendientesCola === 1 ? 'suscriptor' : 'suscriptores'})
             </Text>
           </Pressable>
         </View>
