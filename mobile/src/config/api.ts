@@ -18,8 +18,13 @@
 
 import Constants from 'expo-constants';
 
-/** Puerto donde escucha MediApp.Api. Cambiar solo si se reconfigura el backend. */
-const PUERTO_BACKEND = 5180;
+/** Puerto donde escucha MediApp.Api.
+ *  - Desarrollo local (dotnet run): 5180
+ *  - Docker (docker compose):       5080
+ *  Usar 5080 como default para que Docker funcione sin tocar nada.
+ *  Si corrés dotnet run directamente, cambiá este valor a 5180.
+ */
+const PUERTO_BACKEND = 5080;
 
 interface ExtraConfig {
   apiBaseUrl?: string;
