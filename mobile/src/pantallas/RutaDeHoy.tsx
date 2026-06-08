@@ -206,10 +206,7 @@ export default function RutaDeHoy({ navigation }: Props) {
           <Pressable
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() =>
-              navigation.navigate('Lecturas', {
-                screen: 'DetalleSuscriptor',
-                params: { id_suscriptor: item.id_suscriptor },
-              })
+              navigation.navigate('DetalleSuscriptor', { id_suscriptor: item.id_suscriptor })
             }
           >
             <View style={styles.cardContent}>

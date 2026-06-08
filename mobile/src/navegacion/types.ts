@@ -20,6 +20,16 @@ import type {
 
 export type InicioStackParamList = {
   RutaDeHoy: undefined;
+  DetalleSuscriptor: { id_suscriptor: number };
+  CapturarLectura: { id_medidor: number; id_suscriptor: number };
+  CapturarFoto: { id_medidor: number; id_periodo: string; id_suscriptor: number };
+  ResultadoCalculo: {
+    lectura: Lectura;
+    resultado: ResultadoCalculoTipo;
+    parametros: ParametrosTarifa;
+    estrato: Estrato;
+    id_suscriptor: number;
+  };
 };
 
 export type LecturasStackParamList = {
