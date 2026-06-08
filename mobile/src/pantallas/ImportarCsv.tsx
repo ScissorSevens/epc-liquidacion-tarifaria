@@ -245,7 +245,10 @@ export default function ImportarCsv({ navigation }: Props) {
           <RenderResultado
             reporte={estado.reporte}
             archivoNombre={estado.archivoNombre}
-            onVolverInicio={() => navigation.navigate('Inicio', { screen: 'RutaDeHoy' })}
+            onVolverInicio={() => {
+              navigation.popToTop();
+              navigation.navigate('Inicio', { screen: 'RutaDeHoy' });
+            }}
             onImportarOtro={reset}
           />
         )}
