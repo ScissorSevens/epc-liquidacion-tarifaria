@@ -239,12 +239,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             <Text style={styles.btnPrimaryText}>VER HISTORIAL</Text>
           </Pressable>
           <Pressable
-            onPress={() =>
-              navigation.replace('CapturarLectura', {
-                id_medidor: lectura.id_medidor,
-                id_suscriptor,
-              })
-            }
+            onPress={() => navigation.navigate('Inicio', { screen: 'RutaDeHoy' })}
             style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
           >
             <Text style={styles.btnSecondaryText}>VOLVER A LA RUTA</Text>
