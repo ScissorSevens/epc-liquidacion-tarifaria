@@ -176,7 +176,21 @@ export default function Configuracion({ navigation }: Props) {
         return;
       }
 
-      operario = (await resp.json()) as Operario;
+      const raw = (await resp.json()) as {
+        id: number; numeroCedula: string; nombre: string;
+        email: string; rol: string; estado: string;
+        dispositivoId?: string; createdAt?: string;
+      };
+      operario = {
+        id_operario: raw.id,
+        numero_cedula: raw.numeroCedula,
+        nombre: raw.nombre,
+        email: raw.email,
+        rol: raw.rol,
+        estado: raw.estado,
+        dispositivo_id: raw.dispositivoId,
+        created_at: raw.createdAt,
+      };
     } catch {
       // Error de red — el backend no fue alcanzado
       Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
