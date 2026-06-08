@@ -90,7 +90,7 @@ function formatearFecha(iso: string): string {
  *   placeholder "— (sin evidencia foto)".
  */
 export default function ResultadoCalculo({ navigation, route }: Props) {
-  const { lectura, resultado, parametros, estrato, id_suscriptor } =
+  const { lectura, resultado, parametros, estrato, id_suscriptor, nombre_suscriptor } =
     route.params;
 
   const [detalleAbierto, setDetalleAbierto] = useState(true);
@@ -116,7 +116,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
       {/* Header */}
       <TopBar
         titulo="Factura calculada"
-        onBack={() => navigation.popToTop()}
+        onBack={() => navigation.goBack()}
       />
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -219,7 +219,10 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         {/* Acciones */}
         <View style={styles.actionsCol}>
           <Pressable
-            onPress={() => navigation.popToTop()}
+            onPress={() => navigation.navigate('Historial', {
+              id_suscriptor,
+              nombre: nombre_suscriptor,
+            })}
             style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
           >
             <MaterialIcons name="history" size={20} color={COLORS.onPrimary} />

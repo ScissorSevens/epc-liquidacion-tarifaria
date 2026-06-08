@@ -287,6 +287,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
         parametros: PARAMETROS_TARIFARIOS_DEMO,
         estrato,
         id_suscriptor,
+        nombre_suscriptor: suscriptor?.nombre_apellidos ?? '',
       });
     } catch (err) {
       const causa = (err as { cause?: { codigo?: string } })?.cause?.codigo;
