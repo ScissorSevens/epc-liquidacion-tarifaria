@@ -152,6 +152,9 @@ export default function Configuracion({ navigation }: Props) {
     }
 
     setAsignando(true);
+
+    // ── 1. Llamada al backend ─────────────────────────────────────────────────
+    let operario: Operario;
     try {
       const deviceId = await obtenerOCrearDeviceId();
       const baseUrl = obtenerApiBaseUrl();
@@ -168,20 +171,44 @@ export default function Configuracion({ navigation }: Props) {
 
       if (resp.status === 401 || resp.status === 404) {
         Alert.alert('Error', 'Cédula o contraseña incorrectos.');
+        setAsignando(false);
         return;
       }
       if (resp.status === 409) {
         Alert.alert('Dispositivo ocupado', 'Este dispositivo ya está vinculado a otro operario. Contactá al administrador.');
+        setAsignando(false);
         return;
       }
       if (!resp.ok) {
         Alert.alert('Error', `No se pudo asignar el operario (${resp.status}).`);
+        setAsignando(false);
         return;
       }
 
-      const operario = (await resp.json()) as Operario;
-      await AsyncStorage.setItem(CLAVE_CEDULA, cedula.trim());
+      const raw = (await resp.json()) as {
+        id: number; numeroCedula: string; nombre: string;
+        email: string; rol: string; estado: string;
+        dispositivoId?: string; createdAt?: string;
+      };
+      operario = {
+        id_operario: raw.id,
+        numero_cedula: raw.numeroCedula,
+        nombre: raw.nombre,
+        email: raw.email,
+        rol: raw.rol,
+        estado: raw.estado,
+        dispositivo_id: raw.dispositivoId,
+        created_at: raw.createdAt,
+      };
+    } catch {
+      Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
+      setAsignando(false);
+      return;
+    }
 
+    // ── 2. Persistencia local ─────────────────────────────────────────────────
+    try {
+      await AsyncStorage.setItem(CLAVE_CEDULA, cedula.trim());
       const bootstrap = await getBootstrap();
       const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
       await repo.inicializar();
@@ -191,7 +218,8 @@ export default function Configuracion({ navigation }: Props) {
       setPassword('');
       setPerfil({ tipo: 'operario', operario });
     } catch {
-      Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
+      // Vinculado en backend pero falló persistencia local — mostramos igual
+      setPerfil({ tipo: 'operario', operario });
     } finally {
       setAsignando(false);
     }
