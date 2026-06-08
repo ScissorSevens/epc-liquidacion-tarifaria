@@ -162,14 +162,17 @@ export default function Configuracion({ navigation }: Props) {
 
       if (resp.status === 401 || resp.status === 404) {
         Alert.alert('Error', 'Cédula o contraseña incorrectos.');
+        setAsignando(false);
         return;
       }
       if (resp.status === 409) {
         Alert.alert('Dispositivo ocupado', 'Este dispositivo ya está vinculado a otro operario. Contactá al administrador.');
+        setAsignando(false);
         return;
       }
       if (!resp.ok) {
         Alert.alert('Error', `No se pudo asignar el operario (${resp.status}).`);
+        setAsignando(false);
         return;
       }
 
