@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Modal,
@@ -79,6 +80,7 @@ type Estado =
  * pero no rompe — deuda explicita, ver reporte del sub-agente.
  */
 export default function ImportarCsv({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [estado, setEstado] = useState<Estado>({ fase: 'idle' });
   const [dialogFormatoVisible, setDialogFormatoVisible] = useState(false);
   const [dialogConfirmGrande, setDialogConfirmGrande] = useState<{
@@ -196,7 +198,7 @@ export default function ImportarCsv({ navigation }: Props) {
   return (
     <View style={styles.root}>
       {/* Header brutalist */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top, height: 56 + insets.top }]}>
         <Pressable
           onPress={() => navigation.goBack()}
           disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
@@ -208,7 +210,7 @@ export default function ImportarCsv({ navigation }: Props) {
         <View style={styles.headerBtn} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 80 + 20 }]}>
         {estado.fase === 'idle' && (
           <RenderIdle
             onSeleccionar={() => void seleccionarArchivo()}

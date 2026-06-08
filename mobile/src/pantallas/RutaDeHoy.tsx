@@ -47,18 +47,19 @@ export default function RutaDeHoy({ navigation }: Props) {
     setError(null);
     try {
       const bootstrap = await getBootstrap();
-      const [listaSuscriptores, todasLecturas, itemsCola, todosMedidores] = await Promise.all([
+      // Mes actual YYYY-MM — antes del Promise.all para usarlo en la query
+      const mesActual = new Date().toISOString().slice(0, 7);
+      const [listaSuscriptores, lecturasDelMes, itemsCola, todosMedidores] = await Promise.all([
         bootstrap.suscriptorRepo.listar(),
-        bootstrap.lecturaRepo.listar(),
+        bootstrap.lecturaRepo.listarPorMes(mesActual),
         bootstrap.colaRepo.listar(),
         bootstrap.medidorRepo.listar(),
       ]);
 
-      // Contar lecturas capturadas hoy (comparar fecha ISO-8601 con fecha local)
-      const hoy = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      // IDs de medidores con lectura capturada este mes
       const idsConLecturaHoy = new Set(
-        todasLecturas
-          .filter((l) => l.timestamp_captura.slice(0, 10) === hoy)
+        lecturasDelMes
+          .filter((l) => l.id_medidor != null)
           .map((l) => l.id_medidor),
       );
 
@@ -142,6 +143,24 @@ export default function RutaDeHoy({ navigation }: Props) {
         </View>
       </View>
 
+      {/* Banner conectividad — sticky entre header y lista */}
+      {isConnected === false && (
+        <View style={styles.banner}>
+          <MaterialIcons name="cloud-off" size={20} color={COLORS.primary} />
+          <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
+            Sin conexión — los datos se guardarán acá
+          </Text>
+        </View>
+      )}
+      {isConnected === true && (
+        <View style={[styles.banner, styles.bannerOnline]}>
+          <MaterialIcons name="cloud-done" size={20} color={COLORS.primary} />
+          <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
+            Conectado — sincronización disponible
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={suscriptores}
         keyExtractor={(item) => String(item.id_suscriptor)}
@@ -150,16 +169,6 @@ export default function RutaDeHoy({ navigation }: Props) {
         }
         ListHeaderComponent={
           <>
-            {/* Banner offline */}
-            {isConnected === false && (
-              <View style={styles.banner}>
-                <MaterialIcons name="cloud-off" size={20} color={COLORS.primary} />
-                <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
-                  Sin conexión — los datos se guardarán acá
-                </Text>
-              </View>
-            )}
-
             {/* Progreso */}
             <View style={styles.progresoSection}>
               <View style={styles.progresoRow}>
@@ -296,6 +305,10 @@ const styles = StyleSheet.create({
   bannerText: {
     color: COLORS.primary,
     flex: 1,
+  },
+  bannerOnline: {
+    backgroundColor: COLORS.background,
+    borderColor: COLORS.secondary ?? COLORS.primary,
   },
   progresoSection: {
     paddingHorizontal: SPACING.margin,

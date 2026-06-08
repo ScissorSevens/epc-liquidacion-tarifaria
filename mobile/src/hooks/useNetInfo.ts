@@ -1,27 +1,36 @@
 /**
  * Hook wrapper para información de conectividad de red.
  *
- * SHIM INTENCIONAL: `@react-native-community/netinfo` NO está instalado en
- * este proyecto. Este hook retorna siempre `{ isConnected: false }`, lo que
- * hace que el banner "Sin conexión" en RutaDeHoy sea siempre visible.
+ * Usa @react-native-community/netinfo para detectar el estado real de red.
+ * Retorna { isConnected: boolean | null }:
+ *   - null  → estado inicial, aún no determinado
+ *   - true  → con conexión
+ *   - false → sin conexión
  *
- * Esto es correcto para el comportamiento offline-first de MediApp: los datos
- * siempre se guardan localmente y se sincronizan manualmente desde el tab
- * SINCRONIZACIÓN.
- *
- * Para conectar el estado de red real en el futuro:
- *   1. `npm install @react-native-community/netinfo`
- *   2. Reemplazar el cuerpo de este hook por:
- *      ```ts
- *      import NetInfo from '@react-native-community/netinfo';
- *      export function useNetInfo() {
- *        const [state, setState] = useState<{ isConnected: boolean | null }>({ isConnected: null });
- *        useEffect(() => NetInfo.addEventListener(s => setState({ isConnected: s.isConnected })), []);
- *        return state;
- *      }
- *      ```
- *   3. Sin tocar ninguna pantalla — el contrato del hook no cambia.
+ * fetch() consulta el estado actual al montar — sin esto isConnected queda
+ * en null hasta que cambie la red por primera vez.
+ * addEventListener actualiza reactivamente ante cada cambio de red.
  */
+import { useEffect, useState } from 'react';
+import NetInfo from '@react-native-community/netinfo';
+
 export function useNetInfo(): { isConnected: boolean | null } {
-  return { isConnected: false };
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Consulta estado actual al montar
+    NetInfo.fetch().then((state) => {
+      setIsConnected(state.isConnected);
+    }).catch(() => {
+      setIsConnected(false);
+    });
+
+    // Escucha cambios reactivos
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected);
+    });
+    return unsubscribe;
+  }, []);
+
+  return { isConnected };
 }

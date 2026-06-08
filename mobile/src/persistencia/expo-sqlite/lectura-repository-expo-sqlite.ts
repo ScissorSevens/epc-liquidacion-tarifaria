@@ -69,6 +69,7 @@ const SQL_INSERT = `
 `;
 const SQL_SELECT_BY_ID = `SELECT * FROM lectura WHERE id_lectura = ?`;
 const SQL_SELECT_BY_PERIODO = `SELECT * FROM lectura WHERE id_periodo = ? ORDER BY id_lectura`;
+const SQL_LIST_BY_MES = `SELECT * FROM lectura WHERE timestamp_captura LIKE ? || '%' ORDER BY id_lectura`;
 const SQL_SELECT_PENDIENTES_SYNC = `SELECT * FROM lectura WHERE estado_sync = 'pendiente' ORDER BY id_lectura`;
 const SQL_EXISTE = `SELECT 1 AS uno FROM lectura WHERE id_medidor = ? AND id_periodo = ? LIMIT 1`;
 const SQL_UPDATE_SYNC = `
@@ -150,6 +151,7 @@ function aplicarFiltros(base: string, filtros?: FiltrosLectura): SqlConParams {
 }
 
 export interface LecturaRepositoryExpoSqlite extends LecturaRepository {
+  listarPorMes(mes: string): Promise<Lectura[]>;
   cerrar(): Promise<void>;
 }
 
@@ -247,6 +249,11 @@ export function crearLecturaRepositoryExpoSqlite(
         idPeriodo,
       );
       return row !== null && row !== undefined;
+    },
+
+    async listarPorMes(mes: string): Promise<Lectura[]> {
+      const rows = await db.getAllAsync<LecturaRow>(SQL_LIST_BY_MES, mes);
+      return rows.filter((r) => r.id_medidor != null).map(fromRow);
     },
 
     async cerrar(): Promise<void> {
