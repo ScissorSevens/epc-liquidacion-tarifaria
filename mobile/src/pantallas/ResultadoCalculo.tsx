@@ -233,12 +233,6 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         {/* Acciones */}
         <View style={styles.actionsCol}>
           <Pressable
-            onPress={() => navigation.popToTop()}
-            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-          >
-            <Text style={styles.btnPrimaryText}>VER HISTORIAL</Text>
-          </Pressable>
-          <Pressable
             onPress={() => navigation.navigate('Inicio', { screen: 'RutaDeHoy' })}
             style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
           >
