@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
@@ -99,6 +100,10 @@ export default function RutaDeHoy({ navigation }: Props) {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  // Recarga silenciosa al volver a enfocar la pantalla
+  // (ej: después de importar CSV o capturar una lectura)
+  useFocusEffect(useCallback(() => { void cargar(); }, [cargar]));
 
   const fechaHoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long',
