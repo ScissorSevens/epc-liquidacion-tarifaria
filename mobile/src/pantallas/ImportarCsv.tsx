@@ -209,7 +209,7 @@ export default function ImportarCsv({ navigation }: Props) {
       {/* Header brutalist */}
       <View style={[styles.header, { paddingTop: insets.top, height: 56 + insets.top }]}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('Configuracion')}
           disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
           style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
         >

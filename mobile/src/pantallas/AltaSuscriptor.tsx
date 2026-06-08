@@ -248,7 +248,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
       mostrarSnack('Suscriptor y medidor creados correctamente', 'ok');
       setTimeout(() => {
-        navigation.goBack();
+        navigation.navigate('Configuracion');
       }, 800);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -265,7 +265,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
       {/* Header brutalist */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('Configuracion')}
           disabled={enviando}
           style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
         >
@@ -473,7 +473,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
       {/* Bottom bar fijo */}
       <View style={styles.bottomBar}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('Configuracion')}
           disabled={enviando}
           style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
         >
