@@ -132,7 +132,7 @@ export default function Configuracion({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { cargarPerfil(); }, [cargarPerfil]));
 
-  async function asignarOperario(): Promise<void> {
+   async function asignarOperario(): Promise<void> {
     if (!cedula.trim()) {
       Alert.alert('Campo requerido', 'Ingresá tu número de cédula.');
       return;
@@ -143,6 +143,9 @@ export default function Configuracion({ navigation }: Props) {
     }
 
     setAsignando(true);
+
+    // ── 1. Llamada al backend ─────────────────────────────────────────────────
+    let operario: Operario;
     try {
       const deviceId = await obtenerOCrearDeviceId();
       const baseUrl = obtenerApiBaseUrl();
@@ -161,35 +164,42 @@ export default function Configuracion({ navigation }: Props) {
         Alert.alert('Error', 'Cédula o contraseña incorrectos.');
         return;
       }
-
       if (resp.status === 409) {
         Alert.alert('Dispositivo ocupado', 'Este dispositivo ya está vinculado a otro operario. Contactá al administrador.');
         return;
       }
-
       if (!resp.ok) {
         Alert.alert('Error', `No se pudo asignar el operario (${resp.status}).`);
         return;
       }
 
-      const operario = (await resp.json()) as Operario;
+      operario = (await resp.json()) as Operario;
+    } catch {
+      // Error de red — el backend no fue alcanzado
+      Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
+      setAsignando(false);
+      return;
+    }
 
-      // Guardar cédula localmente para futuras cargas
+    // ── 2. Persistencia local (operario ya viene del backend) ─────────────────
+    try {
       await AsyncStorage.setItem(CLAVE_CEDULA, cedula.trim());
-
-      // Persistir operario en SQLite para que funcione sin red
       const bootstrap = await getBootstrap();
       const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
       await repo.inicializar();
       await repo.guardar(operario);
 
-      // Limpiar formulario
       setCedula('');
       setPassword('');
-
       setPerfil({ tipo: 'operario', operario });
-    } catch {
-      Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
+    } catch (e) {
+      // El operario se vinculó en el backend pero falló la persistencia local.
+      // Igual lo mostramos en pantalla — al reiniciar la app se recupera del backend.
+      setPerfil({ tipo: 'operario', operario });
+      Alert.alert(
+        'Aviso',
+        'Operario vinculado correctamente. Hubo un problema guardando datos locales — reiniciá la app si algo no se ve bien.',
+      );
     } finally {
       setAsignando(false);
     }
