@@ -11,7 +11,6 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { parsearCSV } from '@dominio/importacion/parser-csv';
 import type {
@@ -80,7 +79,6 @@ type Estado =
  * pero no rompe — deuda explicita, ver reporte del sub-agente.
  */
 export default function ImportarCsv({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
   const [estado, setEstado] = useState<Estado>({ fase: 'idle' });
   const [dialogFormatoVisible, setDialogFormatoVisible] = useState(false);
   const [dialogConfirmGrande, setDialogConfirmGrande] = useState<{
@@ -198,7 +196,7 @@ export default function ImportarCsv({ navigation }: Props) {
   return (
     <View style={styles.root}>
       {/* Top App Bar */}
-      <View style={[styles.header, { paddingTop: insets.top, height: 64 + insets.top }]}>
+      <View style={styles.header}>
         <View style={styles.headerIzq}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -213,7 +211,7 @@ export default function ImportarCsv({ navigation }: Props) {
         <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 80 + SPACING.md }]}>
+      <ScrollView contentContainerStyle={styles.scroll}>
         {estado.fase === 'idle' && (
           <RenderIdle
             onSeleccionar={() => void seleccionarArchivo()}

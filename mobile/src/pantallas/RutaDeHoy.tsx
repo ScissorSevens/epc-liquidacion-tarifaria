@@ -59,19 +59,18 @@ export default function RutaDeHoy({ navigation }: Props) {
     setError(null);
     try {
       const bootstrap = await getBootstrap();
-      // Mes actual YYYY-MM — calculado ANTES del Promise.all para usarlo en la query
-      const mesActual = new Date().toISOString().slice(0, 7);
-      const [listaSuscriptores, lecturasDelMes, itemsCola, todosMedidores] = await Promise.all([
+      const [listaSuscriptores, todasLecturas, itemsCola, todosMedidores] = await Promise.all([
         bootstrap.suscriptorRepo.listar(),
-        bootstrap.lecturaRepo.listarPorMes(mesActual),
+        bootstrap.lecturaRepo.listar(),
         bootstrap.colaRepo.listar(),
         bootstrap.medidorRepo.listar(),
       ]);
 
-      // IDs de medidores con lectura capturada este mes
+      // Contar lecturas capturadas en el mes actual (YYYY-MM)
+      const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
       const idsConLecturaHoy = new Set(
-        lecturasDelMes
-          .filter((l) => l.id_medidor != null)
+        todasLecturas
+          .filter((l) => l.timestamp_captura.slice(0, 7) === mesActual)
           .map((l) => l.id_medidor),
       );
 
@@ -173,28 +172,28 @@ export default function RutaDeHoy({ navigation }: Props) {
         }
       />
 
-      {/* Banner conectividad — sticky entre TopBar y ScrollView */}
-      {isConnected === false && (
-        <View style={[styles.banner, styles.bannerOffline]}>
-          <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
-          <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOffline]}>
-            Sin conexión — los datos se guardarán localmente
-          </Text>
-        </View>
-      )}
-      {isConnected === true && (
-        <View style={[styles.banner, styles.bannerOnline]}>
-          <MaterialIcons name="cloud-done" size={20} color={COLORS.secondary} />
-          <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOnline]}>
-            Conectado — sincronización disponible
-          </Text>
-        </View>
-      )}
-
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Banner conectividad */}
+        {isConnected === false && (
+          <View style={[styles.banner, styles.bannerOffline]}>
+            <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
+            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOffline]}>
+              Sin conexión — los datos se guardarán localmente
+            </Text>
+          </View>
+        )}
+        {isConnected === true && (
+          <View style={[styles.banner, styles.bannerOnline]}>
+            <MaterialIcons name="cloud-done" size={20} color={COLORS.secondary} />
+            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOnline]}>
+              Conectado — sincronización disponible
+            </Text>
+          </View>
+        )}
+
         {/* Sección de progreso */}
         <View style={styles.progresoCard}>
           <View style={styles.progresoRow}>
