@@ -48,7 +48,7 @@ export default function Login({ navigation }: Props) {
       >
         {/* Encabezado */}
         <View style={estilos.encabezado}>
-          <Text style={estilos.tituloApp}>AquaRuta</Text>
+          <Text style={estilos.tituloApp}>AquaServices</Text>
         </View>
 
         {/* Card de login */}

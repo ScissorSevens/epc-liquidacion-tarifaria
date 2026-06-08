@@ -121,7 +121,7 @@ export default function CapturarFoto({ navigation, route }: Props) {
               Permiso de camara requerido
             </Text>
             <Text variant="bodyMedium" style={styles.mensaje}>
-              AquaRuta necesita acceso a la camara para registrar la
+              AquaServices necesita acceso a la camara para registrar la
               evidencia fotografica del medidor.
             </Text>
             <Button

@@ -1,5 +1,5 @@
 /**
- * Tipos centralizados de navegación para AquaRuta.
+ * Tipos centralizados de navegación para AquaServices.
  *
  * Un único archivo con todos los ParamLists y helpers de screen props
  * evita import cycles entre stacks y es el único lugar donde cambiar rutas.

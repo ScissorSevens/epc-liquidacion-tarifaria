@@ -41,7 +41,7 @@ export function smokeDominio(): ResultadoSmokeDominio {
 
     return {
       estado: 'OK',
-      mensaje: 'AquaRuta - Dominio cargado correctamente',
+      mensaje: 'AquaServices - Dominio cargado correctamente',
       timestamp: new Date().toISOString(),
       smokeMotorTarifario: {
         consumoM3: resultado.consumo,

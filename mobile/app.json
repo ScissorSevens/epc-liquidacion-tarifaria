@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "AquaRuta",
+    "name": "AquaServices",
     "slug": "mediapp",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -16,7 +16,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.ikhthys.aquaruta",
+      "package": "com.ikhthys.aquaservices",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#031632"
@@ -35,7 +35,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "AquaRuta necesita la camara para registrar la evidencia fotografica del medidor.",
+          "cameraPermission": "AquaServices necesita la camara para registrar la evidencia fotografica del medidor.",
           "recordAudioAndroid": false
         }
       ]

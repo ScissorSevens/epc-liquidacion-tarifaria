@@ -1,4 +1,4 @@
-// Resolución de la URL base del backend AquaRuta.
+// Resolución de la URL base del backend AquaServices.
 //
 // Estrategia de resolución (en orden de prioridad):
 //
@@ -18,7 +18,7 @@
 
 import Constants from 'expo-constants';
 
-/** Puerto donde escucha AquaRuta.Api. Cambiar solo si se reconfigura el backend. */
+/** Puerto donde escucha AquaServices.Api. Cambiar solo si se reconfigura el backend. */
 const PUERTO_BACKEND = 5180;
 
 interface ExtraConfig {
@@ -26,7 +26,7 @@ interface ExtraConfig {
 }
 
 /**
- * URL base del backend AquaRuta para esta sesión de Expo.
+ * URL base del backend AquaServices para esta sesión de Expo.
  *
  * En desarrollo resuelve automáticamente la IP del host desde `hostUri`,
  * por lo que funciona sin cambios al moverse entre redes.

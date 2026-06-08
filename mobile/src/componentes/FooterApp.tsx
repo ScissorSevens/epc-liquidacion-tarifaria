@@ -11,7 +11,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 export function FooterApp() {
   return (
     <View style={estilos.contenedor}>
-      <Text style={estilos.texto}>AQUARUTA V0.1.0</Text>
+      <Text style={estilos.texto}>AQUASERVICES V0.1.0</Text>
     </View>
   );
 }

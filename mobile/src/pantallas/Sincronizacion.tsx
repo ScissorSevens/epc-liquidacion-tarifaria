@@ -42,7 +42,7 @@ const formatHora = (d: Date): string =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 
 /**
- * Pantalla de sincronizacion manual con el backend AquaRuta.
+ * Pantalla de sincronizacion manual con el backend AquaServices.
  *
  * Permite al operario:
  *  - Probar la conectividad contra `${baseUrl}/health`.
@@ -229,7 +229,7 @@ export default function Sincronizacion(_props: Props) {
   return (
     <View style={styles.container}>
       {/* TopAppBar */}
-      <TopBar titulo="AquaRuta" />
+      <TopBar titulo="AquaServices" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
