@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -90,7 +92,14 @@ export default function ImportarCsv({ navigation }: Props) {
 
   function reset() {
     setEstado({ fase: 'idle' });
+    setDialogFormatoVisible(false);
+    setDialogConfirmGrande({ visible: false, archivo: null });
   }
+
+  // Resetea estado al perder foco — evita que quede pegada en fase resultado
+  useFocusEffect(useCallback(() => {
+    return () => { reset(); };
+  }, []));
 
   async function seleccionarArchivo() {
     setEstado({ fase: 'leyendo' });
@@ -236,7 +245,7 @@ export default function ImportarCsv({ navigation }: Props) {
           <RenderResultado
             reporte={estado.reporte}
             archivoNombre={estado.archivoNombre}
-            onVolverInicio={() => navigation.popToTop()}
+            onVolverInicio={() => navigation.goBack()}
             onImportarOtro={reset}
           />
         )}
