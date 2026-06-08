@@ -248,10 +248,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
       mostrarSnack('Suscriptor y medidor creados correctamente', 'ok');
       setTimeout(() => {
-        navigation.navigate('Lecturas', {
-          screen: 'DetalleSuscriptor',
-          params: { id_suscriptor: sus.id_suscriptor },
-        });
+        navigation.goBack();
       }, 800);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
