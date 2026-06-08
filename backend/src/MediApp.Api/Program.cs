@@ -111,6 +111,13 @@ try
 
     app.UseSerilogRequestLogging();
 
+    // Aplicar migraciones pendientes al iniciar (idempotente — no hace nada si ya están aplicadas).
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<MediAppDbContext>();
+        await db.Database.MigrateAsync();
+    }
+
     // Health endpoint con AddDbContextCheck (responde 200 + status JSON, 503 si DB no responde).
     app.MapHealthChecks("/health");
 
