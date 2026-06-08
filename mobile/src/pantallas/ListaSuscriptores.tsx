@@ -118,7 +118,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           </View>
           <Pressable
             style={({ pressed }) => [styles.btnAgregar, pressed && styles.btnPressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'AltaSuscriptor' })}
+            onPress={() => navigation.navigate('AltaSuscriptor')}
           >
             <MaterialIcons name="add" size={24} color={COLORS.onPrimary} />
           </Pressable>
@@ -172,7 +172,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           </Text>
           <Pressable
             style={({ pressed }) => [styles.btnPrimario, pressed && styles.btnPressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'AltaSuscriptor' })}
+            onPress={() => navigation.navigate('AltaSuscriptor')}
           >
             <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>AGREGAR SUSCRIPTOR</Text>
           </Pressable>

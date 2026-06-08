@@ -44,6 +44,7 @@ export type LecturasStackParamList = {
     estrato: Estrato;
     id_suscriptor: number;
   };
+  AltaSuscriptor: undefined;
 };
 
 export type SyncStackParamList = {

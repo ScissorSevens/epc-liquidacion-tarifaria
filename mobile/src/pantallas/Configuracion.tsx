@@ -254,7 +254,7 @@ export default function Configuracion({ navigation }: Props) {
       <View style={styles.seccion}>
         <Pressable
           style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-          onPress={() => navigation.replace('AltaSuscriptor')}
+          onPress={() => navigation.navigate('AltaSuscriptor')}
         >
           <MaterialIcons name="person-add" size={24} color={COLORS.primary} />
           <Text style={[TYPOGRAPHY.bodyMd, styles.itemText]}>Agregar suscriptor</Text>
@@ -265,7 +265,7 @@ export default function Configuracion({ navigation }: Props) {
 
         <Pressable
           style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-          onPress={() => navigation.replace('ImportarCsv')}
+          onPress={() => navigation.navigate('ImportarCsv')}
         >
           <MaterialIcons name="upload-file" size={24} color={COLORS.primary} />
           <Text style={[TYPOGRAPHY.bodyMd, styles.itemText]}>Importar desde CSV</Text>
