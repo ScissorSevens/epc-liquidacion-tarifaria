@@ -9,6 +9,7 @@ namespace MediApp.Api.Dominio.Puertos;
 public interface IRepositorioOperario
 {
     Task<IReadOnlyList<Operario>> ListarAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<Operario>> ListarActivosAsync(CancellationToken ct = default);
     Task<Operario?> ObtenerPorIdAsync(int id, CancellationToken ct = default);
     Task AgregarAsync(Operario entidad, CancellationToken ct = default);
     Task GuardarCambiosAsync(CancellationToken ct = default);

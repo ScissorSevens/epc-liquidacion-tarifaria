@@ -20,12 +20,9 @@ public class ServicioOperarios : IServicioOperarios
     public async Task<IReadOnlyList<Operario>> ListarAsync(CancellationToken ct = default)
         => await _repositorio.ListarAsync(ct);
 
-    /// <summary>Retorna todos los operarios activos.</summary>
+    /// <summary>Retorna todos los operarios activos delegando el filtrado a la base de datos.</summary>
     public async Task<IReadOnlyList<Operario>> ListarActivosAsync(CancellationToken ct = default)
-    {
-        var todos = await _repositorio.ListarAsync(ct);
-        return todos.Where(o => o.Estado == "activo").ToList();
-    }
+        => await _repositorio.ListarActivosAsync(ct);
 
     /// <summary>Retorna un operario por Id, o null si no existe.</summary>
     public async Task<Operario?> ObtenerPorIdAsync(int id, CancellationToken ct = default)
