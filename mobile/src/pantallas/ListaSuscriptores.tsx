@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { FilaSuscriptor } from '../componentes/FilaSuscriptor';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -100,50 +101,25 @@ export default function ListaSuscriptores({ navigation }: Props) {
     [navigation],
   );
 
+  const keyExtractor = useCallback(
+    (item: Suscriptor) => String(item.id_suscriptor),
+    [],
+  );
+
+  const handleVerFicha = useCallback(
+    (id: number) => navigation.navigate('DetalleSuscriptor', { id_suscriptor: id }),
+    [navigation],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: Suscriptor }) => (
-      <View style={styles.card}>
-        {/* Código + Nombre */}
-        <Text style={styles.cardCodigo}>#{item.codigo}</Text>
-        <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]} numberOfLines={1}>
-          {item.nombre_apellidos}
-        </Text>
-
-        {/* Dirección */}
-        {item.direccion !== '' && (
-          <View style={styles.cardDireccionRow}>
-            <MaterialIcons name="location-on" size={14} color={COLORS.onSurfaceVariant} />
-            <Text style={[TYPOGRAPHY.labelMd, styles.cardDireccion]} numberOfLines={1}>
-              {item.direccion}
-            </Text>
-          </View>
-        )}
-
-        {/* Acciones: Ficha (ghost) + Tomar lectura (pill) */}
-        <View style={styles.cardAcciones}>
-          <Pressable
-            style={({ pressed }) => [styles.btnFicha, pressed && styles.pressed]}
-            onPress={() =>
-              navigation.navigate('DetalleSuscriptor', {
-                id_suscriptor: item.id_suscriptor,
-              })
-            }
-          >
-            <MaterialIcons name="info-outline" size={14} color={COLORS.secondary} />
-            <Text style={[TYPOGRAPHY.labelMd, styles.btnFichaTexto]}>Ver ficha</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
-            onPress={() => { void navegarACapturar(item); }}
-          >
-            <MaterialIcons name="add-a-photo" size={14} color={COLORS.onPrimary} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>TOMAR LECTURA</Text>
-          </Pressable>
-        </View>
-      </View>
+      <FilaSuscriptor
+        item={item}
+        onVerFicha={handleVerFicha}
+        onCapturarLectura={navegarACapturar}
+      />
     ),
-    [navigation, navegarACapturar],
+    [handleVerFicha, navegarACapturar],
   );
 
   return (
@@ -208,7 +184,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
         ) : (
           <FlatList
             data={filtrados}
-            keyExtractor={(item) => String(item.id_suscriptor)}
+            keyExtractor={keyExtractor}
             renderItem={renderItem}
             scrollEnabled={false}
             contentContainerStyle={styles.lista}
@@ -357,60 +333,12 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  // ── Cards ─────────────────────────────────────────────────────────────────
+  // ── Lista ──────────────────────────────────────────────────────────────────
   lista: {
     gap: SPACING.sm + 4,
   },
-  card: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    paddingHorizontal: SPACING.margin,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm + 4,
-    gap: SPACING.xs,
-    ...SHADOWS.card,
-  },
-  cardCodigo: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.secondary,
-    letterSpacing: 0.5,
-    opacity: 0.8,
-  },
-  cardNombre: {
-    color: COLORS.primary,
-    marginBottom: SPACING.xs,
-  },
-  cardDireccionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: SPACING.xs,
-  },
-  cardDireccion: {
-    color: COLORS.onSurfaceVariant,
-    flex: 1,
-  },
 
-  // ── Acciones en una sola fila ──────────────────────────────────────────────
-  cardAcciones: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: SPACING.xs + 2,
-  },
-  btnFicha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.xs,
-  },
-  btnFichaTexto: {
-    color: COLORS.secondary,
-  },
+  // ── Botones compartidos (usados también en el estado de error/retry) ────────
   btnTomarLectura: {
     flexDirection: 'row',
     alignItems: 'center',
