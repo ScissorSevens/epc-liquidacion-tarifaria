@@ -19,6 +19,7 @@ public class RepositorioLecturaEF : IRepositorioLectura
 
     public async Task<IReadOnlyList<Lectura>> ListarAsync(CancellationToken ct = default)
         => await _db.Lecturas
+            .AsNoTracking()
             .Include(l => l.Medidor)
                 .ThenInclude(m => m!.Suscriptor)
             .OrderByDescending(l => l.Periodo)

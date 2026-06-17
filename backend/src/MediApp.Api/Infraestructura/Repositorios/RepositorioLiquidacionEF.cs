@@ -19,6 +19,7 @@ public class RepositorioLiquidacionEF : IRepositorioLiquidacion
 
     public async Task<IReadOnlyList<Liquidacion>> ListarAsync(CancellationToken ct = default)
         => await _db.Liquidaciones
+            .AsNoTracking()
             .Include(liq => liq.Lectura)
                 .ThenInclude(l => l!.Medidor)
                     .ThenInclude(m => m!.Suscriptor)

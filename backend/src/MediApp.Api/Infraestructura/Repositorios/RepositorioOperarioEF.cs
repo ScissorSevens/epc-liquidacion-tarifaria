@@ -20,6 +20,14 @@ public class RepositorioOperarioEF : IRepositorioOperario
 
     public async Task<IReadOnlyList<Operario>> ListarAsync(CancellationToken ct = default)
         => await _db.Operarios
+            .AsNoTracking()
+            .OrderBy(o => o.Nombre)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Operario>> ListarActivosAsync(CancellationToken ct = default)
+        => await _db.Operarios
+            .AsNoTracking()
+            .Where(o => o.Estado == "activo")
             .OrderBy(o => o.Nombre)
             .ToListAsync(ct);
 

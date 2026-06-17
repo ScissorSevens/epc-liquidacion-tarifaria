@@ -19,6 +19,7 @@ public class RepositorioSuscriptorEF : IRepositorioSuscriptor
 
     public async Task<IReadOnlyList<Suscriptor>> ListarAsync(CancellationToken ct = default)
         => await _db.Suscriptores
+            .AsNoTracking()
             .OrderBy(s => s.Codigo)
             .ToListAsync(ct);
 

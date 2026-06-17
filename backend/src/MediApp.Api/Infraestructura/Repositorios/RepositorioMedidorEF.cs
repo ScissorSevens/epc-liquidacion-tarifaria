@@ -19,6 +19,7 @@ public class RepositorioMedidorEF : IRepositorioMedidor
 
     public async Task<IReadOnlyList<Medidor>> ListarAsync(CancellationToken ct = default)
         => await _db.Medidores
+            .AsNoTracking()
             .Include(m => m.Suscriptor)
             .OrderBy(m => m.NumeroMedidor)
             .ToListAsync(ct);
