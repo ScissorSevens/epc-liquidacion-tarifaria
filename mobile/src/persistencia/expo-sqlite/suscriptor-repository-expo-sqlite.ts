@@ -40,7 +40,6 @@ interface SuscriptorRow {
   readonly cedula: string;
   readonly municipio: string;
   readonly sector: string | null;
-  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
@@ -63,7 +62,6 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
     ...(row.sector !== null && { sector: row.sector }),
-    ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
       matricula_inmobiliaria: row.matricula_inmobiliaria,
     }),
@@ -78,8 +76,8 @@ const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
     matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio,
-    cedula, municipio, sector, calle
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    cedula, municipio, sector
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
@@ -90,6 +88,19 @@ const SQL_MAX_CODIGO = `SELECT MAX(CAST(codigo AS INTEGER)) AS max_codigo FROM s
 // orden natural de presentacion para listas de clientes.
 const SQL_LISTAR = `SELECT * FROM suscriptor ORDER BY codigo ASC`;
 const SQL_UPDATE_SUBSIDIO = `UPDATE suscriptor SET aplica_subsidio = ? WHERE id_suscriptor = ?`;
+
+const SQL_UPDATE = `
+  UPDATE suscriptor
+  SET nombre_apellidos       = ?,
+      municipio              = ?,
+      sector                 = ?,
+      direccion              = ?,
+      estrato                = ?,
+      matricula_inmobiliaria = ?,
+      numero_catastral       = ?,
+      estado                 = ?
+  WHERE id_suscriptor        = ?
+`;
 
 /**
  * Traduce errores expo-sqlite a mensajes de dominio especificos para
@@ -129,7 +140,6 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.cedula,
           data.municipio,
           data.sector ?? null,
-          data.calle ?? null,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });
@@ -171,10 +181,27 @@ export function crearSuscriptorRepositoryExpoSqlite(
       return rows.map(fromRow);
     },
 
-    async actualizar(_id: number, _cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
-      throw new Error(
-        'actualizar: no implementado todavia — fuera de scope de la versión actual',
+    async actualizar(id: number, cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
+      const result = await db.runAsync(
+        SQL_UPDATE,
+        cambios.nombre_apellidos ?? null,
+        cambios.municipio        ?? null,
+        cambios.sector           ?? null,
+        cambios.direccion        ?? null,
+        cambios.estrato          ?? null,
+        cambios.matricula_inmobiliaria ?? null,
+        cambios.numero_catastral ?? null,
+        cambios.estado           ?? null,
+        id,
       );
+      if (result.changes === 0) {
+        throw new Error(`actualizar: suscriptor ${id} no encontrado`);
+      }
+      const row = await db.getFirstAsync<SuscriptorRow>(SQL_SELECT_BY_ID, id);
+      if (!row) {
+        throw new Error(`actualizar: suscriptor ${id} no encontrado tras UPDATE`);
+      }
+      return fromRow(row);
     },
 
     async toggleSubsidio(id: number, valor: boolean): Promise<Suscriptor> {

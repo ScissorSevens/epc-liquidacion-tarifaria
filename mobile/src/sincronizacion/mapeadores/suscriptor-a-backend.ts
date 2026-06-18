@@ -32,6 +32,10 @@ import type { Suscriptor } from '@dominio/suscriptores/types';
  *   - estado: ∈ {activo, inactivo, suspendido}.
  *   - createdAt: ISO 8601.
  *   - idCliente: regex `^[\w-]+:\d+$`, MaxLength 120.
+ *   - cedula: MaxLength 20 (opcional, When condicional).
+ *   - municipio: MaxLength 100 (opcional, When condicional).
+ *   - sector: MaxLength 100 (opcional, When condicional).
+ *   - aplicaSubsidio: bool? (sin validacion de formato).
  */
 export interface SuscriptorPayloadBackend {
   codigo: string;
@@ -43,6 +47,10 @@ export interface SuscriptorPayloadBackend {
   estado: string;
   createdAt: string;
   idCliente: string;
+  cedula?: string;
+  municipio?: string;
+  sector?: string;
+  aplicaSubsidio?: boolean;
 }
 
 /**
@@ -81,6 +89,19 @@ export function mapearSuscriptorParaBackend(
   if (sus.numero_catastral !== undefined) {
     payload.numeroCatastral = sus.numero_catastral;
   }
+
+  // Campos extendidos: incluidos cuando existen (cierra el gap de sincronizacion
+  // que existia desde el alta — SC-ES-12).
+  if (sus.cedula) {
+    payload.cedula = sus.cedula;
+  }
+  if (sus.municipio) {
+    payload.municipio = sus.municipio;
+  }
+  if (sus.sector !== undefined) {
+    payload.sector = sus.sector;
+  }
+  payload.aplicaSubsidio = sus.aplica_subsidio;
 
   return payload;
 }

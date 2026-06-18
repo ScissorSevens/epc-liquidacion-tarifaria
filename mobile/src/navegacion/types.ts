@@ -15,6 +15,7 @@ import type {
   ParametrosTarifa,
   ResultadoCalculo as ResultadoCalculoTipo,
 } from '@dominio/motor-tarifario/types';
+import type { Suscriptor } from '@dominio/suscriptores/types';
 
 // ── Stacks ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export type InicioStackParamList = {
     id_suscriptor: number;
     nombre_suscriptor: string;
   };
+  EditarSuscriptor: { suscriptor: Suscriptor };
 };
 
 export type LecturasStackParamList = {
@@ -54,6 +56,7 @@ export type LecturasStackParamList = {
   };
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
+  EditarSuscriptor: { suscriptor: Suscriptor };
 };
 
 export type SyncStackParamList = {

@@ -381,8 +381,6 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             <View style={styles.divider} />
             <Campo label="Sector" valor={suscriptor.sector ?? '—'} />
             <View style={styles.divider} />
-            <Campo label="Calle" valor={suscriptor.calle ?? '—'} />
-            <View style={styles.divider} />
             <Campo
               label="Matrícula inmobiliaria"
               valor={suscriptor.matricula_inmobiliaria ?? '—'}
@@ -493,13 +491,22 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
 
       {/* ── Bottom bar fijo ── */}
       {!loading && (
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, styles.bottomBarRow]}>
           <Pressable
             onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.btnVolver, pressed && styles.pressedLight]}
+            style={({ pressed }) => [styles.btnVolver, styles.btnHalf, pressed && styles.pressedLight]}
           >
             <Text style={styles.btnVolverText}>VOLVER</Text>
           </Pressable>
+          {suscriptor !== null && (
+            <Pressable
+              onPress={() => navigation.navigate('EditarSuscriptor', { suscriptor })}
+              style={({ pressed }) => [styles.btnEditar, styles.btnHalf, pressed && styles.pressedDark]}
+            >
+              <MaterialIcons name="edit" size={16} color={COLORS.onPrimary} />
+              <Text style={styles.btnEditarText}>EDITAR</Text>
+            </Pressable>
+          )}
         </View>
       )}
     </View>
@@ -695,6 +702,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
+  bottomBarRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  btnHalf: {
+    flex: 1,
+  },
   btnVolver: {
     borderWidth: 2,
     borderColor: COLORS.primaryContainer,
@@ -705,6 +719,21 @@ const styles = StyleSheet.create({
   btnVolverText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primaryContainer,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  btnEditar: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+  },
+  btnEditarText: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
     letterSpacing: 2,
     textTransform: 'uppercase',
   },
