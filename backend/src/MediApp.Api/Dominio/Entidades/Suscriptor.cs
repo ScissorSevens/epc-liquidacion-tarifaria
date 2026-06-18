@@ -56,4 +56,19 @@ public class Suscriptor
     [Required]
     [MaxLength(120)]
     public string IdCliente { get; set; } = string.Empty;
+
+    /// <summary>Cedula del suscriptor (nullable — retrocompatibilidad con registros previos).</summary>
+    [MaxLength(20)]
+    public string? Cedula { get; set; }
+
+    /// <summary>Municipio del suscriptor (nullable — retrocompatibilidad con registros previos).</summary>
+    [MaxLength(100)]
+    public string? Municipio { get; set; }
+
+    /// <summary>Sector del suscriptor (nullable — retrocompatibilidad con registros previos).</summary>
+    [MaxLength(100)]
+    public string? Sector { get; set; }
+
+    /// <summary>Indica si aplica subsidio tarifario (nullable — retrocompatibilidad con registros previos).</summary>
+    public bool? AplicaSubsidio { get; set; }
 }
