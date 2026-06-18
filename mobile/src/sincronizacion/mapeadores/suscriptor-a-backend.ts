@@ -92,10 +92,12 @@ export function mapearSuscriptorParaBackend(
 
   // Campos extendidos: incluidos cuando existen (cierra el gap de sincronizacion
   // que existia desde el alta — SC-ES-12).
-  if (sus.cedula) {
+  // Guarda `!== undefined` en todos: string vacio "" es valor valido
+  // (limpia el campo en server); truthy excluiria "" incorrectamente.
+  if (sus.cedula !== undefined) {
     payload.cedula = sus.cedula;
   }
-  if (sus.municipio) {
+  if (sus.municipio !== undefined) {
     payload.municipio = sus.municipio;
   }
   if (sus.sector !== undefined) {

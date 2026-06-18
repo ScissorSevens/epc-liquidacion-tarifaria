@@ -11,8 +11,8 @@
  *    de better-sqlite3).
  *  - El mapeo de errores SQLite va por substring del mensaje (ver
  *    `traducir-error.ts`): expo-sqlite no expone `.code` discreto.
- *  - `actualizar` y `eliminar` son stubs honestos — fuera de scope MVP,
- *    igual que el adapter Node.
+ *  - `actualizar` esta implementado con SQL real (UPDATE + re-fetch).
+ *  - `eliminar` es stub honesto — fuera de scope de la version actual.
  *
  * IMPORTANTE: este adapter NO esta cubierto por jest del root (no hay
  * infra jest mobile). Validacion contractual: tests Node del adapter
