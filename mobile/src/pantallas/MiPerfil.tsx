@@ -1,10 +1,10 @@
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useState } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { CommonActions } from '@react-navigation/native';
 
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
+import { limpiarSesion } from '../composition/constantes';
 import {
   COLORS,
   RADIUS,
@@ -15,7 +15,9 @@ import {
 } from '../theme/skeletal-tokens';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 
-type Props = ConfigStackScreenProps<'MiPerfil'>;
+type Props = ConfigStackScreenProps<'MiPerfil'> & {
+  readonly onLogoutRequested: () => void;
+};
 
 /** Datos de perfil estáticos — en el futuro vendrán del store. */
 const PERFIL = {
@@ -29,7 +31,7 @@ const PERFIL = {
   ultimaSincro: '—',
 };
 
-export default function MiPerfil({ navigation }: Props) {
+export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
 
   function mostrarToast() {
@@ -97,17 +99,9 @@ export default function MiPerfil({ navigation }: Props) {
         {/* Cerrar sesión */}
         <Pressable
           style={({ pressed }) => [estilos.botonCerrar, pressed && estilos.botonPresionado]}
-          onPress={() => {
-            // Sube al Root stack (ConfigStack → Tabs → Root) para resetear a Login.
-            // En producción, usar un NavigationRef global para garantizar el reset al root.
-            const rootNav = navigation.getParent()?.getParent();
-            const dispatcher = rootNav ?? navigation;
-            dispatcher.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              }),
-            );
+          onPress={async () => {
+            await limpiarSesion();
+            onLogoutRequested();
           }}
         >
           <MaterialIcons name="logout" size={20} color={COLORS.error} />

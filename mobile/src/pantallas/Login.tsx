@@ -12,18 +12,20 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { FooterApp } from '../componentes/FooterApp';
+import { guardarSesion } from '../composition/constantes';
 import { BORDERS, COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
-import type { RootStackScreenProps } from '../navegacion/types';
 
-type Props = RootStackScreenProps<'Login'>;
+interface Props {
+  readonly onLoginSuccess: () => void;
+}
 
-export default function Login({ navigation }: Props) {
+export default function Login({ onLoginSuccess }: Props) {
   const [cedula, setCedula] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
   const [errores, setErrores] = useState<{ cedula?: boolean; contrasena?: boolean }>({});
 
-  function handleIngresar() {
+  async function handleIngresar() {
     const nuevosErrores: { cedula?: boolean; contrasena?: boolean } = {};
     if (!cedula.trim()) nuevosErrores.cedula = true;
     if (!contrasena.trim()) nuevosErrores.contrasena = true;
@@ -34,7 +36,8 @@ export default function Login({ navigation }: Props) {
     }
     setErrores({});
     // TODO: validar credenciales contra API/local
-    navigation.navigate('Main', {} as any);
+    await guardarSesion({ cedula: cedula.trim() });
+    onLoginSuccess();
   }
 
   return (

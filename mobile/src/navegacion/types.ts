@@ -20,7 +20,6 @@ import type { Suscriptor } from '@dominio/suscriptores/types';
 // ── Stacks ────────────────────────────────────────────────────────────────────
 
 export type RootStackParamList = {
-  Login: undefined;
   Main: NavigatorScreenParams<TabParamList>;
 };
 
@@ -117,6 +116,6 @@ export type ConfigStackScreenProps<T extends keyof ConfigStackParamList> =
     BottomTabScreenProps<TabParamList>
   >;
 
-/** Props para pantallas dentro del RootStack (Login, etc.). */
+/** Props para pantallas dentro del RootStack (Main). */
 export type RootStackScreenProps<T extends keyof RootStackParamList> =
   NativeStackScreenProps<RootStackParamList, T>;

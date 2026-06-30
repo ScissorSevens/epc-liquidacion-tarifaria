@@ -139,7 +139,11 @@ const tabIconStyles = StyleSheet.create({
 
 // ── Navigator ─────────────────────────────────────────────────────────────────
 
-export default function AppNavigator() {
+interface Props {
+  readonly onLogoutRequested: () => void;
+}
+
+export default function AppNavigator({ onLogoutRequested }: Props) {
   return (
     <Tab.Navigator
       initialRouteName="Inicio"
@@ -176,9 +180,10 @@ export default function AppNavigator() {
       />
       <Tab.Screen
         name="Config"
-        component={ConfigStack}
         options={{ tabBarIcon: () => <TabIcon name="person" label="Perfil" /> }}
-      />
+      >
+        {() => <ConfigStack onLogoutRequested={onLogoutRequested} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
