@@ -4,6 +4,15 @@
  * La sesion se persiste en AsyncStorage con la clave `clave_storage_sesion`.
  * AuthGate consulta esta clave para decidir si mostrar Login o el RootNavigator.
  * Login y MiPerfil escriben/borran este mismo slot al autenticar/cerrar sesion.
+ *
+ * ⚠️ DEUDA DOCUMENTADA — TICKET-EPIC-LOGIN-001:
+ * El shape de Sesion actual (solo `cedula`) es un PLACEHOLDER limitado del
+ * OQ3 deferred del spec auth-gate (ver sdd/splash-logo-animado/spec).
+ * Cuando se implemente auth real con backend .NET, migrar a:
+ *   { token: string; cedula: string; expiresAt?: string (ISO 8601) }
+ * y refinar `cargarSesion()` para devolver null si `expiresAt` está vencido
+ * (`Date.now() < new Date(expiresAt).getTime()`).
+ * El criterio de validez actual NO decodifica JWT ni verifica expiración.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,6 +33,11 @@ export async function cargarSesion(): Promise<Sesion | null> {
     }
     return { cedula: parsed.cedula };
   } catch {
+    // Limpieza defensiva: si el JSON está corrupto, removemos la entrada
+    // para evitar re-validación repetida del mismo basura. Spec 2.3 SHOULD.
+    void AsyncStorage.removeItem(clave_storage_sesion).catch(() => {
+      // Silencioso: storage cleanup es defensivo, no debe romper el flujo.
+    });
     return null;
   }
 }

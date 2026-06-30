@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   useAnimatedStyle,
@@ -77,6 +78,15 @@ export function SplashAnimado({ onAnimationEnd, logo }: Props) {
         );
       },
     );
+
+    // Cleanup: cancelar worklets y animaciones pendientes en unmount.
+    // Sin esto, hot reload puede dejar referencias activas que disparan
+    // setState sobre componentes desmontados (React warning). Ver scenario
+    // 1.8 del spec splash-logo-animado.
+    return () => {
+      cancelAnimation(opacidad);
+      cancelAnimation(escala);
+    };
   }, []);
 
   const estiloAnimado = useAnimatedStyle(() => ({
