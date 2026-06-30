@@ -31,6 +31,7 @@
     "moduleNameMapper": {
       "@expo/vector-icons/(.*)": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
       "@expo/vector-icons": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
+      "^expo(/.*)?$": "<rootDir>/__tests__/__mocks__/expo.js",
       "^expo-sqlite$": "<rootDir>/__tests__/__mocks__/expo-sqlite.js",
       "expo-asset": "<rootDir>/__tests__/__mocks__/expo-asset.js"
     }

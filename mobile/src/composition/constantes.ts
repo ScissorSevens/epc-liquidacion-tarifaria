@@ -12,19 +12,17 @@ export const clave_storage_sesion = '@sistema_epc:sesion';
 
 export interface Sesion {
   readonly cedula: string;
-  readonly id_operario: string;
-  readonly rol: string;
 }
 
 export async function cargarSesion(): Promise<Sesion | null> {
   const crudo = await AsyncStorage.getItem(clave_storage_sesion);
   if (crudo === null) return null;
   try {
-    const parsed = JSON.parse(crudo) as Sesion;
-    if (typeof parsed.cedula !== 'string' || typeof parsed.id_operario !== 'string' || typeof parsed.rol !== 'string') {
+    const parsed = JSON.parse(crudo) as Partial<Sesion>;
+    if (typeof parsed.cedula !== 'string' || parsed.cedula.length === 0) {
       return null;
     }
-    return parsed;
+    return { cedula: parsed.cedula };
   } catch {
     return null;
   }
