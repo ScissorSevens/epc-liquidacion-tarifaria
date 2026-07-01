@@ -35,6 +35,21 @@ import {
   crearMedidorRepositoryExpoSqlite,
   type MedidorRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/medidor-repository-expo-sqlite';
+import {
+  crearPrestadorRepositoryExpoSqlite,
+  type PrestadorRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/prestador-repository-expo-sqlite';
+import {
+  crearAcuerdoMunicipalRepositoryExpoSqlite,
+  type AcuerdoMunicipalRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/acuerdo-municipal-repository-expo-sqlite';
+import {
+  crearParametrosTarifaRepositoryExpoSqlite,
+  type ParametrosTarifaRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/parametros-tarifa-repository-expo-sqlite';
+import type { Prestador } from '@dominio/prestadores';
+import type { AcuerdoMunicipal } from '@dominio/acuerdo-municipal';
+import type { ParametrosTarifa } from '@dominio/parametros-tarifa';
 import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
 import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
 import type { Hasher, IdGenerator } from '@dominio/shared/ports';
@@ -79,6 +94,10 @@ export interface BootstrapApp {
   // `bootstrap-completo.ts` del root para coherencia entre Node y mobile.
   readonly suscriptorRepo: SuscriptorRepositoryExpoSqlite;
   readonly medidorRepo: MedidorRepositoryExpoSqlite;
+  // Multi-tenant (Fase 4 del change motor-tarifario-cra-825-2017-multitenant):
+  readonly prestadorRepo: PrestadorRepositoryExpoSqlite;
+  readonly acuerdoMunicipalRepo: AcuerdoMunicipalRepositoryExpoSqlite;
+  readonly parametrosTarifaRepo: ParametrosTarifaRepositoryExpoSqlite;
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
   readonly clienteHttp: ClienteSincronizacion;
@@ -89,6 +108,16 @@ export interface BootstrapApp {
    */
   readonly procesadorCola: () => Promise<ResultadoSync>;
   readonly smoke: ResultadoSmokeDominio;
+  /**
+   * Resuelve el contexto multi-tenant del prestador activo:
+   * ParametrosTarifa + AcuerdoMunicipal vigentes. Usado por la UI
+   * (CapturarLectura, ResultadoCalculo) y por la fase 6 (workspace).
+   */
+  readonly resolverContextoPrestador: (id_prestador: number) => Promise<{
+    prestador: Prestador;
+    parametros: ParametrosTarifa | null;
+    acuerdo: AcuerdoMunicipal | null;
+  }>;
 }
 
 /**
@@ -110,6 +139,9 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const colaRepo = crearColaRepositoryExpoSqlite(db);
   const suscriptorRepo = crearSuscriptorRepositoryExpoSqlite(db);
   const medidorRepo = crearMedidorRepositoryExpoSqlite(db);
+  const prestadorRepo = crearPrestadorRepositoryExpoSqlite(db);
+  const acuerdoMunicipalRepo = crearAcuerdoMunicipalRepositoryExpoSqlite(db);
+  const parametrosTarifaRepo = crearParametrosTarifaRepositoryExpoSqlite(db);
 
   // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
   // de crypto.getRandomValues importado al tope del archivo). Cualquier
@@ -157,6 +189,19 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
 
   const smoke = smokeDominio();
 
+  const resolverContextoPrestador = async (id_prestador: number) => {
+    const prestador = await prestadorRepo.obtenerPorId(id_prestador);
+    if (!prestador) {
+      throw new Error(`resolverContextoPrestador: prestador ${id_prestador} no existe`);
+    }
+    const hoy = new Date().toISOString();
+    const [parametros, acuerdo] = await Promise.all([
+      parametrosTarifaRepo.buscarVigente(id_prestador, hoy),
+      acuerdoMunicipalRepo.buscarVigente(id_prestador, hoy),
+    ]);
+    return { prestador, parametros, acuerdo };
+  };
+
   return {
     db,
     facturaRepo,
@@ -164,11 +209,15 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
     colaRepo,
     suscriptorRepo,
     medidorRepo,
+    prestadorRepo,
+    acuerdoMunicipalRepo,
+    parametrosTarifaRepo,
     hasher,
     idGenerator,
     clienteHttp,
     apiBaseUrl,
     procesadorCola,
     smoke,
+    resolverContextoPrestador,
   };
 }
