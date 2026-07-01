@@ -71,6 +71,10 @@ try
     builder.Services.AddScoped<IRepositorioLiquidacion, RepositorioLiquidacionEF>();
     builder.Services.AddScoped<IRepositorioOperario, RepositorioOperarioEF>();
     builder.Services.AddScoped<IRepositorioSyncRegistro, RepositorioSyncRegistroEF>();
+    // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
+    builder.Services.AddScoped<IRepositorioPrestador, RepositorioPrestadorEF>();
+    builder.Services.AddScoped<IRepositorioAcuerdoMunicipal, RepositorioAcuerdoMunicipalEF>();
+    builder.Services.AddScoped<IRepositorioParametrosTarifa, RepositorioParametrosTarifaEF>();
 
     // Repositorios genéricos para SyncHandler (uno por entidad sincronizable).
     builder.Services.AddScoped<IRepositorioEntidad<Suscriptor>, RepositorioEntidadEF<Suscriptor>>();
