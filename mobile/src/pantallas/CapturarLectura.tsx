@@ -16,17 +16,21 @@ import {
 import {
   liquidarLectura,
   registrarLectura,
+  type ContextoLiquidacion,
 } from '@dominio/captura-lecturas/captura-lecturas';
 import type {
   EntradaLectura,
   EvidenciaFoto,
 } from '@dominio/captura-lecturas/types';
-import type { Estrato } from '@dominio/motor-tarifario/types';
+import type {
+  AcuerdoMunicipal,
+  ParametrosTarifa,
+} from '@dominio/parametros-tarifa';
+import type { Prestador } from '@dominio/prestadores';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
-import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import { photoCaptureStore } from '../composition/photo-capture-store';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
@@ -46,6 +50,12 @@ interface FormState {
   lectura_actual: string;
   id_periodo: string;
   observaciones: string;
+}
+
+interface ContextoMultiTenant {
+  readonly prestador: Prestador;
+  readonly parametros: ParametrosTarifa | null;
+  readonly acuerdo: AcuerdoMunicipal | null;
 }
 
 type CampoForm = keyof FormState;
@@ -151,6 +161,13 @@ export default function CapturarLectura({ navigation, route }: Props) {
   const [suscriptor, setSuscriptor] = useState<Suscriptor | undefined>(
     undefined,
   );
+  // Contexto multi-tenant: prestador + parametros vigentes + acuerdo vigente.
+  // Resuelto via `resolverContextoPrestador` del bootstrap. Si falla, queda
+  // undefined y la UI muestra un error bloqueante.
+  const [contextoMultiTenant, setContextoMultiTenant] = useState<ContextoMultiTenant | undefined>(
+    undefined,
+  );
+  const [errorContexto, setErrorContexto] = useState<string | undefined>(undefined);
 
   // Recibe la evidencia cuando `CapturarFoto` llama `goBack()` y depositó
   // la evidencia en `photoCaptureStore`. El listener de 'focus' garantiza
@@ -206,7 +223,25 @@ export default function CapturarLectura({ navigation, route }: Props) {
         const { suscriptorRepo } = await getBootstrap();
         const s = await suscriptorRepo.buscarPorId(id_suscriptor);
         if (cancelado) return;
-        if (s !== null) setSuscriptor(s);
+        if (s !== null) {
+          setSuscriptor(s);
+          // Tambien cargar el contexto multi-tenant del prestador del suscriptor
+          if (s.id_prestador > 0 || contextoMultiTenant === undefined) {
+            try {
+              const { resolverContextoPrestador } = await getBootstrap();
+              const ctx = await resolverContextoPrestador(s.id_prestador);
+              if (!cancelado) setContextoMultiTenant(ctx);
+            } catch (eCtx) {
+              if (!cancelado) {
+                setErrorContexto(
+                  `No se pudo cargar el contexto del prestador ${s.id_prestador}: ${
+                    eCtx instanceof Error ? eCtx.message : String(eCtx)
+                  }`,
+                );
+              }
+            }
+          }
+        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.warn('[CapturarLectura] no se pudo cargar suscriptor:', e);
@@ -254,6 +289,17 @@ export default function CapturarLectura({ navigation, route }: Props) {
       mostrarSnack('Cargando datos del suscriptor, reintentar en un momento', 'error');
       return;
     }
+    if (errorContexto !== undefined) {
+      mostrarSnack(errorContexto, 'error');
+      return;
+    }
+    if (contextoMultiTenant === undefined || contextoMultiTenant.parametros === null) {
+      mostrarSnack(
+        `El prestador ${suscriptor.id_prestador} no tiene ParametrosTarifa vigentes. Configurelos antes de liquidar.`,
+        'error',
+      );
+      return;
+    }
     setCalculando(true);
     try {
       const obs = form.observaciones.trim();
@@ -266,13 +312,12 @@ export default function CapturarLectura({ navigation, route }: Props) {
         ...(obs !== '' && { observaciones: obs }),
         ...(evidencia !== undefined && { evidencia }),
       };
-      const lectura = registrarLectura(entrada);
-      const estrato = suscriptor.estrato as Estrato;
-      const resultado = liquidarLectura(
-        lectura,
-        PARAMETROS_TARIFARIOS_DEMO,
-        estrato,
-      );
+      const lectura = registrarLectura(entrada, suscriptor.id_prestador);
+      const contexto: ContextoLiquidacion = {
+        parametros: contextoMultiTenant.parametros,
+        acuerdo: contextoMultiTenant.acuerdo,
+      };
+      const resultado = liquidarLectura(lectura, suscriptor, contexto);
       const bootstrap = await getBootstrap();
       await persistirYEncolarLectura({
         lectura,
@@ -284,10 +329,11 @@ export default function CapturarLectura({ navigation, route }: Props) {
       navigation.navigate('ResultadoCalculo', {
         lectura,
         resultado,
-        parametros: PARAMETROS_TARIFARIOS_DEMO,
-        estrato,
+        parametros: contextoMultiTenant.parametros,
+        estrato: suscriptor.estrato,
         id_suscriptor,
-        nombre_suscriptor: suscriptor?.nombre_apellidos ?? '',
+        nombre_suscriptor: suscriptor.nombre_apellidos,
+        prestador: contextoMultiTenant.prestador,
       });
     } catch (err) {
       const causa = (err as { cause?: { codigo?: string } })?.cause?.codigo;
