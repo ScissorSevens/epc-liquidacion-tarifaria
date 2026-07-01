@@ -26,6 +26,13 @@ public class LiquidacionValidator : AbstractValidator<LiquidacionPayload>
         RuleFor(x => x.Contribucion).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Total).GreaterThanOrEqualTo(0);
 
+        // Multi-tenant: id_prestador >= 0 (0 = EPC-LEGACY backward compat).
+        // Si la nueva versión del mobile lo envia (> 0), el endpoint
+        // resuelve contra AcuerdoMunicipal vigente para revalidar.
+        RuleFor(x => x.IdPrestador)
+            .GreaterThanOrEqualTo(0)
+            .WithMessage("idPrestador debe ser >= 0 (0 = legacy EPC-LEGACY).");
+
         // Validación cruzada del Total. Tolerancia 0.01 por redondeo.
         RuleFor(x => x)
             .Must(x =>
@@ -34,6 +41,11 @@ public class LiquidacionValidator : AbstractValidator<LiquidacionPayload>
                 return Math.Abs(x.Total - calculado) <= 0.01m;
             })
             .WithMessage("Total debe ser igual a CargoFijo + CargoBasico + CargoExcedente - Subsidio + Contribucion (tolerancia 0.01).");
+
+        // Regla cruzada vs AcuerdoMunicipal (revalidacion post-attach):
+        // cuando el caller indica id_prestador, la revalidacion contra el
+        // Acuerdo vigente la hace ServicioLiquidaciones (no el validator
+        // puro) porque requiere IO a DB. Aqui dejamos la regla basica.
 
         RuleFor(x => x.IdCliente)
             .NotEmpty().MaximumLength(120);
