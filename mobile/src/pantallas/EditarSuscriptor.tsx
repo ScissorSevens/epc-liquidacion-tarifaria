@@ -14,6 +14,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { ActualizarSuscriptorInput, EstadoSuscriptor, Suscriptor } from '@dominio/suscriptores/types';
+import { CATEGORIAS_USO, ETIQUETAS_CATEGORIA_USO, type CategoriaUso } from '@dominio/categorias-uso';
 import { editarYEncolarSuscriptor } from '../adapters/editar-y-encolar-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
@@ -36,6 +37,7 @@ interface FormEditarState {
   sector: string;
   direccion: string;
   estrato: EstratoStr;
+  categoria_uso: CategoriaUso;
   matricula_inmobiliaria: string;
   numero_catastral: string;
   estado: EstadoSuscriptor;
@@ -59,6 +61,7 @@ function initForm(sus: Suscriptor): FormEditarState {
     sector: sus.sector ?? '',
     direccion: sus.direccion,
     estrato: String(sus.estrato) as EstratoStr,
+    categoria_uso: sus.categoria_uso,
     matricula_inmobiliaria: sus.matricula_inmobiliaria ?? '',
     numero_catastral: sus.numero_catastral ?? '',
     estado: sus.estado,
@@ -107,6 +110,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
         sector: form.sector.trim() || undefined,
         direccion: form.direccion.trim(),
         estrato: Number(form.estrato) as Suscriptor['estrato'],
+        categoria_uso: form.categoria_uso,
         matricula_inmobiliaria: form.matricula_inmobiliaria.trim() || undefined,
         numero_catastral: form.numero_catastral.trim() || undefined,
         estado: form.estado,
@@ -194,6 +198,36 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                   </Pressable>
                 ))}
               </View>
+            </View>
+
+            {/* Categoría de uso (Q10 spec, multi-tenant) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>CATEGORÍA DE USO</Text>
+              <View style={styles.chipsRowCategoria}>
+                {CATEGORIAS_USO.map((cat) => (
+                  <Pressable
+                    key={cat}
+                    onPress={() => setCampo('categoria_uso', cat)}
+                    style={({ pressed }) => [
+                      styles.chipCategoria,
+                      form.categoria_uso === cat && styles.chipSel,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipTextSm,
+                        form.categoria_uso === cat && styles.chipTextSel,
+                      ]}
+                    >
+                      {ETIQUETAS_CATEGORIA_USO[cat]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.helperTextCategoria}>
+                Define cómo el motor tarifario aplica subsidios o contribuciones (ver Res CRA 825/2017).
+              </Text>
             </View>
 
             {/* Estado */}
@@ -483,6 +517,33 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     backgroundColor: COLORS.surfaceContainerLowest,
     paddingHorizontal: SPACING.xs,
+  },
+
+  // ── Chips categoria de uso (5 opciones — wrap) ────────────────────────────
+  chipsRowCategoria: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+  },
+  chipCategoria: {
+    paddingHorizontal: SPACING.md,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.surfaceContainerLowest,
+  },
+  chipTextSm: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+  },
+  helperTextCategoria: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 
   // ── Snack ──────────────────────────────────────────────────────────────────
