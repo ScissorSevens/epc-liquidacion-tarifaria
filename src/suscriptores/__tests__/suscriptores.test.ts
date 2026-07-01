@@ -24,16 +24,30 @@ describe('crearSuscriptor — factory de borrador', () => {
 
     expect(resultado).toEqual({
       codigo: '0005',
-      nombre_apellidos: 'Juan Pérez',
+      nombre_apellidos: 'Juan Perez',
       cedula: '123456789',
-      municipio: 'Bogotá',
-      direccion: 'Calle 5 #10-20',
+      municipio: 'Bogota',
+      direccion: 'Calle Falsa 123',
       estrato: 3,
+      matricula_inmobiliaria: undefined,
+      numero_catastral: undefined,
       aplica_subsidio: false,
       estado: 'activo',
+      id_prestador: 0,
+      categoria_uso: 'residencial',
     });
     expect(resultado).not.toHaveProperty('id_suscriptor');
     expect(resultado).not.toHaveProperty('created_at');
+  });
+
+  it('propaga id_prestador y categoria_uso cuando el caller los provee', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      id_prestador: 7,
+      categoria_uso: 'comercial',
+    });
+    expect(resultado.id_prestador).toBe(7);
+    expect(resultado.categoria_uso).toBe('comercial');
   });
 });
 

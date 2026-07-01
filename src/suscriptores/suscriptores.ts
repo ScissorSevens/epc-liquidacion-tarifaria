@@ -75,6 +75,13 @@ function validarEntrada(input: CrearSuscriptorInput): void {
   }
 }
 
+/**
+ * Crea un SuscriptorBorrador propagando los campos multi-tenant
+ * (id_prestador, categoria_uso). Si el caller no los provee, asume los
+ * defaults legacy (id_prestador=0, categoria_uso='residencial') para
+ * mantener compatibilidad con datos anteriores al change
+ * motor-tarifario-cra-825-2017-multitenant.
+ */
 export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador {
   validarEntrada(input);
 

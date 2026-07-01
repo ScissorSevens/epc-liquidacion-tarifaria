@@ -14,6 +14,8 @@ const inputValido: CrearSuscriptorInput = {
   direccion: 'Calle 5 #10-20',
   estrato: 3,
   aplica_subsidio: false,
+  id_prestador: 0,
+  categoria_uso: 'residencial',
 };
 
 describe('crearSuscriptor — factory de borrador', () => {
@@ -27,11 +29,25 @@ describe('crearSuscriptor — factory de borrador', () => {
       municipio: 'Bogotá',
       direccion: 'Calle 5 #10-20',
       estrato: 3,
+      matricula_inmobiliaria: undefined,
+      numero_catastral: undefined,
       aplica_subsidio: false,
       estado: 'activo',
+      id_prestador: 0,
+      categoria_uso: 'residencial',
     });
     expect(resultado).not.toHaveProperty('id_suscriptor');
     expect(resultado).not.toHaveProperty('created_at');
+  });
+
+  it('propaga id_prestador y categoria_uso cuando el caller los provee', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      id_prestador: 7,
+      categoria_uso: 'comercial',
+    });
+    expect(resultado.id_prestador).toBe(7);
+    expect(resultado.categoria_uso).toBe('comercial');
   });
 });
 
@@ -163,12 +179,12 @@ describe('crearSuscriptor — cedula', () => {
   });
 
   it('acepta cedula de 6 dígitos (límite inferior)', () => {
-    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456', municipio: 'Bogotá' } as unknown as CrearSuscriptorInput);
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456' });
     expect(resultado.cedula).toBe('123456');
   });
 
   it('acepta cedula de 12 dígitos (límite superior)', () => {
-    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456789012', municipio: 'Bogotá' } as unknown as CrearSuscriptorInput);
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456789012' });
     expect(resultado.cedula).toBe('123456789012');
   });
 });
@@ -176,18 +192,18 @@ describe('crearSuscriptor — cedula', () => {
 describe('crearSuscriptor — municipio', () => {
   it('rechaza municipio vacío', () => {
     expect(() =>
-      crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: '' } as unknown as CrearSuscriptorInput),
+      crearSuscriptor({ ...inputValido, municipio: '' }),
     ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_VACIO);
   });
 
   it('rechaza municipio de 101 caracteres', () => {
     expect(() =>
-      crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: 'a'.repeat(101) } as unknown as CrearSuscriptorInput),
+      crearSuscriptor({ ...inputValido, municipio: 'a'.repeat(101) }),
     ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_LARGO);
   });
 
   it('acepta municipio válido', () => {
-    const resultado = crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: 'Medellín' } as unknown as CrearSuscriptorInput);
+    const resultado = crearSuscriptor({ ...inputValido, municipio: 'Medellín' });
     expect(resultado.municipio).toBe('Medellín');
   });
 });
@@ -195,12 +211,12 @@ describe('crearSuscriptor — municipio', () => {
 describe('crearSuscriptor — sector', () => {
   it('rechaza sector de 101 caracteres', () => {
     expect(() =>
-      crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: 'Bogotá', sector: 'a'.repeat(101) } as unknown as CrearSuscriptorInput),
+      crearSuscriptor({ ...inputValido, sector: 'a'.repeat(101) }),
     ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO);
   });
 
   it('acepta sector undefined', () => {
-    const resultado = crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: 'Bogotá', sector: undefined } as unknown as CrearSuscriptorInput);
+    const resultado = crearSuscriptor({ ...inputValido, sector: undefined });
     expect(resultado.sector).toBeUndefined();
   });
 });
@@ -208,12 +224,12 @@ describe('crearSuscriptor — sector', () => {
 describe('crearSuscriptor — calle', () => {
   it('rechaza calle de 101 caracteres', () => {
     expect(() =>
-      crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: 'Bogotá', calle: 'a'.repeat(101) } as unknown as CrearSuscriptorInput),
+      crearSuscriptor({ ...inputValido, calle: 'a'.repeat(101) }),
     ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA);
   });
 
   it('acepta calle undefined', () => {
-    const resultado = crearSuscriptor({ ...inputValido, cedula: '1234567', municipio: 'Bogotá', calle: undefined } as unknown as CrearSuscriptorInput);
+    const resultado = crearSuscriptor({ ...inputValido, calle: undefined });
     expect(resultado.calle).toBeUndefined();
   });
 });
