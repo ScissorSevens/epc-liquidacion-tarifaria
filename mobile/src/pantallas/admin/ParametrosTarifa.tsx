@@ -1,8 +1,12 @@
 /**
  * Pantalla admin: parámetros tarifarios de un prestador por periodo (5 años).
  *
- * Define: cargo fijo, precios por bloque, consumo básico, costos medios
- * (CMA, CMO, CMI, CMT, CMVIAA), IPUF, mínimo vital opcional.
+ * Edita los insumos del motor tarifario según Res CRA 825/2017 (art. 9-10) +
+ * 907/2019 (art. 14): costos medios (CMA, CMO, CMI, CMT, CMVIAA), agua
+ * (AS, IPUF, N), mínimo vital opcional.
+ *
+ * Multi-tenant: cada prestador tiene sus ParametrosTarifa (1 vigente
+ * por periodo). El motor usa estos insumos + AcuerdoMunicipal.
  */
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -13,6 +17,7 @@ import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
 
 interface Props {
   readonly id_prestador: number;
+  readonly id_acuerdo: number;
   readonly parametrosActuales: ParametrosTarifa | null;
   readonly repo: {
     guardar: (p: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>) => Promise<ParametrosTarifa>;
@@ -21,29 +26,33 @@ interface Props {
 
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
 
-export default function ParametrosTarifaForm({ id_prestador, parametrosActuales, repo }: Props) {
+export default function ParametrosTarifaForm({ id_prestador, id_acuerdo, parametrosActuales, repo }: Props) {
   const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
-  const [cargoFijo, setCargoFijo] = useState(String(parametrosActuales?.cargo_fijo_pesos ?? 15000));
-  const [precioBasico, setPrecioBasico] = useState(String(parametrosActuales?.precio_m3_basico ?? 2000));
-  const [precioComplementario, setPrecioComplementario] = useState(String(parametrosActuales?.precio_m3_complementario ?? 0));
-  const [precioSuntuario, setPrecioSuntuario] = useState(String(parametrosActuales?.precio_m3_suntuario ?? 0));
-  const [consumoBasico, setConsumoBasico] = useState(String(parametrosActuales?.consumo_basico_m3 ?? 20));
-  const [consumoComplementario, setConsumoComplementario] = useState(String(parametrosActuales?.consumo_complementario_m3 ?? 0));
   const [cma, setCma] = useState(String(parametrosActuales?.cma ?? 0));
   const [cmo, setCmo] = useState(String(parametrosActuales?.cmo ?? 0));
   const [cmi, setCmi] = useState(String(parametrosActuales?.cmi ?? 0));
   const [cmt, setCmt] = useState(String(parametrosActuales?.cmt ?? 0));
   const [cmviaa, setCmviaa] = useState(String(parametrosActuales?.cmviaa ?? 0));
+  const [aplicaCmviaa, setAplicaCmviaa] = useState(parametrosActuales?.aplica_cmviaa ?? false);
+  const [aguaSuministrada, setAguaSuministrada] = useState(String(parametrosActuales?.agua_suministrada_m3_anio ?? 0));
   const [ipuf, setIpuf] = useState(String(parametrosActuales?.ipuf_m3_suscriptor_mes ?? 6));
-  const [consumoCorregido, setConsumoCorregido] = useState(String(parametrosActuales?.consumo_corregido_m3_anual ?? 0));
+  const [suscriptoresPromedio, setSuscriptoresPromedio] = useState(String(parametrosActuales?.suscriptores_promedio ?? 0));
   const [aplicaMinimoVital, setAplicaMinimoVital] = useState(parametrosActuales?.aplica_minimo_vital ?? false);
   const [m3Gratis, setM3Gratis] = useState(String(parametrosActuales?.m3_gratis_minimo_vital ?? 0));
-  const [vigenteDesde, setVigenteDesde] = useState(parametrosActuales?.vigente_desde ?? new Date().toISOString().slice(0, 10));
-  const [vigenteHasta, setVigenteHasta] = useState(parametrosActuales?.vigente_hasta ?? `${Number(periodoDefault()) + 4}-12-31`);
+  const [vigenteDesde, setVigenteDesde] = useState(
+    parametrosActuales?.vigente_desde?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+  );
+  const [vigenteHasta, setVigenteHasta] = useState(
+    parametrosActuales?.vigente_hasta?.slice(0, 10) ?? `${Number(periodoDefault()) + 4}-12-31`,
+  );
   const [guardando, setGuardando] = useState(false);
 
   const num = (s: string): number => {
     const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+  const entero = (s: string): number => {
+    const n = parseInt(s, 10);
     return isNaN(n) ? 0 : n;
   };
 
@@ -52,23 +61,19 @@ export default function ParametrosTarifaForm({ id_prestador, parametrosActuales,
     try {
       await repo.guardar({
         id_prestador,
-        id_acuerdo: parametrosActuales?.id_acuerdo ?? 0,
-        periodo: num(periodo),
-        cargo_fijo_pesos: num(cargoFijo),
-        precio_m3_basico: num(precioBasico),
-        precio_m3_complementario: num(precioComplementario),
-        precio_m3_suntuario: num(precioSuntuario),
-        consumo_basico_m3: num(consumoBasico),
-        consumo_complementario_m3: num(consumoComplementario),
+        id_acuerdo,
+        periodo: entero(periodo),
         cma: num(cma),
         cmo: num(cmo),
         cmi: num(cmi),
         cmt: num(cmt),
         cmviaa: num(cmviaa),
+        aplica_cmviaa: aplicaCmviaa,
+        agua_suministrada_m3_anio: num(aguaSuministrada),
         ipuf_m3_suscriptor_mes: num(ipuf),
-        consumo_corregido_m3_anual: num(consumoCorregido),
+        suscriptores_promedio: entero(suscriptoresPromedio),
         aplica_minimo_vital: aplicaMinimoVital,
-        m3_gratis_minimo_vital: parseInt(m3Gratis, 10) || 0,
+        m3_gratis_minimo_vital: entero(m3Gratis),
         vigente_desde: vigenteDesde,
         vigente_hasta: vigenteHasta,
       });
@@ -99,60 +104,48 @@ export default function ParametrosTarifaForm({ id_prestador, parametrosActuales,
         <TextInput style={estilos.input} value={vigenteHasta} onChangeText={setVigenteHasta} />
       </View>
 
-      <Text style={estilos.seccion}>Cargo fijo y bloques de consumo</Text>
-      <View style={estilos.campo}>
-        <Text style={estilos.label}>Cargo fijo ($/mes)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={cargoFijo} onChangeText={setCargoFijo} />
-      </View>
-      <View style={estilos.campo}>
-        <Text style={estilos.label}>Precio m³ básico ($)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={precioBasico} onChangeText={setPrecioBasico} />
-      </View>
-      <View style={estilos.campo}>
-        <Text style={estilos.label}>Precio m³ complementario ($)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={precioComplementario} onChangeText={setPrecioComplementario} />
-      </View>
-      <View style={estilos.campo}>
-        <Text style={estilos.label}>Precio m³ suntuario ($)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={precioSuntuario} onChangeText={setPrecioSuntuario} />
-      </View>
-      <View style={estilos.campo}>
-        <Text style={estilos.label}>Consumo básico (m³)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={consumoBasico} onChangeText={setConsumoBasico} />
-      </View>
-      <View style={estilos.campo}>
-        <Text style={estilos.label}>Consumo complementario (m³)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={consumoComplementario} onChangeText={setConsumoComplementario} />
-      </View>
-
       <Text style={estilos.seccion}>Costos medios (estudio de costos del prestador)</Text>
-      {(['cma', 'cmo', 'cmi', 'cmt', 'cmviaa'] as const).map((campo) => {
-        const [v, s] = (() => {
-          switch (campo) {
-            case 'cma': return [cma, setCma];
-            case 'cmo': return [cmo, setCmo];
-            case 'cmi': return [cmi, setCmi];
-            case 'cmt': return [cmt, setCmt];
-            case 'cmviaa': return [cmviaa, setCmviaa];
-          }
-        })() as [string, (s: string) => void];
-        const label = { cma: 'CMA · Cargo Medio Administración', cmo: 'CMO · Cargo Medio Operación', cmi: 'CMI · Cargo Medio Inversión', cmt: 'CMT · Cargo Medio Tasas', cmviaa: 'CMVIAA · Inversiones Ambientales Adicionales (907/2019)' }[campo];
-        return (
-          <View key={campo} style={estilos.campo}>
-            <Text style={estilos.label}>{label}</Text>
-            <TextInput style={estilos.input} keyboardType="numeric" value={v} onChangeText={s} />
-          </View>
-        );
-      })}
-
-      <Text style={estilos.seccion}>Pérdidas y consumo corregido</Text>
+      <Text style={estilos.nota}>Estos son los insumos de la fórmula normativa. El motor NO acepta inputs planos.</Text>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>IPUF (m³/suscriptor/mes, estándar 6)</Text>
+        <Text style={estilos.label}>CMA · Costo Medio Administración ($/año, art. 9)</Text>
+        <TextInput style={estilos.input} keyboardType="numeric" value={cma} onChangeText={setCma} />
+      </View>
+      <View style={estilos.campo}>
+        <Text style={estilos.label}>CMO · Costo Medio Operación ($/m³)</Text>
+        <TextInput style={estilos.input} keyboardType="numeric" value={cmo} onChangeText={setCmo} />
+      </View>
+      <View style={estilos.campo}>
+        <Text style={estilos.label}>CMI · Costo Medio Inversión ($/m³)</Text>
+        <TextInput style={estilos.input} keyboardType="numeric" value={cmi} onChangeText={setCmi} />
+      </View>
+      <View style={estilos.campo}>
+        <Text style={estilos.label}>CMT · Costo Medio Tasas Ambientales ($/m³)</Text>
+        <TextInput style={estilos.input} keyboardType="numeric" value={cmt} onChangeText={setCmt} />
+      </View>
+
+      <View style={estilos.campoFila}>
+        <Text style={estilos.label}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
+        <Switch value={aplicaCmviaa} onValueChange={setAplicaCmviaa} />
+      </View>
+      {aplicaCmviaa && (
+        <View style={estilos.campo}>
+          <Text style={estilos.label}>CMVIAA · Costo Medio Variable Inv. Ambientales Adicionales ($/m³)</Text>
+          <TextInput style={estilos.input} keyboardType="numeric" value={cmviaa} onChangeText={setCmviaa} />
+        </View>
+      )}
+
+      <Text style={estilos.seccion}>Agua y suscriptores (insumo ASP = AS - IPUF×12×N)</Text>
+      <View style={estilos.campo}>
+        <Text style={estilos.label}>Agua Suministrada año base (m³/año)</Text>
+        <TextInput style={estilos.input} keyboardType="numeric" value={aguaSuministrada} onChangeText={setAguaSuministrada} />
+      </View>
+      <View style={estilos.campo}>
+        <Text style={estilos.label}>IPUF (m³/suscriptor/mes, art. 5, estándar 6)</Text>
         <TextInput style={estilos.input} keyboardType="numeric" value={ipuf} onChangeText={setIpuf} />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Consumo corregido anual (m³, agregado prestador)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={consumoCorregido} onChangeText={setConsumoCorregido} />
+        <Text style={estilos.label}>Suscriptores promedio (N) — divisor de CF = CMA/N</Text>
+        <TextInput style={estilos.input} keyboardType="numeric" value={suscriptoresPromedio} onChangeText={setSuscriptoresPromedio} />
       </View>
 
       <Text style={estilos.seccion}>Mínimo vital (Decreto 776/2025 — opcional)</Text>
@@ -181,6 +174,7 @@ const estilos = StyleSheet.create({
   titulo: { ...TYPOGRAPHY.titleLg, color: COLORS.onSurface },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
   seccion: { ...TYPOGRAPHY.titleSm, color: COLORS.primary, marginTop: SPACING.md },
+  nota: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, fontStyle: 'italic', marginBottom: SPACING.xs },
   campo: { gap: SPACING.xs },
   campoFila: {
     flexDirection: 'row',
