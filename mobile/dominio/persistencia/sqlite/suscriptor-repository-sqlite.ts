@@ -47,6 +47,8 @@ interface SuscriptorRow {
   readonly aplica_subsidio: number;
   readonly estado: string;
   readonly created_at: string;
+  readonly id_prestador: number;
+  readonly categoria_uso: string;
 }
 
 function fromRow(row: SuscriptorRow): Suscriptor {
@@ -61,6 +63,8 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     aplica_subsidio: row.aplica_subsidio === 1,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
+    id_prestador: row.id_prestador,
+    categoria_uso: row.categoria_uso as Suscriptor['categoria_uso'],
     ...(row.sector !== null && { sector: row.sector }),
     ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
@@ -77,11 +81,11 @@ const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, cedula, municipio, sector, calle,
     direccion, estrato, matricula_inmobiliaria, numero_catastral,
-    aplica_subsidio, estado
+    aplica_subsidio, estado, id_prestador, categoria_uso
   ) VALUES (
     @codigo, @nombre_apellidos, @cedula, @municipio, @sector, @calle,
     @direccion, @estrato, @matricula_inmobiliaria, @numero_catastral,
-    @aplica_subsidio, @estado
+    @aplica_subsidio, @estado, @id_prestador, @categoria_uso
   )
 `;
 
@@ -131,6 +135,8 @@ export function crearSuscriptorRepositorySqlite(
       numero_catastral: s.numero_catastral ?? null,
       aplica_subsidio: s.aplica_subsidio ? 1 : 0,
       estado: s.estado,
+      id_prestador: s.id_prestador,
+      categoria_uso: s.categoria_uso,
     };
   }
 

@@ -79,8 +79,10 @@ describe('importarSuscriptoresYMedidores', () => {
       direccion: 'Vieja',
       estrato: 2,
       aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
       estado: 'activo',
-    });
+        });
 
     const r = await importarSuscriptoresYMedidores(
       [fila({ linea: 2, codigo: '0001', numero_medidor: 'M-NUEVO' })],
@@ -111,6 +113,8 @@ describe('importarSuscriptoresYMedidores', () => {
       direccion: 'Y',
       estrato: 1,
       aplica_subsidio: false,
+      id_prestador: 0,
+      categoria_uso: 'residencial',
       estado: 'activo',
     });
     await sis.medidorRepo.crear({
@@ -146,6 +150,8 @@ describe('importarSuscriptoresYMedidores', () => {
       direccion: 'X',
       estrato: 1,
       aplica_subsidio: false,
+      id_prestador: 0,
+      categoria_uso: 'residencial',
       estado: 'activo',
     });
     const susConMed = await sis.suscriptorRepo.crear({
@@ -156,6 +162,8 @@ describe('importarSuscriptoresYMedidores', () => {
       direccion: 'Y',
       estrato: 1,
       aplica_subsidio: false,
+      id_prestador: 0,
+      categoria_uso: 'residencial',
       estado: 'activo',
     });
     await sis.medidorRepo.crear({

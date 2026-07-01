@@ -14,6 +14,7 @@
 import { registrarLectura } from '../captura-lecturas';
 import { liquidarLectura } from '../captura-lecturas/captura-lecturas';
 import { crearLiquidacion } from '../calculo/calculo';
+import type { Suscriptor } from '../suscriptores/types';
 import {
   registrarLecturaCapturada,
   registrarLiquidacionCreada,
