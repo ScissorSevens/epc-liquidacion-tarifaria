@@ -1,41 +1,84 @@
 /**
- * Tipos del motor tarifario CRA
- * Resolución CRA 688 de 2014 y actualizaciones
+ * Tipos del motor tarifario conforme a Res CRA 825/2017 (arts. 9-10)
+ * modificado por Res CRA 907/2019 art. 14. Multi-tenant.
+ *
+ * El motor es pure function: NO accede a storage. El caller
+ * (`liquidarLectura`, `bootstrap`) resuelve `ParametrosTarifa` y
+ * `AcuerdoMunicipal` vigentes y los pasa como argumentos.
  */
 
-export interface ParametrosTarifa {
-  cargoFijo: number;          // Cargo fijo mensual en pesos
-  precioM3: number;           // Precio por m³ dentro del consumo básico
-  precioM3Excedente: number;  // Precio por m³ que exceda el consumo básico
-  consumoBasico: number;      // Consumo básico en m³ (umbral)
-}
+import type { CategoriaUso } from '../categorias-uso';
+import type { AcuerdoMunicipal } from '../acuerdo-municipal';
+import type { ParametrosTarifa } from '../parametros-tarifa';
 
 export type Estrato = 1 | 2 | 3 | 4 | 5 | 6;
 
-export interface PeriodoFacturacion {
-  mes: number;              // Mes de facturación (1-12)
-  anio: number;             // Año de facturación (ej: 2025)
-}
-
+/**
+ * Entrada al motor. Trae TODO el contexto multi-tenant inline: el
+ * caller es responsable de resolver ParametrosTarifa y AcuerdoMunicipal
+ * vigentes del prestador antes de invocar.
+ */
 export interface EntradaCalculo {
-  lecturaAnterior: number;  // Lectura anterior del medidor en m³
-  lecturaActual: number;    // Lectura actual del medidor en m³
-  parametros: ParametrosTarifa;
-  estrato?: Estrato;        // Estrato socioeconómico (1-6), opcional para backwards compat
-  aplicaSubsidio?: boolean;  // Si false, no aplica factor aunque tenga estrato
-  periodo?: PeriodoFacturacion;  // Periodo de facturación, opcional para backwards compat
+  readonly id_prestador: number;
+  readonly consumo_m3: number;
+  readonly estrato: Estrato;
+  readonly categoria_uso: CategoriaUso;
 }
 
-export interface ResultadoCalculo {
-  consumo: number;              // Consumo del periodo en m³
-  consumoBasico: number;        // m³ cobrados a tarifa básica
-  consumoExcedente: number;     // m³ cobrados a tarifa excedente
-  cargoFijo: number;            // Cargo fijo aplicado
-  cargoConsumo: number;         // Cargo por consumo básico
-  cargoExcedente: number;       // Cargo por consumo excedente
-  subsidio: number;             // Monto subsidiado (estratos 1-3)
-  contribucion: number;         // Monto contribución (estratos 5-6)
-  total: number;                // Total a facturar
-  periodo?: PeriodoFacturacion; // Periodo de facturación (si fue proporcionado)
-  error?: string;               // Mensaje de error (solo en batch, cuando la entrada es inválida)
+/**
+ * Bloque de consumo: rangos [desde_m3, hasta_m3] a precio uniforme.
+ * 825/2017 NO obliga a bloques múltiples (prestador decide). El motor
+ * actualmente retorna 1 bloque global; en futuro se puede extender
+ * para bloques (básico + complementario + suntuario).
+ */
+export interface BloqueConsumo {
+  readonly desde_m3: number;
+  readonly hasta_m3: number;
+  readonly m3_facturados: number;
+  readonly precio_unitario: number;  // $/m³
+  readonly subtotal: number;          // pesos enteros
 }
+
+/**
+ * Metadata del cálculo: trazabilidad + flags de comportamiento.
+ */
+export interface MetadataCalculo {
+  readonly norma_aplicada: string;
+  readonly acuerdo_id: number | null;
+  readonly parametros_id: number;
+  readonly cmviaa_aplicado: boolean;
+  readonly minimo_vital_aplicado: boolean;
+  readonly factor_capeado: boolean;
+  readonly version_motor: string;
+  readonly calculo_timestamp: string;  // ISO 8601
+}
+
+/**
+ * Resultado del cálculo. Inmutable. El motor retorna TODOS los
+ * componentes desglosados para auditoría + display en ResultadoCalculo.
+ */
+export interface ResultadoCalculo {
+  readonly id_prestador: number;
+  readonly estrato: Estrato;
+  readonly categoria_uso: CategoriaUso;
+  readonly consumo_m3: number;
+  readonly consumo_efectivo_m3: number;
+  readonly bloques: readonly BloqueConsumo[];
+  /** Cargo fijo (art. 9 Res 825/2017 = CMA/N). Pesos enteros. */
+  readonly cargo_fijo: number;
+  /** CC unitario ($/m³) según art. 10 mod 907/2019 art. 14. 2 decimales. */
+  readonly cc_unitario: number;
+  /** CC total = cc_unitario × consumo_efectivo. Pesos enteros. */
+  readonly cc_total: number;
+  readonly subsidio: number;
+  readonly contribucion: number;
+  readonly total: number;
+  /** Factor aplicado (negativo=subsidio, positivo=contribución, 0=pleno). */
+  readonly factor_aplicado: number;
+  readonly metadata: MetadataCalculo;
+  /** Solo en batch, cuando la entrada es inválida. */
+  readonly error?: string;
+}
+
+// Re-exports para conveniencia de callers
+export type { AcuerdoMunicipal, ParametrosTarifa, CategoriaUso };

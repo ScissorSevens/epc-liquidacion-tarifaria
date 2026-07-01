@@ -1,2 +1,2 @@
-export { calcularLiquidacion, calcularBatch } from './motor-tarifario';
-export type { ParametrosTarifa, PeriodoFacturacion, EntradaCalculo, ResultadoCalculo } from './types';
+export { calcularLiquidacion, calcularBatch, calcularFactor, calcularCCUnitario, aplicarMinimoVital, caparFactorEstrato, TOPES_NACIONALES } from './motor-tarifario';
+export type { EntradaCalculo, ResultadoCalculo, BloqueConsumo, MetadataCalculo, Estrato } from './types';
