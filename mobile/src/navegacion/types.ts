@@ -70,6 +70,11 @@ export type ConfigStackParamList = {
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
   MiPerfil: undefined;
+  Admin: undefined;
+  GestionPrestadores: undefined;
+  AcuerdoMunicipal: { id_prestador: number };
+  ParametrosTarifa: { id_prestador: number };
+  ImportarPrestadores: undefined;
 };
 
 // ── Tab raíz ──────────────────────────────────────────────────────────────────

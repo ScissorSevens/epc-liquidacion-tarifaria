@@ -4,6 +4,11 @@ import AltaSuscriptor from '../../pantallas/AltaSuscriptor';
 import Configuracion from '../../pantallas/Configuracion';
 import ImportarCsv from '../../pantallas/ImportarCsv';
 import MiPerfil from '../../pantallas/MiPerfil';
+import Admin from '../../pantallas/admin/Admin';
+import GestionPrestadores from '../../pantallas/admin/GestionPrestadores';
+import AcuerdoMunicipal from '../../pantallas/admin/AcuerdoMunicipal';
+import ParametrosTarifa from '../../pantallas/admin/ParametrosTarifa';
+import ImportarPrestadores from '../../pantallas/admin/ImportarPrestadores';
 import type { ConfigStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<ConfigStackParamList>();
@@ -21,6 +26,11 @@ export default function ConfigStack({ onLogoutRequested }: Props) {
       <Stack.Screen name="MiPerfil">
         {() => <MiPerfil onLogoutRequested={onLogoutRequested} />}
       </Stack.Screen>
+      <Stack.Screen name="Admin" component={Admin} />
+      <Stack.Screen name="GestionPrestadores" component={GestionPrestadores} />
+      <Stack.Screen name="AcuerdoMunicipal" component={AcuerdoMunicipal} />
+      <Stack.Screen name="ParametrosTarifa" component={ParametrosTarifa} />
+      <Stack.Screen name="ImportarPrestadores" component={ImportarPrestadores} />
     </Stack.Navigator>
   );
 }
