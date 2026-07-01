@@ -20,6 +20,10 @@ public class MediAppDbContext : DbContext
     public DbSet<Lectura> Lecturas => Set<Lectura>();
     public DbSet<Liquidacion> Liquidaciones => Set<Liquidacion>();
     public DbSet<SyncRegistro> SyncRegistros => Set<SyncRegistro>();
+    // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
+    public DbSet<Prestador> Prestadores => Set<Prestador>();
+    public DbSet<AcuerdoMunicipal> AcuerdosMunicipales => Set<AcuerdoMunicipal>();
+    public DbSet<ParametrosTarifa> ParametrosTarifa => Set<ParametrosTarifa>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,5 +102,67 @@ public class MediAppDbContext : DbContext
             .HasForeignKey(l => l.IdOperario)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // ===== Multi-tenant: Prestador + Acuerdo + ParametrosTarifa =====
+
+        modelBuilder.Entity<Prestador>()
+            .HasIndex(p => p.Codigo)
+            .IsUnique();
+        modelBuilder.Entity<Prestador>()
+            .HasIndex(p => p.Municipio);
+        modelBuilder.Entity<Prestador>()
+            .HasIndex(p => p.Estado);
+
+        modelBuilder.Entity<AcuerdoMunicipal>()
+            .HasIndex(a => new { a.IdPrestador, a.FechaVigenciaDesde, a.FechaVigenciaHasta });
+
+        modelBuilder.Entity<ParametrosTarifa>()
+            .HasIndex(p => new { p.IdPrestador, p.Periodo });
+        modelBuilder.Entity<ParametrosTarifa>()
+            .HasIndex(p => new { p.IdPrestador, p.Periodo, p.VigenteDesde })
+            .IsUnique();
+
+        // Multi-tenant FKs en entidades existentes
+        modelBuilder.Entity<Suscriptor>()
+            .HasOne(s => s.Prestador)
+            .WithMany()
+            .HasForeignKey(s => s.IdPrestador)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Suscriptor>()
+            .HasIndex(s => s.IdPrestador);
+
+        modelBuilder.Entity<Lectura>()
+            .HasOne(l => l.Prestador)
+            .WithMany()
+            .HasForeignKey(l => l.IdPrestador)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Lectura>()
+            .HasIndex(l => l.IdPrestador);
+
+        modelBuilder.Entity<Liquidacion>()
+            .HasOne(li => li.Prestador)
+            .WithMany()
+            .HasForeignKey(li => li.IdPrestador)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Liquidacion>()
+            .HasIndex(li => li.IdPrestador);
+
+        modelBuilder.Entity<AcuerdoMunicipal>()
+            .HasOne(a => a.Prestador)
+            .WithMany()
+            .HasForeignKey(a => a.IdPrestador)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ParametrosTarifa>()
+            .HasOne(p => p.Prestador)
+            .WithMany()
+            .HasForeignKey(p => p.IdPrestador)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ParametrosTarifa>()
+            .HasOne(p => p.Acuerdo)
+            .WithMany()
+            .HasForeignKey(p => p.IdAcuerdo)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
