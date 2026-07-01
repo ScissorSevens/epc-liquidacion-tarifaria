@@ -18,6 +18,8 @@ using MediApp.Api.Features.Lecturas;
 using MediApp.Api.Features.Liquidaciones;
 using MediApp.Api.Features.Medidores;
 using MediApp.Api.Features.Operarios;
+using MediApp.Api.Features.AcuerdosMunicipales;
+using MediApp.Api.Features.ParametrosTarifa;
 using MediApp.Api.Features.Prestadores;
 using MediApp.Api.Features.Suscriptores;
 using MediApp.Api.Infraestructura;
@@ -65,6 +67,8 @@ try
     builder.Services.AddScoped<IValidator<OperarioPayload>, OperarioValidator>();
     // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
     builder.Services.AddScoped<IValidator<PrestadorPayload>, PrestadorValidator>();
+    builder.Services.AddScoped<IValidator<AcuerdoMunicipalPayload>, AcuerdoMunicipalValidator>();
+    builder.Services.AddScoped<IValidator<ParametrosTarifaPayload>, ParametrosTarifaValidator>();
 
     // Almacén de evidencias fotográficas (Lectura). Singleton: stateless, lee config en el ctor.
     builder.Services.AddSingleton<IAlmacenEvidencias, AlmacenLocal>();
@@ -139,7 +143,11 @@ try
     app.MapGroup("/api/v1/liquidaciones").MapLiquidacionesEndpoints();
     app.MapGroup("/api/v1/operarios").MapOperariosEndpoints();
     // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
-    app.MapGroup("/api/v1/prestadores").MapPrestadoresEndpoints();
+    app.MapGroup("/api/v1/prestadores")
+        .MapPrestadoresEndpoints()
+        .MapAcuerdosMunicipalesEndpoints()
+        .MapParametrosTarifaEndpoints()
+        .MapImportarPrestadoresEndpoints();
 
     app.Run();
 }
