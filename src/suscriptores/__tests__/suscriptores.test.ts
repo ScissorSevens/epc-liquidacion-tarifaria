@@ -7,13 +7,15 @@ import type { CrearSuscriptorInput, SuscriptorBorrador } from '../types';
 import { MENSAJES_ERROR_SUSCRIPTOR } from '../types';
 
 const inputValido: CrearSuscriptorInput = {
-  codigo: '0005',
-  nombre_apellidos: 'Juan Pérez',
-  cedula: '123456789',
-  municipio: 'Bogotá',
-  direccion: 'Calle 5 #10-20',
-  estrato: 3,
-  aplica_subsidio: false,
+    codigo: '0005',
+    nombre_apellidos: 'Juan Perez',
+    cedula: '123456789',
+    municipio: 'Bogota',
+    direccion: 'Calle Falsa 123',
+    estrato: 3,
+    aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
 };
 
 describe('crearSuscriptor — factory de borrador', () => {

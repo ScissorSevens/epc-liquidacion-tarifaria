@@ -191,8 +191,10 @@ function inputE2E(): EmitirFacturaInput {
       direccion: 'Calle 5 #2-10',
       estrato: 2,
       aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
       estado: 'activo',
-      created_at: '2026-01-01T00:00:00.000Z',
+          created_at: '2026-01-01T00:00:00.000Z',
     },
     medidor: {
       id_medidor: 10,

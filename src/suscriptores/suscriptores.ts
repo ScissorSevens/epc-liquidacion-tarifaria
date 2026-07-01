@@ -91,5 +91,7 @@ export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador
     numero_catastral: input.numero_catastral,
     aplica_subsidio: input.aplica_subsidio,
     estado: input.estado ?? 'activo',
+    id_prestador: input.id_prestador ?? 0,
+    categoria_uso: input.categoria_uso ?? 'residencial',
   };
 }
