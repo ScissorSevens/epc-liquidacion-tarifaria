@@ -84,15 +84,9 @@ function operarioBase(): Operario {
 
 function resultadoCalculoBase(): ResultadoCalculo {
   return {
-    consumo: 12,
-    consumoBasico: 12,
-    consumoExcedente: 0,
-    cargoFijo: 5000,
-    cargoConsumo: 18000,
-    cargoExcedente: 0,
-    subsidio: 4600,
-    contribucion: 0,
-    total: 18400,
+    id_prestador: 0, estrato: 4 as const, categoria_uso: 'residencial' as const, consumo_m3: 10, consumo_efectivo_m3: 10, bloques: [],
+    cargo_fijo: 5000, cc_unitario: 1500, cc_total: 15000,
+    subsidio: 0, contribucion: 0, total: 20000, factor_aplicado: 0, metadata: { norma_aplicada: 'X', acuerdo_id: null, parametros_id: 0, cmviaa_aplicado: false, minimo_vital_aplicado: false, factor_capeado: false, version_motor: 'X', calculo_timestamp: 'X' },
   };
 }
 
@@ -213,15 +207,20 @@ describe('emitirFactura — happy path', () => {
 
   it('snapshotea liquidacion (id, hash, resultado completo) y la congela', () => {
     const resultado: ResultadoCalculo = {
-      consumo: 22,
-      consumoBasico: 20,
-      consumoExcedente: 2,
-      cargoFijo: 5500,
-      cargoConsumo: 30000,
-      cargoExcedente: 7000,
+      id_prestador: 0,
+      estrato: 5 as const,
+      categoria_uso: 'residencial' as const,
+      consumo_m3: 22,
+      consumo_efectivo_m3: 22,
+      bloques: [],
+      cargo_fijo: 5500,
+      cc_unitario: 1500,
+      cc_total: 33000,
       subsidio: 0,
       contribucion: 4250,
       total: 46750,
+      factor_aplicado: 0.10,
+      metadata: { norma_aplicada: 'X', acuerdo_id: null, parametros_id: 0, cmviaa_aplicado: false, minimo_vital_aplicado: false, factor_capeado: false, version_motor: 'X', calculo_timestamp: 'X' },
     };
     const base = {
       ...liquidacionBase(),

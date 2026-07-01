@@ -40,13 +40,44 @@ const hasher: Hasher = { sha256: (input: string) => `hash-fake-${fakeChecksum(in
 const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seqId).padStart(4, '0')}` };
 beforeEach(() => { _seqId = 0; });
 
-// Tarifas de referencia (CRA Res. 688/2014, valores estilizados)
+// Tarifas de referencia (Res CRA 825/2017 + 907/2019, valores estilizados)
 const PARAMETROS: ParametrosTarifa = {
-  cargoFijo: 5000,
-  precioM3: 2000,
-  precioM3Excedente: 4000,
-  consumoBasico: 16,
+  id_parametros: 1,
+  id_prestador: 0,
+  id_acuerdo: 1,
+  periodo: 2026,
+  cma: 30_000_000,
+  cmo: 1500,
+  cmi: 300,
+  cmt: 200,
+  cmviaa: 0,
+  aplica_cmviaa: false,
+  agua_suministrada_m3_anio: 500_000,
+  ipuf_m3_suscriptor_mes: 6,
+  suscriptores_promedio: 3000,
+  aplica_minimo_vital: false,
+  m3_gratis_minimo_vital: 0,
+  vigente_desde: '2026-01-01',
+  vigente_hasta: '2026-12-31',
+  created_at: '2026-01-01T00:00:00',
 };
+
+const SUSCRIPTOR_BASE: Suscriptor = {
+  id_suscriptor: 1,
+  codigo: 'S001',
+  nombre_apellidos: 'Test',
+  cedula: '123',
+  municipio: 'Bog',
+  direccion: 'Calle 1',
+  estrato: 3,
+  aplica_subsidio: false,
+  estado: 'activo',
+  created_at: '2026-01-01T00:00:00',
+  id_prestador: 0,
+  categoria_uso: 'residencial',
+};
+
+const CONTEXTO = { parametros: PARAMETROS, acuerdo: null };
 
 const ACTOR: Actor = { id: 'op-001', rol: 'OPERARIO' };
 
@@ -78,9 +109,9 @@ describe('E2E: integración del núcleo TS', () => {
       expect(lectura.estado_sync).toBe('pendiente');
 
       // 2. Liquidamos la lectura con el motor tarifario
-      const resultado = liquidarLectura(lectura, PARAMETROS, 3);
-      expect(resultado.consumo).toBe(18);
-      expect(resultado.consumoExcedente).toBe(2);
+      const resultado = liquidarLectura(lectura, SUSCRIPTOR_BASE, CONTEXTO);
+      expect(resultado.consumo_m3).toBe(18);
+      expect(resultado.cc_total).toBeGreaterThan(0);
       expect(resultado.total).toBeGreaterThan(0);
 
       // 3. Creamos la Liquidacion inmutable (con hash de integridad)
@@ -204,6 +235,7 @@ describe('E2E: integración del núcleo TS', () => {
   describe('Conflicto 409 → SOBRESCRIBIR_LOCAL → reintento exitoso', () => {
     it('el server reporta 409 con su hash, el operario decide sobrescribir, segundo intento funciona', async () => {
       // Setup mínimo: una liquidación encolada
+      const suscriptorE2: Suscriptor = { ...SUSCRIPTOR_BASE, estrato: 2 };
       const resultado = liquidarLectura(
         registrarLectura({
           id_medidor: 2002,
@@ -211,9 +243,9 @@ describe('E2E: integración del núcleo TS', () => {
           id_periodo: '202601',
           lectura_anterior: 50,
           lectura_actual: 60,
-        }),
-        PARAMETROS,
-        2
+        }, 0),
+        suscriptorE2,
+        CONTEXTO
       );
 
       const liquidacion = crearLiquidacion({

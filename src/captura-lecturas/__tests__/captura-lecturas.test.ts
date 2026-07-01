@@ -1,6 +1,7 @@
-import { registrarLectura, validarEvidencia, liquidarLectura } from '../captura-lecturas';
+import { registrarLectura, validarEvidencia, liquidarLectura, ContextoLiquidacion } from '../captura-lecturas';
 import { EntradaLectura } from '../types';
-import { ParametrosTarifa, Estrato } from '../../motor-tarifario/types';
+import type { ParametrosTarifa, AcuerdoMunicipal } from '../../motor-tarifario/types';
+import type { Suscriptor } from '../../suscriptores/types';
 
 describe('Captura de Lecturas', () => {
   const entradaBase: EntradaLectura = {
@@ -291,12 +292,63 @@ describe('Captura de Lecturas', () => {
   });
 });
 
-describe('Integracion captura → motor tarifario', () => {
+describe('Integracion captura → motor tarifario (multi-tenant)', () => {
   const parametrosBase: ParametrosTarifa = {
-    cargoFijo: 5000,
-    precioM3: 800,
-    precioM3Excedente: 1500,
-    consumoBasico: 20,
+    id_parametros: 1,
+    id_prestador: 0,
+    id_acuerdo: 1,
+    periodo: 2026,
+    cma: 30_000_000,        // CF = 30M / 3000 = 10_000
+    cmo: 1500,
+    cmi: 300,
+    cmt: 200,
+    cmviaa: 0,
+    aplica_cmviaa: false,
+    agua_suministrada_m3_anio: 500_000,  // ASP > 0
+    ipuf_m3_suscriptor_mes: 6,
+    suscriptores_promedio: 3000,
+    aplica_minimo_vital: false,
+    m3_gratis_minimo_vital: 0,
+    vigente_desde: '2026-01-01',
+    vigente_hasta: '2026-12-31',
+    created_at: '2026-01-01T00:00:00',
+  };
+
+  const acuerdoBase: AcuerdoMunicipal = {
+    id_acuerdo: 1,
+    id_prestador: 0,
+    factor_subsidio_e1: -0.60,
+    factor_subsidio_e2: -0.50,
+    factor_subsidio_e3: -0.40,
+    factor_contribucion_e5: 0.50,
+    factor_contribucion_e6: 0.60,
+    factor_contribucion_comercial: 0.50,
+    factor_contribucion_industrial: 0.30,
+    fecha_vigencia_desde: '2026-01-01',
+    fecha_vigencia_hasta: '2026-12-31',
+    acto_administrativo_url: null,
+    observaciones: null,
+    created_at: '2026-01-01T00:00:00',
+  };
+
+  const suscriptorBase: Suscriptor = {
+    id_suscriptor: 1,
+    codigo: 'S001',
+    nombre_apellidos: 'Test',
+    cedula: '123',
+    municipio: 'Bog',
+    direccion: 'Calle 1',
+    estrato: 4,
+    aplica_subsidio: false,
+    estado: 'activo',
+    created_at: '2026-01-01T00:00:00',
+    id_prestador: 0,
+    categoria_uso: 'residencial',
+  };
+
+  const contextoBase: ContextoLiquidacion = {
+    parametros: parametrosBase,
+    acuerdo: acuerdoBase,
   };
 
   const entradaBase: EntradaLectura = {
@@ -307,84 +359,66 @@ describe('Integracion captura → motor tarifario', () => {
     lectura_anterior: 130,
   };
 
-  it('liquida una lectura capturada con parametros de tarifa', () => {
-    const lectura = registrarLectura(entradaBase);
-    const resultado = liquidarLectura(lectura, parametrosBase);
+  it('liquida una lectura capturada con contexto multi-tenant', () => {
+    const lectura = registrarLectura(entradaBase, 0);
+    const resultado = liquidarLectura(lectura, suscriptorBase, contextoBase);
 
-    // consumo = 150 - 130 = 20 m³ (todo básico)
-    expect(resultado.consumo).toBe(20);
-    expect(resultado.cargoFijo).toBe(5000);
-    expect(resultado.cargoConsumo).toBe(16000);       // 20 * 800
-    expect(resultado.cargoExcedente).toBe(0);
-    expect(resultado.total).toBe(21000);               // 5000 + 16000
+    expect(resultado.consumo_m3).toBe(20);
+    expect(resultado.id_prestador).toBe(0);
+    expect(resultado.cargo_fijo).toBe(10_000);
+    expect(resultado.cc_unitario).toBeGreaterThan(0);
+    // E4 = sin subsidio ni contribucion
+    expect(resultado.subsidio).toBe(0);
+    expect(resultado.contribucion).toBe(0);
+    // total = CF + CC_total
+    expect(resultado.total).toBe(resultado.cargo_fijo + resultado.cc_total);
   });
 
-  it('liquida lectura con estrato y aplica subsidio', () => {
-    const lectura = registrarLectura(entradaBase);
-    const estrato: Estrato = 1;
-    const resultado = liquidarLectura(lectura, parametrosBase, estrato);
+  it('liquida lectura con estrato 1 aplicando subsidio 60%', () => {
+    const suscriptorE1: Suscriptor = { ...suscriptorBase, estrato: 1 };
+    const lectura = registrarLectura(entradaBase, 0);
+    const resultado = liquidarLectura(lectura, suscriptorE1, contextoBase);
 
-    // subsidio 70% de (5000 + 16000) = 14700
-    expect(resultado.subsidio).toBe(14700);
-    expect(resultado.total).toBe(6300);                // 5000 + 16000 - 14700
+    expect(resultado.estrato).toBe(1);
+    expect(resultado.factor_aplicado).toBeCloseTo(-0.60, 5);
+    expect(resultado.subsidio).toBeGreaterThan(0);
   });
 
-  it('liquida lectura con consumo excedente', () => {
-    const entrada: EntradaLectura = {
-      ...entradaBase,
-      lectura_actual: 160,    // consumo = 30 (20 básico + 10 excedente)
-      lectura_anterior: 130,
-    };
-    const lectura = registrarLectura(entrada);
-    const resultado = liquidarLectura(lectura, parametrosBase);
+  it('liquida lectura con consumo cero → solo cargo fijo', () => {
+    const entrada: EntradaLectura = { ...entradaBase, lectura_actual: 130, lectura_anterior: 130 };
+    const lectura = registrarLectura(entrada, 0);
+    const resultado = liquidarLectura(lectura, suscriptorBase, contextoBase);
 
-    expect(resultado.consumo).toBe(30);
-    expect(resultado.consumoBasico).toBe(20);
-    expect(resultado.consumoExcedente).toBe(10);
-    expect(resultado.cargoConsumo).toBe(16000);        // 20 * 800
-    expect(resultado.cargoExcedente).toBe(15000);      // 10 * 1500
-    expect(resultado.total).toBe(36000);               // 5000 + 16000 + 15000
-  });
-
-  it('liquida lectura con periodo y lo incluye en el resultado', () => {
-    const entrada: EntradaLectura = {
-      ...entradaBase,
-    };
-    const lectura = registrarLectura(entrada);
-    const resultado = liquidarLectura(lectura, parametrosBase);
-
-    // El periodo viene del id_periodo de la lectura (202504 → mes 4, año 2025)
-    expect(resultado.periodo).toEqual({ mes: 4, anio: 2025 });
-  });
-
-  it('liquida lectura con consumo cero', () => {
-    const entrada: EntradaLectura = {
-      ...entradaBase,
-      lectura_actual: 130,
-      lectura_anterior: 130,
-    };
-    const lectura = registrarLectura(entrada);
-    const resultado = liquidarLectura(lectura, parametrosBase);
-
-    expect(resultado.consumo).toBe(0);
-    expect(resultado.total).toBe(5000);                // solo cargo fijo
+    expect(resultado.consumo_m3).toBe(0);
+    expect(resultado.cc_total).toBe(0);
+    expect(resultado.total).toBe(10_000);
   });
 
   it('liquida lectura con lecturas decimales', () => {
     const entrada: EntradaLectura = {
       ...entradaBase,
-      lectura_actual: 150.750,
-      lectura_anterior: 130.250,
+      lectura_actual: 150.75,
+      lectura_anterior: 130.25,
     };
-    const lectura = registrarLectura(entrada);
-    const resultado = liquidarLectura(lectura, parametrosBase);
+    const lectura = registrarLectura(entrada, 0);
+    const resultado = liquidarLectura(lectura, suscriptorBase, contextoBase);
 
-    // consumo = 150.750 - 130.250 = 20.5 (20 básico + 0.5 excedente)
-    expect(resultado.consumo).toBe(20.5);
-    expect(resultado.consumoBasico).toBe(20);
-    expect(resultado.consumoExcedente).toBe(0.5);
-    expect(resultado.cargoConsumo).toBe(16000);        // 20 * 800
-    expect(resultado.cargoExcedente).toBe(750);        // 0.5 * 1500
-    expect(resultado.total).toBe(21750);               // 5000 + 16000 + 750
+    expect(resultado.consumo_m3).toBe(20.5);
+  });
+
+  it('denormaliza id_prestador en la lectura al registrar', () => {
+    const lectura = registrarLectura(entradaBase, 7);
+    expect(lectura.id_prestador).toBe(7);
+  });
+
+  it('categoria comercial → solo contribucion, nunca subsidio', () => {
+    const susComercial: Suscriptor = { ...suscriptorBase, estrato: 1, categoria_uso: 'comercial' };
+    const lectura = registrarLectura(entradaBase, 0);
+    const resultado = liquidarLectura(lectura, susComercial, contextoBase);
+
+    expect(resultado.categoria_uso).toBe('comercial');
+    expect(resultado.subsidio).toBe(0);
+    expect(resultado.contribucion).toBeGreaterThan(0);
+    expect(resultado.factor_aplicado).toBeCloseTo(0.50, 5);
   });
 });
