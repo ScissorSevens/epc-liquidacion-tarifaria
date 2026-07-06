@@ -120,6 +120,16 @@ try
     app.UseExceptionHandler();
     app.UseStatusCodePages();
 
+    // HSTS: fuerza HTTPS en navegadores. Defense in depth contra sslstrip.
+    // Mobile NO se beneficia directamente (no usa HSTS headers) pero
+    // administradores web del dashboard SÍ. Solo en producción — en
+    // desarrollo rompería el reload loop con self-signed certs.
+    // TICKET-P0.4 seguridad: deployment REQUIERE TLS termination.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
+
     // Sirve wwwroot/index.html (dashboard web estático, sin build/npm externo).
     app.UseStaticFiles();
     app.MapFallbackToFile("index.html");
