@@ -21,6 +21,7 @@ import {
   ETIQUETAS_CATEGORIA_USO,
   type CategoriaUso,
 } from '@dominio/categorias-uso';
+import { logger } from '../composicion/logger';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
@@ -301,8 +302,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
       }, 800);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
-      console.warn('[AltaSuscriptor] error inesperado:', err);
+      logger.warn('AltaSuscriptor', 'error inesperado', { err });
       mostrarSnack(`Error inesperado: ${msg}`, 'error');
     } finally {
       setEnviando(false);
