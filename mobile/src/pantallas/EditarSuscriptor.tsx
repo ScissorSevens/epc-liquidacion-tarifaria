@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -41,6 +42,7 @@ interface FormEditarState {
   matricula_inmobiliaria: string;
   numero_catastral: string;
   estado: EstadoSuscriptor;
+  aplica_subsidio: boolean;
 }
 
 interface SnackState {
@@ -65,6 +67,7 @@ function initForm(sus: Suscriptor): FormEditarState {
     matricula_inmobiliaria: sus.matricula_inmobiliaria ?? '',
     numero_catastral: sus.numero_catastral ?? '',
     estado: sus.estado,
+    aplica_subsidio: sus.aplica_subsidio,
   };
 }
 
@@ -114,6 +117,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
         matricula_inmobiliaria: form.matricula_inmobiliaria.trim() || undefined,
         numero_catastral: form.numero_catastral.trim() || undefined,
         estado: form.estado,
+        aplica_subsidio: form.aplica_subsidio,
       };
       await editarYEncolarSuscriptor({
         idSuscriptor: suscriptor.id_suscriptor,
@@ -250,6 +254,18 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                   </Pressable>
                 ))}
               </View>
+            </View>
+
+            {/* Toggle subsidio (cambia post-creación) */}
+            <View style={styles.toggleRow}>
+              <Text style={[TYPOGRAPHY.bodyMd, styles.toggleLabel]}>¿Aplica subsidio?</Text>
+              <Switch
+                value={form.aplica_subsidio}
+                onValueChange={(v) => setCampo('aplica_subsidio', v)}
+                trackColor={{ false: COLORS.surfaceVariant, true: COLORS.secondaryContainer }}
+                thumbColor={COLORS.surfaceContainerLowest}
+                disabled={enviando}
+              />
             </View>
           </View>
 
@@ -544,6 +560,17 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     fontStyle: 'italic',
     marginTop: 2,
+  },
+
+  // ── Toggle subsidio (cambia post-creación) ────────────────────────────────
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  toggleLabel: {
+    color: COLORS.primary,
   },
 
   // ── Snack ──────────────────────────────────────────────────────────────────
