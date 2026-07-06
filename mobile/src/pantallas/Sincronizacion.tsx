@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import type { BootstrapApp, ResultadoSync } from '../composition/bootstrap';
+import type { ResultadoSync } from '../composition/bootstrap';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
@@ -50,9 +50,13 @@ const formatHora = (d: Date): string =>
  *  - Ver el conteo de items pendientes en la cola SQLite local.
  *  - Revisar el log de los ultimos eventos en la sesion actual (no
  *    persiste cross-launch — es solo feedback inmediato).
+ *
+ * TICKET-P1.8: antes de este fix, el bootstrap se guardaba en useState
+ * lo cual duplicaba memoria y podia referenciar una version stale si
+ * el bootstrap cambiaba en runtime. Ahora cada handler obtiene el
+ * bootstrap via `getBootstrap()` (singleton cacheado).
  */
 export default function Sincronizacion(_props: Props) {
-  const [bootstrap, setBootstrap] = useState<BootstrapApp | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [cargando, setCargando] = useState<null | 'health' | 'sync' | 'cola'>(
     null,
@@ -64,22 +68,6 @@ export default function Sincronizacion(_props: Props) {
     pendientes: 0,
   });
   const [estadoConexion, setEstadoConexion] = useState<'stable' | 'offline' | 'unknown'>('unknown');
-
-  useEffect(() => {
-    let activo = true;
-    getBootstrap()
-      .then((b) => {
-        if (activo) setBootstrap(b);
-      })
-      .catch((e: unknown) => {
-        if (activo) {
-          setBootError(e instanceof Error ? e.message : String(e));
-        }
-      });
-    return () => {
-      activo = false;
-    };
-  }, []);
 
   const agregarEvento = useCallback(
     (
@@ -102,10 +90,10 @@ export default function Sincronizacion(_props: Props) {
   );
 
   const probarConexion = useCallback(async () => {
-    if (!bootstrap) return;
     setCargando('health');
-    const url = `${bootstrap.apiBaseUrl}/health`;
     try {
+      const bootstrap = await getBootstrap();
+      const url = `${bootstrap.apiBaseUrl}/health`;
       const resp = await fetch(url);
       const txt = await resp.text();
       const ok = resp.ok && txt.toLowerCase().includes('healthy');
@@ -119,17 +107,17 @@ export default function Sincronizacion(_props: Props) {
       setEstadoConexion('offline');
       agregarEvento(
         'error',
-        `No se pudo conectar a ${url}: ${e instanceof Error ? e.message : String(e)}`,
+        `No se pudo conectar al backend: ${e instanceof Error ? e.message : String(e)}`,
       );
     } finally {
       setCargando(null);
     }
-  }, [bootstrap, agregarEvento]);
+  }, [agregarEvento]);
 
   const sincronizar = useCallback(async () => {
-    if (!bootstrap) return;
     setCargando('sync');
     try {
+      const bootstrap = await getBootstrap();
       const r: ResultadoSync = await bootstrap.procesadorCola();
       setContadores({
         exitosos: r.enviados,
@@ -148,12 +136,12 @@ export default function Sincronizacion(_props: Props) {
     } finally {
       setCargando(null);
     }
-  }, [bootstrap, agregarEvento]);
+  }, [agregarEvento]);
 
   const verCola = useCallback(async () => {
-    if (!bootstrap) return;
     setCargando('cola');
     try {
+      const bootstrap = await getBootstrap();
       const items = await bootstrap.colaRepo.listar();
       if (items.length === 0) {
         agregarEvento('cola', 'Cola vacia');
@@ -185,7 +173,7 @@ export default function Sincronizacion(_props: Props) {
     } finally {
       setCargando(null);
     }
-  }, [bootstrap, agregarEvento]);
+  }, [agregarEvento]);
 
   if (bootError) {
     return (
@@ -195,7 +183,7 @@ export default function Sincronizacion(_props: Props) {
     );
   }
 
-  if (!bootstrap) {
+  if (cargando === 'health' && !estadoConexion) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.primary} />
