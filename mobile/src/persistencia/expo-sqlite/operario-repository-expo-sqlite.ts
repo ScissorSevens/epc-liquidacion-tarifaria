@@ -13,6 +13,7 @@ import type { Operario } from '../../operarios/types';
 
 interface OperarioRow {
   readonly id_operario: number;
+  readonly id_prestador: number;
   readonly numero_cedula: string;
   readonly nombre: string;
   readonly email: string;
@@ -25,6 +26,7 @@ interface OperarioRow {
 const SQL_CREATE_TABLE = `
 CREATE TABLE IF NOT EXISTS operarios (
   id_operario    INTEGER PRIMARY KEY,
+  id_prestador   INTEGER NOT NULL DEFAULT 0,
   numero_cedula  TEXT NOT NULL UNIQUE,
   nombre         TEXT NOT NULL,
   email          TEXT NOT NULL,
@@ -38,9 +40,10 @@ CREATE TABLE IF NOT EXISTS operarios (
 const SQL_LISTAR = `SELECT * FROM operarios ORDER BY nombre ASC`;
 const SQL_BUSCAR_POR_DISPOSITIVO = `SELECT * FROM operarios WHERE dispositivo_id = ? LIMIT 1`;
 const SQL_UPSERT = `
-INSERT INTO operarios (id_operario, numero_cedula, nombre, email, rol, estado, dispositivo_id, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO operarios (id_operario, id_prestador, numero_cedula, nombre, email, rol, estado, dispositivo_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id_operario) DO UPDATE SET
+  id_prestador   = excluded.id_prestador,
   numero_cedula  = excluded.numero_cedula,
   nombre         = excluded.nombre,
   email          = excluded.email,
@@ -53,6 +56,7 @@ ON CONFLICT(id_operario) DO UPDATE SET
 function fromRow(row: OperarioRow): Operario {
   return {
     id_operario: row.id_operario,
+    id_prestador: row.id_prestador,
     numero_cedula: row.numero_cedula,
     nombre: row.nombre,
     email: row.email,
@@ -91,6 +95,7 @@ export function crearOperarioRepositoryExpoSqlite(
     async guardar(operario: Operario): Promise<void> {
       await db.runAsync(SQL_UPSERT,
         operario.id_operario,
+        operario.id_prestador,
         operario.numero_cedula,
         operario.nombre,
         operario.email,

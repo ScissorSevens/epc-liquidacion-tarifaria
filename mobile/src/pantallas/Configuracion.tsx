@@ -103,7 +103,7 @@ export default function Configuracion({ navigation }: Props) {
         const resp = await fetch(`${baseUrl}/api/v1/operarios`);
         if (resp.ok) {
           const lista = (await resp.json()) as Array<{
-            id: number; numeroCedula: string; nombre: string;
+            id: number; idPrestador: number; numeroCedula: string; nombre: string;
             email: string; rol: string; estado: string;
             dispositivoId?: string; createdAt?: string;
           }>;
@@ -113,6 +113,7 @@ export default function Configuracion({ navigation }: Props) {
           if (encontrado) {
             const operario: Operario = {
               id_operario: encontrado.id,
+              id_prestador: encontrado.idPrestador,
               numero_cedula: encontrado.numeroCedula,
               nombre: encontrado.nombre,
               email: encontrado.email,
@@ -186,12 +187,13 @@ export default function Configuracion({ navigation }: Props) {
       }
 
       const raw = (await resp.json()) as {
-        id: number; numeroCedula: string; nombre: string;
+        id: number; idPrestador: number; numeroCedula: string; nombre: string;
         email: string; rol: string; estado: string;
         dispositivoId?: string; createdAt?: string;
       };
       operario = {
         id_operario: raw.id,
+        id_prestador: raw.idPrestador,
         numero_cedula: raw.numeroCedula,
         nombre: raw.nombre,
         email: raw.email,

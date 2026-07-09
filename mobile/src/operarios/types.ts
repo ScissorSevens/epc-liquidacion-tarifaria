@@ -8,6 +8,7 @@
 
 export interface Operario {
   id_operario: number;
+  id_prestador: number;
   numero_cedula: string;
   nombre: string;
   email: string;
