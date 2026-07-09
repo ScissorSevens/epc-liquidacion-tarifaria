@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using System;
 
 #nullable disable
@@ -25,7 +26,7 @@ namespace MediApp.Api.Persistence.Migrations
                 columns: table => new
                 {
                     id_prestador = table.Column<int>(nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     codigo = table.Column<string>(maxLength: 50, nullable: false),
                     nombre = table.Column<string>(maxLength: 200, nullable: false),
                     nit = table.Column<string>(maxLength: 20, nullable: false),
@@ -55,7 +56,7 @@ namespace MediApp.Api.Persistence.Migrations
                 columns: table => new
                 {
                     id_acuerdo = table.Column<int>(nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     id_prestador = table.Column<int>(nullable: false),
                     factor_subsidio_e1 = table.Column<double>(nullable: false),
                     factor_subsidio_e2 = table.Column<double>(nullable: false),
@@ -89,7 +90,7 @@ namespace MediApp.Api.Persistence.Migrations
                 columns: table => new
                 {
                     id_parametros = table.Column<int>(nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     id_prestador = table.Column<int>(nullable: false),
                     id_acuerdo = table.Column<int>(nullable: false),
                     periodo = table.Column<int>(nullable: false),
