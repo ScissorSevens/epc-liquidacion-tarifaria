@@ -8,12 +8,16 @@
  * Reglas cubiertas:
  *   - 2.2 `idPrestadorRequeridoValido` — operario multi-tenant debe tener
  *     `id_prestador > 0` (columna agregada por migration 016, FK a prestador).
+ *   - 2.3 `passwordCumpleMinima` — política de longitud mínima para la
+ *     contraseña cruda que el operario envía al login.
  *
  * Por ahora el módulo solo contiene reglas del change
  * `setup-inicial-multi-tenant-auth`. Las reglas históricas (cedula, email,
  * password_hash) viven en `operarios.ts` factory a través de
  * `MENSAJES_ERROR_OPERARIO`.
  */
+
+const PASSWORD_LONGITUD_MINIMA = 8;
 
 /**
  * Valida que un operario pertenezca a un prestador multi-tenant.
@@ -32,4 +36,25 @@
  */
 export function idPrestadorRequeridoValido(idPrestador: number): boolean {
   return Number.isInteger(idPrestador) && idPrestador > 0;
+}
+
+/**
+ * Valida que la contraseña cruda tenga la longitud mínima aceptable.
+ *
+ * Política: 8 caracteres mínimo (alineado con NIST SP 800-63B como
+ * referencia base; el hasher real y la sal se gestionan en la capa de
+ * infraestructura — el dominio solo recibe la contraseña cruda desde la
+ * pantalla de Login para verificar la regla de UX antes de enviar al
+ * puerto de auth real en Fase 4).
+ *
+ * El parámetro se declara `string` pero la guarda `typeof === 'string'`
+ * hace que la función sea segura ante entradas `undefined`/null que un
+ * form mal inicializado podría entregar.
+ *
+ * @param password cadena cruda del input del usuario.
+ * @returns `true` solo si es string con `length >= 8`. `false` para
+ *          vacío, no-string o longitud insuficiente.
+ */
+export function passwordCumpleMinima(password: string): boolean {
+  return typeof password === 'string' && password.length >= PASSWORD_LONGITUD_MINIMA;
 }
