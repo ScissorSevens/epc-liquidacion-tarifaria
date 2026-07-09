@@ -9,6 +9,7 @@
  */
 
 import type * as SQLite from 'expo-sqlite';
+import type { ActualizarOperarioInput } from '../../../dominio/operarios/types';
 import type { Operario } from '../../operarios/types';
 
 interface OperarioRow {
@@ -38,7 +39,12 @@ CREATE TABLE IF NOT EXISTS operarios (
 `;
 
 const SQL_LISTAR = `SELECT * FROM operarios ORDER BY nombre ASC`;
+const SQL_LISTAR_POR_PRESTADOR = `SELECT * FROM operarios WHERE id_prestador = ? ORDER BY nombre ASC`;
+const SQL_BUSCAR_POR_ID = `SELECT * FROM operarios WHERE id_operario = ? LIMIT 1`;
+const SQL_BUSCAR_POR_CEDULA = `SELECT * FROM operarios WHERE numero_cedula = ? LIMIT 1`;
 const SQL_BUSCAR_POR_DISPOSITIVO = `SELECT * FROM operarios WHERE dispositivo_id = ? LIMIT 1`;
+const SQL_BUSCAR_POR_DISPOSITIVO_Y_PRESTADOR =
+  `SELECT * FROM operarios WHERE dispositivo_id = ? AND id_prestador = ? LIMIT 1`;
 const SQL_UPSERT = `
 INSERT INTO operarios (id_operario, id_prestador, numero_cedula, nombre, email, rol, estado, dispositivo_id, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -52,6 +58,21 @@ ON CONFLICT(id_operario) DO UPDATE SET
   dispositivo_id = excluded.dispositivo_id,
   created_at     = excluded.created_at
 `;
+
+/**
+ * Columnas actualizables vía `actualizar()`. Refleja
+ * `ActualizarOperarioInput` del dominio pero a nivel SQL.
+ */
+const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof OperarioRow> = [
+  'id_prestador',
+  'numero_cedula',
+  'nombre',
+  'email',
+  'rol',
+  'estado',
+  'dispositivo_id',
+  'created_at',
+];
 
 function fromRow(row: OperarioRow): Operario {
   return {
@@ -67,11 +88,64 @@ function fromRow(row: OperarioRow): Operario {
   };
 }
 
+/**
+ * Construye y ejecuta un UPDATE dinámico basado en las claves presentes
+ * en `cambios`. Solo las columnas enumeradas en COLUMNAS_ACTUALIZABLES
+ * son modificables (filtro defensivo contra keys inesperadas).
+ *
+ * @returns fila actualizada (leída de la DB para reflejar el rowid real).
+ */
+function ejecutarActualizacion(
+  db: SQLite.SQLiteDatabase,
+  id: number,
+  cambios: ActualizarOperarioInput,
+): Promise<Operario> {
+  const sets: string[] = [];
+  const valores: Array<string | number | null> = [];
+  for (const columna of COLUMNAS_ACTUALIZABLES) {
+    const valor = (cambios as Record<string, unknown>)[columna];
+    if (Object.prototype.hasOwnProperty.call(cambios, columna)) {
+      sets.push(`${columna} = ?`);
+      // dispositivo_id y created_at admiten null explícito (limpieza de cache).
+      valores.push(valor === undefined ? null : (valor as string | number | null));
+    }
+  }
+  if (sets.length === 0) {
+    // Nada que actualizar → retornamos la fila actual.
+    return db
+      .getFirstAsync<OperarioRow>(SQL_BUSCAR_POR_ID, id)
+      .then((row) => {
+        if (!row) throw new Error(`Operario id=${id} no existe`);
+        return fromRow(row);
+      });
+  }
+  valores.push(id);
+  const sql = `UPDATE operarios SET ${sets.join(', ')} WHERE id_operario = ?`;
+  return db
+    .runAsync(sql, ...valores)
+    .then(() => db.getFirstAsync<OperarioRow>(SQL_BUSCAR_POR_ID, id))
+    .then((row) => {
+      if (!row) throw new Error(`Operario id=${id} no existe tras actualizar`);
+      return fromRow(row);
+    });
+}
+
 export interface OperarioRepositoryExpoSqlite {
   inicializar(): Promise<void>;
   listar(): Promise<Operario[]>;
+  listarPorPrestador(idPrestador: number): Promise<Operario[]>;
+  buscarPorId(id: number): Promise<Operario | null>;
+  buscarPorCedula(cedula: string): Promise<Operario | null>;
+  /**
+   * Búsqueda por dispositivo_id ONLY (single key). Conservada por
+   * compatibilidad con `pantallas/Configuracion.tsx`; para filtrado
+   * multi-tenant usar `buscarPorDispositivo(dispositivoId, idPrestador)`.
+   */
   buscarPorDispositivoId(id: string): Promise<Operario | null>;
+  /** Compuesto dispositivo_id + id_prestador (multi-tenant). */
+  buscarPorDispositivo(dispositivoId: string, idPrestador: number): Promise<Operario | null>;
   guardar(operario: Operario): Promise<void>;
+  actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario>;
 }
 
 export function crearOperarioRepositoryExpoSqlite(
@@ -87,8 +161,35 @@ export function crearOperarioRepositoryExpoSqlite(
       return rows.map(fromRow);
     },
 
+    async listarPorPrestador(idPrestador: number): Promise<Operario[]> {
+      const rows = await db.getAllAsync<OperarioRow>(SQL_LISTAR_POR_PRESTADOR, idPrestador);
+      return rows.map(fromRow);
+    },
+
+    async buscarPorId(id: number): Promise<Operario | null> {
+      const row = await db.getFirstAsync<OperarioRow>(SQL_BUSCAR_POR_ID, id);
+      return row ? fromRow(row) : null;
+    },
+
+    async buscarPorCedula(cedula: string): Promise<Operario | null> {
+      const row = await db.getFirstAsync<OperarioRow>(SQL_BUSCAR_POR_CEDULA, cedula);
+      return row ? fromRow(row) : null;
+    },
+
     async buscarPorDispositivoId(id: string): Promise<Operario | null> {
       const row = await db.getFirstAsync<OperarioRow>(SQL_BUSCAR_POR_DISPOSITIVO, id);
+      return row ? fromRow(row) : null;
+    },
+
+    async buscarPorDispositivo(
+      dispositivoId: string,
+      idPrestador: number,
+    ): Promise<Operario | null> {
+      const row = await db.getFirstAsync<OperarioRow>(
+        SQL_BUSCAR_POR_DISPOSITIVO_Y_PRESTADOR,
+        dispositivoId,
+        idPrestador,
+      );
       return row ? fromRow(row) : null;
     },
 
@@ -104,6 +205,10 @@ export function crearOperarioRepositoryExpoSqlite(
         operario.dispositivo_id ?? null,
         operario.created_at ?? null,
       );
+    },
+
+    actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario> {
+      return ejecutarActualizacion(db, id, cambios);
     },
   };
 }
