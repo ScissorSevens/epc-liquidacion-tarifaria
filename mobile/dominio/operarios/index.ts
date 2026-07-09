@@ -9,3 +9,4 @@ export type {
   OperarioRepository,
 } from './types';
 export { MENSAJES_ERROR_OPERARIO } from './types';
+export { idPrestadorRequeridoValido } from './validador-operario';
