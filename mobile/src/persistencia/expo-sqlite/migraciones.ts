@@ -290,6 +290,25 @@ CREATE UNIQUE INDEX idx_operario_dispositivo_unique
   WHERE dispositivo_id IS NOT NULL;
 `;
 
+// Espejo verbatim de mobile/dominio/persistencia/sqlite/migrations/016_setup_inicial_multi_tenant.sql.
+// Agrega representante_legal al prestador + id_prestador FK al operario +
+// reemplaza UNIQUE de operario por uno compuesto (dispositivo_id, id_prestador).
+const MIGRACION_016_SETUP_INICIAL_MULTI_TENANT = `
+ALTER TABLE prestador ADD COLUMN representante_legal TEXT NOT NULL DEFAULT '';
+ALTER TABLE prestador ADD COLUMN representante_legal_cedula TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE operario ADD COLUMN id_prestador INTEGER NOT NULL DEFAULT 0
+  REFERENCES prestador(id_prestador) ON DELETE RESTRICT;
+
+DROP INDEX IF EXISTS idx_operario_dispositivo_unique;
+CREATE UNIQUE INDEX idx_operario_dispositivo_prestador_unique
+  ON operario(dispositivo_id, id_prestador)
+  WHERE dispositivo_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
+  ON operario(id_prestador);
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -306,6 +325,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 13, nombre: '013_lectura_add_id_prestador', sql: MIGRACION_013_LECTURA_ADD_ID_PRESTADOR },
   { version: 14, nombre: '014_factura_add_id_prestador', sql: MIGRACION_014_FACTURA_ADD_ID_PRESTADOR },
   { version: 15, nombre: '015_operario', sql: MIGRACION_015_OPERARIO },
+  { version: 16, nombre: '016_setup_inicial_multi_tenant', sql: MIGRACION_016_SETUP_INICIAL_MULTI_TENANT },
 ];
 
 

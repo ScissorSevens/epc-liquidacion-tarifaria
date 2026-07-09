@@ -85,4 +85,9 @@ export const migrations: readonly Migration[] = Object.freeze([
     nombre: '015_operario',
     sql: leerSQL('015_operario.sql'),
   },
+  {
+    version: 16,
+    nombre: '016_setup_inicial_multi_tenant',
+    sql: leerSQL('016_setup_inicial_multi_tenant.sql'),
+  },
 ]);
