@@ -26,6 +26,8 @@ export interface Prestador {
   readonly codigo: string;
   readonly nombre: string;
   readonly nit: string;
+  readonly representante_legal: string;
+  readonly representante_legal_cedula: string;
   readonly municipio: string;
   readonly departamento: string;
   readonly segmento: SegmentoPrestador;
@@ -39,7 +41,18 @@ export interface Prestador {
 
 export type PrestadorBorrador = Omit<Prestador, 'id_prestador' | 'created_at' | 'updated_at'>;
 
-export type CrearPrestadorInput = PrestadorBorrador;
+/**
+ * Input para crear un prestador. `estado` y `contacto` son opcionales para
+ * que la factory `crearPrestador` aplique defaults (`'activo'` y `null`).
+ * El resto replica el shape de `PrestadorBorrador` y se exige en creación.
+ */
+export type CrearPrestadorInput = Omit<
+  PrestadorBorrador,
+  'estado' | 'contacto'
+> & {
+  readonly estado?: EstadoPrestador;
+  readonly contacto?: string | null;
+};
 
 export type ActualizarPrestadorInput = Partial<
   Pick<
@@ -52,6 +65,8 @@ export type ActualizarPrestadorInput = Partial<
     | 'num_suscriptores_urbanos'
     | 'num_suscriptores_rurales'
     | 'contacto'
+    | 'representante_legal'
+    | 'representante_legal_cedula'
   >
 >;
 
@@ -95,6 +110,9 @@ export const MENSAJES_ERROR_PRESTADOR = {
   NOMBRE_LARGO: 'nombre no puede superar 200 caracteres',
   NIT_VACIO: 'nit no puede estar vacío',
   NIT_LARGO: 'nit no puede superar 20 caracteres',
+  REPRESENTANTE_LEGAL_VACIO: 'representante_legal no puede estar vacío',
+  CEDULA_REP_LEGAL_INVALIDA:
+    'cédula del representante legal debe tener entre 6 y 12 dígitos',
   MUNICIPIO_VACIO: 'municipio no puede estar vacío',
   MUNICIPIO_LARGO: 'municipio no puede superar 100 caracteres',
   DEPARTAMENTO_VACIO: 'departamento no puede estar vacío',
