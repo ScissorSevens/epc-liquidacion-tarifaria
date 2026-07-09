@@ -48,4 +48,18 @@ public class Operario
     [Required]
     [MaxLength(40)]
     public string CreatedAt { get; set; } = string.Empty;
+
+    /// <summary>
+    /// FK a Prestador (multi-tenant). Default 0 = prestador legacy "EPC-LEGACY"
+    /// (id_prestador=0) que mantiene compatibilidad con datos preexistentes.
+    /// Restricción: ON DELETE RESTRICT — un prestador con operarios no se puede eliminar.
+    /// SDD: setup-inicial-multi-tenant-auth phase 3 task 3.4.
+    /// </summary>
+    public int IdPrestador { get; set; }
+
+    /// <summary>
+    /// Navigation property opcional. Null cuando el operario se carga sin
+    /// eager-loading de Prestador.
+    /// </summary>
+    public Prestador? Prestador { get; set; }
 }

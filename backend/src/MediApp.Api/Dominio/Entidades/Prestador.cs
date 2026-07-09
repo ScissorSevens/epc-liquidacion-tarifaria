@@ -65,4 +65,11 @@ public class Prestador
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Operarios asignados a este prestador (multi-tenant). Relación 1:N
+    /// configurada en MediAppDbContext.OnModelCreating.
+    /// SDD: setup-inicial-multi-tenant-auth phase 3 task 3.4.
+    /// </summary>
+    public ICollection<Operario> Operarios { get; set; } = new List<Operario>();
 }

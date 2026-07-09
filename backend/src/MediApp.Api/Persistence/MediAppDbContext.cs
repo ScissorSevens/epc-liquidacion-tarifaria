@@ -103,6 +103,17 @@ public class MediAppDbContext : DbContext
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Operario → Prestador: FK multi-tenant. NOT NULL, ON DELETE RESTRICT
+        // (un prestador con operarios no se puede eliminar — protege la jerarquía).
+        // SDD: setup-inicial-multi-tenant-auth phase 3 task 3.4.
+        modelBuilder.Entity<Operario>()
+            .HasOne(o => o.Prestador)
+            .WithMany(p => p.Operarios)
+            .HasForeignKey(o => o.IdPrestador)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Operario>()
+            .HasIndex(o => o.IdPrestador);
+
         // ===== Multi-tenant: Prestador + Acuerdo + ParametrosTarifa =====
 
         modelBuilder.Entity<Prestador>()
