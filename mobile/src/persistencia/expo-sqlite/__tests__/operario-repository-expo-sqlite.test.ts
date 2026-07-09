@@ -19,6 +19,7 @@ import type { Operario } from '../../../operarios/types';
 
 function buildRow(overrides: Partial<{
   id_operario: number;
+  id_prestador: number;
   numero_cedula: string;
   nombre: string;
   email: string;
@@ -29,6 +30,7 @@ function buildRow(overrides: Partial<{
 }> = {}) {
   return {
     id_operario: 1,
+    id_prestador: 1,
     numero_cedula: '123',
     nombre: 'Ana',
     email: 'ana@test.com',
@@ -117,6 +119,7 @@ describe('buscarPorDispositivoId()', () => {
 
     const esperado: Operario = {
       id_operario: 7,
+      id_prestador: 1,
       nombre: 'Carlos',
       numero_cedula: '999',
       email: 'carlos@test.com',

@@ -7,6 +7,7 @@ import type { CrearOperarioInput, OperarioBorrador } from '../types';
 import { MENSAJES_ERROR_OPERARIO } from '../types';
 
 const inputValido: CrearOperarioInput = {
+  id_prestador: 1,
   numero_cedula: '1234567890',
   nombre: 'Ana Gómez',
   email: 'ana@epc.co',

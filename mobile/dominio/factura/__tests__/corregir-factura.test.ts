@@ -78,6 +78,7 @@ function periodoBase(): Periodo {
 function operarioBase(): Operario {
   return {
     id_operario: 7,
+    id_prestador: 1,
     numero_cedula: '1234567890',
     nombre: 'Ana Gómez',
     email: 'ana@epc.co',
