@@ -268,6 +268,28 @@ ALTER TABLE factura ADD COLUMN id_prestador INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX idx_factura_prestador ON factura (id_prestador);
 `;
 
+// Espejo verbatim de mobile/dominio/persistencia/sqlite/migrations/015_operario.sql.
+// Crea la tabla operario (deuda técnica "Iter 7"). Migration 016 le agrega
+// id_prestador y reemplaza el UNIQUE por uno compuesto.
+const MIGRACION_015_OPERARIO = `
+CREATE TABLE operario (
+  id_operario    INTEGER PRIMARY KEY AUTOINCREMENT,
+  numero_cedula  TEXT    NOT NULL UNIQUE,
+  nombre         TEXT    NOT NULL,
+  email          TEXT    NOT NULL DEFAULT '',
+  password_hash  TEXT    NOT NULL DEFAULT '',
+  rol            TEXT    NOT NULL DEFAULT 'operario'
+                          CHECK (rol IN ('operario', 'supervisor', 'admin')),
+  estado         TEXT    NOT NULL DEFAULT 'activo'
+                          CHECK (estado IN ('activo', 'inactivo')),
+  dispositivo_id TEXT    NULL,
+  created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE UNIQUE INDEX idx_operario_dispositivo_unique
+  ON operario(dispositivo_id)
+  WHERE dispositivo_id IS NOT NULL;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -283,6 +305,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 12, nombre: '012_suscriptor_add_id_prestador', sql: MIGRACION_012_SUSCRIPTOR_ADD_ID_PRESTADOR },
   { version: 13, nombre: '013_lectura_add_id_prestador', sql: MIGRACION_013_LECTURA_ADD_ID_PRESTADOR },
   { version: 14, nombre: '014_factura_add_id_prestador', sql: MIGRACION_014_FACTURA_ADD_ID_PRESTADOR },
+  { version: 15, nombre: '015_operario', sql: MIGRACION_015_OPERARIO },
 ];
 
 
