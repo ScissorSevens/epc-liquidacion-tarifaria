@@ -38,6 +38,8 @@ interface PrestadorRow {
   readonly codigo: string;
   readonly nombre: string;
   readonly nit: string;
+  readonly representante_legal: string;
+  readonly representante_legal_cedula: string;
   readonly municipio: string;
   readonly departamento: string;
   readonly segmento: number;
@@ -55,6 +57,8 @@ function fromRow(row: PrestadorRow): Prestador {
     codigo: row.codigo,
     nombre: row.nombre,
     nit: row.nit,
+    representante_legal: row.representante_legal,
+    representante_legal_cedula: row.representante_legal_cedula,
     municipio: row.municipio,
     departamento: row.departamento,
     segmento: row.segmento as Prestador['segmento'],
@@ -69,10 +73,12 @@ function fromRow(row: PrestadorRow): Prestador {
 
 const SQL_INSERT = `
   INSERT INTO prestador (
-    codigo, nombre, nit, municipio, departamento, segmento,
+    codigo, nombre, nit, representante_legal, representante_legal_cedula,
+    municipio, departamento, segmento,
     num_suscriptores_urbanos, num_suscriptores_rurales, contacto, estado
   ) VALUES (
-    @codigo, @nombre, @nit, @municipio, @departamento, @segmento,
+    @codigo, @nombre, @nit, @representante_legal, @representante_legal_cedula,
+    @municipio, @departamento, @segmento,
     @num_suscriptores_urbanos, @num_suscriptores_rurales, @contacto, @estado
   )
 `;
@@ -112,6 +118,10 @@ export function crearPrestadorRepositorySqlite(
         updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now')
     WHERE id_prestador = @id_prestador
   `);
+  // (representante_legal y representante_legal_cedula NO se actualizan
+  // desde la UI: son datos del prestador definidos en SetupInicial que
+  // requieren cambio manual del admin. Mantener fuera del UPDATE evita
+  // pisar accidentalmente el rep. legal con null/undefined.)
   const stmtSuspender = db.prepare(`
     UPDATE prestador
     SET estado = 'suspendido',
@@ -130,6 +140,8 @@ export function crearPrestadorRepositorySqlite(
       codigo: p.codigo,
       nombre: p.nombre,
       nit: p.nit,
+      representante_legal: p.representante_legal,
+      representante_legal_cedula: p.representante_legal_cedula,
       municipio: p.municipio,
       departamento: p.departamento,
       segmento: p.segmento,
