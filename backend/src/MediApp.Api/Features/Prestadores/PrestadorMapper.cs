@@ -10,6 +10,8 @@ public static class PrestadorMapper
         Codigo = p.Codigo,
         Nombre = p.Nombre,
         Nit = p.Nit,
+        RepresentanteLegal = p.RepresentanteLegal,
+        RepresentanteLegalCedula = p.RepresentanteLegalCedula,
         Municipio = p.Municipio,
         Departamento = p.Departamento,
         Segmento = p.Segmento,
@@ -24,6 +26,8 @@ public static class PrestadorMapper
         entidad.Codigo = p.Codigo;
         entidad.Nombre = p.Nombre;
         entidad.Nit = p.Nit;
+        entidad.RepresentanteLegal = p.RepresentanteLegal;
+        entidad.RepresentanteLegalCedula = p.RepresentanteLegalCedula;
         entidad.Municipio = p.Municipio;
         entidad.Departamento = p.Departamento;
         entidad.Segmento = p.Segmento;

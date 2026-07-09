@@ -30,6 +30,16 @@ public class Prestador
     [MaxLength(20)]
     public string Nit { get; set; } = string.Empty;
 
+    /// <summary>Nombre completo del representante legal. Requerido por SSRD/SSSPD.</summary>
+    [Required]
+    [MaxLength(200)]
+    public string RepresentanteLegal { get; set; } = string.Empty;
+
+    /// <summary>Cédula del representante legal (6-12 dígitos). Requerido por SSRD/SSSPD.</summary>
+    [Required]
+    [MaxLength(12)]
+    public string RepresentanteLegalCedula { get; set; } = string.Empty;
+
     [Required]
     [MaxLength(100)]
     public string Municipio { get; set; } = string.Empty;

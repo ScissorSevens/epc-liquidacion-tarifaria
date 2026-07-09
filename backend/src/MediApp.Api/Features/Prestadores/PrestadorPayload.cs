@@ -17,6 +17,14 @@ public class PrestadorPayload
     [JsonPropertyName("nit")]
     public string Nit { get; set; } = string.Empty;
 
+    /// <summary>Nombre completo del representante legal del prestador.</summary>
+    [JsonPropertyName("representante_legal")]
+    public string RepresentanteLegal { get; set; } = string.Empty;
+
+    /// <summary>Cédula del representante legal del prestador (6-12 dígitos).</summary>
+    [JsonPropertyName("representante_legal_cedula")]
+    public string RepresentanteLegalCedula { get; set; } = string.Empty;
+
     [JsonPropertyName("municipio")]
     public string Municipio { get; set; } = string.Empty;
 
