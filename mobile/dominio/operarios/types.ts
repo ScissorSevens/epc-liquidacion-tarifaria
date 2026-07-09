@@ -56,4 +56,5 @@ export const MENSAJES_ERROR_OPERARIO = {
   NOMBRE_LARGO: 'nombre no puede superar 150 caracteres',
   ESTADO_INVALIDO: "estado debe ser 'activo' o 'inactivo'",
   DISPOSITIVO_LARGO: 'dispositivo_id no puede superar 100 caracteres',
+  ID_PRESTADOR_INVALIDO: 'id_prestador debe ser mayor a 0',
 } as const;

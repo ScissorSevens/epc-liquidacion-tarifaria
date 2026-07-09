@@ -19,6 +19,7 @@ describe('crearOperario — factory de borrador', () => {
     const resultado: OperarioBorrador = crearOperario(inputValido);
 
     expect(resultado).toEqual({
+      id_prestador: 1,
       numero_cedula: '1234567890',
       nombre: 'Ana Gómez',
       email: 'ana@epc.co',
@@ -28,6 +29,25 @@ describe('crearOperario — factory de borrador', () => {
     });
     expect(resultado).not.toHaveProperty('id_operario');
     expect(resultado).not.toHaveProperty('created_at');
+  });
+
+  it('propaga id_prestador del input al OperarioBorrador', () => {
+    const resultado = crearOperario({ ...inputValido, id_prestador: 7 });
+    expect(resultado.id_prestador).toBe(7);
+  });
+});
+
+describe('crearOperario — id_prestador (Fase 3 cierre / TDD)', () => {
+  it('rechaza id_prestador = 0 con ID_PRESTADOR_INVALIDO', () => {
+    expect(() => crearOperario({ ...inputValido, id_prestador: 0 })).toThrow(
+      MENSAJES_ERROR_OPERARIO.ID_PRESTADOR_INVALIDO,
+    );
+  });
+
+  it('rechaza id_prestador negativo', () => {
+    expect(() => crearOperario({ ...inputValido, id_prestador: -1 })).toThrow(
+      MENSAJES_ERROR_OPERARIO.ID_PRESTADOR_INVALIDO,
+    );
   });
 });
 
