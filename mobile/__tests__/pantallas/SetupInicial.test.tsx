@@ -366,7 +366,9 @@ const SESION_FAKE_VALIDA = {
  * Avanza del paso 1 al paso 2 rellenando el form del prestador
  * con valores validos y tocando SIGUIENTE.
  */
-function avanzarAPaso2PasandoPrestador(getAllByPlaceholderText: typeof import('@testing-library/react-native').getAllByPlaceholderText) {
+function avanzarAPaso2PasandoPrestador(
+  getAllByPlaceholderText: (text: RegExp | string) => readonly import('react-native').TextInput[],
+) {
   // El orden de los inputs en el form es:
   // 0: nombre, 1: nit, 2: rep_legal, 3: rep_legal_cedula, 4: municipio,
   // 5: departamento, 6: suscriptores_urbanos, 7: suscriptores_rurales,
@@ -440,7 +442,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     fireEvent.press(getByText('SIGUIENTE'));
 
     // Campo password visible en paso 2
-    expect(getByPlaceholderText('Minimo 8 caracteres')).toBeTruthy();
+    expect(getByPlaceholderText('Mínimo 8 caracteres')).toBeTruthy();
   });
 
   it('I2.4 al tocar FINALIZAR con form valido llama bootstrapCompleto con los datos correctos', async () => {
@@ -453,7 +455,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     // Llenamos paso 2
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
-    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    fireEvent.changeText(getByPlaceholderText('Mínimo 8 caracteres'), 'miclave123');
     // Confirmar password: el segundo input de tipo password
     const inputs = getAllByPlaceholderText(/.+/);
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
@@ -477,7 +479,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
 
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
-    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    fireEvent.changeText(getByPlaceholderText('Mínimo 8 caracteres'), 'miclave123');
     const inputs = getAllByPlaceholderText(/.+/);
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
     fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
@@ -500,7 +502,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
 
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
-    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    fireEvent.changeText(getByPlaceholderText('Mínimo 8 caracteres'), 'miclave123');
     const inputs = getAllByPlaceholderText(/.+/);
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
     fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
@@ -526,7 +528,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
 
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
-    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    fireEvent.changeText(getByPlaceholderText('Mínimo 8 caracteres'), 'miclave123');
     const inputs = getAllByPlaceholderText(/.+/);
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
     fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
