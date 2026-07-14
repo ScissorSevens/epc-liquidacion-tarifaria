@@ -1,3 +1,9 @@
+// Los tests de inmutabilidad (Cycle 28) dependen de strict mode para
+// que `Object.freeze()` arroje TypeError al intentar mutar. Sin esto,
+// Babel + babel-preset-expo no emiten 'use strict' en archivos TS y la
+// mutación falla silenciosamente.
+'use strict';
+
 /**
  * Módulo AUDITORIA — Eventos inmutables encadenados
  * Ciclo 26: Crear evento LIQUIDACION_CREADA con hash propio
