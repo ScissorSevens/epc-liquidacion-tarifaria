@@ -1,23 +1,40 @@
 // mobile/__tests__/componentes/Login.test.tsx
 //
-// Tests contractuales del Login stub (Fase 4 Tarea 4.2.3).
+// Tests contractuales del Login real contra SQLite (TICKET-EPIC-LOGIN-001
+// / PUNTO A — Fase 5 Tarea 5.2).
 //
-// MODO DEMO: el Login crea una Sesion fake local para no romper TS con el
-// shape multi-tenant. El backend real llega en Fase 5.2 (pantallas).
+// REEMPLAZA el stub "modo demo" de Fase 4.2.3. El Login ahora valida
+// cedula + password contra la DB local SQLite via `loginLocal()` y crea
+// una Sesion multi-tenant con el idPrestador REAL del operario.
 //
-// Cobertura:
-//   - handleIngresar con inputs validos -> crearSesionFake con shape completo
-//     (token + cedula + nombre + idPrestador + expiresAt futuro)
-//   - guardarSesion recibe la sesion fake
-//   - useWorkspace.setSesionCompleta se invoca con la sesion fake
-//   - onLoginSuccess callback se invoca al terminar
-//   - Inputs invalidos (cedula vacia, contrasena corta) -> marca errores
-//     y NO llama guardarSesion ni onLoginSuccess
+// COBERTURA:
+//   - Happy path: cedula + password validas → loginLocal → guardarSesion
+//     + useWorkspace.setSesionCompleta + onLoginSuccess.
+//   - Validacion de inputs: cedula vacia / password < 8 → no llama
+//     loginLocal ni side-effects.
+//   - Errores tipados de loginLocal:
+//       * OPERARIO_NO_ENCONTRADO → Alert "No encontramos un operario..."
+//       * PASSWORD_INCORRECTA   → Alert "Contrasena incorrecta..."
+//   - Error generico (DB caida, etc.) → Alert con mensaje user-friendly.
+//   - Multi-tenant: la sesion persistida tiene idPrestador del operario
+//     (NO hardcoded a 1).
 //
-// Mocks:
-//   - AsyncStorage (cargarSesion/guardarSesion via composition/constantes)
-//   - useWorkspace: spy sobre setSesionCompleta
+// MOCKS:
+//   - expo-splash-screen (silent preventAutoHide).
+//   - AsyncStorage.
+//   - theme tokens.
+//   - getBootstrap: provee operarioRepo + hasher con stubs in-memory.
+//   - loginLocal: spy jest.fn() que el test controla por caso.
+//   - Alert.alert: spy para asserir que se llamo con titulo + mensaje.
+//
+// TDD Evidence:
+//   RED  → estos tests son la primera implementacion del nuevo handler.
+//          Antes de este commit, el archivo `composition/login-local.ts`
+//          no existe. Los tests fallan al importarlo.
+//   GREEN → el handler de Login.tsx usa loginLocal + los Alerts correctos
+//          y los tests pasan.
 
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
@@ -31,9 +48,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock del theme — Login.tsx importa tokens; los mocks de jest-expo
-// ya proveen react-native pero los tokens custom requieren importar
-// los modulos reales (no son pure-JS, son constantes).
 jest.mock('../../src/theme/skeletal-tokens', () => ({
   BORDERS: { thin: { borderWidth: 1 } },
   COLORS: {
@@ -64,23 +78,69 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
   },
 }));
 
+// Mock de loginLocal: el test controla lo que retorna / rechaza.
+jest.mock('../../src/composition/login-local', () => ({
+  loginLocal: jest.fn(),
+  ERROR_OPERARIO_NO_ENCONTRADO: 'OPERARIO_NO_ENCONTRADO',
+  ERROR_PASSWORD_INCORRECTA: 'PASSWORD_INCORRECTA',
+}));
+
+// Mock de getBootstrap: provee operarioRepo + hasher con stubs deterministas.
+// Login.tsx solo usa estos dos del bootstrap; los demas son irrelevantes para
+// el handler (AuthGate los consume en otra capa).
+jest.mock('../../src/composition/get-bootstrap', () => ({
+  getBootstrap: jest.fn().mockResolvedValue({
+    operarioRepo: { buscarPorCedula: jest.fn() },
+    hasher: { sha256: (s: string) => `sha256(${s})` },
+  }),
+}));
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Login from '../../src/pantallas/Login';
-import { guardarSesion, clave_storage_sesion } from '../../src/composition/constantes';
+import { clave_storage_sesion } from '../../src/composition/constantes';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
+import { loginLocal } from '../../src/composition/login-local';
 import type { Sesion } from '../../src/composition/constantes';
+import type { LoginLocalResultado } from '../../src/composition/login-local';
 
 const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<
   typeof AsyncStorage.setItem
 >;
+const mockedLoginLocal = loginLocal as jest.MockedFunction<typeof loginLocal>;
 
-describe('Login (Fase 4.2.3 — stub modo demo)', () => {
+/** Sesion valida de un operario multi-tenant. idPrestador = 7 (NO hardcoded). */
+const SESION_VALIDA: Sesion = {
+  token: 'fake-token-12345',
+  cedula: '51800012',
+  nombre: 'Ana Lopez',
+  idPrestador: 7,
+  expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+};
+
+const RESULTADO_LOGIN_VALIDO: LoginLocalResultado = {
+  sesion: SESION_VALIDA,
+  operario: {
+    id_operario: 42,
+    id_prestador: 7,
+    numero_cedula: '51800012',
+    nombre: 'Ana Lopez',
+    email: 'ana@test.com',
+    password_hash: 'sha256(mi-clave)',
+    rol: 'operario',
+    estado: 'activo',
+    created_at: '2024-01-15T00:00:00Z',
+  },
+};
+
+describe('Login (PUNTO A — Login real contra SQLite)', () => {
   let onLoginSuccess: jest.Mock;
+  let alertSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
     onLoginSuccess = jest.fn();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     useWorkspace.setState({
       id_prestador_activo: 0,
       prestador: null,
@@ -89,26 +149,53 @@ describe('Login (Fase 4.2.3 — stub modo demo)', () => {
       parametros_vigentes: null,
       cargando: false,
     });
+    // Default del mock: login OK con sesion multi-tenant (idPrestador=7).
+    mockedLoginLocal.mockResolvedValue(RESULTADO_LOGIN_VALIDO);
   });
 
-  // ─────────────────────────────────────────────────────────────
-  // Happy path: handleIngresar con inputs validos
-  // ─────────────────────────────────────────────────────────────
-  describe('handleIngresar con inputs validos', () => {
-    it('L1.1 guarda una Sesion con shape completo multi-tenant en AsyncStorage', async () => {
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Happy path: handleIngresar con inputs validos + loginLocal OK
+  // ──────────────────────────────────────────────────────────────────
+  describe('handleIngresar con inputs validos y login OK', () => {
+    it('L1.1 llama loginLocal con cedula trimmed + password y password_hash real', async () => {
       const { getByPlaceholderText, getByText } = render(
         <Login onLoginSuccess={onLoginSuccess} />,
       );
 
-      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '1234567890');
-      fireEvent.changeText(getByPlaceholderText('••••••••'), 'password1234');
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '  51800012  ');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
       fireEvent.press(getByText('Ingresar'));
 
       await waitFor(() => {
-        expect(mockedSetItem).toHaveBeenCalled();
+        expect(mockedLoginLocal).toHaveBeenCalledTimes(1);
       });
 
-      // Buscamos la escritura bajo la clave de sesion
+      const args = mockedLoginLocal.mock.calls[0][0];
+      // Login hace cedula.trim() antes de pasar al helper.
+      expect(args.cedula).toBe('51800012');
+      expect(args.password).toBe('mi-clave-secreta');
+      // El helper debe recibir las deps operarioRepo + hasher (del bootstrap).
+      expect(args.operarioRepo).toBeDefined();
+      expect(args.hasher).toBeDefined();
+    });
+
+    it('L1.2 guarda la sesion con idPrestador real (NO hardcoded a 1) en AsyncStorage', async () => {
+      const { getByPlaceholderText, getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
+      fireEvent.press(getByText('Ingresar'));
+
+      await waitFor(() => {
+        expect(onLoginSuccess).toHaveBeenCalledTimes(1);
+      });
+
       const escrituraSesion = mockedSetItem.mock.calls.find(
         ([clave]) => clave === clave_storage_sesion,
       );
@@ -117,48 +204,22 @@ describe('Login (Fase 4.2.3 — stub modo demo)', () => {
       const [, payload] = escrituraSesion as [string, string];
       const sesionGuardada = JSON.parse(payload) as Sesion;
 
-      // Shape completo multi-tenant:
+      // Multi-tenant: idPrestador real del operario (7), NO 1.
+      expect(sesionGuardada.idPrestador).toBe(7);
+      expect(sesionGuardada.idPrestador).not.toBe(1);
+      expect(sesionGuardada.cedula).toBe('51800012');
+      expect(sesionGuardada.nombre).toBe('Ana Lopez');
       expect(sesionGuardada.token).toMatch(/^fake-token-/);
-      expect(sesionGuardada.cedula).toBe('1234567890');
-      expect(sesionGuardada.nombre).toBe('Operario Demo');
-      expect(sesionGuardada.idPrestador).toBe(1); // placeholder demo
-      expect(sesionGuardada.expiresAt).toBeGreaterThan(Date.now());
     });
 
-    it('L1.2 expiresAt esta en el futuro con holgura de ~24h', async () => {
-      const antesDe = Date.now();
-      const { getByPlaceholderText, getByText } = render(
-        <Login onLoginSuccess={onLoginSuccess} />,
-      );
-
-      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '1234567890');
-      fireEvent.changeText(getByPlaceholderText('••••••••'), 'password1234');
-      fireEvent.press(getByText('Ingresar'));
-
-      await waitFor(() => {
-        expect(onLoginSuccess).toHaveBeenCalledTimes(1);
-      });
-
-      const escrituraSesion = mockedSetItem.mock.calls.find(
-        ([clave]) => clave === clave_storage_sesion,
-      );
-      const [, payload] = escrituraSesion as [string, string];
-      const sesionGuardada = JSON.parse(payload) as Sesion;
-
-      // 24h ± 1s de holgura (el handler puede tardar ms en ejecutarse)
-      const veinticuatroHoras = 24 * 60 * 60 * 1000;
-      expect(sesionGuardada.expiresAt).toBeGreaterThanOrEqual(antesDe + veinticuatroHoras - 1000);
-      expect(sesionGuardada.expiresAt).toBeLessThanOrEqual(antesDe + veinticuatroHoras + 1000);
-    });
-
-    it('L1.3 sincroniza useWorkspace con sesion.idPrestador via setSesionCompleta', async () => {
+    it('L1.3 sincroniza useWorkspace con sesion.idPrestador (7) via setSesionCompleta', async () => {
       const spySetSesion = jest.spyOn(useWorkspace.getState(), 'setSesionCompleta');
       const { getByPlaceholderText, getByText } = render(
         <Login onLoginSuccess={onLoginSuccess} />,
       );
 
-      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '1234567890');
-      fireEvent.changeText(getByPlaceholderText('••••••••'), 'password1234');
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
       fireEvent.press(getByText('Ingresar'));
 
       await waitFor(() => {
@@ -166,17 +227,17 @@ describe('Login (Fase 4.2.3 — stub modo demo)', () => {
       });
 
       const sesionLlamada = spySetSesion.mock.calls[0][0] as Sesion;
-      expect(sesionLlamada.idPrestador).toBe(1);
-      expect(sesionLlamada.cedula).toBe('1234567890');
+      expect(sesionLlamada.idPrestador).toBe(7);
+      expect(sesionLlamada.cedula).toBe('51800012');
     });
 
-    it('L1.4 invoca onLoginSuccess exactamente una vez al terminar', async () => {
+    it('L1.4 invoca onLoginSuccess exactamente una vez al terminar exitosamente', async () => {
       const { getByPlaceholderText, getByText } = render(
         <Login onLoginSuccess={onLoginSuccess} />,
       );
 
-      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '1234567890');
-      fireEvent.changeText(getByPlaceholderText('••••••••'), 'password1234');
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
       fireEvent.press(getByText('Ingresar'));
 
       await waitFor(() => {
@@ -184,48 +245,38 @@ describe('Login (Fase 4.2.3 — stub modo demo)', () => {
       });
     });
 
-    it('L1.5 usa guardarSesion de composition/constantes (no setItem directo)', async () => {
-      // Spy directo sobre guardarSesion — el Login NO debe llamar
-      // AsyncStorage.setItem directamente, debe usar el helper para
-      // mantener consistencia.
-      const spyGuardar = jest.spyOn({ guardarSesion }, 'guardarSesion');
+    it('L1.5 NO muestra Alert.alert en el happy path (el login fue exitoso)', async () => {
       const { getByPlaceholderText, getByText } = render(
         <Login onLoginSuccess={onLoginSuccess} />,
       );
 
-      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '1234567890');
-      fireEvent.changeText(getByPlaceholderText('••••••••'), 'password1234');
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
       fireEvent.press(getByText('Ingresar'));
 
       await waitFor(() => {
-        expect(onLoginSuccess).toHaveBeenCalled();
+        expect(onLoginSuccess).toHaveBeenCalledTimes(1);
       });
-      // Verificacion indirecta: AsyncStorage.setItem fue llamado con la clave
-      // de sesion (lo cual solo guardarSesion hace bajo esa clave exacta).
-      const escriturasConClaveSesion = mockedSetItem.mock.calls.filter(
-        ([clave]) => clave === clave_storage_sesion,
-      );
-      expect(escriturasConClaveSesion).toHaveLength(1);
-      spyGuardar.mockRestore();
+
+      expect(alertSpy).not.toHaveBeenCalled();
     });
   });
 
-  // ─────────────────────────────────────────────────────────────
-  // Validacion de inputs: handleIngresar con inputs invalidos
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────
+  // Validacion de inputs (sigue igual que el stub)
+  // ──────────────────────────────────────────────────────────────────
   describe('handleIngresar con inputs invalidos', () => {
-    it('L2.1 no llama guardarSesion ni onLoginSuccess si cedula esta vacia', async () => {
+    it('L2.1 no llama loginLocal ni onLoginSuccess si cedula esta vacia', async () => {
       const { getByPlaceholderText, getByText } = render(
         <Login onLoginSuccess={onLoginSuccess} />,
       );
 
-      // Solo llenamos contrasena, dejamos cedula vacia
-      fireEvent.changeText(getByPlaceholderText('••••••••'), 'password1234');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
       fireEvent.press(getByText('Ingresar'));
 
-      // Esperamos un microtask para asegurar que el handler completo se ejecuto
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 20));
 
+      expect(mockedLoginLocal).not.toHaveBeenCalled();
       expect(onLoginSuccess).not.toHaveBeenCalled();
       const escriturasConClaveSesion = mockedSetItem.mock.calls.filter(
         ([clave]) => clave === clave_storage_sesion,
@@ -233,18 +284,133 @@ describe('Login (Fase 4.2.3 — stub modo demo)', () => {
       expect(escriturasConClaveSesion).toHaveLength(0);
     });
 
-    it('L2.2 no llama guardarSesion ni onLoginSuccess si contrasena < 8 chars', async () => {
+    it('L2.2 no llama loginLocal ni onLoginSuccess si contrasena < 8 chars', async () => {
       const { getByPlaceholderText, getByText } = render(
         <Login onLoginSuccess={onLoginSuccess} />,
       );
 
-      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '1234567890');
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
       fireEvent.changeText(getByPlaceholderText('••••••••'), 'short');
       fireEvent.press(getByText('Ingresar'));
 
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockedLoginLocal).not.toHaveBeenCalled();
+      expect(onLoginSuccess).not.toHaveBeenCalled();
+      const escriturasConClaveSesion = mockedSetItem.mock.calls.filter(
+        ([clave]) => clave === clave_storage_sesion,
+      );
+      expect(escriturasConClaveSesion).toHaveLength(0);
+    });
+
+    it('L2.3 no llama loginLocal ni onLoginSuccess si cedula < 6 digitos', async () => {
+      const { getByPlaceholderText, getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '12345');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
+      fireEvent.press(getByText('Ingresar'));
+
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockedLoginLocal).not.toHaveBeenCalled();
+      expect(onLoginSuccess).not.toHaveBeenCalled();
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Errores tipados de loginLocal → Alert con mensaje claro al usuario
+  // ──────────────────────────────────────────────────────────────────
+  describe('errores de loginLocal', () => {
+    it('L3.1 OPERARIO_NO_ENCONTRADO → Alert "No encontramos un operario..." + NO onLoginSuccess', async () => {
+      mockedLoginLocal.mockRejectedValueOnce(new Error('OPERARIO_NO_ENCONTRADO'));
+
+      const { getByPlaceholderText, getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '00000000');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
+      fireEvent.press(getByText('Ingresar'));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
 
       expect(onLoginSuccess).not.toHaveBeenCalled();
+      // El Alert debe mencionar que no se encontro el operario (user-friendly,
+      // no el codigo crudo).
+      const argumentosAlert = alertSpy.mock.calls[0];
+      const mensajeCompleto = argumentosAlert.slice(1).join(' ');
+      expect(mensajeCompleto.toLowerCase()).toMatch(/no encontramos|operario|cédula|cedula/);
+      // NO debe mencionar el codigo crudo OPERARIO_NO_ENCONTRADO (es para devs).
+      expect(mensajeCompleto).not.toContain('OPERARIO_NO_ENCONTRADO');
+    });
+
+    it('L3.2 PASSWORD_INCORRECTA → Alert "Contrasena incorrecta..." + NO onLoginSuccess', async () => {
+      mockedLoginLocal.mockRejectedValueOnce(new Error('PASSWORD_INCORRECTA'));
+
+      const { getByPlaceholderText, getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-equivocada');
+      fireEvent.press(getByText('Ingresar'));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      expect(onLoginSuccess).not.toHaveBeenCalled();
+      const argumentosAlert = alertSpy.mock.calls[0];
+      const mensajeCompleto = argumentosAlert.slice(1).join(' ');
+      expect(mensajeCompleto.toLowerCase()).toMatch(/contrase|contrasena|incorrecta/);
+      expect(mensajeCompleto).not.toContain('PASSWORD_INCORRECTA');
+    });
+
+    it('L3.3 error generico (DB caida) → Alert con mensaje user-friendly + NO onLoginSuccess', async () => {
+      mockedLoginLocal.mockRejectedValueOnce(new Error('SQLITE BUSY'));
+
+      const { getByPlaceholderText, getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
+      fireEvent.press(getByText('Ingresar'));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      expect(onLoginSuccess).not.toHaveBeenCalled();
+      const argumentosAlert = alertSpy.mock.calls[0];
+      const mensajeCompleto = argumentosAlert.slice(1).join(' ');
+      // Mensaje user-friendly que SI puede mencionar el error tecnico (es OK
+      // mostrar "SQLITE BUSY" porque es info util para soporte), pero DEBE
+      // enmarcarlo en un contexto de "no se pudo iniciar sesion".
+      expect(mensajeCompleto.toLowerCase()).toMatch(/no se pudo|iniciar sesión|iniciar sesion/);
+    });
+
+    it('L3.4 cuando loginLocal falla, NO se persiste sesion ni se sincroniza workspace', async () => {
+      mockedLoginLocal.mockRejectedValueOnce(new Error('OPERARIO_NO_ENCONTRADO'));
+
+      const spySetSesion = jest.spyOn(useWorkspace.getState(), 'setSesionCompleta');
+      const { getByPlaceholderText, getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '00000000');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
+      fireEvent.press(getByText('Ingresar'));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      expect(spySetSesion).not.toHaveBeenCalled();
       const escriturasConClaveSesion = mockedSetItem.mock.calls.filter(
         ([clave]) => clave === clave_storage_sesion,
       );

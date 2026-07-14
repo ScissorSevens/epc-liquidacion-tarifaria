@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +14,12 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { FooterApp } from '../componentes/FooterApp';
 import { guardarSesion, type Sesion } from '../composition/constantes';
+import {
+  loginLocal,
+  ERROR_OPERARIO_NO_ENCONTRADO,
+  ERROR_PASSWORD_INCORRECTA,
+} from '../composition/login-local';
+import { getBootstrap } from '../composition/get-bootstrap';
 import { useWorkspace } from '../composicion/useWorkspace';
 import { BORDERS, COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
@@ -20,35 +27,31 @@ interface Props {
   readonly onLoginSuccess: () => void;
 }
 
-const MS_EN_UN_DIA = 24 * 60 * 60 * 1000;
-const ID_PRESTADOR_DEMO = 1; // Placeholder hasta Fase 5.2 (backend real)
-const NOMBRE_DEMO = 'Operario Demo';
-
 /**
- * Login stub (Fase 4 Tarea 4.2.3) — MODO DEMO.
+ * Login real contra SQLite (TICKET-EPIC-LOGIN-001 / PUNTO A — Fase 5.2).
  *
- * Crea una Sesion fake local para no romper TS con el shape multi-tenant.
- * El backend real (.NET EPC + endpoint /auth) llega en Fase 5.2 (pantallas).
- *
- * La sesion fake tiene:
- *   - token: 'fake-token-' + Date.now()
- *   - cedula: input del usuario (trim)
- *   - nombre: placeholder fijo 'Operario Demo'
- *   - idPrestador: 1 (placeholder; el backend devolvera el real)
- *   - expiresAt: now + 24h
+ * Reemplaza el stub "modo demo" de Fase 4.2.3. Ahora valida cedula +
+ * password contra la DB local del dispositivo via `loginLocal()` y crea
+ * una Sesion multi-tenant con el idPrestador REAL del operario.
  *
  * Flujo:
- *   1. Valida inputs (cedula no vacia + contrasena >= 8 chars)
- *   2. Construye Sesion fake
- *   3. guardarSesion(sesion) en AsyncStorage
- *   4. useWorkspace.setSesionCompleta(sesion) — sync id_prestador_activo
- *   5. onLoginSuccess() — AuthGate cambia decision a con_sesion
+ *   1. Valida inputs (cedula >= 6 digitos + contrasena >= 8 chars)
+ *   2. Resuelve deps via `getBootstrap()` (operarioRepo + hasher)
+ *   3. Llama `loginLocal({ operarioRepo, hasher, cedula, password })`
+ *   4. Si OK → guardarSesion(sesion) + setSesionCompleta + onLoginSuccess
+ *   5. Si throw OPERARIO_NO_ENCONTRADO  → Alert "No encontramos un operario..."
+ *   6. Si throw PASSWORD_INCORRECTA    → Alert "Contrasena incorrecta..."
+ *   7. Si throw otro error             → Alert "No se pudo iniciar sesion..."
+ *
+ * Multi-tenant: la sesion persistida tiene `idPrestador` del operario
+ * (NO hardcoded a 1). Cada operario entra a SU prestador.
  */
 export default function Login({ onLoginSuccess }: Props) {
   const [cedula, setCedula] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
   const [errores, setErrores] = useState<{ cedula?: boolean; contrasena?: boolean }>({});
+  const [cargando, setCargando] = useState(false);
 
   async function handleIngresar() {
     const nuevosErrores: { cedula?: boolean; contrasena?: boolean } = {};
@@ -60,19 +63,43 @@ export default function Login({ onLoginSuccess }: Props) {
       return;
     }
     setErrores({});
+    setCargando(true);
 
-    // MODO DEMO — Fase 4.2.3 stub. Backend real en Fase 5.2.
-    const sesionFake: Sesion = {
-      token: `fake-token-${Date.now()}`,
-      cedula: cedula.trim(),
-      nombre: NOMBRE_DEMO,
-      idPrestador: ID_PRESTADOR_DEMO,
-      expiresAt: Date.now() + MS_EN_UN_DIA,
-    };
+    try {
+      const { operarioRepo, hasher } = await getBootstrap();
+      const resultado = await loginLocal({
+        operarioRepo,
+        hasher,
+        cedula: cedula.trim(),
+        password: contrasena,
+      });
 
-    await guardarSesion(sesionFake);
-    await useWorkspace.getState().setSesionCompleta(sesionFake);
-    onLoginSuccess();
+      // Login OK → persistir sesion + sincronizar workspace + notificar.
+      await guardarSesion(resultado.sesion);
+      await useWorkspace.getState().setSesionCompleta(resultado.sesion);
+      onLoginSuccess();
+    } catch (err) {
+      const codigo = err instanceof Error ? err.message : String(err);
+
+      if (codigo === ERROR_OPERARIO_NO_ENCONTRADO) {
+        Alert.alert(
+          'No encontramos tu cuenta',
+          'No encontramos un operario con esa cédula. Verificá que hayas completado el setup inicial o contactá al administrador.',
+        );
+      } else if (codigo === ERROR_PASSWORD_INCORRECTA) {
+        Alert.alert(
+          'Contraseña incorrecta',
+          'La contraseña no coincide. Intentá de nuevo.',
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          `No se pudo iniciar sesión. Detalle técnico: ${codigo}`,
+        );
+      }
+    } finally {
+      setCargando(false);
+    }
   }
 
   return (
