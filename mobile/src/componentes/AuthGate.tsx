@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { SplashAnimado } from './SplashAnimado';
 import Login from '../pantallas/Login';
 import RootNavigator from '../navegacion/RootNavigator';
-import { cargarSesion, limpiarSesion, type Sesion } from '../composition/constantes';
+import { cargarSesion, limpiarSesion } from '../composition/constantes';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { useWorkspace } from '../composicion/useWorkspace';
 import { logger } from '../composicion/logger';
