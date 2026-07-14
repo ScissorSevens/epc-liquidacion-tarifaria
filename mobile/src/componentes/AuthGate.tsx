@@ -6,7 +6,11 @@ import { SplashAnimado } from './SplashAnimado';
 import Login from '../pantallas/Login';
 import SetupInicial from '../pantallas/SetupInicial';
 import RootNavigator from '../navegacion/RootNavigator';
-import { cargarSesion, limpiarSesion } from '../composition/constantes';
+import {
+  cargarSesion,
+  estadoSesionPersistida,
+  limpiarSesion,
+} from '../composition/constantes';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { limpiarDatosLegacyBypass } from '../composition/migracion-datos-legacy';
 import { crearOperarioRepositoryExpoSqlite } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
@@ -16,6 +20,15 @@ import { logger } from '../composicion/logger';
 type Decision = 'loading' | 'sin_setup' | 'sin_sesion' | 'con_sesion';
 
 /**
+ * Mensaje que se muestra arriba del Login cuando el operario tuvo una
+ * sesion persistida que vencio. Es un copy estatico del lado UX: no se
+ * compone dinamicamente porque la causa es siempre la misma (token
+ * expirado por las 24h del contrato).
+ */
+const MENSAJE_SESION_VENCIDA =
+  'Tu sesión anterior venció. Volvé a ingresar tu cédula y contraseña.';
+
+/**
  * Componente raiz de autenticacion.
  *
  * Decide que mostrar en el cold-boot segun dos senales independientes:
@@ -23,13 +36,24 @@ type Decision = 'loading' | 'sin_setup' | 'sin_sesion' | 'con_sesion';
  *      - NO  -> sin_setup (placeholder de SetupInicial, implementado en 5.1)
  *      - SI  -> continuar
  *   2. Sesion: hay una sesion persistida valida en AsyncStorage?
- *      - NO / vencida -> sin_sesion (Login)
- *      - SI           -> con_sesion (RootNavigator + sync useWorkspace)
+ *      - NO / vencida / invalida -> sin_sesion (Login; con banner si vencio)
+ *      - SI                     -> con_sesion (RootNavigator + sync useWorkspace)
+ *
+ * PUNTO C — Detalle de sesion (PUNTO C):
+ *   Antes, `cargarSesion()` colapsaba todo a `Sesion|null` y perdiamos
+ *   el POR QUE del null. Ahora consultamos `estadoSesionPersistida()`
+ *   ANTES de pedir la sesion para distinguir tres casos:
+ *     - 'no_existe' (cold-boot limpio) -> Login silencioso.
+ *     - 'invalida'  (storage con basura) -> Login silencioso (cleanup
+ *       ya lo hizo estadoSesionPersistida).
+ *     - 'vencida'   (token expirado, storage preservado) -> Login con
+ *       banner arriba del form (mensajeInicial). El operario sabe
+ *       exactamente por que lo vemos de nuevo en el Login.
  *
  * Estados renderizados:
  *   - loading:    SplashAnimado mientras decide
- *   - sin_setup:  Placeholder textual "Setup inicial pendiente" (5.1)
- *   - sin_sesion: Login (stub en 4.2.3, real en 5.2)
+ *   - sin_setup:  SetupInicial (wizard 2 pasos)
+ *   - sin_sesion: Login (con mensajeInicial si vencio)
  *   - con_sesion: NavigationContainer(RootNavigator)
  *
  * Dual-flag anti-flicker: solo invoca `SplashScreen.hideAsync()` cuando
@@ -44,6 +68,15 @@ type Decision = 'loading' | 'sin_setup' | 'sin_sesion' | 'con_sesion';
 export function AuthGate() {
   const [decision, setDecision] = useState<Decision>('loading');
   const [splashComplete, setSplashComplete] = useState(false);
+  /**
+   * Mensaje que se pasa a Login cuando el operario tuvo sesion expirada.
+   * Si esta vacio, Login rendea sin banner (cold-boot limpio o sesion
+   * corrupta). Si esta set, Login muestra el banner amarillo arriba del
+   * form. AuthGate setea esto segun `estadoSesionPersistida()`; Login
+   * puede dismissar el banner via su propio state interno (el prop es
+   * solo el "semilla" inicial, despias el operario lo cierra con la X).
+   */
+  const [mensajeInicial, setMensajeInicial] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     // La deteccion arranca INMEDIATAMENTE al montar (empty deps).
@@ -81,7 +114,22 @@ export function AuthGate() {
           return;
         }
 
-        // 2. ¿Hay sesion persistida valida?
+        // 2. PUNTO C: clasificamos la sesion persistida ANTES de pedirla.
+        //    Asi podemos mostrar el banner "Tu sesion anterior vencio"
+        //    solo cuando aplique (estado === 'vencida'), no en cold-boot
+        //    limpio ('no_existe') ni cuando hay basura en storage
+        //    ('invalida'). La sesion vencida NO se borra de AsyncStorage
+        //    en este punto — el cleanup defensivo solo se hace en 'invalida'.
+        const estadoSesion = await estadoSesionPersistida();
+        if (cancelado) return;
+
+        if (estadoSesion === 'vencida') {
+          setMensajeInicial(MENSAJE_SESION_VENCIDA);
+        }
+
+        // 3. Cargamos la sesion tipada (cargarSesion ya es wrapper de
+        //    estadoSesionPersistida, asi que hace el read + parse final
+        //    cuando estado === 'valida').
         const sesion = await cargarSesion();
         if (cancelado) return;
 
@@ -90,7 +138,7 @@ export function AuthGate() {
           return;
         }
 
-        // 3. Sync del workspace con la sesion resuelta y decision final.
+        // 4. Sync del workspace con la sesion resuelta y decision final.
         await useWorkspace.getState().setSesionCompleta(sesion);
         if (cancelado) return;
         setDecision('con_sesion');
@@ -155,7 +203,11 @@ export function AuthGate() {
   }
 
   if (decision === 'sin_sesion') {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    // PUNTO C: pasamos mensajeInicial para que Login muestre el banner
+    // amarillo "Tu sesion anterior vencio" arriba del form cuando el
+    // estado clasificado fue 'vencida'. En cold-boot limpio o 'invalida',
+    // mensajeInicial queda undefined y Login rendea sin banner.
+    return <Login onLoginSuccess={handleLoginSuccess} mensajeInicial={mensajeInicial} />;
   }
 
   return (

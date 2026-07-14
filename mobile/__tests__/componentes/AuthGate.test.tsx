@@ -67,8 +67,21 @@ jest.mock('../../src/pantallas/Login', () => {
   const { Text } = require('react-native');
   return {
     __esModule: true,
-    default: ({ onLoginSuccess }: { onLoginSuccess: () => void }) =>
-      React.createElement(Text, { onPress: onLoginSuccess }, 'login-mock'),
+    default: ({
+      onLoginSuccess,
+      mensajeInicial,
+    }: {
+      onLoginSuccess: () => void;
+      mensajeInicial?: string;
+    }) =>
+      React.createElement(
+        Text,
+        {
+          onPress: onLoginSuccess,
+          testID: 'login-mock',
+        },
+        `login-mock${mensajeInicial ? ':' + mensajeInicial : ''}`,
+      ),
   };
 });
 
@@ -122,10 +135,14 @@ import { getBootstrap } from '../../src/composition/get-bootstrap';
 import { limpiarDatosLegacyBypass } from '../../src/composition/migracion-datos-legacy';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
 import type { Sesion } from '../../src/composition/constantes';
+import { clave_storage_sesion } from '../../src/composition/constantes';
 import { AuthGate } from '../../src/componentes/AuthGate';
 
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<
   typeof AsyncStorage.getItem
+>;
+const mockedRemoveItem = AsyncStorage.removeItem as jest.MockedFunction<
+  typeof AsyncStorage.removeItem
 >;
 const mockedHideAsync = SplashScreen.hideAsync as jest.MockedFunction<
   typeof SplashScreen.hideAsync
@@ -260,7 +277,10 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
 
       const { findByText } = render(<AuthGate />);
 
-      await findByText('login-mock');
+      // PUNTO C: sesion vencida ahora muestra Login con mensajeInicial,
+      // asi que el mock rendea "login-mock:<texto>". Usamos un regex para
+      // matchear cualquier mensaje sin atarnos al copy exacto.
+      await findByText(/^login-mock(:.*)?$/);
     });
   });
 
@@ -271,7 +291,9 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
     it('A3.1 muestra RootNavigator cuando hay prestadores y sesion valida', async () => {
       mockBootstrapConPrestadores([{ id_prestador: 42 }]);
       const sesion = crearSesionValida({ idPrestador: 42 });
-      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
+      // PUNTO C: cargarSesion hace doble read (estadoSesionPersistida +
+      // re-read para typed return). mockResolvedValue cubre ambas lecturas.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesion));
 
       const { findByText, queryByText } = render(<AuthGate />);
 
@@ -282,7 +304,8 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
     it('A3.2 sincroniza useWorkspace.id_prestador_activo con sesion.idPrestador', async () => {
       mockBootstrapConPrestadores([{ id_prestador: 7 }]);
       const sesion = crearSesionValida({ idPrestador: 7 });
-      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
+      // PUNTO C: ver A3.1.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesion));
 
       render(<AuthGate />);
 
@@ -294,7 +317,8 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
     it('A3.3 invoca setSesionCompleta del workspace con la sesion resuelta', async () => {
       mockBootstrapConPrestadores([{ id_prestador: 9 }]);
       const sesion = crearSesionValida({ idPrestador: 9 });
-      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
+      // PUNTO C: ver A3.1.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesion));
 
       const spySetSesion = jest.spyOn(useWorkspace.getState(), 'setSesionCompleta');
 
@@ -352,7 +376,8 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       mockSplashAnimadoDebeLlamarOnAnimationEnd = false;
       mockBootstrapConPrestadores([{ id_prestador: 42 }]);
       const sesion = crearSesionValida({ idPrestador: 42 });
-      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
+      // PUNTO C: doble read defensivo, ver A3.1.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesion));
 
       const callsBefore = mockedHideAsync.mock.calls.length;
       const { findByText } = render(<AuthGate />);
@@ -421,6 +446,111 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       const idxListar = ordenLlamadas.indexOf('prestadorRepo.listar');
       expect(idxLimpiar).toBeGreaterThanOrEqual(0);
       expect(idxListar).toBeGreaterThan(idxLimpiar);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // PUNTO C — AuthGate detecta sesion vencida y pasa mensajeInicial a Login
+  //
+  // Caso UX: el operario deja la app abierta 24h+, vuelve a entrar,
+  // encuentra Login silencioso y se confunde ("que paso?"). Ahora
+  // AuthGate debe distinguir 'vencida' de 'no_existe' / 'invalida' y
+  // pasar un mensaje breve al Login solo cuando vencio.
+  //
+  // Implementacion: AuthGate consulta estadoSesionPersistida() ANTES de
+  // cargarSesion() para tener el motivo. Si estado === 'vencida',
+  // setea un mensajeInicial que Login rendera como banner arriba del form.
+  //
+  // El mock de Login incluye el mensajeInicial en el texto que renderea
+  // (formato 'login-mock:<mensaje>' si lo hay, 'login-mock' solo si no)
+  // para que estos tests puedan asserir end-to-end sin tocar el
+  // componente real.
+  // ─────────────────────────────────────────────────────────────
+  describe('PUNTO C — sesion vencida con mensaje claro al operario', () => {
+    const MENSAJE_VENCIDA = 'Tu sesión anterior venció. Volvé a ingresar tu cédula y contraseña.';
+
+    it('A7.1 cuando la sesion esta vencida, Login recibe mensajeInicial con el texto esperado', async () => {
+      mockBootstrapConPrestadores([{ id_prestador: 1 }]);
+      const sesionVencida = crearSesionValida({ expiresAt: Date.now() - 1000 });
+      // PUNTO C: doble read defensivo. mockResolvedValue cubre ambas.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesionVencida));
+
+      const { findByText } = render(<AuthGate />);
+
+      // El mock de Login rendea "login-mock:<mensaje>" cuando recibe
+      // mensajeInicial, "login-mock" cuando no.
+      await findByText(`login-mock:${MENSAJE_VENCIDA}`);
+    });
+
+    it('A7.2 cuando NO hay sesion persistida, Login NO recibe mensajeInicial', async () => {
+      mockBootstrapConPrestadores([{ id_prestador: 1 }]);
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      const { findByText, queryByText } = render(<AuthGate />);
+
+      // Texto exacto "login-mock" (sin dos puntos) = sin mensajeInicial.
+      await findByText('login-mock');
+      // El texto "login-mock:<mensaje>" NO debe existir.
+      expect(queryByText(`login-mock:${MENSAJE_VENCIDA}`)).toBeNull();
+    });
+
+    it('A7.3 cuando la sesion es invalida (JSON corrupto), Login NO recibe mensajeInicial', async () => {
+      // "Invalida" no es "vencida" — el operario nunca tuvo sesion
+      // utilizable, asi que no le mentimos con "Tu sesion anterior
+      // vencio". Solo 'vencida' dispara el banner.
+      mockBootstrapConPrestadores([{ id_prestador: 1 }]);
+      mockedGetItem.mockResolvedValueOnce('{ json corrupto');
+
+      const { findByText } = render(<AuthGate />);
+
+      await findByText('login-mock');
+    });
+
+    it('A7.4 cuando la sesion es valida, NO se muestra Login (caso con_sesion)', async () => {
+      // Caso opuesto: sesion valida → RootNavigator, NO Login, NO mensaje.
+      // Esto ya estaba cubierto por A3.1 pero lo dejamos explicito en el
+      // bloque PUNTO C como regression guard.
+      mockBootstrapConPrestadores([{ id_prestador: 42 }]);
+      const sesionValida = crearSesionValida({ idPrestador: 42 });
+      // PUNTO C: doble read, ver A3.1.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesionValida));
+
+      const { findByText, queryByText } = render(<AuthGate />);
+
+      await findByText('root-navigator-mock');
+      expect(queryByText('login-mock')).toBeNull();
+      expect(queryByText(`login-mock:${MENSAJE_VENCIDA}`)).toBeNull();
+    });
+
+    it('A7.5 cuando la sesion esta vencida, NO se borra de AsyncStorage (precondición para el banner)', async () => {
+      // Precondición: estadoSesionPersistida() NO debe limpiar storage
+      // en el caso 'vencida' para que AuthGate pueda leer el mensaje.
+      // (Esto ya esta cubierto por E1.3 del modulo constantes; este
+      // test es regression guard desde el lado de AuthGate.)
+      mockBootstrapConPrestadores([{ id_prestador: 1 }]);
+      const sesionVencida = crearSesionValida({ expiresAt: Date.now() - 1000 });
+      // PUNTO C: AuthGate hace DOS lecturas (estadoSesionPersistida +
+      // cargarSesion). mockResolvedValue (persistente) cubre ambas;
+      // mockResolvedValueOnce dejaria la segunda lectura como undefined
+      // → JSON.parse(undefined) throw → catch 'invalida' → removeItem
+      // → el test mediria el comportamiento del catch, no el de la rama
+      // 'vencida'.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesionVencida));
+
+      // Capturamos el contador de removeItem ANTES del render para hacer
+      // una aserción de DELTA (los mocks no se resetean entre tests en
+      // este archivo, solo clearAllMocks; ver comentario en beforeEach).
+      const callsBefore = mockedRemoveItem.mock.calls.length;
+
+      const { findByText } = render(<AuthGate />);
+
+      // Esperamos a que Login rende (con banner) para asegurar que el
+      // flujo completo de deteccion termino.
+      await findByText(/^login-mock(:.*)?$/);
+
+      const callsAfter = mockedRemoveItem.mock.calls.length;
+      // Delta debe ser cero: la rama 'vencida' no debe disparar removeItem.
+      expect(callsAfter - callsBefore).toBe(0);
     });
   });
 });
