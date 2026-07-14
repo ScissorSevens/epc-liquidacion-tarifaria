@@ -15,6 +15,13 @@
  * FASE 4 TAREA 4.1 — reemplazo del placeholder `{ cedula }` por el shape real.
  * `esSesionValida` se exporta unicamente para tests (helper privado de hecho,
  * expuesto por necesidad de cobertura). No es parte de la API publica.
+ *
+ * FASE 5 TAREA 5.3 — PUNTO C: token vencido con mensaje claro.
+ * `estadoSesionPersistida()` devuelve 'no_existe' | 'vencida' | 'invalida'
+ * | 'valida' para que AuthGate pueda distinguir "primera vez" de "el token
+ * vencio" y mostrar el banner adecuado. La sesion `vencida` NO se borra de
+ * storage (queda ahi para que el proximo login overwrite la borre via
+ * `guardarSesion`). `cargarSesion()` se vuelve wrapper de este helper.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +35,96 @@ export interface Sesion {
   readonly idPrestador: number;
   /** Timestamp absoluto en ms desde epoch. La sesion vence cuando Date.now() >= expiresAt. */
   readonly expiresAt: number;
+}
+
+/**
+ * Estado posible de la sesion persistida en AsyncStorage.
+ *
+ * - 'no_existe': la clave nunca fue escrita. Cold-boot limpio / primer login.
+ * - 'vencida':   hubo sesion pero `expiresAt <= Date.now()`. NO se borra
+ *                de storage — AuthGate debe informar al operario.
+ * - 'invalida':  basura en storage (JSON corrupto, shape invalido, campos
+ *                requeridos faltantes). Se borra defensivamente para no
+ *                re-validar el mismo error en cada cold-boot.
+ * - 'valida':    sesion vigente con todos los campos requeridos en orden.
+ */
+export type EstadoSesion = 'no_existe' | 'vencida' | 'invalida' | 'valida';
+
+/**
+ * Helper interno: borra la clave de sesion de AsyncStorage silenciosamente.
+ * Usado por `estadoSesionPersistida()` cuando detecta estado 'invalida'.
+ * Encapsulado aca para que los tests puedan espiar UN solo punto de cleanup
+ * y para que el try/catch de la promise colgante no se duplique.
+ */
+function limpiarStorageDefensivo(): void {
+  void AsyncStorage.removeItem(clave_storage_sesion).catch(() => {
+    // Silencioso: storage cleanup es defensivo, no debe romper el flujo
+    // de arranque de AuthGate si AsyncStorage fallara (DB corrupta, etc.).
+  });
+}
+
+/**
+ * Lee la sesion persistida y la clasifica segun POR QUE es o no utilizable.
+ *
+ * Diferencia con `cargarSesion()`: cargarSesion colapsa todo en `Sesion|null`,
+ * perdiendo la razon del null. Este helper expone el motivo para que AuthGate
+ * pueda decidir si mostrar Login silencioso, Login con banner de "sesion
+ * vencida", o SetupInicial.
+ *
+ * Reglas de cleanup (PUNTO C):
+ *   - 'no_existe': nada que limpiar.
+ *   - 'vencida':   NO se borra (queremos que el operario sepa que vencio).
+ *                  `guardarSesion()` del proximo login overwrite la entrada.
+ *   - 'invalida':  borra defensivo para no re-validar basura en cold-boot.
+ *   - 'valida':    nada que limpiar.
+ *
+ * Las reglas de "shape invalido" replican el contrato de `esSesionValida()`:
+ *   - token: string no vacio.
+ *   - cedula: string no vacio.
+ *   - idPrestador: number entero > 0.
+ *   - expiresAt: number.
+ * A diferencia de `esSesionValida`, este helper considera 'vencida' cuando
+ * `expiresAt <= Date.now()` (no `>`). El boundary se trata como vencida
+ * porque el token ya no es util para una nueva peticion.
+ */
+export async function estadoSesionPersistida(): Promise<EstadoSesion> {
+  const crudo = await AsyncStorage.getItem(clave_storage_sesion);
+  if (crudo === null) return 'no_existe';
+
+  let parsed: Partial<Sesion>;
+  try {
+    parsed = JSON.parse(crudo) as Partial<Sesion>;
+  } catch {
+    limpiarStorageDefensivo();
+    return 'invalida';
+  }
+
+  if (typeof parsed.token !== 'string' || parsed.token.length === 0) {
+    limpiarStorageDefensivo();
+    return 'invalida';
+  }
+  if (typeof parsed.cedula !== 'string' || parsed.cedula.length === 0) {
+    limpiarStorageDefensivo();
+    return 'invalida';
+  }
+  if (
+    typeof parsed.idPrestador !== 'number' ||
+    !Number.isInteger(parsed.idPrestador) ||
+    parsed.idPrestador <= 0
+  ) {
+    limpiarStorageDefensivo();
+    return 'invalida';
+  }
+  if (typeof parsed.expiresAt !== 'number') {
+    limpiarStorageDefensivo();
+    return 'invalida';
+  }
+  // Vencio: NO limpiamos storage. AuthGate usa este estado para mostrar
+  // el banner "Tu sesion anterior vencio".
+  if (parsed.expiresAt <= Date.now()) {
+    return 'vencida';
+  }
+  return 'valida';
 }
 
 /**
@@ -58,35 +155,32 @@ export function esSesionValida(s: Partial<Sesion>): s is Sesion {
 }
 
 /**
- * Lee la sesion persistida y la devuelve si sigue vigente.
- * Devuelve `null` (y limpia AsyncStorage defensivamente) cuando:
- *   - no hay nada en storage
- *   - el JSON esta corrupto
- *   - la sesion esta vencida (expiresAt < Date.now())
- *   - falta algun campo requerido o es invalido
+ * Lee la sesion persistida y la devuelve si sigue vigente. Devuelve `null`
+ * en cualquier otro caso.
+ *
+ * Tras PUNTO C, esta funcion es un wrapper sobre `estadoSesionPersistida()`:
+ * delega a ella la decision de cleanup (que distingue 'vencida' vs
+ * 'invalida') y solo cuando el estado es 'valida' re-lee storage para
+ * devolver el objeto tipado. Asi, cargarSesion no pierde la informacion
+ * sobre POR QUE devolvio null (AuthGate ya la tiene via estadoSesionPersistida).
+ *
+ * Si `estadoSesionPersistida()` retorna 'valida', el `getItem` siguiente
+ * debe devolver la misma cadena que acabamos de parsear — confiamos en
+ * que AsyncStorage no la modifica entre llamadas (es read-only en RN).
  */
 export async function cargarSesion(): Promise<Sesion | null> {
+  const estado = await estadoSesionPersistida();
+  if (estado !== 'valida') return null;
+
+  // Re-leemos para tener el objeto crudo (estadoSesionPersistida no lo
+  // expone para mantener su contrato chico). El getItem siguiente es
+  // idempotente: AsyncStorage no muta la clave entre lecturas.
   const crudo = await AsyncStorage.getItem(clave_storage_sesion);
   if (crudo === null) return null;
-
   try {
-    const parsed = JSON.parse(crudo) as Partial<Sesion>;
-    if (!esSesionValida(parsed)) {
-      // Sesion invalida (vencida o corrupta por shape): limpieza defensiva
-      // para no re-validar el mismo basura en el proximo cold-boot.
-      // Spec 2.3 SHOULD: rechazo silencioso + cleanup.
-      void AsyncStorage.removeItem(clave_storage_sesion).catch(() => {
-        // Silencioso: storage cleanup es defensivo, no debe romper el flujo
-        // de arranque de AuthGate.
-      });
-      return null;
-    }
-    return parsed as Sesion;
+    return JSON.parse(crudo) as Sesion;
   } catch {
-    // JSON corrupto: misma limpieza defensiva.
-    void AsyncStorage.removeItem(clave_storage_sesion).catch(() => {
-      // Silencioso.
-    });
+    // Estado 'valida' garantizo JSON parseable, pero por seguridad:
     return null;
   }
 }
@@ -96,6 +190,10 @@ export async function cargarSesion(): Promise<Sesion | null> {
  * tal cual: es responsabilidad del caller garantizar `esSesionValida(sesion)`
  * en alguna verificacion previa al `setItem` (conexion de red OK, backend
  * devolvio token valido, expiresAt = now + 24h, etc.).
+ *
+ * En PUNTO C, esta funcion tambien cumple el rol de "cleanup" del caso
+ * `vencida`: cuando el operario se loguea exitosamente despues de ver el
+ * banner, `guardarSesion()` overwrite la entrada expirada.
  */
 export async function guardarSesion(sesion: Sesion): Promise<void> {
   await AsyncStorage.setItem(clave_storage_sesion, JSON.stringify(sesion));
@@ -104,8 +202,9 @@ export async function guardarSesion(sesion: Sesion): Promise<void> {
 /**
  * Elimina la sesion persistida. Se invoca desde:
  *   - AuthGate: cuando el operario confirma logout en MiPerfil.
- *   - cargarSesion defensivamente: cuando la sesion guardada esta vencida o
- *     corrupta (cleanup inline arriba).
+ *   - estadoSesionPersistida defensivamente: cuando la sesion guardada
+ *     tiene shape invalido (cleanup inline, encapsulado en
+ *     `limpiarStorageDefensivo`).
  * AsyncStorage.removeItem sobre clave inexistente es no-op (no rechaza), asi
  * que esta funcion se mantiene como await lineal sin try/catch.
  */

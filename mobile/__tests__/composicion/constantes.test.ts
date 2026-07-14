@@ -27,6 +27,8 @@ import {
   limpiarSesion,
   clave_storage_sesion,
   esSesionValida,
+  estadoSesionPersistida,
+  type EstadoSesion,
 } from '../../src/composition/constantes';
 
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<
@@ -81,25 +83,17 @@ describe('constantes.ts (sesion multi-tenant)', () => {
 
     it('T1.2 devuelve la sesion persistida cuando es valida y no esta vencida', async () => {
       const sesion = crearSesionValida();
-      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
+      // PUNTO C: cargarSesion ahora hace doble read defensivo
+      // (uno en estadoSesionPersistida y otro al final para devolver el
+      // objeto tipado). mockResolvedValue (persistente) cubre las dos
+      // llamadas; antes usabamos mockResolvedValueOnce pero eso dejaba
+      // la segunda lectura como undefined → JSON.parse undefined → null.
+      mockedGetItem.mockResolvedValue(JSON.stringify(sesion));
 
       const resultado = await cargarSesion();
 
       expect(resultado).toEqual(sesion);
       expect(mockedRemoveItem).not.toHaveBeenCalled();
-    });
-
-    it('T1.3 devuelve null y limpia AsyncStorage cuando la sesion esta vencida', async () => {
-      const sesionVencida: Sesion = crearSesionValida({
-        expiresAt: Date.now() - 1000, // vencida hace 1s
-      });
-      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionVencida));
-
-      const resultado = await cargarSesion();
-
-      expect(resultado).toBeNull();
-      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
-      expect(mockedRemoveItem).toHaveBeenCalledTimes(1);
     });
 
     it('T1.4 devuelve null y limpia AsyncStorage cuando el JSON esta corrupto', async () => {
@@ -284,5 +278,167 @@ describe('constantes.ts (sesion multi-tenant)', () => {
     expect(typeof sesion.expiresAt).toBe('number');
     // nombre es opcional pero presente en el fixture
     expect(typeof sesion.nombre).toBe('string');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Bloque 5: estadoSesionPersistida (PUNTO C — token vencido)
+  //
+  // Diferencia entre cargarSesion (que solo devuelve Sesion|null)
+  // y estadoSesionPersistida (que explica POR QUE devolvio null):
+  //   - 'no_existe': nunca hubo sesion en AsyncStorage.
+  //   - 'vencida':   hubo sesion pero el token ya expiro. NO se borra
+  //                  de storage para que AuthGate sepa que existio y
+  //                  muestre el mensaje "Tu sesion anterior vencio".
+  //   - 'invalida':  storage tiene basura (JSON corrupto, campos
+  //                  faltantes/invalidos). Se borra defensivamente.
+  //   - 'valida':    sesion vigente, todas las reglas pasan.
+  //
+  // cargarSesion se vuelve wrapper: si estadoSesionPersistida() !==
+  // 'valida' devuelve null. Asi no pierde el comportamiento que ya
+  // cubria el contrato anterior (null + cleanup si invalida).
+  // ─────────────────────────────────────────────────────────────
+  describe('estadoSesionPersistida (PUNTO C)', () => {
+    it('E1.1 devuelve "no_existe" cuando AsyncStorage no tiene la clave', async () => {
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      const estado: EstadoSesion = await estadoSesionPersistida();
+
+      expect(estado).toBe('no_existe');
+      // En "no_existe" no hay nada que limpiar.
+      expect(mockedRemoveItem).not.toHaveBeenCalled();
+    });
+
+    it('E1.2 devuelve "valida" cuando la sesion persistida esta vigente', async () => {
+      const sesion = crearSesionValida();
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('valida');
+      expect(mockedRemoveItem).not.toHaveBeenCalled();
+    });
+
+    it('E1.3 devuelve "vencida" cuando expiresAt < now y NO borra AsyncStorage', async () => {
+      const sesionVencida: Sesion = crearSesionValida({
+        expiresAt: Date.now() - 1000, // vencida hace 1s
+      });
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionVencida));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('vencida');
+      // PUNTO C: NO borramos la sesion vencida para que AuthGate pueda
+      // informar al operario. Se sobreescribira en el proximo login
+      // exitoso via guardarSesion().
+      expect(mockedRemoveItem).not.toHaveBeenCalled();
+    });
+
+    it('E1.4 devuelve "vencida" tambien cuando expiresAt === now (cero o menos)', async () => {
+      const sesionExpiradaJusto: Sesion = crearSesionValida({
+        expiresAt: Date.now(),
+      });
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionExpiradaJusto));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('vencida');
+      expect(mockedRemoveItem).not.toHaveBeenCalled();
+    });
+
+    it('E1.5 devuelve "invalida" y borra AsyncStorage cuando el JSON esta corrupto', async () => {
+      mockedGetItem.mockResolvedValueOnce('{ esto no es json valido');
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+      expect(mockedRemoveItem).toHaveBeenCalledTimes(1);
+    });
+
+    it('E1.6 devuelve "invalida" y borra cuando falta el campo token', async () => {
+      const sesionParcial = {
+        cedula: '1234567890',
+        idPrestador: 42,
+        expiresAt: Date.now() + 60_000,
+      };
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionParcial));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.7 devuelve "invalida" y borra cuando falta el campo cedula', async () => {
+      const sesionParcial = {
+        token: 'tok-algún-string',
+        idPrestador: 42,
+        expiresAt: Date.now() + 60_000,
+      };
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionParcial));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.8 devuelve "invalida" y borra cuando falta el campo idPrestador', async () => {
+      const sesionParcial = {
+        token: 'tok-algún-string',
+        cedula: '1234567890',
+        expiresAt: Date.now() + 60_000,
+      };
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionParcial));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.9 devuelve "invalida" y borra cuando falta el campo expiresAt', async () => {
+      const sesionParcial = {
+        token: 'tok-algún-string',
+        cedula: '1234567890',
+        idPrestador: 42,
+      };
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionParcial));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.10 devuelve "invalida" y borra cuando idPrestador es <= 0', async () => {
+      const sesionInvalida: Sesion = crearSesionValida({ idPrestador: 0 });
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionInvalida));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.11 devuelve "invalida" y borra cuando token es string vacio', async () => {
+      const sesionVacia: Sesion = crearSesionValida({ token: '' });
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionVacia));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.12 devuelve "invalida" y borra cuando cedula es string vacio', async () => {
+      const sesionVacia: Sesion = crearSesionValida({ cedula: '' });
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionVacia));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
   });
 });
