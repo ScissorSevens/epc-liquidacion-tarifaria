@@ -25,10 +25,24 @@ import { BORDERS, COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/
 
 interface Props {
   readonly onLoginSuccess: () => void;
+  /**
+   * Mensaje opcional que se muestra como banner dismissable arriba del form.
+   * Usado por AuthGate (PUNTO C) para informar al operario que su sesion
+   * persistida vencio y debe volver a ingresar. Si es undefined, no se
+   * rendea banner (cold-boot limpio o sesion invalida donde NO queremos
+   * el mensaje "Tu sesion anterior vencio").
+   *
+   * El mensaje es "semilla": Login lo copia a state interno en el primer
+   * render y el state es lo que controla la visibilidad. Asi, si el
+   * operario toca la X, el banner se oculta aunque el prop siga siendo
+   * el mismo en re-renders futuros (no revive al mensaje dismissed).
+   */
+  readonly mensajeInicial?: string;
 }
 
 /**
- * Login real contra SQLite (TICKET-EPIC-LOGIN-001 / PUNTO A — Fase 5.2).
+ * Login real contra SQLite (TICKET-EPIC-LOGIN-001 / PUNTO A — Fase 5.2)
+ * + banner de sesion vencida (PUNTO C — Fase 5 Tarea 5.3).
  *
  * Reemplaza el stub "modo demo" de Fase 4.2.3. Ahora valida cedula +
  * password contra la DB local del dispositivo via `loginLocal()` y crea
@@ -45,13 +59,28 @@ interface Props {
  *
  * Multi-tenant: la sesion persistida tiene `idPrestador` del operario
  * (NO hardcoded a 1). Cada operario entra a SU prestador.
+ *
+ * PUNTO C — Banner "Tu sesion anterior vencio":
+ *   Si AuthGate detecta que la sesion persistida esta vencida, pasa
+ *   `mensajeInicial` y Login rendea un banner amarillo arriba del form.
+ *   El operario puede dismissarlo con la X (UX: no forzamos a leer un
+ *   mensaje que ya entendio). El state interno `mensajeVisible`
+ *   controla la visibilidad; el prop es solo la semilla inicial.
  */
-export default function Login({ onLoginSuccess }: Props) {
+export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
   const [cedula, setCedula] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
   const [errores, setErrores] = useState<{ cedula?: boolean; contrasena?: boolean }>({});
   const [cargando, setCargando] = useState(false);
+  /**
+   * Estado interno del banner. Inicializado con mensajeInicial si viene
+   * del prop; el operario puede dismissar tocandola X, en cuyo caso
+   * queda undefined y no vuelve a aparecer aunque el prop cambie.
+   */
+  const [mensajeVisible, setMensajeVisible] = useState<string | undefined>(
+    mensajeInicial,
+  );
 
   async function handleIngresar() {
     const nuevosErrores: { cedula?: boolean; contrasena?: boolean } = {};
@@ -115,6 +144,38 @@ export default function Login({ onLoginSuccess }: Props) {
         <View style={estilos.encabezado}>
           <Text style={estilos.tituloApp}>AquaServices</Text>
         </View>
+
+        {/* Banner PUNTO C: sesion vencida, dismissable con X */}
+        {mensajeVisible !== undefined && (
+          <View
+            style={estilos.banner}
+            accessibilityRole="alert"
+            accessibilityLabel={`Aviso: ${mensajeVisible}`}
+          >
+            <MaterialIcons
+              name="info"
+              size={20}
+              color={COLORS.warning}
+              style={estilos.bannerIcono}
+            />
+            <Text style={estilos.bannerTexto} numberOfLines={3}>
+              {mensajeVisible}
+            </Text>
+            <Pressable
+              onPress={() => setMensajeVisible(undefined)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar mensaje"
+              testID="banner-cerrar"
+            >
+              <MaterialIcons
+                name="close"
+                size={18}
+                color={COLORS.onSurfaceVariant}
+              />
+            </Pressable>
+          </View>
+        )}
 
         {/* Card de login */}
         <View style={estilos.card}>
@@ -217,6 +278,32 @@ const estilos = StyleSheet.create({
   tituloApp: {
     ...TYPOGRAPHY.headlineLg,
     color: COLORS.primary,
+  },
+  // PUNTO C — banner amarillo dismissable arriba del form.
+  // Por que warningContainer / warning: tokens ya existentes en
+  // skeletal-tokens (no agregamos paleta nueva). Fondo amarillo suave
+  // + texto/borde naranja para asegurar contraste WCAG AA.
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.warningContainer,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.warning,
+    borderRadius: RADIUS.md,
+    marginHorizontal: SPACING.margin,
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
+  },
+  bannerIcono: {
+    marginRight: SPACING.xs,
+  },
+  bannerTexto: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onWarningContainer,
+    flex: 1,
+    lineHeight: 18,
   },
   card: {
     marginHorizontal: SPACING.margin,

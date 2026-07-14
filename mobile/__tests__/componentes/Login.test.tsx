@@ -62,6 +62,9 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
     onSurface: '#000',
     onSurfaceVariant: '#555',
     error: '#f00',
+    warning: '#f90',
+    warningContainer: '#fff4e0',
+    onWarningContainer: '#5a3500',
   },
   RADIUS: { md: 8, xl: 16 },
   SHADOWS: { card: {} },
@@ -415,6 +418,83 @@ describe('Login (PUNTO A — Login real contra SQLite)', () => {
         ([clave]) => clave === clave_storage_sesion,
       );
       expect(escriturasConClaveSesion).toHaveLength(0);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // PUNTO C — Banner "Tu sesion anterior vencio" arriba del form
+  //
+  // Cuando AuthGate detecta que la sesion persistida esta vencida, le
+  // pasa `mensajeInicial` a Login. Login debe:
+  //   1. Mostrar el mensaje como banner amarillo arriba del form.
+  //   2. Permitir dismissar el banner con un boton X (UX: no queremos
+  //      forzar al operario a leer un mensaje que ya entendio).
+  //
+  // Si `mensajeInicial` es undefined (cold-boot limpio / invalida), el
+  // banner NO debe aparecer — el Login rendea sin cambios.
+  //
+  // El mensaje es un prop "semilla": Login lo copia a state interno la
+  // primera vez y despues el state es lo que controla la visibilidad.
+  // Asi, si el operario toca X, el banner desaparece aunque el prop
+  // siga siendo el mismo (re-render no lo revive).
+  // ──────────────────────────────────────────────────────────────────
+  describe('PUNTO C — banner de sesion vencida (mensajeInicial)', () => {
+    const MENSAJE_VENCIDA =
+      'Tu sesión anterior venció. Volvé a ingresar tu cédula y contraseña.';
+
+    it('L4.1 muestra el banner con el mensajeInicial arriba del form', () => {
+      const { getByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} mensajeInicial={MENSAJE_VENCIDA} />,
+      );
+
+      // El mensaje debe aparecer en algun lado del arbol.
+      expect(getByText(MENSAJE_VENCIDA)).toBeTruthy();
+    });
+
+    it('L4.2 NO muestra banner cuando mensajeInicial es undefined', () => {
+      const { queryByText } = render(
+        <Login onLoginSuccess={onLoginSuccess} />,
+      );
+
+      // Sin prop mensajeInicial → sin banner → texto del mensaje ausente.
+      expect(queryByText(MENSAJE_VENCIDA)).toBeNull();
+    });
+
+    it('L4.3 al tocar la X del banner, el mensaje se oculta (banner dismissable)', () => {
+      const { getByText, queryByText, getByTestId } = render(
+        <Login onLoginSuccess={onLoginSuccess} mensajeInicial={MENSAJE_VENCIDA} />,
+      );
+
+      // El mensaje esta visible al renderizar.
+      expect(getByText(MENSAJE_VENCIDA)).toBeTruthy();
+
+      // La X del banner es un Pressable con testID='banner-cerrar'
+      // (presionar el Text interno del MaterialIcon no dispara el
+      // onPress del Pressable contenedor; usamos el testID del wrapper).
+      fireEvent.press(getByTestId('banner-cerrar'));
+
+      // Despues de dismissar, el mensaje debe haber desaparecido del arbol.
+      expect(queryByText(MENSAJE_VENCIDA)).toBeNull();
+    });
+
+    it('L4.4 el banner NO afecta el flujo de handleIngresar (login normal sigue funcionando)', async () => {
+      // Regression guard: agregar el banner no debe romper el flujo de
+      // login normal (happy path con banner visible).
+      const { getByText, getByPlaceholderText } = render(
+        <Login onLoginSuccess={onLoginSuccess} mensajeInicial={MENSAJE_VENCIDA} />,
+      );
+
+      // Banner visible.
+      expect(getByText(MENSAJE_VENCIDA)).toBeTruthy();
+
+      // Pero el form sigue accesible: tipeamos y submitimos.
+      fireEvent.changeText(getByPlaceholderText('0.000.000-0'), '51800012');
+      fireEvent.changeText(getByPlaceholderText('••••••••'), 'mi-clave-secreta');
+      fireEvent.press(getByText('Ingresar'));
+
+      await waitFor(() => {
+        expect(onLoginSuccess).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });
