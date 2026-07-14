@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -13,8 +14,8 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import {
-  PRESTADOR_FORM_VACIO,
   OPERARIO_FORM_VACIO,
+  PRESTADOR_FORM_VACIO,
   prestadorFormABootstrap,
   validarPaso1,
   validarPaso2,
@@ -23,6 +24,17 @@ import {
   type OperarioForm,
   type PrestadorForm,
 } from '../composition/validaciones-setup';
+import {
+  bootstrapCompleto,
+  type PrestadorRepoPort,
+  type AcuerdoRepoPort,
+  type ParametrosRepoPort,
+  type OperarioRepoPort,
+} from '../composition/bootstrap-completo';
+import { getBootstrap } from '../composition/get-bootstrap';
+import { guardarSesion } from '../composition/constantes';
+import { useWorkspace } from '../composicion/useWorkspace';
+import { logger } from '../composicion/logger';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
 interface Props {
@@ -35,17 +47,9 @@ interface Props {
  * Wizard de 2 pasos que muestra AuthGate cuando `prestadorRepo.listar()`
  * devuelve `[]` (estado `sin_setup`):
  *
- *   PASO 1 — Datos del prestador (10 campos)
- *     nombre (REQ), nit (REQ), representante_legal (REQ),
- *     representante_legal_cedula (REQ, 6-12 digitos), municipio (REQ),
- *     departamento (REQ, default 'Cundinamarca'), segmento (dropdown REQ,
- *     default 2), num_suscriptores_urbanos (REQ, default 0),
- *     num_suscriptores_rurales (REQ), email (OPT), telefono (OPT).
- *
- *   PASO 2 — Datos del primer operario (5 campos + consent)
- *     cedula (REQ, 6-12 digitos), nombre (REQ), email (OPT),
- *     password (REQ, >= 8 chars), confirmar_password (REQ, == password),
- *     consent (REQ — Ley 1581/2012).
+ *   PASO 1 — Datos del prestador (10 campos). Ver `validarPaso1`.
+ *   PASO 2 — Datos del primer operario (5 campos) + consent (Ley 1581/2012).
+ *            Ver `validarPaso2`.
  *
  * Al tocar [FINALIZAR] con form valido:
  *   1. Revalida todo.
@@ -55,8 +59,8 @@ interface Props {
  *   4. Sincroniza `useWorkspace.setSesionCompleta()`.
  *   5. Llama `onComplete()` para que AuthGate cambie a `con_sesion`.
  *
- * Si algo falla, muestra un toast rojo arriba con el mensaje de error
- * y mantiene los datos del formulario para reintento.
+ * Si algo falla, muestra un banner rojo con el mensaje de error y
+ * mantiene los datos del formulario para reintento.
  *
  * Por ahora, `bootstrapCompleto` se implementa como una funcion local
  * mobile (no llama al backend todavia — eso es Fase 6).
@@ -92,6 +96,56 @@ export default function SetupInicial({ onComplete }: Props) {
     setPaso(1);
   }
 
+  async function handleFinalizar() {
+    // 1. Revalida todo (defensivo: la UI ya valida en cada onBlur/onPress).
+    const nuevosErroresOperario = validarPaso2(operarioForm);
+    setErroresOperario(nuevosErroresOperario);
+    if (Object.keys(nuevosErroresOperario).length > 0) {
+      return;
+    }
+
+    setCargando(true);
+    setErrorGlobal(undefined);
+    try {
+      // 2. Bootstrap del tenant via getBootstrap (cached) + bootstrapCompleto.
+      const bs = await getBootstrap();
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: bs.prestadorRepo as unknown as PrestadorRepoPort,
+        acuerdoRepo: bs.acuerdoMunicipalRepo as unknown as AcuerdoRepoPort,
+        parametrosRepo: bs.parametrosTarifaRepo as unknown as ParametrosRepoPort,
+        operarioRepo: bs.operarioRepo as unknown as OperarioRepoPort,
+        hasher: bs.hasher,
+        idGenerator: bs.idGenerator,
+        input: {
+          prestadorData: prestadorFormABootstrap(prestadorForm),
+          operarioData: {
+            numero_cedula: operarioForm.cedula.trim(),
+            nombre: operarioForm.nombre.trim(),
+            ...(operarioForm.email.trim() !== '' && { email: operarioForm.email.trim() }),
+            password: operarioForm.password,
+          },
+        },
+      });
+
+      // 3. Persistir sesion local (placeholder hasta que llegue el backend).
+      await guardarSesion(resultado.sesion);
+
+      // 4. Sincronizar useWorkspace con la sesion resuelta.
+      await useWorkspace.getState().setSesionCompleta(resultado.sesion);
+
+      // 5. Notificar al padre (AuthGate cambia decision a con_sesion).
+      onComplete();
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : String(err);
+      logger.warn('SetupInicial', 'error en bootstrap', { error: mensaje });
+      setErrorGlobal(mensaje);
+      // Mantenemos los datos del form para que el operario pueda reintentar
+      // sin tener que volver a tipear todo.
+    } finally {
+      setCargando(false);
+    }
+  }
+
   // ── Render: paso 1 (datos del prestador) ──────────────────────────────────
   if (paso === 1) {
     return (
@@ -100,11 +154,11 @@ export default function SetupInicial({ onComplete }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.encabezado}>
-          <Text style={styles.titulo}>Configuración Inicial</Text>
-          <Text style={styles.subtitulo}>Paso 1 de 2</Text>
-          <Text style={styles.subtituloSecundario}>Datos del prestador</Text>
-        </View>
+          <View style={styles.encabezado}>
+            <Text style={styles.titulo}>Configuración Inicial</Text>
+            <Text style={styles.subtitulo}>Paso 1 de 2</Text>
+            <Text style={styles.subtituloSecundario}>Datos del prestador</Text>
+          </View>
 
           <View style={styles.card}>
             <CampoTexto
@@ -156,7 +210,6 @@ export default function SetupInicial({ onComplete }: Props) {
               maxLength={100}
             />
 
-            {/* Segmento: dropdown visual con chips */}
             <View style={styles.campoContenedor}>
               <Text style={styles.etiqueta}>SEGMENTO (Res CRA 825/2017)</Text>
               <View style={styles.chipsRow}>
@@ -181,7 +234,6 @@ export default function SetupInicial({ onComplete }: Props) {
               )}
             </View>
 
-            {/* Suscriptores urbanos / rurales */}
             <View style={styles.filaDosColumnas}>
               <View style={styles.colMitad}>
                 <CampoNumero
@@ -237,9 +289,6 @@ export default function SetupInicial({ onComplete }: Props) {
   }
 
   // ── Render: paso 2 (datos del operario + finalizar) ──────────────────────
-  // Por ahora solo el esqueleto: el [FINALIZAR] con bootstrap viene en el
-  // siguiente commit (GREEN paso 2). El estado 'cargando' y 'errorGlobal'
-  // ya estan cableados para que el commit siguiente los use.
   return (
     <KeyboardAvoidingView
       style={styles.raiz}
@@ -253,9 +302,71 @@ export default function SetupInicial({ onComplete }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.onSurfaceVariant, textAlign: 'center' }]}>
-            Formulario del operario en construcción…
-          </Text>
+          <CampoTexto
+            etiqueta="CÉDULA"
+            placeholder="6 a 12 dígitos"
+            value={operarioForm.cedula}
+            onChangeText={(v) => setCampoOperario('cedula', v.replace(/\D/g, ''))}
+            error={erroresOperario.cedula}
+            keyboardType="numeric"
+            maxLength={12}
+          />
+          <CampoTexto
+            etiqueta="NOMBRE COMPLETO"
+            placeholder="Nombre completo del operario"
+            value={operarioForm.nombre}
+            onChangeText={(v) => setCampoOperario('nombre', v)}
+            error={erroresOperario.nombre}
+          />
+          <CampoTexto
+            etiqueta="EMAIL (opcional)"
+            placeholder="contacto@ejemplo.com"
+            value={operarioForm.email}
+            onChangeText={(v) => setCampoOperario('email', v)}
+            error={erroresOperario.email}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <CampoTexto
+            etiqueta="CONTRASEÑA"
+            placeholder="Mínimo 8 caracteres"
+            value={operarioForm.password}
+            onChangeText={(v) => setCampoOperario('password', v)}
+            error={erroresOperario.password}
+            secureTextEntry
+          />
+          <CampoTexto
+            etiqueta="CONFIRMAR CONTRASEÑA"
+            placeholder="Repetir contraseña"
+            value={operarioForm.confirmar_password}
+            onChangeText={(v) => setCampoOperario('confirmar_password', v)}
+            error={erroresOperario.confirmar_password}
+            secureTextEntry
+          />
+
+          {/* Checkbox de consentimiento (Ley 1581/2012) */}
+          <Pressable
+            onPress={() => setCampoOperario('consentimiento', !operarioForm.consentimiento)}
+            disabled={cargando}
+            style={({ pressed }) => [
+              styles.consentimientoFila,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Switch
+              value={operarioForm.consentimiento}
+              onValueChange={(v) => setCampoOperario('consentimiento', v)}
+              disabled={cargando}
+              trackColor={{ false: COLORS.outlineVariant, true: COLORS.primaryContainer }}
+              thumbColor={COLORS.surfaceContainerLowest}
+            />
+            <Text style={styles.consentimientoTexto}>
+              Acepto el tratamiento de mis datos personales según la Ley 1581/2012.
+            </Text>
+          </Pressable>
+          {erroresOperario.consentimiento !== undefined && (
+            <Text style={styles.errorText}>{erroresOperario.consentimiento}</Text>
+          )}
         </View>
 
         {errorGlobal !== undefined && (
@@ -274,16 +385,7 @@ export default function SetupInicial({ onComplete }: Props) {
             <Text style={styles.textoBotonSecundario}>ATRÁS</Text>
           </Pressable>
           <Pressable
-            onPress={() => {
-              // Placeholder hasta el commit siguiente: solo valida el paso 2
-              // y avisa al usuario. La integracion con bootstrapCompleto
-              // llega en el commit GREEN paso 2.
-              const nuevosErrores = validarPaso2(operarioForm);
-              setErroresOperario(nuevosErrores);
-              if (Object.keys(nuevosErrores).length === 0) {
-                setErrorGlobal('Paso 2: integración con bootstrap pendiente (commit siguiente)');
-              }
-            }}
+            onPress={() => void handleFinalizar()}
             style={({ pressed }) => [
               styles.botonPrimario,
               styles.botonPrimarioFlexible,
@@ -537,7 +639,15 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
+  consentimientoFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  consentimientoTexto: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurface,
+    flex: 1,
+  },
 });
-
-// Evita warning de variables no usadas al exportar
-void prestadorFormABootstrap;

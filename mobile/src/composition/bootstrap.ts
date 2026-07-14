@@ -47,6 +47,10 @@ import {
   crearParametrosTarifaRepositoryExpoSqlite,
   type ParametrosTarifaRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/parametros-tarifa-repository-expo-sqlite';
+import {
+  crearOperarioRepositoryExpoSqlite,
+  type OperarioRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import type { Prestador } from '@dominio/prestadores';
 import type { AcuerdoMunicipal } from '@dominio/acuerdo-municipal';
 import type { ParametrosTarifa } from '@dominio/parametros-tarifa';
@@ -98,6 +102,11 @@ export interface BootstrapApp {
   readonly prestadorRepo: PrestadorRepositoryExpoSqlite;
   readonly acuerdoMunicipalRepo: AcuerdoMunicipalRepositoryExpoSqlite;
   readonly parametrosTarifaRepo: ParametrosTarifaRepositoryExpoSqlite;
+  // Operarios: construido al final para que limpiarDatosLegacyBypass (que
+  // lo construye ad-hoc) pueda seguir funcionando. Fase 5 Tarea 5.1 lo
+  // expone en el BootstrapApp para que el setup wizard cree el primer
+  // operario via bootstrapCompleto() sin tener que re-construir el repo.
+  readonly operarioRepo: OperarioRepositoryExpoSqlite;
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
   readonly clienteHttp: ClienteSincronizacion;
@@ -142,6 +151,8 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const prestadorRepo = crearPrestadorRepositoryExpoSqlite(db);
   const acuerdoMunicipalRepo = crearAcuerdoMunicipalRepositoryExpoSqlite(db);
   const parametrosTarifaRepo = crearParametrosTarifaRepositoryExpoSqlite(db);
+  const operarioRepo = crearOperarioRepositoryExpoSqlite(db);
+  await operarioRepo.inicializar();
 
   // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
   // de crypto.getRandomValues importado al tope del archivo). Cualquier
@@ -212,6 +223,7 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
     prestadorRepo,
     acuerdoMunicipalRepo,
     parametrosTarifaRepo,
+    operarioRepo,
     hasher,
     idGenerator,
     clienteHttp,
