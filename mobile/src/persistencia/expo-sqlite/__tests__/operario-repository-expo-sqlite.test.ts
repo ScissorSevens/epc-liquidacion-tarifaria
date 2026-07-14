@@ -296,3 +296,43 @@ describe('listarPorPrestador()', () => {
     expect(resultado[1].id_prestador).toBe(5);
   });
 });
+
+// ── eliminarPorCedula ─────────────────────────────────────────────────────────
+//
+// TICKET-EPIC-LOGIN-001 — Fase 4 Tarea 4.3.2:
+// Necesitamos borrar operarios con cedula legacy ('placeholder') introducidos
+// por el bypass viejo de Configuracion.tsx (ya eliminado en 4.3.1). El helper
+// `limpiarDatosLegacyBypass()` consume este metodo para limpiar la DB en
+// cold-boot.
+//
+// El metodo es idempotente: borrar una cedula inexistente es no-op (no rechaza).
+// Esto permite que `limpiarDatosLegacyBypass()` corra multiples veces en el
+// mismo arranque sin romper la app.
+
+describe('eliminarPorCedula()', () => {
+  it('ejecuta DELETE FROM operarios WHERE numero_cedula = ? con la cedula recibida', async () => {
+    const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 0, changes: 1 });
+    const db = buildDb({ runAsync });
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    await repo.eliminarPorCedula('placeholder');
+
+    expect(runAsync).toHaveBeenCalledTimes(1);
+    const [sql, ...params] = runAsync.mock.calls[0];
+    expect(sql).toMatch(/DELETE\s+FROM\s+operarios/i);
+    expect(sql).toMatch(/WHERE\s+numero_cedula\s*=\s*\?/i);
+    expect(params).toEqual(['placeholder']);
+  });
+
+  it('resuelve sin lanzar error cuando la cedula no existe en la DB', async () => {
+    // expo-sqlite devuelve changes: 0 cuando el WHERE no matchea; el helper
+    // expone esto como un await lineal sin error. Esto valida la
+    // idempotencia del metodo.
+    const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 0, changes: 0 });
+    const db = buildDb({ runAsync });
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    await expect(repo.eliminarPorCedula('no-existe')).resolves.toBeUndefined();
+    expect(runAsync).toHaveBeenCalledTimes(1);
+  });
+});
