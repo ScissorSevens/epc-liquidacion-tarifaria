@@ -1,3 +1,9 @@
+// Los tests de inmutabilidad (ciclo runtime) dependen de strict mode para
+// que `Object.freeze()` arroje TypeError al intentar mutar. Sin esto,
+// Babel + babel-preset-expo no emiten 'use strict' en archivos TS y la
+// mutación falla silenciosamente, haciendo que `toThrow(TypeError)` falle.
+'use strict';
+
 /**
  * Módulo CALCULO — Liquidación inmutable
  * Creación básica de Liquidación
