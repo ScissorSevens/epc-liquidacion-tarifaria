@@ -1,3 +1,9 @@
+// Los tests de inmutabilidad (factura entera congelada) dependen de strict
+// mode para que `Object.freeze()` arroje TypeError al intentar mutar.
+// Sin esto, Babel + babel-preset-expo no emiten 'use strict' en archivos TS
+// y la mutación falla silenciosamente, haciendo que `toThrow(TypeError)` falle.
+'use strict';
+
 /**
  * Tests del módulo FACTURA — funciones puras.
  *
@@ -143,7 +149,7 @@ describe('emitirFactura — happy path', () => {
     expect(factura.numero_factura).toBe('MZ-001-2981');
   });
 
-  it('snapshotea suscriptor (codigo, nombre, direccion, estrato) y lo congela', () => {
+  it('snapshotea suscriptor (codigo, nombre, direccion, estrato, id_prestador, categoria_uso) y lo congela', () => {
     const suscriptor: Suscriptor = {
       ...suscriptorBase(),
       codigo: '00042',
@@ -157,6 +163,8 @@ describe('emitirFactura — happy path', () => {
       nombre_apellidos: 'Carlos Ruiz',
       direccion: 'Carrera 7 #14-30',
       estrato: 3,
+      id_prestador: suscriptor.id_prestador,
+      categoria_uso: suscriptor.categoria_uso,
     });
     expect(Object.isFrozen(factura.snapshot.suscriptor)).toBe(true);
   });
