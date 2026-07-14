@@ -100,10 +100,16 @@ jest.mock('../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn(),
 }));
 
+jest.mock('../../src/composition/migracion-datos-legacy', () => ({
+  __esModule: true,
+  limpiarDatosLegacyBypass: jest.fn().mockResolvedValue(undefined),
+}));
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { getBootstrap } from '../../src/composition/get-bootstrap';
+import { limpiarDatosLegacyBypass } from '../../src/composition/migracion-datos-legacy';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
 import type { Sesion } from '../../src/composition/constantes';
 import { AuthGate } from '../../src/componentes/AuthGate';
@@ -116,6 +122,9 @@ const mockedHideAsync = SplashScreen.hideAsync as jest.MockedFunction<
 >;
 const mockedGetBootstrap = getBootstrap as jest.MockedFunction<
   typeof getBootstrap
+>;
+const mockedLimpiarLegacy = limpiarDatosLegacyBypass as jest.MockedFunction<
+  typeof limpiarDatosLegacyBypass
 >;
 
 /** Construye una sesion valida con expiresAt futuro. */
@@ -134,6 +143,7 @@ function crearSesionValida(overrides: Partial<Sesion> = {}): Sesion {
 function mockBootstrapConPrestadores(prestadores: unknown[]): void {
   mockedGetBootstrap.mockResolvedValue({
     prestadorRepo: { listar: jest.fn().mockResolvedValue(prestadores) },
+    db: {} as never,
   } as never);
 }
 
@@ -147,6 +157,9 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
     // modulo necesita para correr.
     mockedGetItem.mockReset();
     mockedGetBootstrap.mockReset();
+    mockedLimpiarLegacy.mockReset();
+    // Re-set default: limpiarDatosLegacyBypass resuelve sin error.
+    mockedLimpiarLegacy.mockResolvedValue(undefined);
     // NO reseteamos mockedHideAsync aqui — los tests del dual-flag
     // verifican toHaveBeenCalledTimes, que necesita el call history intacto
     // para comparar contra el conteo del test actual. Si lo reseteamos, los
@@ -328,6 +341,59 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       await waitFor(() => {
         expect(mockedHideAsync.mock.calls.length).toBe(callsBefore + 1);
       });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Limpieza defensiva de datos legacy (Fase 4 Tarea 4.3.2)
+  // ─────────────────────────────────────────────────────────────
+  //
+  // AuthGate debe correr limpiarDatosLegacyBypass al iniciar, ANTES de
+  // decidir sin_setup / sin_sesion / con_sesion. Esto limpia operarios
+  // con id=0 o cedula='placeholder' que el bypass viejo de
+  // Configuracion.tsx (eliminado en 4.3.1) pudo haber dejado en la DB.
+  describe('limpieza de datos legacy (Fase 4.3.2 wire-up)', () => {
+    it('A6.1 invoca limpiarDatosLegacyBypass al cold-boot', async () => {
+      mockBootstrapConPrestadores([]);
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(mockedLimpiarLegacy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('A6.2 la limpieza corre DESPUES del bootstrap pero ANTES de prestadorRepo.listar', async () => {
+      // El helper necesita la db para construir el repo, asi que el
+      // bootstrap se obtiene primero. La limpieza debe ocurrir antes de
+      // prestadorRepo.listar() para que la DB quede limpia antes de la
+      // deteccion del estado sin_setup.
+      const ordenLlamadas: string[] = [];
+      mockedLimpiarLegacy.mockImplementationOnce(async () => {
+        ordenLlamadas.push('limpiar-legacy');
+      });
+      mockedGetBootstrap.mockImplementationOnce(async () => {
+        ordenLlamadas.push('bootstrap');
+        return {
+          prestadorRepo: {
+            listar: jest.fn().mockImplementation(async () => {
+              ordenLlamadas.push('prestadorRepo.listar');
+              return [];
+            }),
+          },
+          db: {} as never,
+        } as never;
+      });
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      const { findByText } = render(<AuthGate />);
+
+      await findByText(/Setup inicial pendiente/i);
+      const idxLimpiar = ordenLlamadas.indexOf('limpiar-legacy');
+      const idxListar = ordenLlamadas.indexOf('prestadorRepo.listar');
+      expect(idxLimpiar).toBeGreaterThanOrEqual(0);
+      expect(idxListar).toBeGreaterThan(idxLimpiar);
     });
   });
 });
