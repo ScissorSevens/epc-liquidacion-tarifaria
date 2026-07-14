@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { SplashAnimado } from './SplashAnimado';
 import Login from '../pantallas/Login';
+import SetupInicial from '../pantallas/SetupInicial';
 import RootNavigator from '../navegacion/RootNavigator';
 import { cargarSesion, limpiarSesion } from '../composition/constantes';
 import { getBootstrap } from '../composition/get-bootstrap';
@@ -114,6 +114,13 @@ export function AuthGate() {
     setDecision('con_sesion');
   }, []);
 
+  const handleSetupComplete = useCallback(() => {
+    // SetupInicial ya invoco guardarSesion + useWorkspace.setSesionCompleta.
+    // Solo necesitamos cambiar el decision para que AuthGate renderice el
+    // RootNavigator en lugar de la pantalla de setup.
+    setDecision('con_sesion');
+  }, []);
+
   const handleLogoutRequested = useCallback(async () => {
     await limpiarSesion();
     useWorkspace.getState().limpiarWorkspace();
@@ -140,15 +147,11 @@ export function AuthGate() {
   }
 
   if (decision === 'sin_setup') {
-    // Placeholder temporal — la pantalla SetupInicial completa se
-    // implementa en Fase 5 Tarea 5.1. Mostramos texto plano para que el
-    // orquestador pueda verificar el estado sin_setup sin tener que
-    // implementar el wizard todavia.
-    return (
-      <Text testID="placeholder-setup-inicial">
-        Setup inicial pendiente — se implementa en 5.1
-      </Text>
-    );
+    // Wizard de 2 pasos: paso 1 (datos del prestador) → paso 2 (datos del
+    // primer operario + consent). Al finalizar, bootstrapCompleto() crea
+    // prestador + acuerdo + parametros + operario atomicamente, persiste
+    // la sesion, sincroniza useWorkspace, y llama onComplete.
+    return <SetupInicial onComplete={handleSetupComplete} />;
   }
 
   if (decision === 'sin_sesion') {

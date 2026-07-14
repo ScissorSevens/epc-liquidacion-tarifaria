@@ -30,7 +30,7 @@
 // get-bootstrap.ts tiene un cache `cached` que persiste entre tests si no
 // forzamos re-import — eso rompe el aislamiento.
 
-import { render, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn().mockResolvedValue(undefined),
@@ -69,6 +69,16 @@ jest.mock('../../src/pantallas/Login', () => {
     __esModule: true,
     default: ({ onLoginSuccess }: { onLoginSuccess: () => void }) =>
       React.createElement(Text, { onPress: onLoginSuccess }, 'login-mock'),
+  };
+});
+
+jest.mock('../../src/pantallas/SetupInicial', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({ onComplete }: { onComplete: () => void }) =>
+      React.createElement(Text, { onPress: onComplete }, 'setup-inicial-mock'),
   };
 });
 
@@ -185,13 +195,13 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
   // Estado sin_setup
   // ─────────────────────────────────────────────────────────────
   describe('estado sin_setup', () => {
-    it('A1.1 muestra placeholder de SetupInicial cuando no hay prestadores en DB', async () => {
+    it('A1.1 muestra SetupInicial cuando no hay prestadores en DB', async () => {
       mockBootstrapConPrestadores([]);
       mockedGetItem.mockResolvedValueOnce(null);
 
       const { findByText, queryByText } = render(<AuthGate />);
 
-      await findByText(/Setup inicial pendiente/i);
+      await findByText('setup-inicial-mock');
       expect(queryByText('login-mock')).toBeNull();
       expect(queryByText('root-navigator-mock')).toBeNull();
     });
@@ -206,8 +216,25 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
 
       const { findByText, queryByText } = render(<AuthGate />);
 
-      await findByText(/Setup inicial pendiente/i);
+      await findByText('setup-inicial-mock');
       expect(queryByText('root-navigator-mock')).toBeNull();
+    });
+
+    it('A1.3 onComplete de SetupInicial cambia decision a con_sesion', async () => {
+      mockBootstrapConPrestadores([]);
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      const { findByText, queryByText } = render(<AuthGate />);
+
+      await findByText('setup-inicial-mock');
+
+      // Simulamos que el usuario completa el wizard tocando el mock
+      // (que en produccion llama onComplete tras bootstrapCompleto exitoso).
+      fireEvent.press(await findByText('setup-inicial-mock'));
+
+      await waitFor(() => {
+        expect(queryByText('root-navigator-mock')).toBeTruthy();
+      });
     });
   });
 
@@ -222,7 +249,7 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       const { findByText, queryByText } = render(<AuthGate />);
 
       await findByText('login-mock');
-      expect(queryByText(/Setup inicial pendiente/i)).toBeNull();
+      expect(queryByText('setup-inicial-mock')).toBeNull();
       expect(queryByText('root-navigator-mock')).toBeNull();
     });
 
@@ -389,7 +416,7 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
 
       const { findByText } = render(<AuthGate />);
 
-      await findByText(/Setup inicial pendiente/i);
+      await findByText('setup-inicial-mock');
       const idxLimpiar = ordenLlamadas.indexOf('limpiar-legacy');
       const idxListar = ordenLlamadas.indexOf('prestadorRepo.listar');
       expect(idxLimpiar).toBeGreaterThanOrEqual(0);
