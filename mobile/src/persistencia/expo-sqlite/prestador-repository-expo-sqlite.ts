@@ -164,5 +164,18 @@ export function crearPrestadorRepositoryExpoSqlite(
       // La conexion la cierra el bootstrap.ts (db.closeAsync). Este adapter
       // no tiene recursos propios que liberar.
     },
+
+    /**
+     * Elimina un prestador por id. Usado por `bootstrapCompleto()` para
+     * rollback si una creacion posterior (acuerdo/parametros/operario)
+     * falla y queremos dejar la DB limpia.
+     *
+     * NO se usa en el flujo normal de la app: un prestador real se
+     * suspende (`suspender()`) pero no se borra. Solo el wizard de
+     * setup inicial lo invoca en la ventana transaccional.
+     */
+    async eliminar(id_prestador: number): Promise<void> {
+      await db.runAsync(`DELETE FROM prestador WHERE id_prestador = ?`, id_prestador);
+    },
   };
 }

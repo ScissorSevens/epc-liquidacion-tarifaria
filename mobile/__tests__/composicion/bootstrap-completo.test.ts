@@ -104,6 +104,9 @@ function buildRepos(state: RepoState) {
       async listar(): Promise<readonly Prestador[]> {
         return Array.from(state.prestadores.values());
       },
+      async eliminar(id_prestador: number): Promise<void> {
+        state.prestadores.delete(id_prestador);
+      },
     },
     acuerdoRepo: {
       async crear(data: CrearAcuerdoMunicipalInput): Promise<AcuerdoMunicipal> {
@@ -126,6 +129,9 @@ function buildRepos(state: RepoState) {
         };
         state.acuerdos.set(id, a);
         return a;
+      },
+      async eliminar(id_acuerdo: number): Promise<void> {
+        state.acuerdos.delete(id_acuerdo);
       },
     },
     parametrosRepo: {
@@ -154,6 +160,9 @@ function buildRepos(state: RepoState) {
         state.parametros.set(id, p);
         return p;
       },
+      async eliminar(id_parametros: number): Promise<void> {
+        state.parametros.delete(id_parametros);
+      },
     },
     operarioRepo: {
       async guardar(borrador: OperarioBorrador): Promise<Operario> {
@@ -172,6 +181,9 @@ function buildRepos(state: RepoState) {
         };
         state.operarios.set(id, op);
         return op;
+      },
+      async eliminar(id_operario: number): Promise<void> {
+        state.operarios.delete(id_operario);
       },
     },
   };

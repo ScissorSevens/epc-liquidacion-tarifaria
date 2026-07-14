@@ -108,5 +108,14 @@ export function crearAcuerdoMunicipalRepositoryExpoSqlite(
     async cerrar(): Promise<void> {
       // Conexion la cierra el bootstrap.
     },
+
+    /**
+     * Elimina un acuerdo municipal por id. Usado por `bootstrapCompleto()`
+     * para rollback si una creacion posterior (parametros/operario) falla
+     * y queremos dejar la DB limpia.
+     */
+    async eliminar(id_acuerdo: number): Promise<void> {
+      await db.runAsync(`DELETE FROM acuerdo_municipal WHERE id_acuerdo = ?`, id_acuerdo);
+    },
   };
 }

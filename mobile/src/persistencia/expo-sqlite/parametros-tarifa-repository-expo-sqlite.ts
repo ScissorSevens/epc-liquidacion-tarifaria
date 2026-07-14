@@ -122,5 +122,14 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
     async cerrar(): Promise<void> {
       // Conexion la cierra el bootstrap.
     },
+
+    /**
+     * Elimina parametros de tarifa por id. Usado por `bootstrapCompleto()`
+     * para rollback si la creacion del operario falla y queremos dejar
+     * la DB limpia.
+     */
+    async eliminar(id_parametros: number): Promise<void> {
+      await db.runAsync(`DELETE FROM parametros_tarifa WHERE id_parametros = ?`, id_parametros);
+    },
   };
 }
