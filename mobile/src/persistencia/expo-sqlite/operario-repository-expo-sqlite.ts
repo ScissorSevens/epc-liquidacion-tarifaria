@@ -59,6 +59,8 @@ ON CONFLICT(id_operario) DO UPDATE SET
   created_at     = excluded.created_at
 `;
 
+const SQL_ELIMINAR_POR_CEDULA = `DELETE FROM operarios WHERE numero_cedula = ?`;
+
 /**
  * Columnas actualizables vía `actualizar()`. Refleja
  * `ActualizarOperarioInput` del dominio pero a nivel SQL.
@@ -146,6 +148,13 @@ export interface OperarioRepositoryExpoSqlite {
   buscarPorDispositivo(dispositivoId: string, idPrestador: number): Promise<Operario | null>;
   guardar(operario: Operario): Promise<void>;
   actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario>;
+  /**
+   * Elimina un operario por cedula. Idempotente: borrar una cedula que no
+   * existe es no-op (resuelve sin error). Usado por
+   * `limpiarDatosLegacyBypass()` para borrar el operario 'placeholder'
+   * que creaba el bypass viejo de Configuracion.tsx (eliminado en 4.3.1).
+   */
+  eliminarPorCedula(cedula: string): Promise<void>;
 }
 
 export function crearOperarioRepositoryExpoSqlite(
@@ -209,6 +218,13 @@ export function crearOperarioRepositoryExpoSqlite(
 
     actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario> {
       return ejecutarActualizacion(db, id, cambios);
+    },
+
+    async eliminarPorCedula(cedula: string): Promise<void> {
+      // DELETE es idempotente: si la cedula no matchea, expo-sqlite devuelve
+      // changes: 0 sin rechazar. Esto permite que limpiarDatosLegacyBypass()
+      // corra multiples veces en el mismo arranque sin romper nada.
+      await db.runAsync(SQL_ELIMINAR_POR_CEDULA, cedula);
     },
   };
 }
