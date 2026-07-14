@@ -12,13 +12,38 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { FooterApp } from '../componentes/FooterApp';
-import { guardarSesion } from '../composition/constantes';
+import { guardarSesion, type Sesion } from '../composition/constantes';
+import { useWorkspace } from '../composicion/useWorkspace';
 import { BORDERS, COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
 interface Props {
   readonly onLoginSuccess: () => void;
 }
 
+const MS_EN_UN_DIA = 24 * 60 * 60 * 1000;
+const ID_PRESTADOR_DEMO = 1; // Placeholder hasta Fase 5.2 (backend real)
+const NOMBRE_DEMO = 'Operario Demo';
+
+/**
+ * Login stub (Fase 4 Tarea 4.2.3) — MODO DEMO.
+ *
+ * Crea una Sesion fake local para no romper TS con el shape multi-tenant.
+ * El backend real (.NET EPC + endpoint /auth) llega en Fase 5.2 (pantallas).
+ *
+ * La sesion fake tiene:
+ *   - token: 'fake-token-' + Date.now()
+ *   - cedula: input del usuario (trim)
+ *   - nombre: placeholder fijo 'Operario Demo'
+ *   - idPrestador: 1 (placeholder; el backend devolvera el real)
+ *   - expiresAt: now + 24h
+ *
+ * Flujo:
+ *   1. Valida inputs (cedula no vacia + contrasena >= 8 chars)
+ *   2. Construye Sesion fake
+ *   3. guardarSesion(sesion) en AsyncStorage
+ *   4. useWorkspace.setSesionCompleta(sesion) — sync id_prestador_activo
+ *   5. onLoginSuccess() — AuthGate cambia decision a con_sesion
+ */
 export default function Login({ onLoginSuccess }: Props) {
   const [cedula, setCedula] = useState('');
   const [contrasena, setContrasena] = useState('');
@@ -27,16 +52,26 @@ export default function Login({ onLoginSuccess }: Props) {
 
   async function handleIngresar() {
     const nuevosErrores: { cedula?: boolean; contrasena?: boolean } = {};
-    if (!cedula.trim()) nuevosErrores.cedula = true;
-    if (!contrasena.trim()) nuevosErrores.contrasena = true;
+    if (!cedula.trim() || cedula.trim().length < 6) nuevosErrores.cedula = true;
+    if (!contrasena || contrasena.length < 8) nuevosErrores.contrasena = true;
 
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
       return;
     }
     setErrores({});
-    // TODO: validar credenciales contra API/local
-    await guardarSesion({ cedula: cedula.trim() });
+
+    // MODO DEMO — Fase 4.2.3 stub. Backend real en Fase 5.2.
+    const sesionFake: Sesion = {
+      token: `fake-token-${Date.now()}`,
+      cedula: cedula.trim(),
+      nombre: NOMBRE_DEMO,
+      idPrestador: ID_PRESTADOR_DEMO,
+      expiresAt: Date.now() + MS_EN_UN_DIA,
+    };
+
+    await guardarSesion(sesionFake);
+    await useWorkspace.getState().setSesionCompleta(sesionFake);
     onLoginSuccess();
   }
 
