@@ -42,6 +42,9 @@ const idGen: IdGenerator = { uuid: () => `uuid-fake-${String(++_seqId).padStart(
 beforeEach(() => { _seqId = 0; });
 
 // Tarifas de referencia (Res CRA 825/2017 + 907/2019, valores estilizados)
+// Nota: agua_suministrada_m3_anio se mantiene en 100_000 (igual que
+// motor-tarifario.test.ts) porque con 500_000 el ASP (agua - perdidas)
+// queda positivo grande y ccUnitario ≈ 0.007 → cc_total redondea a 0.
 const PARAMETROS: ParametrosTarifa = {
   id_parametros: 1,
   id_prestador: 0,
@@ -53,7 +56,7 @@ const PARAMETROS: ParametrosTarifa = {
   cmt: 200,
   cmviaa: 0,
   aplica_cmviaa: false,
-  agua_suministrada_m3_anio: 500_000,
+  agua_suministrada_m3_anio: 100_000,
   ipuf_m3_suscriptor_mes: 6,
   suscriptores_promedio: 3000,
   aplica_minimo_vital: false,
