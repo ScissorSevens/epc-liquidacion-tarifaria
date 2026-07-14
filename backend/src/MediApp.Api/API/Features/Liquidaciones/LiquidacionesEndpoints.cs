@@ -46,12 +46,19 @@ public static class LiquidacionesEndpoints
         });
 
         // GET /api/v1/liquidaciones — listado para el dashboard
-        grupo.MapGet("/", async (IServicioLiquidaciones servicio, CancellationToken ct) =>
+        // GET /api/v1/liquidaciones?prestador_id=X — multi-tenant: filtra por prestador
+        grupo.MapGet("/", async (
+            IServicioLiquidaciones servicio,
+            int? prestador_id,
+            CancellationToken ct) =>
         {
-            var lista = await servicio.ListarAsync(ct);
+            var lista = prestador_id.HasValue
+                ? await servicio.ListarPorPrestadorAsync(prestador_id.Value, ct)
+                : await servicio.ListarAsync(ct);
             return Results.Ok(lista.Select(liq => new
             {
                 liq.Id,
+                liq.IdPrestador,
                 liq.Estrato,
                 liq.ConsumoM3,
                 liq.CargoFijo,

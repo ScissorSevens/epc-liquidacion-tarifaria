@@ -50,4 +50,44 @@ export const migrations: readonly Migration[] = Object.freeze([
     nombre: '008_suscriptor_add_cedula_municipio',
     sql: leerSQL('008_suscriptor_add_cedula_municipio.sql'),
   },
+  {
+    version: 9,
+    nombre: '009_prestador',
+    sql: leerSQL('009_prestador.sql'),
+  },
+  {
+    version: 10,
+    nombre: '010_acuerdo_municipal',
+    sql: leerSQL('010_acuerdo_municipal.sql'),
+  },
+  {
+    version: 11,
+    nombre: '011_parametros_tarifa',
+    sql: leerSQL('011_parametros_tarifa.sql'),
+  },
+  {
+    version: 12,
+    nombre: '012_suscriptor_add_id_prestador',
+    sql: leerSQL('012_suscriptor_add_id_prestador.sql'),
+  },
+  {
+    version: 13,
+    nombre: '013_lectura_add_id_prestador',
+    sql: leerSQL('013_lectura_add_id_prestador.sql'),
+  },
+  {
+    version: 14,
+    nombre: '014_factura_add_id_prestador',
+    sql: leerSQL('014_factura_add_id_prestador.sql'),
+  },
+  {
+    version: 15,
+    nombre: '015_operario',
+    sql: leerSQL('015_operario.sql'),
+  },
+  {
+    version: 16,
+    nombre: '016_setup_inicial_multi_tenant',
+    sql: leerSQL('016_setup_inicial_multi_tenant.sql'),
+  },
 ]);

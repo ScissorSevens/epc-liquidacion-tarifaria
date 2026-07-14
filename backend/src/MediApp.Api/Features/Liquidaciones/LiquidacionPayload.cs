@@ -39,4 +39,13 @@ public class LiquidacionPayload
     /// <summary>idCliente offline de la propia Liquidación.</summary>
     [JsonPropertyName("idCliente")]
     public string IdCliente { get; set; } = string.Empty;
+
+    /// <summary>
+    /// FK al prestador (multi-tenant, denormalizado). Requerido en nuevas
+    /// versiones del cliente mobile (cambio motor-tarifario-cra-825-2017-
+    /// multitenant). Mobile v1 puede NO enviarlo; en ese caso el backend
+    /// asume id_prestador=0 (EPC-LEGACY).
+    /// </summary>
+    [JsonPropertyName("idPrestador")]
+    public int IdPrestador { get; set; } = 0;
 }

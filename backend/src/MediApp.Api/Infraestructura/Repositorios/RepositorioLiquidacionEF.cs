@@ -26,6 +26,16 @@ public class RepositorioLiquidacionEF : IRepositorioLiquidacion
             .OrderByDescending(liq => liq.Id)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Liquidacion>> ListarPorPrestadorAsync(int idPrestador, CancellationToken ct = default)
+        => await _db.Liquidaciones
+            .AsNoTracking()
+            .Include(liq => liq.Lectura)
+                .ThenInclude(l => l!.Medidor)
+                    .ThenInclude(m => m!.Suscriptor)
+            .Where(liq => liq.IdPrestador == idPrestador)
+            .OrderByDescending(liq => liq.Id)
+            .ToListAsync(ct);
+
     public async Task<Liquidacion?> ObtenerPorIdAsync(int id, CancellationToken ct = default)
         => await _db.Liquidaciones.FindAsync(new object[] { id }, ct);
 

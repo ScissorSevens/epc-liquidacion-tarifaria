@@ -40,4 +40,9 @@ export interface Lectura {
   timestamp_captura: string;      // ISO-8601
   timestamp_sync?: string;        // ISO-8601, cuando se sincroniza
   estado_sync: EstadoSync;
+  /**
+   * Denormalizado del suscriptor al momento de captura (multi-tenant).
+   * NOT NULL DEFAULT 0 legacy. Resuelto via suscriptor.id_prestador.
+   */
+  id_prestador?: number;
 }

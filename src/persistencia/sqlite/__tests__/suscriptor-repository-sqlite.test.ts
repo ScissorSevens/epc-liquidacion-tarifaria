@@ -21,6 +21,8 @@ function suscriptorBase(overrides: Partial<SuscriptorBorrador> = {}): Suscriptor
     estrato: 3,
     aplica_subsidio: false,
     estado: 'activo',
+    id_prestador: 0,
+    categoria_uso: 'residencial',
     ...overrides,
   };
 }

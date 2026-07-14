@@ -45,4 +45,10 @@ public class Liquidacion
     [Required]
     [MaxLength(120)]
     public string IdCliente { get; set; } = string.Empty;
+
+    /// <summary>FK al prestador (multi-tenant, denormalizado). NOT NULL DEFAULT 0 legacy.</summary>
+    public int IdPrestador { get; set; } = 0;
+
+    [ForeignKey(nameof(IdPrestador))]
+    public Prestador? Prestador { get; set; }
 }

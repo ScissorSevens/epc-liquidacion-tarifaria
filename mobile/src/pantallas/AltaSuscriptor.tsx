@@ -16,6 +16,12 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { crearSuscriptor, MENSAJES_ERROR_SUSCRIPTOR } from '@dominio/suscriptores';
+import {
+  CATEGORIAS_USO,
+  ETIQUETAS_CATEGORIA_USO,
+  type CategoriaUso,
+} from '@dominio/categorias-uso';
+import { logger } from '../composicion/logger';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
@@ -51,6 +57,7 @@ interface FormState {
   direccion: string;
   estrato: EstratoStr;
   aplica_subsidio: boolean;
+  categoria_uso: CategoriaUso;
   matricula_inmobiliaria: string;
   numero_catastral: string;
   fecha_instalacion: string;
@@ -76,6 +83,7 @@ const ESTADO_INICIAL: FormState = {
   direccion: '',
   estrato: '',
   aplica_subsidio: true,
+  categoria_uso: 'residencial',
   matricula_inmobiliaria: '',
   numero_catastral: '',
   fecha_instalacion: '',
@@ -243,6 +251,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
         direccion: form.direccion.trim(),
         estrato: estratoNum,
         aplica_subsidio: form.aplica_subsidio,
+        categoria_uso: form.categoria_uso,
         matricula_inmobiliaria:
           form.matricula_inmobiliaria.trim() === ''
             ? undefined
@@ -293,8 +302,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
       }, 800);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
-      console.warn('[AltaSuscriptor] error inesperado:', err);
+      logger.warn('AltaSuscriptor', 'error inesperado', { err });
       mostrarSnack(`Error inesperado: ${msg}`, 'error');
     } finally {
       setEnviando(false);
@@ -428,6 +436,37 @@ export default function AltaSuscriptor({ navigation }: Props) {
                 thumbColor={COLORS.surfaceContainerLowest}
                 disabled={enviando}
               />
+            </View>
+
+            {/* Categoría de uso (multi-tenant Q10 spec) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>CATEGORÍA DE USO</Text>
+              <View style={styles.chipsRowCategoria}>
+                {CATEGORIAS_USO.map((cat) => (
+                  <Pressable
+                    key={cat}
+                    onPress={() => setCampo('categoria_uso', cat)}
+                    disabled={enviando}
+                    style={({ pressed }) => [
+                      styles.chipCategoria,
+                      form.categoria_uso === cat && styles.chipSel,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipTextSm,
+                        form.categoria_uso === cat && styles.chipTextSel,
+                      ]}
+                    >
+                      {ETIQUETAS_CATEGORIA_USO[cat]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.helperTextCategoria}>
+                Define cómo el motor tarifario aplica subsidios o contribuciones (ver Res CRA 825/2017).
+              </Text>
             </View>
           </View>
 
@@ -757,6 +796,33 @@ const styles = StyleSheet.create({
   chipTextSel: {
     color: COLORS.primary,
     fontWeight: '700',
+  },
+
+  // ── Chips categoria de uso (Q10 spec, 5 opciones) ──────────────────────────
+  chipsRowCategoria: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+  },
+  chipCategoria: {
+    paddingHorizontal: SPACING.md,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.surfaceContainerLowest,
+  },
+  chipTextSm: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+  },
+  helperTextCategoria: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 
   // ── Toggle subsidio ────────────────────────────────────────────────────────

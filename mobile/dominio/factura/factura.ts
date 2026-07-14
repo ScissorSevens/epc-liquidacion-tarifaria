@@ -101,6 +101,8 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     nombre_apellidos: input.suscriptor.nombre_apellidos,
     direccion: input.suscriptor.direccion,
     estrato: input.suscriptor.estrato,
+    id_prestador: input.suscriptor.id_prestador,
+    categoria_uso: input.suscriptor.categoria_uso,
   });
   const medidorSnapshot = deepFreeze({
     numero_medidor: input.medidor.numero_medidor,

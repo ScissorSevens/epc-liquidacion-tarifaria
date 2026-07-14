@@ -55,8 +55,10 @@ describe('bootstrapCompleto', () => {
         direccion: 'Av Siempreviva 742',
         estrato: 3,
         aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
         estado: 'activo',
-      });
+          });
       const med = await sis.medidorRepo.crear({
         numero_medidor: 'M-001',
         id_suscriptor: sus.id_suscriptor,

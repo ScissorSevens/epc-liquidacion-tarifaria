@@ -32,6 +32,22 @@ export interface FacturaSnapshotSuscriptor {
   readonly nombre_apellidos: string;
   readonly direccion: string;
   readonly estrato: 1 | 2 | 3 | 4 | 5 | 6;
+  /** FK al prestador del suscriptor (denormalizado en el snapshot). */
+  readonly id_prestador: number;
+  /** Categoría de uso (Q10 spec). */
+  readonly categoria_uso: 'residencial' | 'comercial' | 'industrial' | 'oficial' | 'especial';
+}
+
+/**
+ * Snapshot del prestador que emitió la factura. Se incluye en el
+ * snapshot de la factura para que el reporte y la factura emitida
+ * tengan la información del prestador al momento del cálculo.
+ */
+export interface FacturaSnapshotPrestador {
+  readonly id_prestador: number;
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly municipio: string;
 }
 
 export interface FacturaSnapshotMedidor {

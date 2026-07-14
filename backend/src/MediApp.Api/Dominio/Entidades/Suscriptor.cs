@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MediApp.Api.Dominio.Entidades;
 
@@ -71,4 +72,15 @@ public class Suscriptor
 
     /// <summary>Indica si aplica subsidio tarifario (nullable — retrocompatibilidad con registros previos).</summary>
     public bool? AplicaSubsidio { get; set; }
+
+    /// <summary>FK al prestador (multi-tenant). NOT NULL DEFAULT 0 legacy.</summary>
+    public int IdPrestador { get; set; } = 0;
+
+    [ForeignKey(nameof(IdPrestador))]
+    public Prestador? Prestador { get; set; }
+
+    /// <summary>Categoria de uso (Q10 spec). Default 'residencial'.</summary>
+    [Required]
+    [MaxLength(20)]
+    public string CategoriaUso { get; set; } = "residencial";
 }

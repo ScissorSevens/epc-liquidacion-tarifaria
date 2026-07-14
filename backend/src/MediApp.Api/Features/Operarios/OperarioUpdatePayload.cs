@@ -27,4 +27,11 @@ public class OperarioUpdatePayload
 
     [JsonPropertyName("dispositivoId")]
     public string? DispositivoId { get; set; }
+
+    /// <summary>
+    /// FK a Prestador (multi-tenant). Null = no cambiar el prestador asignado.
+    /// SDD: setup-inicial-multi-tenant-auth phase 3 task 3.4.
+    /// </summary>
+    [JsonPropertyName("id_prestador")]
+    public int? IdPrestador { get; set; }
 }

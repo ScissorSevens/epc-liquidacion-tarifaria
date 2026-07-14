@@ -3,11 +3,13 @@ using MediApp.Api.Aplicacion.Lecturas;
 using MediApp.Api.Aplicacion.Liquidaciones;
 using MediApp.Api.Aplicacion.Medidores;
 using MediApp.Api.Aplicacion.Operarios;
+using MediApp.Api.Aplicacion.Prestadores;
 using MediApp.Api.Aplicacion.Suscriptores;
 using MediApp.Api.API.Features.Lecturas;
 using MediApp.Api.API.Features.Liquidaciones;
 using MediApp.Api.API.Features.Medidores;
 using MediApp.Api.API.Features.Operarios;
+using MediApp.Api.API.Features.Prestadores;
 using MediApp.Api.API.Features.Suscriptores;
 using MediApp.Api.Common;
 using MediApp.Api.Dominio.Entidades;
@@ -16,6 +18,9 @@ using MediApp.Api.Features.Lecturas;
 using MediApp.Api.Features.Liquidaciones;
 using MediApp.Api.Features.Medidores;
 using MediApp.Api.Features.Operarios;
+using MediApp.Api.Features.AcuerdosMunicipales;
+using MediApp.Api.Features.ParametrosTarifa;
+using MediApp.Api.Features.Prestadores;
 using MediApp.Api.Features.Suscriptores;
 using MediApp.Api.Infraestructura;
 using MediApp.Api.Infraestructura.Almacen;
@@ -60,6 +65,10 @@ try
     builder.Services.AddScoped<IValidator<LecturaPayload>, LecturaValidator>();
     builder.Services.AddScoped<IValidator<LiquidacionPayload>, LiquidacionValidator>();
     builder.Services.AddScoped<IValidator<OperarioPayload>, OperarioValidator>();
+    // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
+    builder.Services.AddScoped<IValidator<PrestadorPayload>, PrestadorValidator>();
+    builder.Services.AddScoped<IValidator<AcuerdoMunicipalPayload>, AcuerdoMunicipalValidator>();
+    builder.Services.AddScoped<IValidator<ParametrosTarifaPayload>, ParametrosTarifaValidator>();
 
     // Almacén de evidencias fotográficas (Lectura). Singleton: stateless, lee config en el ctor.
     builder.Services.AddSingleton<IAlmacenEvidencias, AlmacenLocal>();
@@ -71,6 +80,10 @@ try
     builder.Services.AddScoped<IRepositorioLiquidacion, RepositorioLiquidacionEF>();
     builder.Services.AddScoped<IRepositorioOperario, RepositorioOperarioEF>();
     builder.Services.AddScoped<IRepositorioSyncRegistro, RepositorioSyncRegistroEF>();
+    // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
+    builder.Services.AddScoped<IRepositorioPrestador, RepositorioPrestadorEF>();
+    builder.Services.AddScoped<IRepositorioAcuerdoMunicipal, RepositorioAcuerdoMunicipalEF>();
+    builder.Services.AddScoped<IRepositorioParametrosTarifa, RepositorioParametrosTarifaEF>();
 
     // Repositorios genéricos para SyncHandler (uno por entidad sincronizable).
     builder.Services.AddScoped<IRepositorioEntidad<Suscriptor>, RepositorioEntidadEF<Suscriptor>>();
@@ -90,6 +103,8 @@ try
     builder.Services.AddScoped<IServicioLecturas, ServicioLecturas>();
     builder.Services.AddScoped<IServicioLiquidaciones, ServicioLiquidaciones>();
     builder.Services.AddScoped<IServicioOperarios, ServicioOperarios>();
+    // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
+    builder.Services.AddScoped<IServicioPrestadores, ServicioPrestadores>();
 
     // Healthcheck con ping a la DB (reemplaza el handler manual mínimo del Día 1).
     builder.Services.AddHealthChecks().AddDbContextCheck<MediAppDbContext>("postgres");
@@ -104,6 +119,16 @@ try
 
     app.UseExceptionHandler();
     app.UseStatusCodePages();
+
+    // HSTS: fuerza HTTPS en navegadores. Defense in depth contra sslstrip.
+    // Mobile NO se beneficia directamente (no usa HSTS headers) pero
+    // administradores web del dashboard SÍ. Solo en producción — en
+    // desarrollo rompería el reload loop con self-signed certs.
+    // TICKET-P0.4 seguridad: deployment REQUIERE TLS termination.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
 
     // Sirve wwwroot/index.html (dashboard web estático, sin build/npm externo).
     app.UseStaticFiles();
@@ -127,6 +152,12 @@ try
     app.MapGroup("/api/v1/lecturas").MapLecturasEndpoints();
     app.MapGroup("/api/v1/liquidaciones").MapLiquidacionesEndpoints();
     app.MapGroup("/api/v1/operarios").MapOperariosEndpoints();
+    // Multi-tenant (cambio motor-tarifario-cra-825-2017-multitenant):
+    app.MapGroup("/api/v1/prestadores")
+        .MapPrestadoresEndpoints()
+        .MapAcuerdosMunicipalesEndpoints()
+        .MapParametrosTarifaEndpoints()
+        .MapImportarPrestadoresEndpoints();
 
     app.Run();
 }

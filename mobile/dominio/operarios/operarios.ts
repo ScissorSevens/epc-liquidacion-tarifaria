@@ -41,6 +41,9 @@ function validarEntrada(input: CrearOperarioInput): void {
   if (input.password_hash === '') {
     throw new Error(MENSAJES_ERROR_OPERARIO.PASSWORD_HASH_VACIO);
   }
+  if (input.id_prestador <= 0) {
+    throw new Error(MENSAJES_ERROR_OPERARIO.ID_PRESTADOR_INVALIDO);
+  }
   if (input.rol !== undefined && !ROLES_VALIDOS.has(input.rol)) {
     throw new Error(MENSAJES_ERROR_OPERARIO.ROL_INVALIDO);
   }
@@ -59,6 +62,7 @@ export function crearOperario(input: CrearOperarioInput): OperarioBorrador {
   validarEntrada(input);
 
   return {
+    id_prestador: input.id_prestador,
     numero_cedula: input.numero_cedula,
     nombre: input.nombre,
     email: input.email,

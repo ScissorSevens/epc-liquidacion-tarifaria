@@ -1,6 +1,18 @@
+/**
+ * Módulo de captura de lecturas — orquestador puro que conecta el
+ * registro de Lectura con el motor tarifario multi-tenant.
+ *
+ * Multi-tenant: `liquidarLectura` ahora recibe el suscriptor (que
+ * provee id_prestador y categoria_uso) + un bootstrap con los
+ * ParametrosTarifa y AcuerdoMunicipal vigentes del prestador. Esto
+ * reemplaza la firma anterior que recibía solo ParametrosTarifa
+ * (single-tenant implícito).
+ */
+
 import { EntradaLectura, EvidenciaFoto, Lectura } from './types.js';
 import { calcularLiquidacion } from '../motor-tarifario/motor-tarifario';
-import { Estrato, ParametrosTarifa, ResultadoCalculo } from '../motor-tarifario/types';
+import type { AcuerdoMunicipal, ParametrosTarifa, ResultadoCalculo } from '../motor-tarifario/types';
+import type { Suscriptor } from '../suscriptores/types';
 import { PERIODO_REGEX } from '../periodos/types';
 
 /** Extensiones de imagen válidas para evidencia */
@@ -48,31 +60,25 @@ function validarEntrada(entrada: EntradaLectura): void {
   }
 }
 
-/**
- * Valida los datos de evidencia fotográfica
- * @throws Error si la evidencia es inválida
- */
 function validarEvidenciaEntrada(evidencia: EvidenciaFoto): void {
   if (!evidencia.foto_path || evidencia.foto_path.trim() === '') {
     throw new Error('foto_path no puede estar vacio');
   }
-
   if (!EXTENSIONES_IMAGEN.test(evidencia.foto_path)) {
     throw new Error('foto_path debe ser una imagen (.jpg, .jpeg, .png, .heic)');
   }
-
   if (evidencia.foto_hash !== undefined && !SHA256_REGEX.test(evidencia.foto_hash)) {
     throw new Error('foto_hash debe ser SHA-256 valido (64 caracteres hexadecimales)');
   }
 }
 
 /**
- * Registra una lectura de medidor capturada en campo
- * Retorna un objeto Lectura con estado pendiente
+ * Registra una lectura de medidor capturada en campo.
+ * Retorna un objeto Lectura con estado pendiente, denormalizando
+ * id_prestador del suscriptor (multi-tenant).
  */
-export function registrarLectura(entrada: EntradaLectura): Lectura {
+export function registrarLectura(entrada: EntradaLectura, id_prestador = 0): Lectura {
   validarEntrada(entrada);
-
   return {
     id_medidor: entrada.id_medidor,
     id_periodo: entrada.id_periodo,
@@ -84,12 +90,12 @@ export function registrarLectura(entrada: EntradaLectura): Lectura {
     observaciones: entrada.observaciones || undefined,
     timestamp_captura: new Date().toISOString(),
     estado_sync: 'pendiente',
+    id_prestador,
   };
 }
 
 /**
  * Valida si una lectura tiene evidencia fotográfica completa
- * @param lectura - Lectura a validar
  * @param opciones - { requiereHash: true } para exigir integridad SHA-256
  */
 export function validarEvidencia(
@@ -102,28 +108,38 @@ export function validarEvidencia(
 }
 
 /**
- * Convierte id_periodo (YYYYMM) a objeto PeriodoFacturacion
+ * Contexto multi-tenant para liquidarLectura: parametros vigentes del
+ * prestador + acuerdo vigente. El caller los resuelve del workspace
+ * activo (Zustand store + repos SQLite).
  */
-function parsePeriodo(idPeriodo: string): { mes: number; anio: number } {
-  const anio = parseInt(idPeriodo.substring(0, 4), 10);
-  const mes = parseInt(idPeriodo.substring(4, 6), 10);
-  return { mes, anio };
+export interface ContextoLiquidacion {
+  readonly parametros: ParametrosTarifa;
+  readonly acuerdo: AcuerdoMunicipal | null;
 }
 
 /**
- * Liquida una lectura capturada usando el motor tarifario CRA
- * Conecta el módulo de captura con el motor de liquidación
+ * Liquida una lectura capturada usando el motor tarifario multi-tenant.
+ *
+ * Cambia firma vs versión anterior:
+ *  - ANTES: (lectura, parametros, estrato?)
+ *  - AHORA: (lectura, suscriptor, contexto) — el suscriptor provee
+ *    id_prestador + categoria_uso + estrato; el contexto provee
+ *    ParametrosTarifa + AcuerdoMunicipal vigentes del prestador.
  */
 export function liquidarLectura(
   lectura: Lectura,
-  parametros: ParametrosTarifa,
-  estrato?: Estrato,
+  suscriptor: Suscriptor,
+  contexto: ContextoLiquidacion,
 ): ResultadoCalculo {
-  return calcularLiquidacion({
-    lecturaAnterior: lectura.lectura_anterior,
-    lecturaActual: lectura.lectura_actual,
-    parametros,
-    estrato,
-    periodo: parsePeriodo(lectura.id_periodo),
-  });
+  const consumo = lectura.lectura_actual - lectura.lectura_anterior;
+  return calcularLiquidacion(
+    {
+      id_prestador: suscriptor.id_prestador,
+      consumo_m3: consumo,
+      estrato: suscriptor.estrato,
+      categoria_uso: suscriptor.categoria_uso,
+    },
+    contexto.parametros,
+    contexto.acuerdo,
+  );
 }

@@ -7,6 +7,7 @@ export type RolOperario = 'operario' | 'supervisor' | 'admin';
 
 export interface Operario {
   readonly id_operario: number;
+  readonly id_prestador: number;
   readonly numero_cedula: string;
   readonly nombre: string;
   readonly email: string;
@@ -28,7 +29,7 @@ export type CrearOperarioInput = Omit<
 };
 
 export type ActualizarOperarioInput = Partial<
-  Pick<Operario, 'estado' | 'rol' | 'dispositivo_id' | 'password_hash'>
+  Pick<Operario, 'estado' | 'rol' | 'dispositivo_id' | 'password_hash' | 'id_prestador'>
 >;
 
 /**
@@ -55,4 +56,5 @@ export const MENSAJES_ERROR_OPERARIO = {
   NOMBRE_LARGO: 'nombre no puede superar 150 caracteres',
   ESTADO_INVALIDO: "estado debe ser 'activo' o 'inactivo'",
   DISPOSITIVO_LARGO: 'dispositivo_id no puede superar 100 caracteres',
+  ID_PRESTADOR_INVALIDO: 'id_prestador debe ser mayor a 0',
 } as const;

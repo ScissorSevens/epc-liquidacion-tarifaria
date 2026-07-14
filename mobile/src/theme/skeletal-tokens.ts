@@ -62,6 +62,8 @@ export const COLORS = {
   inverseOnSurface: '#EAF1FF',
   // Advertencia.
   warning: '#EF6C00',
+  warningContainer: '#FFEDD5',
+  onWarningContainer: '#5A3500',
   // Estados de error (heredados del DESIGN.md).
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',

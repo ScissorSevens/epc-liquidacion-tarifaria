@@ -90,14 +90,17 @@ function formatearFecha(iso: string): string {
  *   placeholder "— (sin evidencia foto)".
  */
 export default function ResultadoCalculo({ navigation, route }: Props) {
-  const { lectura, resultado, parametros, estrato, id_suscriptor, nombre_suscriptor } =
+  const { lectura, resultado, parametros, estrato, id_suscriptor, nombre_suscriptor, prestador } =
     route.params;
 
   const [detalleAbierto, setDetalleAbierto] = useState(true);
 
   const subsidioMostrar = resultado.subsidio > 0;
   const contribMostrar = resultado.contribucion > 0;
-  const excedenteMostrar = resultado.consumoExcedente > 0;
+  // En el motor multi-tenant, el "consumo excedente" no se desglosa por bloque.
+  // Mostramos un mensaje informativo cuando el consumo efectivo es > 0
+  // (consumo_efectivo_m3 = consumo_m3 si no aplica mínimo vital).
+  const excedenteMostrar = resultado.consumo_efectivo_m3 > 0;
 
   const fechaTxt = formatearFecha(lectura.timestamp_captura);
   const hashTxt =
@@ -107,8 +110,8 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
   const subtitulo = useMemo(
     () =>
-      `Suscriptor #${id_suscriptor} — Medidor #${lectura.id_medidor} — Periodo ${lectura.id_periodo}`,
-    [id_suscriptor, lectura.id_medidor, lectura.id_periodo],
+      `${prestador?.nombre ?? '—'} (${prestador?.municipio ?? '—'}) — Suscriptor #${id_suscriptor} — Medidor #${lectura.id_medidor} — ${lectura.id_periodo}`,
+    [prestador?.nombre, prestador?.municipio, id_suscriptor, lectura.id_medidor, lectura.id_periodo],
   );
 
   return (
@@ -160,7 +163,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             </View>
             <Text style={styles.bentoConsumoLabel}>Consumo del Periodo</Text>
           </View>
-          <Text style={styles.bentoConsumoVal}>{resultado.consumo} m³</Text>
+            <Text style={styles.bentoConsumoVal}>{resultado.consumo_m3} m³</Text>
         </View>
 
         {/* Detalle colapsable */}
@@ -182,19 +185,13 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
           {detalleAbierto && (
             <View style={styles.detalleBody}>
               <FilaDetalle
-                label="Cargo Fijo"
-                valor={formatearCOP(resultado.cargoFijo)}
+                label={`Cargo Fijo (CF = CMA/N)`}
+                valor={formatearCOP(resultado.cargo_fijo)}
               />
               <FilaDetalle
-                label={`Cargo Consumo Básico (${resultado.consumoBasico}m³)`}
-                valor={formatearCOP(resultado.cargoConsumo)}
+                label={`Cargo Consumo (CC unit ${formatearCOP(resultado.cc_unitario)}/m³ × ${resultado.consumo_efectivo_m3}m³)`}
+                valor={formatearCOP(resultado.cc_total)}
               />
-              {excedenteMostrar && (
-                <FilaDetalle
-                  label={`Cargo Excedente (${resultado.consumoExcedente}m³)`}
-                  valor={formatearCOP(resultado.cargoExcedente)}
-                />
-              )}
               {subsidioMostrar && (
                 <FilaDetalle
                   label={`Subsidio (estrato ${estrato})`}
@@ -208,8 +205,13 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
                 />
               )}
               <FilaDetalle
-                label="Umbral básico aplicado"
-                valor={`${parametros.consumoBasico} m³`}
+                label="Norma aplicada"
+                valor={resultado.metadata.norma_aplicada}
+                meta
+              />
+              <FilaDetalle
+                label="Versión motor"
+                valor={resultado.metadata.version_motor}
                 meta
               />
             </View>
@@ -247,6 +249,18 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>FECHA</Text>
             <Text style={styles.metaVal}>{fechaTxt}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>PRESTADOR</Text>
+            <Text style={styles.metaVal} numberOfLines={1}>
+              {prestador?.nombre ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>MUNICIPIO</Text>
+            <Text style={styles.metaVal} numberOfLines={1}>
+              {prestador?.municipio ?? '—'}
+            </Text>
           </View>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>OPERADOR</Text>

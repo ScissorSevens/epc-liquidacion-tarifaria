@@ -15,6 +15,7 @@ import type {
   ParametrosTarifa,
   ResultadoCalculo as ResultadoCalculoTipo,
 } from '@dominio/motor-tarifario/types';
+import type { Prestador } from '@dominio/prestadores';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 
 // ── Stacks ────────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ export type InicioStackParamList = {
     estrato: Estrato;
     id_suscriptor: number;
     nombre_suscriptor: string;
+    prestador: Prestador;
   };
   EditarSuscriptor: { suscriptor: Suscriptor };
 };
@@ -52,6 +54,7 @@ export type LecturasStackParamList = {
     estrato: Estrato;
     id_suscriptor: number;
     nombre_suscriptor: string;
+    prestador: Prestador;
   };
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
@@ -67,6 +70,11 @@ export type ConfigStackParamList = {
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
   MiPerfil: undefined;
+  Admin: undefined;
+  GestionPrestadores: undefined;
+  AcuerdoMunicipal: { id_prestador: number };
+  ParametrosTarifa: { id_prestador: number };
+  ImportarPrestadores: undefined;
 };
 
 // ── Tab raíz ──────────────────────────────────────────────────────────────────

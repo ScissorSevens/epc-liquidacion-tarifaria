@@ -77,6 +77,8 @@ export async function importarSuscriptoresYMedidores(
           direccion: fila.direccion,
           estrato: fila.estrato as Suscriptor['estrato'],
           aplica_subsidio: fila.aplica_subsidio ?? false,
+          id_prestador: 0,
+          categoria_uso: 'residencial',
           ...(fila.matricula_inmobiliaria
             ? { matricula_inmobiliaria: fila.matricula_inmobiliaria }
             : {}),
