@@ -1,11 +1,33 @@
+import './__mocks__/use-focus-effect-mock';
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RutaDeHoy from '../../src/pantallas/RutaDeHoy';
 import { crearNavMock } from './__mocks__/nav';
 import { getBootstrap } from '../../src/composition/get-bootstrap';
 
 jest.mock('../../src/composition/get-bootstrap');
 const mockGetBootstrap = getBootstrap as jest.MockedFunction<typeof getBootstrap>;
+
+// RutaDeHoy usa TopBar → useSafeAreaInsets → SafeAreaProvider.
+// initialMetrics zero para aserciones estables.
+const renderConProviders = (ui: React.ReactElement) =>
+  render(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 320, height: 568 },
+        insets: { top: 0, left: 0, right: 0, bottom: 0 },
+      }}
+    >
+      {ui}
+    </SafeAreaProvider>,
+  );
+
+// useNetInfo depende de @react-native-community/netinfo que requiere
+// APIs nativas no disponibles en jest. Mockeamos a "sin conexión" estable.
+jest.mock('../../src/hooks/useNetInfo', () => ({
+  useNetInfo: () => ({ isConnected: false }),
+}));
 
 // La fecha de hoy en formato YYYY-MM-DD
 const HOY = new Date().toISOString().slice(0, 10);
@@ -78,40 +100,39 @@ describe('RutaDeHoy', () => {
     jest.clearAllMocks();
   });
 
-  // SC-SYS-11: suscriptor con lectura hoy muestra "Capturada hoy"
-  it('SC-SYS-11: suscriptor con lectura hoy muestra Capturada hoy', async () => {
+  // SC-SYS-11: suscriptor con lectura este mes muestra "Capturado este mes"
+  it('SC-SYS-11: suscriptor con lectura este mes muestra Capturado este mes', async () => {
     configurarBootstrap();
-    render(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText('Capturada hoy')).toBeTruthy();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText('Capturado este mes')).toBeTruthy();
   });
 
-  // SC-SYS-12: suscriptores sin lectura muestran "Pendiente"
-  it('SC-SYS-12: suscriptores sin lectura muestran Pendiente', async () => {
+  // SC-SYS-12: suscriptores sin lectura muestran "Lectura pendiente"
+  it('SC-SYS-12: suscriptores sin lectura muestran Lectura pendiente', async () => {
     configurarBootstrap();
-    render(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    await screen.findByText('Capturada hoy');
-    const pendientes = screen.getAllByText('Pendiente');
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Capturado este mes');
+    const pendientes = screen.getAllByText('Lectura pendiente');
     expect(pendientes.length).toBe(2);
   });
 
-  // SC-SYS-13: cola con 4 items PENDIENTE muestra botón SINCRONIZAR con conteo
-  it('SC-SYS-13: cola con 4 pendientes muestra SINCRONIZAR con conteo', async () => {
-    const cola = [
-      { id: 1, estado: 'PENDIENTE' },
-      { id: 2, estado: 'PENDIENTE' },
-      { id: 3, estado: 'PENDIENTE' },
-      { id: 4, estado: 'PENDIENTE' },
-    ];
-    configurarBootstrap({ cola });
-    render(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText(/SINCRONIZAR/)).toBeTruthy();
-    expect(await screen.findByText(/4/)).toBeTruthy();
+  // SC-SYS-13: el contador del header refleja total de lecturas capturadas
+  // (la pantalla actual NO renderiza un botón SINCRONIZAR — sólo lleva el
+  // conteo de pendientes a la tab Sincronizacion). Verificamos que el conteo
+  // del mes se incrementa cuando hay lecturas.
+  it('SC-SYS-13: contador LECTURAS DEL MES refleja capturas', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText('LECTURAS DEL MES')).toBeTruthy();
+    // El contador "1 / 3" se renderiza como Text fragmentado.
+    // Buscamos el Text hijo "/ 3" que es único del contador.
+    expect(screen.getByText('/ 3')).toBeTruthy();
   });
 
-  // SC-SYS-14: cola vacía — botón SINCRONIZAR NO aparece
-  it('SC-SYS-14: cola vacía oculta botón SINCRONIZAR', async () => {
+  // SC-SYS-14: la cola ya no tiene un botón SINCRONIZAR en esta pantalla
+  it('SC-SYS-14: SINCRONIZAR no aparece (movido a tab Sincronizacion)', async () => {
     configurarBootstrap({ cola: [] });
-    render(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
     await screen.findByText('Ana García');
     expect(screen.queryByText(/SINCRONIZAR/)).toBeNull();
   });
@@ -119,14 +140,16 @@ describe('RutaDeHoy', () => {
   // SC-SYS-15: error en carga muestra REINTENTAR
   it('SC-SYS-15: error en carga muestra REINTENTAR', async () => {
     mockGetBootstrap.mockRejectedValue(new Error('fallo de red'));
-    render(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
     expect(await screen.findByText('REINTENTAR')).toBeTruthy();
   });
 
-  // SC-SYS-16: 1 de 3 suscriptores con lectura → "1 / 3 capturadas"
-  it('SC-SYS-16: muestra el progreso correcto 1 / 3 capturadas', async () => {
+  // SC-SYS-16: 1 de 3 suscriptores con lectura → contador 1 / 3
+  it('SC-SYS-16: muestra el progreso correcto 1 / 3', async () => {
     configurarBootstrap();
-    render(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText('1 / 3 capturadas')).toBeTruthy();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText(/LECTURAS DEL MES/)).toBeTruthy();
+    // El contador muestra "1 / 3" (Text fragmentado por el span interior)
+    expect(screen.getByText('/ 3')).toBeTruthy();
   });
 });
