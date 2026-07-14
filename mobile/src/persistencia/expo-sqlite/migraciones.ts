@@ -309,6 +309,34 @@ CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
   ON operario(id_prestador);
 `;
 
+/**
+ * TICKET-EPIC-LOGIN-001 — PUNTO A: Login real local contra SQLite.
+ *
+ * El repo de operarios (`operario-repository-expo-sqlite.ts`) usa la tabla
+ * `operarios` (plural) — distinta de la tabla `operario` (singular) que
+ * crean las migrations 015+016 — porque fue cableada así por una decisión
+ * anterior (las migrations canónicas del dominio no son la fuente única
+ * del schema en mobile). Las DBs existentes en devices de dev tienen la
+ * tabla `operarios` SIN la columna `password_hash`, lo que impide el
+ * login offline del PUNTO A.
+ *
+ * Esta migration agrega `password_hash` a `operarios` para DBs pre-PUNTO-A.
+ *
+ * Para DBs nuevas (cold install en devices nuevos): el repo
+ * `crearOperarioRepositoryExpoSqlite` ya crea `operarios` CON la columna
+ * en su `SQL_CREATE_TABLE` (PUNTO A commit). Esta migration es no-op
+ * para esas DBs porque la columna ya existe (migrations controlan el
+ * version con `__migraciones_aplicadas` — se aplica 1 vez por device).
+ *
+ * DEFAULT '': las filas pre-existentes quedan con hash vacío; un operario
+ * legacy sin hash válido NO puede hacer login (PASSWORD_INCORRECTA). Esto
+ * es aceptable porque el setup inicial (Fase 5.1) siempre crea el primer
+ * operario con password_hash real via bootstrapCompleto → operarioRepo.guardar.
+ */
+const MIGRACION_017_OPERARIO_PASSWORD_HASH = `
+ALTER TABLE operarios ADD COLUMN password_hash TEXT NOT NULL DEFAULT '';
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -326,6 +354,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 14, nombre: '014_factura_add_id_prestador', sql: MIGRACION_014_FACTURA_ADD_ID_PRESTADOR },
   { version: 15, nombre: '015_operario', sql: MIGRACION_015_OPERARIO },
   { version: 16, nombre: '016_setup_inicial_multi_tenant', sql: MIGRACION_016_SETUP_INICIAL_MULTI_TENANT },
+  { version: 17, nombre: '017_operario_password_hash', sql: MIGRACION_017_OPERARIO_PASSWORD_HASH },
 ];
 
 

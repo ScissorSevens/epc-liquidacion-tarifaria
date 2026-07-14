@@ -23,6 +23,7 @@ function buildRow(overrides: Partial<{
   numero_cedula: string;
   nombre: string;
   email: string;
+  password_hash: string;
   rol: string;
   estado: string;
   dispositivo_id: string | null;
@@ -34,6 +35,7 @@ function buildRow(overrides: Partial<{
     numero_cedula: '123',
     nombre: 'Ana',
     email: 'ana@test.com',
+    password_hash: '',
     rol: 'operario',
     estado: 'activo',
     dispositivo_id: null,
@@ -125,6 +127,7 @@ describe('buscarPorDispositivoId()', () => {
       nombre: 'Carlos',
       numero_cedula: '999',
       email: 'carlos@test.com',
+      password_hash: '',
       rol: 'supervisor',
       estado: 'activo',
       dispositivo_id: 'device-abc',
@@ -334,5 +337,143 @@ describe('eliminarPorCedula()', () => {
 
     await expect(repo.eliminarPorCedula('no-existe')).resolves.toBeUndefined();
     expect(runAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── password_hash: persistencia y lectura para login offline (PUNTO A) ──────
+//
+// TICKET-EPIC-LOGIN-001 — PUNTO A: Login real local contra SQLite.
+// El bootstrapCompleto (Fase 5.1) hashea el password del operario con SHA-256
+// y se lo pasa a `guardar()`. Para que el Login pueda validar localmente,
+// el repo DEBE:
+//   - Incluir `password_hash` en el UPSERT (sino el hash se pierde al guardar).
+//   - Devolver `password_hash` en `buscarPorCedula`/`listar`/etc. (sino el
+//     Login no puede comparar contra el hash guardado).
+//
+// Sin esto, el Login real contra SQLite es imposible porque el hash nunca
+// se persiste ni se lee del row.
+//
+// TDD Evidence:
+//   RED → estos tests fallan antes del commit que agrega `password_hash`
+//         al OperarioRow, al SQL_UPSERT y al fromRow().
+
+describe('password_hash (PUNTO A: Login real local)', () => {
+  describe('guardar()', () => {
+    it('GH1.1 incluye la columna password_hash en el INSERT/UPSERT', async () => {
+      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 0, changes: 1 });
+      const db = buildDb({ runAsync });
+      const repo = crearOperarioRepositoryExpoSqlite(db);
+
+      const borrador = {
+        id_prestador: 1,
+        numero_cedula: '12345678',
+        nombre: 'Ana',
+        email: 'ana@test.com',
+        password_hash: 'sha256(secret)',
+        rol: 'operario' as const,
+        estado: 'activo' as const,
+      };
+
+      await repo.guardar({
+        ...borrador,
+        id_operario: 1,
+        created_at: '2024-01-15',
+      });
+
+      expect(runAsync).toHaveBeenCalledTimes(1);
+      const [sql, ...params] = runAsync.mock.calls[0];
+      expect(sql).toMatch(/password_hash/i);
+      // El hash pasado al repo debe terminar como parametro del SQL
+      const paramsStr = JSON.stringify(params);
+      expect(paramsStr).toContain('sha256(secret)');
+    });
+
+    it('GH1.2 persiste 9 columnas + 9 params (id_operario, id_prestador, numero_cedula, nombre, email, password_hash, rol, estado, dispositivo_id, created_at) → 10 params', async () => {
+      const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 0, changes: 1 });
+      const db = buildDb({ runAsync });
+      const repo = crearOperarioRepositoryExpoSqlite(db);
+
+      await repo.guardar({
+        id_operario: 7,
+        id_prestador: 1,
+        numero_cedula: '51800012',
+        nombre: 'Ana',
+        email: 'ana@test.com',
+        password_hash: 'sha256(mi-clave)',
+        rol: 'operario',
+        estado: 'activo',
+        dispositivo_id: undefined,
+        created_at: '2024-01-15',
+      });
+
+      const [sql, ...params] = runAsync.mock.calls[0];
+      // 9 placeholders `?` (id_prestador, numero_cedula, nombre, email,
+      // password_hash, rol, estado, dispositivo_id, created_at) — el primer
+      // param es id_operario que va en VALUES (...).
+      expect(sql).toMatch(/VALUES\s*\(\s*\?,\s*\?,\s*\?,\s*\?,\s*\?,\s*\?,\s*\?,\s*\?,\s*\?,\s*\?\)/i);
+      expect(params).toHaveLength(10);
+      expect(params).toEqual([
+        7,           // id_operario (1er param, antes de VALUES)
+        1,           // id_prestador
+        '51800012',  // numero_cedula
+        'Ana',       // nombre
+        'ana@test.com', // email
+        'sha256(mi-clave)', // password_hash (NUEVO)
+        'operario',  // rol
+        'activo',    // estado
+        null,        // dispositivo_id
+        '2024-01-15', // created_at
+      ]);
+    });
+  });
+
+  describe('fromRow (via buscarPorCedula)', () => {
+    it('GH2.1 devuelve el campo password_hash cuando la fila lo trae', async () => {
+      const rowConHash = {
+        id_operario: 3,
+        id_prestador: 1,
+        numero_cedula: '51800012',
+        nombre: 'Ana',
+        email: 'ana@test.com',
+        password_hash: 'sha256(mi-clave)', // ← presente en la fila SQL
+        rol: 'operario',
+        estado: 'activo',
+        dispositivo_id: null,
+        created_at: '2024-01-15',
+      };
+      const getFirstAsync = jest.fn().mockResolvedValue(rowConHash);
+      const db = buildDb({ getFirstAsync });
+      const repo = crearOperarioRepositoryExpoSqlite(db);
+
+      const resultado = await repo.buscarPorCedula('51800012');
+
+      expect(resultado).not.toBeNull();
+      expect(resultado!.password_hash).toBe('sha256(mi-clave)');
+    });
+
+    it('GH2.2 un Operario devuelto por buscarPorCedula satisface el tipo de dominio (incluye password_hash como string)', async () => {
+      const rowConHash = {
+        id_operario: 3,
+        id_prestador: 1,
+        numero_cedula: '51800012',
+        nombre: 'Ana',
+        email: 'ana@test.com',
+        password_hash: 'abc123hash',
+        rol: 'operario',
+        estado: 'activo',
+        dispositivo_id: null,
+        created_at: '2024-01-15',
+      };
+      const db = buildDb({ getFirstAsync: jest.fn().mockResolvedValue(rowConHash) });
+      const repo = crearOperarioRepositoryExpoSqlite(db);
+
+      const resultado = await repo.buscarPorCedula('51800012');
+
+      // Type assertion + valor concreto: si fromRow omitiera password_hash,
+      // el campo seria undefined y este expect fallaria.
+      const operario = resultado as Operario;
+      expect(typeof operario.password_hash).toBe('string');
+      expect(operario.password_hash).toBe('abc123hash');
+    });
   });
 });

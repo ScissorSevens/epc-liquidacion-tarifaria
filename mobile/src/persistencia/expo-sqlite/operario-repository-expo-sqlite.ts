@@ -2,7 +2,16 @@
  * Adapter expo-sqlite de `OperarioRepository` para la app móvil.
  *
  * Lee operarios cacheados localmente (sincronizados desde el backend).
- * IMPORTANTE: password_hash NO se persiste en mobile (seguridad).
+ *
+ * PUNTO A (Login real local): `password_hash` SI se persiste en mobile.
+ * Es la única forma de validar login offline contra SQLite sin pedirle
+ * al operario que se conecte al backend. El hash es SHA-256 (no plain),
+ * generado por el `Hasher` inyectado en bootstrapCompleto (Fase 5.1).
+ * Trade-off de seguridad documentado en
+ * TICKET-EPIC-LOGIN-001 / PUNTO A (2026-07-09):
+ *   - MVP: stored hash OK para demo offline.
+ *   - Producción: cuando llegue el backend (Fase 6), el hash se reemplaza
+ *     por un token de sesión opaco y este flujo deja de usarse.
  *
  * La tabla se crea con `CREATE TABLE IF NOT EXISTS` — idempotente.
  * Llamar `inicializar()` antes de usar cualquier otra función.
@@ -18,6 +27,11 @@ interface OperarioRow {
   readonly numero_cedula: string;
   readonly nombre: string;
   readonly email: string;
+  /**
+   * Hash SHA-256 de la contraseña del operario. Persistido para permitir
+   * login offline (PUNTO A). Ver doc del archivo.
+   */
+  readonly password_hash: string;
   readonly rol: string;
   readonly estado: string;
   readonly dispositivo_id: string | null;
@@ -31,6 +45,7 @@ CREATE TABLE IF NOT EXISTS operarios (
   numero_cedula  TEXT NOT NULL UNIQUE,
   nombre         TEXT NOT NULL,
   email          TEXT NOT NULL,
+  password_hash  TEXT NOT NULL DEFAULT '',
   rol            TEXT NOT NULL DEFAULT 'operario',
   estado         TEXT NOT NULL DEFAULT 'activo',
   dispositivo_id TEXT,
@@ -46,13 +61,14 @@ const SQL_BUSCAR_POR_DISPOSITIVO = `SELECT * FROM operarios WHERE dispositivo_id
 const SQL_BUSCAR_POR_DISPOSITIVO_Y_PRESTADOR =
   `SELECT * FROM operarios WHERE dispositivo_id = ? AND id_prestador = ? LIMIT 1`;
 const SQL_UPSERT = `
-INSERT INTO operarios (id_operario, id_prestador, numero_cedula, nombre, email, rol, estado, dispositivo_id, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO operarios (id_operario, id_prestador, numero_cedula, nombre, email, password_hash, rol, estado, dispositivo_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id_operario) DO UPDATE SET
   id_prestador   = excluded.id_prestador,
   numero_cedula  = excluded.numero_cedula,
   nombre         = excluded.nombre,
   email          = excluded.email,
+  password_hash  = excluded.password_hash,
   rol            = excluded.rol,
   estado         = excluded.estado,
   dispositivo_id = excluded.dispositivo_id,
@@ -70,6 +86,7 @@ const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof OperarioRow> = [
   'numero_cedula',
   'nombre',
   'email',
+  'password_hash',
   'rol',
   'estado',
   'dispositivo_id',
@@ -83,6 +100,7 @@ function fromRow(row: OperarioRow): Operario {
     numero_cedula: row.numero_cedula,
     nombre: row.nombre,
     email: row.email,
+    password_hash: row.password_hash,
     rol: row.rol,
     estado: row.estado,
     ...(row.dispositivo_id !== null && { dispositivo_id: row.dispositivo_id }),
@@ -209,6 +227,7 @@ export function crearOperarioRepositoryExpoSqlite(
         operario.numero_cedula,
         operario.nombre,
         operario.email,
+        operario.password_hash,
         operario.rol,
         operario.estado,
         operario.dispositivo_id ?? null,
