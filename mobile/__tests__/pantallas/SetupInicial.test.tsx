@@ -96,17 +96,21 @@ import { useWorkspace } from '../../src/composicion/useWorkspace';
 
 describe('validarPaso1()', () => {
   it('V1.1 retorna errores cuando todos los campos requeridos estan vacios', () => {
+    // PRESTADOR_FORM_VACIO ya tiene departamento='Cundinamarca' y segmento=2
+    // (defaults razonables). El test verifica los REQ sin default.
     const errores = validarPaso1(PRESTADOR_FORM_VACIO);
 
-    // Campos REQ: nombre, nit, representante_legal, representante_legal_cedula,
-    // municipio, departamento, segmento, num_suscriptores_urbanos,
-    // num_suscriptores_rurales. Email y telefono son OPT.
+    // Campos REQ sin default: nombre, nit, representante_legal,
+    // representante_legal_cedula, municipio. Los demas REQ ya tienen
+    // defaults razonables (departamento='Cundinamarca', segmento=2,
+    // num_suscriptores=0).
     expect(errores.nombre).toBeDefined();
     expect(errores.nit).toBeDefined();
     expect(errores.representante_legal).toBeDefined();
     expect(errores.representante_legal_cedula).toBeDefined();
     expect(errores.municipio).toBeDefined();
-    expect(errores.departamento).toBeDefined();
+    // Defaults que NO deben generar error:
+    expect(errores.departamento).toBeUndefined(); // tiene default 'Cundinamarca'
     expect(errores.segmento).toBeUndefined(); // tiene default 2
   });
 
