@@ -96,6 +96,7 @@ export interface PrestadorRepository {
   actualizar(id_prestador: number, cambios: ActualizarPrestadorInput): Promise<Prestador>;
   suspender(id_prestador: number): Promise<Prestador>;
   reactivar(id_prestador: number): Promise<Prestador>;
+  eliminar(id: number): Promise<void>;
 }
 
 /**

@@ -86,6 +86,7 @@ export interface ParametrosTarifaRepository {
    */
   buscarVigente(id_prestador: number, fecha: string): Promise<ParametrosTarifa | null>;
   buscarPorPeriodo(id_prestador: number, periodo: number): Promise<ParametrosTarifa | null>;
+  eliminar(id: number): Promise<void>;
 }
 
 export const MENSAJES_ERROR_PARAMETROS = {

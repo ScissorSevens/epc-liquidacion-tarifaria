@@ -173,6 +173,10 @@ export function crearParametrosTarifaRepositorySqlite(
       return row ? fromRow(row) : null;
     },
 
+    async eliminar(id: number): Promise<void> {
+      db.prepare('DELETE FROM parametros_tarifa WHERE id_parametros = ?').run(id);
+    },
+
     cerrar(): void {
       db.close();
     },

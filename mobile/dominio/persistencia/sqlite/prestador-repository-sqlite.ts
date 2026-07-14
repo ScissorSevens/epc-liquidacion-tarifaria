@@ -256,6 +256,10 @@ export function crearPrestadorRepositorySqlite(
       return fromRow(row);
     },
 
+    async eliminar(id: number): Promise<void> {
+      db.prepare('DELETE FROM prestador WHERE id_prestador = ?').run(id);
+    },
+
     cerrar(): void {
       db.close();
     },

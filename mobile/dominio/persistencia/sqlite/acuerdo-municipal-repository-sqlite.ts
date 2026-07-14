@@ -170,6 +170,10 @@ export function crearAcuerdoMunicipalRepositorySqlite(
       return row ? fromRow(row) : null;
     },
 
+    async eliminar(id: number): Promise<void> {
+      db.prepare('DELETE FROM acuerdo_municipal WHERE id_acuerdo = ?').run(id);
+    },
+
     cerrar(): void {
       db.close();
     },

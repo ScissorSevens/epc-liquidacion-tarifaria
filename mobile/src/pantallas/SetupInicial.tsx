@@ -27,7 +27,6 @@ import {
 import {
   bootstrapCompleto,
   type PrestadorRepoPort,
-  type AcuerdoRepoPort,
   type ParametrosRepoPort,
   type OperarioRepoPort,
 } from '../composition/bootstrap-completo';
@@ -111,7 +110,7 @@ export default function SetupInicial({ onComplete }: Props) {
       const bs = await getBootstrap();
       const resultado = await bootstrapCompleto({
         prestadorRepo: bs.prestadorRepo as unknown as PrestadorRepoPort,
-        acuerdoRepo: bs.acuerdoMunicipalRepo as unknown as AcuerdoRepoPort,
+        acuerdoRepo: bs.acuerdoMunicipalRepo,
         parametrosRepo: bs.parametrosTarifaRepo as unknown as ParametrosRepoPort,
         operarioRepo: bs.operarioRepo as unknown as OperarioRepoPort,
         hasher: bs.hasher,

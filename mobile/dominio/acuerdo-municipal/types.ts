@@ -82,6 +82,7 @@ export interface AcuerdoMunicipalRepository {
    * `null` si no hay Acuerdo vigente.
    */
   buscarVigente(id_prestador: number, fecha: string): Promise<AcuerdoMunicipal | null>;
+  eliminar(id: number): Promise<void>;
 }
 
 export const MENSAJES_ERROR_ACUERDO = {
