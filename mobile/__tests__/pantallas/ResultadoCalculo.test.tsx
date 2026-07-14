@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ResultadoCalculo from '../../src/pantallas/ResultadoCalculo';
 import { crearNavMock } from './__mocks__/nav';
 
@@ -7,6 +8,12 @@ import { crearNavMock } from './__mocks__/nav';
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
 }));
+
+// TopBar (componente de la pantalla) usa useSafeAreaInsets → requiere
+// SafeAreaProvider en el árbol. initialMetrics default = 0 en todas las
+// dimensiones para mantener aserciones estables.
+const renderConProviders = (ui: React.ReactElement) =>
+  render(<SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 320, height: 568 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>{ui}</SafeAreaProvider>);
 
 const paramsBase = {
   lectura: {
@@ -20,18 +27,31 @@ const paramsBase = {
   },
   resultado: {
     total: 1234567,
-    consumo: 15,
-    consumoBasico: 10,
-    consumoExcedente: 5,
-    cargoFijo: 5000,
-    cargoConsumo: 20000,
-    cargoExcedente: 10000,
+    consumo_m3: 15,
+    consumo_efectivo_m3: 15,
+    bloques: [],
+    cargo_fijo: 5000,
+    cc_unitario: 1333.33,
+    cc_total: 20000,
     subsidio: 0,
     contribucion: 0,
+    factor_aplicado: 0,
+    metadata: {
+      norma_aplicada: 'Res CRA 825/2017',
+      acuerdo_id: null,
+      parametros_id: 1,
+      cmviaa_aplicado: false,
+      minimo_vital_aplicado: false,
+      factor_capeado: false,
+      version_motor: '825-907-v1',
+      calculo_timestamp: '2026-05-11T10:00:00.000Z',
+    },
   },
   parametros: { consumoBasico: 10 },
   estrato: 2,
   id_suscriptor: 42,
+  nombre_suscriptor: 'Juan Pérez',
+  prestador: { nombre: 'EPC S.A.', municipio: 'Bogotá' },
 };
 
 function crearRutaMock(params = paramsBase) {
@@ -48,7 +68,7 @@ describe('ResultadoCalculo', () => {
 
   // SC-SYS-01: total COP formateado con separadores de miles
   it('SC-SYS-01: muestra el total con separadores de miles', () => {
-    render(
+    renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
     // Intl.NumberFormat en JSDOM puede formatear con . o , según locale
@@ -56,18 +76,21 @@ describe('ResultadoCalculo', () => {
     expect(elemento).toBeTruthy();
   });
 
-  // SC-SYS-02: botón VER HISTORIAL llama popToTop
-  it('SC-SYS-02: VER HISTORIAL llama navigation.popToTop()', () => {
-    render(
+  // SC-SYS-02: botón VER HISTORIAL navega a Historial
+  it('SC-SYS-02: VER HISTORIAL llama navigation.navigate con Historial', () => {
+    renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
     fireEvent.press(screen.getByText('VER HISTORIAL'));
-    expect(nav.popToTop).toHaveBeenCalledTimes(1);
+    expect(nav.navigate).toHaveBeenCalledWith('Historial', {
+      id_suscriptor: paramsBase.id_suscriptor,
+      nombre: paramsBase.nombre_suscriptor,
+    });
   });
 
   // SC-SYS-03: botón VOLVER A LA RUTA llama replace con CapturarLectura
   it('SC-SYS-03: VOLVER A LA RUTA llama navigation.replace con CapturarLectura', () => {
-    render(
+    renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
     fireEvent.press(screen.getByText('VOLVER A LA RUTA'));
@@ -79,19 +102,20 @@ describe('ResultadoCalculo', () => {
 
   // SC-SYS-04: toggle del detalle de cálculo oculta y vuelve a mostrar las filas
   it('SC-SYS-04: toggle de detalle oculta y muestra las filas', () => {
-    render(
+    renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
-    // Detalle abierto por defecto → Cargo Fijo visible
-    expect(screen.getByText('Cargo Fijo')).toBeTruthy();
+    // Detalle abierto por defecto → fila Cargo Fijo visible
+    const filaCargoFijo = screen.getByText(/Cargo Fijo/);
+    expect(filaCargoFijo).toBeTruthy();
 
     // Presionar toggle cierra el detalle
     fireEvent.press(screen.getByText('Detalle de cálculo'));
-    expect(screen.queryByText('Cargo Fijo')).toBeNull();
+    expect(screen.queryByText(/Cargo Fijo/)).toBeNull();
 
     // Presionar de nuevo abre
     fireEvent.press(screen.getByText('Detalle de cálculo'));
-    expect(screen.getByText('Cargo Fijo')).toBeTruthy();
+    expect(screen.getByText(/Cargo Fijo/)).toBeTruthy();
   });
 
   // SC-SYS-05: sin foto muestra placeholder "— (sin evidencia foto)"
@@ -100,7 +124,7 @@ describe('ResultadoCalculo', () => {
       ...paramsBase,
       lectura: { ...paramsBase.lectura, evidencia: undefined },
     };
-    render(
+    renderConProviders(
       <ResultadoCalculo
         navigation={nav as any}
         route={crearRutaMock(paramsConFotoNull) as any}
