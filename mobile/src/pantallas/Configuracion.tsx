@@ -24,12 +24,16 @@ import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import { obtenerApiBaseUrl } from '../config/api';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { limpiarSesion } from '../composition/constantes';
+import { useWorkspace } from '../composicion/useWorkspace';
 import {
   crearOperarioRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import type { Operario } from '../operarios/types';
 
-type Props = ConfigStackScreenProps<'Configuracion'>;
+type Props = ConfigStackScreenProps<'Configuracion'> & {
+  readonly onLogoutRequested: () => void;
+};
 
 /** Genera un UUID v4 simple sin dependencias externas. */
 function generarUuid(): string {
@@ -71,7 +75,7 @@ type EstadoPerfil =
 /**
  * Pantalla de perfil — datos del operario + acciones de gestión.
  */
-export default function Configuracion({ navigation }: Props) {
+export default function Configuracion({ navigation, onLogoutRequested }: Props) {
   const [perfil, setPerfil] = useState<EstadoPerfil>({ tipo: 'cargando' });
   const [cedula, setCedula] = useState('');
   const [password, setPassword] = useState('');
@@ -247,6 +251,28 @@ export default function Configuracion({ navigation }: Props) {
     );
   }
 
+  function handleCerrarSesion(): void {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Seguro que querés cerrar sesión? Vas a tener que volver a ingresar tu cédula y contraseña.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            await limpiarSesion();
+            await useWorkspace.getState().limpiarWorkspace();
+            setCedula('');
+            setPassword('');
+            setPerfil({ tipo: 'cargando' });
+            await onLogoutRequested();
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <View style={styles.container}>
       <TopBar titulo="Mi perfil" />
@@ -403,6 +429,15 @@ export default function Configuracion({ navigation }: Props) {
                 <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuTexto]}>Versión</Text>
                 <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuValor]}>1.0.0</Text>
               </View>
+              <View style={styles.separador} />
+              <Pressable
+                style={({ pressed }) => [styles.itemMenu, pressed && styles.itemMenuPressed]}
+                onPress={handleCerrarSesion}
+              >
+                <MaterialIcons name="logout" size={24} color={COLORS.error} />
+                <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuTexto, { color: COLORS.error }]}>Cerrar sesión</Text>
+                <MaterialIcons name="chevron-right" size={24} color={COLORS.outline} />
+              </Pressable>
             </View>
 
             {/* Danger zone */}

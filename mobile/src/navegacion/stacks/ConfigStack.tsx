@@ -20,7 +20,14 @@ interface Props {
 export default function ConfigStack({ onLogoutRequested }: Props) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Configuracion" component={Configuracion} />
+      <Stack.Screen name="Configuracion">
+        {(props) => (
+          <Configuracion
+            {...props}
+            onLogoutRequested={onLogoutRequested}
+          />
+        )}
+      </Stack.Screen>
       <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />
       <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
       <Stack.Screen name="MiPerfil">
