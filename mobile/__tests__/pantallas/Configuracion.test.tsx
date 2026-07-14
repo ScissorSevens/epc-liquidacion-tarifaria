@@ -27,11 +27,16 @@
 
 import './__mocks__/use-focus-effect-mock';
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import Configuracion from '../../src/pantallas/Configuracion';
 import { crearNavMock, crearRouteMock } from './__mocks__/nav';
 import { getBootstrap } from '../../src/composition/get-bootstrap';
+import { limpiarSesion } from '../../src/composition/constantes';
+import { useWorkspace } from '../../src/composicion/useWorkspace';
+import { crearOperarioRepositoryExpoSqlite } from '../../src/persistencia/expo-sqlite/operario-repository-expo-sqlite';
+import type { Operario } from '../../src/operarios/types';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
@@ -40,7 +45,22 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 jest.mock('../../src/composition/get-bootstrap');
+jest.mock('../../src/composition/constantes', () => ({
+  limpiarSesion: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../src/composicion/useWorkspace', () => ({
+  useWorkspace: { getState: jest.fn() },
+}));
+jest.mock('../../src/persistencia/expo-sqlite/operario-repository-expo-sqlite');
+
 const mockGetBootstrap = getBootstrap as jest.MockedFunction<typeof getBootstrap>;
+const mockLimpiarSesion = limpiarSesion as jest.MockedFunction<typeof limpiarSesion>;
+const mockGetWorkspaceState = useWorkspace.getState as jest.MockedFunction<
+  typeof useWorkspace.getState
+>;
+const mockCrearOperarioRepo = crearOperarioRepositoryExpoSqlite as jest.MockedFunction<
+  typeof crearOperarioRepositoryExpoSqlite
+>;
 
 // TopBar y FooterApp usan useSafeAreaInsets que requiere un SafeAreaProvider.
 // Para tests unitarios de Configuracion, mockeamos estos componentes —
@@ -93,6 +113,36 @@ const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<
   typeof AsyncStorage.setItem
 >;
 
+const OPERARIO_LOGUEADO: Operario = {
+  id_operario: 7,
+  id_prestador: 42,
+  numero_cedula: '1234567890',
+  nombre: 'Juana Pérez',
+  email: 'juana@epc.test',
+  password_hash: 'hash-seguro',
+  rol: 'operario',
+  estado: 'activo',
+  dispositivo_id: 'device-test',
+};
+
+const mockLimpiarWorkspace = jest.fn().mockResolvedValue(undefined);
+const mockOnLogoutRequested = jest.fn();
+let mockOperarioRepo: {
+  inicializar: jest.Mock;
+  buscarPorDispositivoId: jest.Mock;
+  guardar: jest.Mock;
+  listar: jest.Mock;
+};
+
+function prepararOperarioLogueado(): void {
+  mockedGetItem.mockImplementation(async (key: string) => {
+    if (key === 'cedula_operario') return OPERARIO_LOGUEADO.numero_cedula;
+    if (key === 'device_uuid') return OPERARIO_LOGUEADO.dispositivo_id ?? null;
+    return null;
+  });
+  mockOperarioRepo.buscarPorDispositivoId.mockResolvedValue(OPERARIO_LOGUEADO);
+}
+
 describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () => {
   let nav: ReturnType<typeof crearNavMock>;
 
@@ -101,14 +151,18 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
     nav = crearNavMock();
     // operarioRepo mockeado: nunca debe ser llamado en el camino "sin
     // cedula guardada" porque no hay nada que buscar.
-    const operarioRepo = {
+    mockOperarioRepo = {
       inicializar: jest.fn().mockResolvedValue(undefined),
       buscarPorDispositivoId: jest.fn().mockResolvedValue(null),
       guardar: jest.fn().mockResolvedValue(undefined),
       listar: jest.fn().mockResolvedValue([]),
     };
+    mockCrearOperarioRepo.mockReturnValue(mockOperarioRepo as never);
+    mockGetWorkspaceState.mockReturnValue({
+      limpiarWorkspace: mockLimpiarWorkspace,
+    } as never);
     mockGetBootstrap.mockResolvedValue({
-      operarioRepo,
+      operarioRepo: mockOperarioRepo,
       db: {} as never,
     } as never);
     // getItem default: NO hay cedula guardada, NO hay device UUID.
@@ -121,7 +175,11 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
 
   it('R1.1 muestra el formulario "Sin operario asignado" cuando no hay cedula guardada', async () => {
     const { findByText } = render(
-      <Configuracion navigation={nav as never} route={crearRouteMock() as never} />,
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
     );
 
     await findByText(/Sin operario asignado/i);
@@ -130,7 +188,11 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
 
   it('R1.2 NO setea automaticamente "cedula_operario" en AsyncStorage sin input del usuario', async () => {
     render(
-      <Configuracion navigation={nav as never} route={crearRouteMock() as never} />,
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
     );
 
     // Esperamos a que la pantalla termine su ciclo de carga (estado sin-operario).
@@ -168,7 +230,11 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
     } as never);
 
     render(
-      <Configuracion navigation={nav as never} route={crearRouteMock() as never} />,
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
     );
 
     // Damos tiempo para que cualquier副作用 del bypass hipotetico ocurra.
@@ -187,7 +253,11 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
     } as never);
 
     render(
-      <Configuracion navigation={nav as never} route={crearRouteMock() as never} />,
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
     );
 
     await new Promise((r) => setTimeout(r, 50));
@@ -196,5 +266,141 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
     // del componente). Si el bypass se re-introduce, fetch seria llamado.
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+});
+
+describe('Configuracion — cerrar sesión (Punto B)', () => {
+  let nav: ReturnType<typeof crearNavMock>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    nav = crearNavMock();
+    mockOperarioRepo = {
+      inicializar: jest.fn().mockResolvedValue(undefined),
+      buscarPorDispositivoId: jest.fn().mockResolvedValue(null),
+      guardar: jest.fn().mockResolvedValue(undefined),
+      listar: jest.fn().mockResolvedValue([]),
+    };
+    mockCrearOperarioRepo.mockReturnValue(mockOperarioRepo as never);
+    mockGetWorkspaceState.mockReturnValue({
+      limpiarWorkspace: mockLimpiarWorkspace,
+    } as never);
+    mockGetBootstrap.mockResolvedValue({
+      operarioRepo: mockOperarioRepo,
+      db: {} as never,
+    } as never);
+  });
+
+  it('B1.1 muestra "Cerrar sesión" cuando hay un operario logueado', async () => {
+    prepararOperarioLogueado();
+
+    const { findByText } = render(
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
+    );
+
+    expect(await findByText('Cerrar sesión')).toBeTruthy();
+  });
+
+  it('B1.2 NO muestra "Cerrar sesión" cuando no hay operario logueado', async () => {
+    mockedGetItem.mockResolvedValue(null);
+
+    const { findByText, queryByText } = render(
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
+    );
+
+    await findByText('Sin operario asignado');
+    expect(queryByText('Cerrar sesión')).toBeNull();
+  });
+
+  it('B1.3 pide confirmación antes de cerrar la sesión', async () => {
+    prepararOperarioLogueado();
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+
+    const { findByText } = render(
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
+    );
+
+    fireEvent.press(await findByText('Cerrar sesión'));
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Cerrar sesión',
+      '¿Seguro que querés cerrar sesión? Vas a tener que volver a ingresar tu cédula y contraseña.',
+      expect.any(Array),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('B1.4 al confirmar limpia la sesión y el workspace', async () => {
+    prepararOperarioLogueado();
+    let acciones: Parameters<typeof Alert.alert>[2] | undefined;
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
+      (_titulo, _mensaje, botones) => {
+        acciones = botones;
+      },
+    );
+
+    const { findByText, queryByText } = render(
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
+    );
+
+    fireEvent.press(await findByText('Cerrar sesión'));
+    const confirmar = acciones?.find((accion) => accion.text === 'Cerrar sesión');
+    expect(confirmar).toBeDefined();
+
+    await act(async () => {
+      await confirmar?.onPress?.();
+    });
+
+    expect(mockLimpiarSesion).toHaveBeenCalledTimes(1);
+    expect(mockLimpiarWorkspace).toHaveBeenCalledTimes(1);
+    expect(mockOnLogoutRequested).toHaveBeenCalledTimes(1);
+    expect(queryByText('Cerrar sesión')).toBeNull();
+    alertSpy.mockRestore();
+  });
+
+  it('B1.5 al cancelar conserva la sesión y el workspace', async () => {
+    prepararOperarioLogueado();
+    let acciones: Parameters<typeof Alert.alert>[2] | undefined;
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
+      (_titulo, _mensaje, botones) => {
+        acciones = botones;
+      },
+    );
+
+    const { findByText } = render(
+      <Configuracion
+        navigation={nav as never}
+        route={crearRouteMock() as never}
+        onLogoutRequested={mockOnLogoutRequested}
+      />,
+    );
+
+    fireEvent.press(await findByText('Cerrar sesión'));
+    const cancelar = acciones?.find((accion) => accion.text === 'Cancelar');
+    expect(cancelar).toBeDefined();
+
+    await act(async () => {
+      await cancelar?.onPress?.();
+    });
+
+    expect(mockLimpiarSesion).not.toHaveBeenCalled();
+    expect(mockLimpiarWorkspace).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 });
