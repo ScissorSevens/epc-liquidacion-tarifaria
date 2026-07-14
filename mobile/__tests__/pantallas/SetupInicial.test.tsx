@@ -321,3 +321,222 @@ describe('SetupInicial (integracion paso 1)', () => {
     expect(queryByPlaceholderText('Minimo 8 caracteres')).toBeNull();
   });
 });
+
+// ── TESTS DE INTEGRACION PASO 2 + BOOTSTRAP ─────────────────────────────────
+
+// Mock de bootstrapCompleto: espiamos la invocacion y devolvemos un
+// resultado consistente con un prestador recien creado. El mock se
+// declara con jest.fn() inline porque jest.mock factories no pueden
+// referenciar variables fuera de scope.
+jest.mock('../../src/composition/bootstrap-completo', () => ({
+  bootstrapCompleto: jest.fn(),
+}));
+
+jest.mock('../../src/composition/get-bootstrap', () => ({
+  getBootstrap: jest.fn().mockResolvedValue({
+    prestadorRepo: {},
+    acuerdoRepo: {},
+    parametrosRepo: {},
+    operarioRepo: {},
+    hasher: { sha256: (s: string) => `sha256(${s})` },
+    idGenerator: { uuid: () => 'uuid-x' },
+  }),
+}));
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clave_storage_sesion } from '../../src/composition/constantes';
+import { bootstrapCompleto } from '../../src/composition/bootstrap-completo';
+
+const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<
+  typeof AsyncStorage.setItem
+>;
+const mockedBootstrapCompleto = bootstrapCompleto as jest.MockedFunction<
+  typeof bootstrapCompleto
+>;
+
+const SESION_FAKE_VALIDA = {
+  token: 'fake-token-12345',
+  cedula: '12345678',
+  nombre: 'Juan Perez',
+  idPrestador: 42,
+  expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+};
+
+/**
+ * Avanza del paso 1 al paso 2 rellenando el form del prestador
+ * con valores validos y tocando SIGUIENTE.
+ */
+function avanzarAPaso2PasandoPrestador(getAllByPlaceholderText: typeof import('@testing-library/react-native').getAllByPlaceholderText) {
+  // El orden de los inputs en el form es:
+  // 0: nombre, 1: nit, 2: rep_legal, 3: rep_legal_cedula, 4: municipio,
+  // 5: departamento, 6: suscriptores_urbanos, 7: suscriptores_rurales,
+  // 8: email, 9: telefono
+  const inputs = getAllByPlaceholderText(/.+/);
+  fireEvent.changeText(inputs[0], 'Asociacion La Esperanza');
+  fireEvent.changeText(inputs[1], '900123456-7');
+  fireEvent.changeText(inputs[2], 'Juan Perez');
+  fireEvent.changeText(inputs[3], '12345678');
+  fireEvent.changeText(inputs[4], 'Caqueza');
+  fireEvent.changeText(inputs[7], '150'); // suscriptores rurales
+}
+
+describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    onCompleteMock.mockClear();
+    mockedSetItem.mockClear();
+    useWorkspace.setState({
+      id_prestador_activo: 0,
+      prestador: null,
+      prestadores_disponibles: [],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
+    // Default del mock: devuelve una sesion fake valida.
+    mockedBootstrapCompleto.mockResolvedValue({
+      prestador: { id_prestador: 42, codigo: '0001' } as never,
+      acuerdo: {} as never,
+      parametros: {} as never,
+      operario: { id_operario: 1, numero_cedula: '12345678' } as never,
+      sesion: SESION_FAKE_VALIDA,
+    });
+  });
+
+  it('I2.1 avanza al paso 2 al tocar SIGUIENTE con form del prestador valido', () => {
+    const { getByText, getAllByPlaceholderText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    // Paso 2 visible
+    expect(getByText('Paso 2 de 2')).toBeTruthy();
+  });
+
+  it('I2.2 NO avanza si la cedula del representante es invalida', () => {
+    const { getByText, getAllByPlaceholderText, queryByText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    const inputs = getAllByPlaceholderText(/.+/);
+    fireEvent.changeText(inputs[0], 'Asociacion La Esperanza');
+    fireEvent.changeText(inputs[1], '900123456-7');
+    fireEvent.changeText(inputs[2], 'Juan Perez');
+    // Cedula del representante: solo 3 digitos → invalida
+    fireEvent.changeText(inputs[3], '123');
+    fireEvent.changeText(inputs[4], 'Caqueza');
+
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    // No avanzo al paso 2
+    expect(queryByText('Paso 2 de 2')).toBeNull();
+  });
+
+  it('I2.3 muestra los campos del operario en el paso 2', () => {
+    const { getByText, getByPlaceholderText, getAllByPlaceholderText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    // Campo password visible en paso 2
+    expect(getByPlaceholderText('Minimo 8 caracteres')).toBeTruthy();
+  });
+
+  it('I2.4 al tocar FINALIZAR con form valido llama bootstrapCompleto con los datos correctos', async () => {
+    const { getByText, getByPlaceholderText, getAllByPlaceholderText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    // Llenamos paso 2
+    fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
+    fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
+    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    // Confirmar password: el segundo input de tipo password
+    const inputs = getAllByPlaceholderText(/.+/);
+    const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
+    fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
+    // Consentimiento: tocamos el checkbox
+    fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
+
+    fireEvent.press(getByText('FINALIZAR'));
+
+    await waitFor(() => {
+      expect(mockedBootstrapCompleto).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('I2.5 al finalizar exitosamente persiste la sesion en AsyncStorage', async () => {
+    const { getByText, getByPlaceholderText, getAllByPlaceholderText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
+    fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
+    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    const inputs = getAllByPlaceholderText(/.+/);
+    const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
+    fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
+    fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
+    fireEvent.press(getByText('FINALIZAR'));
+
+    await waitFor(() => {
+      const escritura = mockedSetItem.mock.calls.find(([k]) => k === clave_storage_sesion);
+      expect(escritura).toBeDefined();
+    });
+  });
+
+  it('I2.6 al finalizar exitosamente sincroniza useWorkspace y llama onComplete', async () => {
+    const spySetSesion = jest.spyOn(useWorkspace.getState(), 'setSesionCompleta');
+    const { getByText, getByPlaceholderText, getAllByPlaceholderText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
+    fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
+    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    const inputs = getAllByPlaceholderText(/.+/);
+    const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
+    fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
+    fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
+    fireEvent.press(getByText('FINALIZAR'));
+
+    await waitFor(() => {
+      expect(spySetSesion).toHaveBeenCalledWith(SESION_FAKE_VALIDA);
+    });
+    await waitFor(() => {
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('I2.7 muestra error global si bootstrapCompleto lanza y mantiene los datos del form', async () => {
+    mockedBootstrapCompleto.mockRejectedValueOnce(new Error('SQLITE FULL'));
+
+    const { getByText, getByPlaceholderText, getAllByPlaceholderText } = render(
+      <SetupInicial onComplete={onCompleteMock} />,
+    );
+    avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+    fireEvent.press(getByText('SIGUIENTE'));
+
+    fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
+    fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
+    fireEvent.changeText(getByPlaceholderText('Minimo 8 caracteres'), 'miclave123');
+    const inputs = getAllByPlaceholderText(/.+/);
+    const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
+    fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
+    fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
+    fireEvent.press(getByText('FINALIZAR'));
+
+    await waitFor(() => {
+      expect(getByText(/SQLITE FULL/i)).toBeTruthy();
+    });
+    // onComplete NO se invoca
+    expect(onCompleteMock).not.toHaveBeenCalled();
+  });
+});
