@@ -8,6 +8,8 @@ import Login from '../pantallas/Login';
 import RootNavigator from '../navegacion/RootNavigator';
 import { cargarSesion, limpiarSesion } from '../composition/constantes';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { limpiarDatosLegacyBypass } from '../composition/migracion-datos-legacy';
+import { crearOperarioRepositoryExpoSqlite } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import { useWorkspace } from '../composicion/useWorkspace';
 import { logger } from '../composicion/logger';
 
@@ -55,11 +57,23 @@ export function AuthGate() {
     let cancelado = false;
     void (async () => {
       try {
+        // 0. Limpieza defensiva de datos legacy (Fase 4.3.2).
+        //    El bypass viejo de Configuracion.tsx (eliminado en 4.3.1)
+        //    pudo haber dejado operarios fantasma con id_operario=0 o
+        //    cedula='placeholder'. Si los dejamos, la deteccion de
+        //    con_sesion podria activarlos por error. El helper es
+        //    idempotente y defensivo (no propaga errores). Debe correr
+        //    ANTES de prestadorRepo.listar() para que la DB quede limpia
+        //    antes de decidir el estado.
+        const bootstrap = await getBootstrap();
+        const operarioRepo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
+        await limpiarDatosLegacyBypass(operarioRepo);
+        if (cancelado) return;
+
         // 1. ¿Hay prestadores en la DB local?
         //    Si NO hay, estamos en sin_setup — el operario debe pasar
         //    por el wizard de SetupInicial antes de poder loguearse.
-        const { prestadorRepo } = await getBootstrap();
-        const prestadores = await prestadorRepo.listar();
+        const prestadores = await bootstrap.prestadorRepo.listar();
         if (cancelado) return;
 
         if (prestadores.length === 0) {
