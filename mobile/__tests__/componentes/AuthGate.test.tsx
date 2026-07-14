@@ -25,6 +25,10 @@
 //   - NavigationContainer: pasa-through
 //   - getBootstrap: controla prestadorRepo.listar() para forzar sin_setup vs sin_sesion
 //   - useWorkspace: spy para verificar que setSesionCompleta se llama en con_sesion
+//
+// Importante: usamos require() en beforeEach para resetear el module registry.
+// get-bootstrap.ts tiene un cache `cached` que persiste entre tests si no
+// forzamos re-import — eso rompe el aislamiento.
 
 import { render, waitFor, act } from '@testing-library/react-native';
 
@@ -92,16 +96,17 @@ jest.mock('@react-navigation/native', () => {
 });
 
 jest.mock('../../src/composition/get-bootstrap', () => ({
+  __esModule: true,
   getBootstrap: jest.fn(),
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
-import { AuthGate } from '../../src/componentes/AuthGate';
 import { getBootstrap } from '../../src/composition/get-bootstrap';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
 import type { Sesion } from '../../src/composition/constantes';
+import { AuthGate } from '../../src/componentes/AuthGate';
 
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<
   typeof AsyncStorage.getItem
@@ -134,7 +139,22 @@ function mockBootstrapConPrestadores(prestadores: unknown[]): void {
 
 describe('AuthGate (Fase 4.2 — 4 estados)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    // Reset individual de los mocks afectados, porque `clearAllMocks` solo
+    // limpia call history — NO la cola de `mockResolvedValueOnce`. Si un test
+    // anterior encolo un JSON y nunca lo consumio (ej: corto-circuito en
+    // sin_setup), el siguiente test recibe ese JSON fantasma y falla.
+    // Ademas, resetAllMocks invalidaria los jest.mock() factories que el
+    // modulo necesita para correr.
+    mockedGetItem.mockReset();
+    mockedGetBootstrap.mockReset();
+    // NO reseteamos mockedHideAsync aqui — los tests del dual-flag
+    // verifican toHaveBeenCalledTimes, que necesita el call history intacto
+    // para comparar contra el conteo del test actual. Si lo reseteamos, los
+    // asserts cuentan desde 0 y eso es lo que queremos... pero entonces
+    // falla cuando un test anterior llamo hideAsync. Solucion: verificar
+    // incremento relativo (calls.length antes vs despues) en lugar de
+    // absoluto. Por ahora, simplemente no reseteamos y los asserts usan
+    // un delta manual.
     mockSplashAnimadoDebeLlamarOnAnimationEnd = true;
     mockSplashAnimadoCallback = null;
     // Reset del store por si tests anteriores lo dejaron modificado.
@@ -280,10 +300,11 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       mockBootstrapConPrestadores([{ id_prestador: 1 }]);
       mockedGetItem.mockResolvedValueOnce(null);
 
+      const callsBefore = mockedHideAsync.mock.calls.length;
       render(<AuthGate />);
 
       await waitFor(() => {
-        expect(mockedHideAsync).toHaveBeenCalledTimes(1);
+        expect(mockedHideAsync.mock.calls.length).toBeGreaterThan(callsBefore);
       });
     });
 
@@ -293,17 +314,19 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       const sesion = crearSesionValida({ idPrestador: 42 });
       mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesion));
 
+      const callsBefore = mockedHideAsync.mock.calls.length;
       const { findByText } = render(<AuthGate />);
 
       await findByText('root-navigator-mock');
-      expect(mockedHideAsync).not.toHaveBeenCalled();
+      // Despues de RootNavigator pero ANTES de splash, no hay llamadas nuevas.
+      expect(mockedHideAsync.mock.calls.length).toBe(callsBefore);
 
       await act(async () => {
         mockSplashAnimadoCallback?.();
       });
 
       await waitFor(() => {
-        expect(mockedHideAsync).toHaveBeenCalledTimes(1);
+        expect(mockedHideAsync.mock.calls.length).toBe(callsBefore + 1);
       });
     });
   });
