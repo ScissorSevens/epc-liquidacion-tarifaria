@@ -1,5 +1,5 @@
 /**
- * Tests de las migrations 015 (CREATE operario) + 016 (ALTER + UNIQUE compuesta).
+ * Tests de las migrations 015 (CREATE operarios) + 016 (ALTER + UNIQUE compuesta).
  *
  * Change: setup-inicial-multi-tenant-auth — Fase 1, tareas 1.1 + 1.2.
  *
@@ -37,13 +37,13 @@ function columnas(db: ReturnType<typeof crearConexion>, tabla: string): string[]
 // Bloque 1 — Migration 015: CREATE operario + UNIQUE temporal sobre dispositivo_id
 // ---------------------------------------------------------------------------
 
-describe('migration 015_operario — crea tabla operario (deuda técnica "Iter 7" saldada)', () => {
-  it('T1.1: crea la tabla operario con todas las columnas del dominio', () => {
+describe('migration 015_operario — crea tabla operarios (deuda técnica "Iter 7" saldada)', () => {
+  it('T1.1: crea la tabla operarios con todas las columnas del dominio', () => {
     const db = crearConexion();
     try {
       ejecutarMigrations(db, migrationsHasta(15));
 
-      const nombres = columnas(db, 'operario');
+      const nombres = columnas(db, 'operarios');
 
       // Las 9 columnas que el schema de dominio necesita (types.ts Operario).
       expect(nombres).toEqual(
@@ -70,7 +70,7 @@ describe('migration 015_operario — crea tabla operario (deuda técnica "Iter 7
       ejecutarMigrations(db, migrationsHasta(15));
 
       const insertar = db.prepare(
-        `INSERT INTO operario
+        `INSERT INTO operarios
            (numero_cedula, nombre, email, password_hash, rol, estado)
          VALUES (?, ?, ?, ?, ?, ?)`,
       );
@@ -95,14 +95,14 @@ describe('migration 015_operario — crea tabla operario (deuda técnica "Iter 7
       // Defaults de la tabla: rol='operario', estado='activo'.
       // El insert básico respeta ambos defaults.
       db.prepare(
-        `INSERT INTO operario (numero_cedula, nombre, email, password_hash)
+        `INSERT INTO operarios (numero_cedula, nombre, email, password_hash)
          VALUES (?, ?, ?, ?)`,
       ).run('87654321', 'Carlos Ruiz', 'carlos@example.com', 'hash-carlos');
 
       const row = db
         .prepare(
           `SELECT numero_cedula, nombre, email, password_hash, rol, estado
-           FROM operario WHERE numero_cedula = ?`,
+           FROM operarios WHERE numero_cedula = ?`,
         )
         .get('87654321') as {
           numero_cedula: string;
@@ -126,7 +126,7 @@ describe('migration 015_operario — crea tabla operario (deuda técnica "Iter 7
       expect(() =>
         db
           .prepare(
-            `INSERT INTO operario (numero_cedula, nombre, email, password_hash, rol)
+            `INSERT INTO operarios (numero_cedula, nombre, email, password_hash, rol)
              VALUES (?, ?, ?, ?, ?)`,
           )
           .run('11111111', 'X', 'x@example.com', 'hx', 'gerente'),
@@ -136,7 +136,7 @@ describe('migration 015_operario — crea tabla operario (deuda técnica "Iter 7
       expect(() =>
         db
           .prepare(
-            `INSERT INTO operario (numero_cedula, nombre, email, password_hash, estado)
+            `INSERT INTO operarios (numero_cedula, nombre, email, password_hash, estado)
              VALUES (?, ?, ?, ?, ?)`,
           )
           .run('22222222', 'Y', 'y@example.com', 'hy', 'suspendido'),
@@ -151,7 +151,7 @@ describe('migration 015_operario — crea tabla operario (deuda técnica "Iter 7
 // Bloque 2 — Migration 016: ALTER prestador + ALTER operario (FK + UNIQUE compuesta)
 // ---------------------------------------------------------------------------
 
-describe('migration 016_setup_inicial_multi_tenant — altera prestador + operario para multi-tenant', () => {
+describe('migration 016_setup_inicial_multi_tenant — altera prestador + operarios para multi-tenant', () => {
   it('T2.1: agrega las columnas representante_legal y representante_legal_cedula al prestador', () => {
     const db = crearConexion();
     try {
@@ -189,18 +189,18 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
     try {
       ejecutarMigrations(db, migrationsHasta(16));
 
-      const cols = columnas(db, 'operario');
+      const cols = columnas(db, 'operarios');
       expect(cols).toContain('id_prestador');
 
       // Insertar un operario sin setear id_prestador → debe tomar default 0
       // (que satisface la FK porque el prestador legacy se sembró en 009_prestador.sql).
       db.prepare(
-        `INSERT INTO operario (numero_cedula, nombre, email, password_hash)
+        `INSERT INTO operarios (numero_cedula, nombre, email, password_hash)
          VALUES (?, ?, ?, ?)`,
       ).run('33333333', 'Default Tester', 'default@example.com', 'h-default');
 
       const row = db
-        .prepare(`SELECT id_prestador FROM operario WHERE numero_cedula = ?`)
+        .prepare(`SELECT id_prestador FROM operarios WHERE numero_cedula = ?`)
         .get('33333333') as { id_prestador: number };
 
       expect(row.id_prestador).toBe(0);
@@ -228,7 +228,7 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
 
       // Mismo dispositivo, distintos prestadores → ambos deben persistir.
       db.prepare(
-        `INSERT INTO operario
+        `INSERT INTO operarios
            (numero_cedula, nombre, email, password_hash, dispositivo_id, id_prestador)
          VALUES (?, ?, ?, ?, ?, ?)`,
       ).run('44444444', 'Ana Pres 1', 'ana1@example.com', 'h1', 'DEVICE-ABC', 1);
@@ -236,7 +236,7 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
       expect(() =>
         db
           .prepare(
-            `INSERT INTO operario
+            `INSERT INTO operarios
                (numero_cedula, nombre, email, password_hash, dispositivo_id, id_prestador)
              VALUES (?, ?, ?, ?, ?, ?)`,
           )
@@ -244,7 +244,7 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
       ).not.toThrow();
 
       const count = db
-        .prepare(`SELECT COUNT(*) AS c FROM operario WHERE dispositivo_id = ?`)
+        .prepare(`SELECT COUNT(*) AS c FROM operarios WHERE dispositivo_id = ?`)
         .get('DEVICE-ABC') as { c: number };
       expect(count.c).toBe(2);
     } finally {
@@ -265,7 +265,7 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
 
       // Primer operario OK.
       db.prepare(
-        `INSERT INTO operario
+        `INSERT INTO operarios
            (numero_cedula, nombre, email, password_hash, dispositivo_id, id_prestador)
          VALUES (?, ?, ?, ?, ?, ?)`,
       ).run('66666666', 'Ana X', 'anax@example.com', 'h1', 'DEVICE-XYZ', 10);
@@ -274,7 +274,7 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
       expect(() =>
         db
           .prepare(
-            `INSERT INTO operario
+            `INSERT INTO operarios
                (numero_cedula, nombre, email, password_hash, dispositivo_id, id_prestador)
              VALUES (?, ?, ?, ?, ?, ?)`,
           )
@@ -297,7 +297,7 @@ describe('migration 016_setup_inicial_multi_tenant — altera prestador + operar
       ).run(20, 'PRES-Y', 'Prestador Y', '888', 'Bogotá', 'Cundinamarca', 1);
 
       db.prepare(
-        `INSERT INTO operario
+        `INSERT INTO operarios
            (numero_cedula, nombre, email, password_hash, dispositivo_id, id_prestador)
          VALUES (?, ?, ?, ?, ?, ?)`,
       ).run('88888888', 'Tester Y', 'testerY@example.com', 'h-y', 'DEVICE-Y', 20);
@@ -336,19 +336,19 @@ describe('compatibilidad con DB legacy: aplicar 015 + 016 sobre prestador id=0 p
       // Aplicar 016: agrega id_prestador NOT NULL DEFAULT 0 a operario, no rompe legacy.
       expect(() => ejecutarMigrations(db, migrationsHasta(16))).not.toThrow();
 
-      // El prestador legacy sigue ahí y la tabla operario está vacía pero usable.
+      // El prestador legacy sigue ahí y la tabla operarios está vacía pero usable.
       const legacyPost = db
         .prepare(`SELECT codigo FROM prestador WHERE id_prestador = 0`)
         .get() as { codigo: string };
       expect(legacyPost.codigo).toBe('EPC-LEGACY');
 
       db.prepare(
-        `INSERT INTO operario (numero_cedula, nombre, email, password_hash)
+        `INSERT INTO operarios (numero_cedula, nombre, email, password_hash)
          VALUES (?, ?, ?, ?)`,
       ).run('99999999', 'Legacy Tester', 'legacy@example.com', 'h-legacy');
 
       const opRow = db
-        .prepare(`SELECT id_prestador FROM operario WHERE numero_cedula = ?`)
+        .prepare(`SELECT id_prestador FROM operarios WHERE numero_cedula = ?`)
         .get('99999999') as { id_prestador: number };
       expect(opRow.id_prestador).toBe(0);
 

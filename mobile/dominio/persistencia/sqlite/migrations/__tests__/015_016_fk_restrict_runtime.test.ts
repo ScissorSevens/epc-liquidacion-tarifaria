@@ -22,7 +22,7 @@ function insertarPrestador(db: DatabaseType, idPrestador: number): void {
 
 function insertarOperario(db: DatabaseType, idOperario: number, idPrestador: number): void {
   db.prepare(
-    `INSERT INTO operario (
+    `INSERT INTO operarios (
        id_operario, numero_cedula, nombre, email, password_hash,
        rol, estado, id_prestador
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -110,7 +110,7 @@ describe('migrations 015/016 — FK ON DELETE RESTRICT en SQLite real', () => {
       .prepare('SELECT id_prestador FROM prestador WHERE id_prestador = ?')
       .get(51);
     const operario = db
-      .prepare('SELECT id_operario FROM operario WHERE id_operario = ?')
+      .prepare('SELECT id_operario FROM operarios WHERE id_operario = ?')
       .get(151);
     expect(prestador).toEqual({ id_prestador: 51 });
     expect(operario).toEqual({ id_operario: 151 });
@@ -150,7 +150,7 @@ describe('migrations 015/016 — FK ON DELETE RESTRICT en SQLite real', () => {
     insertarOperario(db, 153, 53);
 
     const operarioEliminado = db
-      .prepare('DELETE FROM operario WHERE id_operario = ?')
+      .prepare('DELETE FROM operarios WHERE id_operario = ?')
       .run(153);
     const prestadorEliminado = db
       .prepare('DELETE FROM prestador WHERE id_prestador = ?')
@@ -159,7 +159,7 @@ describe('migrations 015/016 — FK ON DELETE RESTRICT en SQLite real', () => {
     expect(operarioEliminado.changes).toBe(1);
     expect(prestadorEliminado.changes).toBe(1);
     expect(
-      db.prepare('SELECT id_operario FROM operario WHERE id_operario = ?').get(153),
+      db.prepare('SELECT id_operario FROM operarios WHERE id_operario = ?').get(153),
     ).toBeUndefined();
     expect(
       db.prepare('SELECT id_prestador FROM prestador WHERE id_prestador = ?').get(53),
