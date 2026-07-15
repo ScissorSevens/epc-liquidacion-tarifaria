@@ -1,6 +1,7 @@
--- Migration 015: crea la tabla operario (deuda técnica "Iter 7" saldada).
+-- Migration 015: crea la tabla operarios (deuda técnica "Iter 7" saldada).
 --
--- Tabla: operario (singular — singular como las demás tablas del schema).
+-- Tabla: operarios (plural — alineado con `operario-repository-expo-sqlite.ts`
+-- y la migration 017 del espejo runtime, que referencian esta misma tabla en plural).
 -- Columnas basadas en `dominio/operarios/types.ts` (interface Operario).
 --
 -- Decisiones:
@@ -22,10 +23,10 @@
 --  - WHERE dispositivo_id IS NOT NULL: dispositivos NULL no ocupan la
 --    constraint (varios operarios sin dispositivo conviven).
 --
--- Esta migration NO toca prestador ni operario (no existe aún antes de 015);
+-- Esta migration NO toca prestador ni operarios (no existe aún antes de 015);
 -- es autocontenida.
 
-CREATE TABLE operario (
+CREATE TABLE operarios (
   id_operario    INTEGER PRIMARY KEY AUTOINCREMENT,
   numero_cedula  TEXT    NOT NULL UNIQUE,
   nombre         TEXT    NOT NULL,
@@ -43,5 +44,5 @@ CREATE TABLE operario (
 -- a compuesta (dispositivo_id, id_prestador)). Filtro NULL para que
 -- múltiples operarios sin dispositivo coexistan.
 CREATE UNIQUE INDEX idx_operario_dispositivo_unique
-  ON operario(dispositivo_id)
+  ON operarios(dispositivo_id)
   WHERE dispositivo_id IS NOT NULL;

@@ -1,12 +1,12 @@
 -- Migration 016: setup inicial multi-tenant.
 --
--- Cambia el schema para que operario sea propiedad de un prestador (multi-tenant).
+-- Cambia el schema para que operarios sea propiedad de un prestador (multi-tenant).
 -- Esta migration es la deuda central del change setup-inicial-multi-tenant-auth.
 --
 -- Cambios:
 --  1) prestador: 2 columnas nuevas (representante_legal, representante_legal_cedula)
 --     para la pantalla de SetupInicial paso 1.
---  2) operario: 1 columna nueva (id_prestador FK con ON DELETE RESTRICT) +
+--  2) operarios: 1 columna nueva (id_prestador FK con ON DELETE RESTRICT) +
 --     cambio del UNIQUE constraint de (dispositivo_id) a (dispositivo_id, id_prestador).
 --  3) Índice sobre id_prestador para queries multi-tenant eficientes.
 --
@@ -30,22 +30,22 @@
 --
 -- ORDEN DE EJECUCION: esta migration DEBE correr DESPUES de:
 --  - 009_prestador (sembrado del prestador legacy id=0)
---  - 015_operario (creación de la tabla operario)
+--  - 015_operario (creación de la tabla operarios)
 
 -- 1) Tabla prestador: 2 columnas nuevas.
 ALTER TABLE prestador ADD COLUMN representante_legal TEXT NOT NULL DEFAULT '';
 ALTER TABLE prestador ADD COLUMN representante_legal_cedula TEXT NOT NULL DEFAULT '';
 
--- 2) Tabla operario: columna FK + reemplazo del UNIQUE.
-ALTER TABLE operario ADD COLUMN id_prestador INTEGER NOT NULL DEFAULT 0
+-- 2) Tabla operarios: columna FK + reemplazo del UNIQUE.
+ALTER TABLE operarios ADD COLUMN id_prestador INTEGER NOT NULL DEFAULT 0
   REFERENCES prestador(id_prestador) ON DELETE RESTRICT;
 
 DROP INDEX IF EXISTS idx_operario_dispositivo_unique;
 CREATE UNIQUE INDEX idx_operario_dispositivo_prestador_unique
-  ON operario(dispositivo_id, id_prestador)
+  ON operarios(dispositivo_id, id_prestador)
   WHERE dispositivo_id IS NOT NULL;
 
 -- 3) Índice sobre id_prestador para queries multi-tenant (filtros por
 --    prestador activo del workspace).
 CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
-  ON operario(id_prestador);
+  ON operarios(id_prestador);
