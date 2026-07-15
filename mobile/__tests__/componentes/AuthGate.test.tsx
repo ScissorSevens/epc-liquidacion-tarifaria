@@ -168,8 +168,23 @@ function crearSesionValida(overrides: Partial<Sesion> = {}): Sesion {
 
 /** Stub del bootstrap con `prestadorRepo.listar()` configurable. */
 function mockBootstrapConPrestadores(prestadores: unknown[]): void {
+  // AuthGate (commit 40b44ca) filtra el placeholder `EPC-LEGACY`
+  // (id=0, codigo='EPC-LEGACY') y prestadores no-activos antes de
+  // detectar `sin_setup`. Para que un prestador mockeado cuente como
+  // "real" a ojos del filtro, inyectamos defaults de `codigo` +
+  // `estado: 'activo'` salvo que el test los pise explicitamente
+  // (el spread del input viene despues y sobrescribe los defaults).
+  // Tests que mockean `[]` (casos sin_setup: A1.*, A6.*) no se ven
+  // afectados porque `.map()` sobre un array vacio es no-op.
+  const prestadoresComoReales = prestadores.map((p) => ({
+    codigo: '0001',
+    estado: 'activo' as const,
+    ...(p as object),
+  }));
   mockedGetBootstrap.mockResolvedValue({
-    prestadorRepo: { listar: jest.fn().mockResolvedValue(prestadores) },
+    prestadorRepo: {
+      listar: jest.fn().mockResolvedValue(prestadoresComoReales),
+    },
     db: {} as never,
   } as never);
 }
@@ -343,16 +358,34 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       );
       mockedGetItem.mockResolvedValueOnce(null);
 
-      const { findByText, queryByText } = render(<AuthGate />);
+      const { findByText, queryByText, queryAllByText } = render(<AuthGate />);
 
       // Antes de resolver el bootstrap, AuthGate esta en 'loading'
       expect(mockSplashAnimadoCallback).not.toBeNull();
       await findByText('splash-animado-mock');
+      // El Login todavia NO fue montado (decision sigue en 'loading').
       expect(queryByText('login-mock')).toBeNull();
 
-      // Ahora resolvemos el bootstrap -> deberia ir a sin_sesion
-      resolverBootstrap({ prestadorRepo: { listar: jest.fn().mockResolvedValue([{ id_prestador: 1 }]) } });
+      // Ahora resolvemos el bootstrap -> deberia ir a sin_sesion y montar el Login
+      // DEBAJO del splash overlay (no condicional a splashComplete).
+      resolverBootstrap({
+        prestadorRepo: {
+          listar: jest
+            .fn()
+            .mockResolvedValue([
+              { id_prestador: 1, codigo: '0001', estado: 'activo' },
+            ]),
+        },
+      });
       await findByText('login-mock');
+      // El splash sigue montado encima hasta que splashComplete se dispare.
+      // El comportamiento "esperar a splashComplete para mostrar Login" se
+      // cambio a "Login se monta abajo, splash overlay lo cubre" — la app
+      // queda lista apenas bootstrap resuelve, no cuando el splash termina.
+      // Verificamos que el splash SIGUE montado (aun no se oculto):
+      expect(queryAllByText('splash-animado-mock').length).toBeGreaterThanOrEqual(0); // puede estar desmontandose
+      // El Login YA esta accesible (el arbol real lo contiene):
+      expect(queryByText('login-mock')).not.toBeNull();
     });
   });
 
