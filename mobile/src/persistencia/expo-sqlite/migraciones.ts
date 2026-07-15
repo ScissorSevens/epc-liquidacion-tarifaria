@@ -337,11 +337,14 @@ CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
  * operario con password_hash real via bootstrapCompleto → operarioRepo.guardar.
  */
 const MIGRACION_017_OPERARIO_PASSWORD_HASH = `
--- Idempotente: la columna password_hash YA EXISTE dentro del CREATE TABLE de
--- la migration 015 (operario está creado completo). El IF NOT EXISTS protege
--- contra devices con DBs viejas donde la 015 original no incluía password_hash
--- (pre-PUNTO-A del SDD setup-inicial-multi-tenant-auth).
-ALTER TABLE operarios ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '';
+-- Agrega password_hash a operario para DBs pre-PUNTO-A del SDD
+-- setup-inicial-multi-tenant-auth. La columna YA EXISTE en CREATE TABLE
+-- de la migration 015 (operarios fue retrofiteado para incluirla), pero
+-- esta migration queda como safety net para DBs muy viejas (pre-2026-07).
+-- La idempotencia se garantiza desde TypeScript via PRAGMA table_info
+-- (la version vieja de SQLite que trae expo-sqlite SDK 54 NO soporta
+-- 'ADD COLUMN IF NOT EXISTS' — tira 'near EXISTS: syntax error').
+ALTER TABLE operarios ADD COLUMN password_hash TEXT NOT NULL DEFAULT '';
 `;
 
 const MIGRACIONES: readonly Migracion[] = [
@@ -402,6 +405,27 @@ export async function aplicarMigracionesAsync(
   if (pendientes.length === 0) return;
 
   for (const migracion of pendientes) {
+    // Idempotencia especial para migration 017: la columna password_hash
+    // YA EXISTE dentro del CREATE TABLE de la 015 moderna. Como el SQLite
+    // viejo (anterior a 3.35) NO soporta 'ADD COLUMN IF NOT EXISTS',
+    // chequeamos via PRAGMA table_info antes de ejecutar la migration.
+    if (migracion.version === 17) {
+      const columnas = await db.getAllAsync<{ name: string }>(
+        "PRAGMA table_info(operarios)",
+      );
+      if (columnas.some((c) => c.name === 'password_hash')) {
+        // La columna ya existe: solo registramos la migration como aplicada
+        // y seguimos con la siguiente.
+        await db.runAsync(
+          'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
+          migracion.version,
+          migracion.nombre,
+          new Date().toISOString(),
+        );
+        continue;
+      }
+    }
+
     await db.execAsync(migracion.sql);
     await db.runAsync(
       'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
