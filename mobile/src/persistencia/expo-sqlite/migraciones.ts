@@ -269,10 +269,10 @@ CREATE INDEX idx_factura_prestador ON factura (id_prestador);
 `;
 
 // Espejo verbatim de mobile/dominio/persistencia/sqlite/migrations/015_operario.sql.
-// Crea la tabla operario (deuda técnica "Iter 7"). Migration 016 le agrega
+// Crea la tabla operarios (deuda técnica "Iter 7"). Migration 016 le agrega
 // id_prestador y reemplaza el UNIQUE por uno compuesto.
 const MIGRACION_015_OPERARIO = `
-CREATE TABLE operario (
+CREATE TABLE operarios (
   id_operario    INTEGER PRIMARY KEY AUTOINCREMENT,
   numero_cedula  TEXT    NOT NULL UNIQUE,
   nombre         TEXT    NOT NULL,
@@ -286,37 +286,40 @@ CREATE TABLE operario (
   created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE UNIQUE INDEX idx_operario_dispositivo_unique
-  ON operario(dispositivo_id)
+  ON operarios(dispositivo_id)
   WHERE dispositivo_id IS NOT NULL;
 `;
 
 // Espejo verbatim de mobile/dominio/persistencia/sqlite/migrations/016_setup_inicial_multi_tenant.sql.
-// Agrega representante_legal al prestador + id_prestador FK al operario +
-// reemplaza UNIQUE de operario por uno compuesto (dispositivo_id, id_prestador).
+// Agrega representante_legal al prestador + id_prestador FK a operarios +
+// reemplaza UNIQUE de operarios por uno compuesto (dispositivo_id, id_prestador).
 const MIGRACION_016_SETUP_INICIAL_MULTI_TENANT = `
 ALTER TABLE prestador ADD COLUMN representante_legal TEXT NOT NULL DEFAULT '';
 ALTER TABLE prestador ADD COLUMN representante_legal_cedula TEXT NOT NULL DEFAULT '';
 
-ALTER TABLE operario ADD COLUMN id_prestador INTEGER NOT NULL DEFAULT 0
+ALTER TABLE operarios ADD COLUMN id_prestador INTEGER NOT NULL DEFAULT 0
   REFERENCES prestador(id_prestador) ON DELETE RESTRICT;
 
 DROP INDEX IF EXISTS idx_operario_dispositivo_unique;
 CREATE UNIQUE INDEX idx_operario_dispositivo_prestador_unique
-  ON operario(dispositivo_id, id_prestador)
+  ON operarios(dispositivo_id, id_prestador)
   WHERE dispositivo_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
-  ON operario(id_prestador);
+  ON operarios(id_prestador);
 `;
 
 /**
  * TICKET-EPIC-LOGIN-001 — PUNTO A: Login real local contra SQLite.
  *
- * El repo de operarios (`operario-repository-expo-sqlite.ts`) usa la tabla
- * `operarios` (plural) — distinta de la tabla `operario` (singular) que
- * crean las migrations 015+016 — porque fue cableada así por una decisión
- * anterior (las migrations canónicas del dominio no son la fuente única
- * del schema en mobile). Las DBs existentes en devices de dev tienen la
+ * El repo de operarios (`operario-repository-expo-sqlite.ts`) y las
+ * migrations 015+016 de este espejo usan AMBOS la tabla `operarios`
+ * (plural). Coherencia asegurada: el bug original donde el repo usaba
+ * `operarios` y las migrations creaban `operario` (singular) está
+ * saldado — un cold-install crea la tabla con el nombre correcto y
+ * todos los queries del repo matchean sin "no such table".
+ *
+ * Algunas DBs existentes en devices de dev (pre-unificación) tienen la
  * tabla `operarios` SIN la columna `password_hash`, lo que impide el
  * login offline del PUNTO A.
  *
