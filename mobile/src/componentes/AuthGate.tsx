@@ -104,13 +104,28 @@ export function AuthGate() {
         await limpiarDatosLegacyBypass(operarioRepo);
         if (cancelado) return;
 
-        // 1. ¿Hay prestadores en la DB local?
+        // 1. ¿Hay prestadores REALES en la DB local?
         //    Si NO hay, estamos en sin_setup — el operario debe pasar
         //    por el wizard de SetupInicial antes de poder loguearse.
-        const prestadores = await bootstrap.prestadorRepo.listar();
+        //
+        //    IMPORTANTE: la migration 009 siembra siempre un prestador
+        //    placeholder `EPC-LEGACY` (id=0) para mantener compat de FKs
+        //    legacy de datos pre-multi-tenant. Ese seed NO cuenta como
+        //    "prestador configurado" — es solo compat. Filtramos:
+        //    - si id=0 → legacy placeholder
+        //    - si codigo='EPC-LEGACY' → legacy placeholder (defensa extra)
+        //    - si estado='suspendido' → no es un prestador activo para login
+        const todosPrestadores = await bootstrap.prestadorRepo.listar();
         if (cancelado) return;
 
-        if (prestadores.length === 0) {
+        const prestadoresReales = todosPrestadores.filter(
+          (p) =>
+            p.id_prestador !== 0 &&
+            p.codigo !== 'EPC-LEGACY' &&
+            p.estado === 'activo',
+        );
+
+        if (prestadoresReales.length === 0) {
           setDecision('sin_setup');
           return;
         }
