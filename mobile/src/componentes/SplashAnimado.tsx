@@ -27,10 +27,16 @@ interface Props {
  *
  * Invoca `onAnimationEnd` cuando la fase 3 termina. Tambien tiene un
  * fallback de 2500ms (max) por si alguna transicion se cuelga.
+ *
+ * AUTO-OCULTAMIENTO: cuando la animacion termina (`terminoAnimacion=true`),
+ * el componente NO se desmonta — sigue montado pero invisible (`display:none`).
+ * Esto evita que el React cleanup del useEffect cancele los setTimeouts
+ * antes de tiempo si el padre decide desmontar el splash por otra razon.
  */
 export function SplashAnimado({ onAnimationEnd, logo }: Props) {
   const [opacidad, setOpacidad] = useState(0);
   const [escala, setEscala] = useState(0.92);
+  const [terminoAnimacion, setTerminoAnimacion] = useState(false);
   const callbackRef = useRef(onAnimationEnd);
   callbackRef.current = onAnimationEnd;
   const disparadoRef = useRef(false);
@@ -39,6 +45,7 @@ export function SplashAnimado({ onAnimationEnd, logo }: Props) {
     function dispararFin() {
       if (disparadoRef.current) return;
       disparadoRef.current = true;
+      setTerminoAnimacion(true);
       callbackRef.current();
     }
 
@@ -74,7 +81,10 @@ export function SplashAnimado({ onAnimationEnd, logo }: Props) {
   }, []);
 
   return (
-    <View style={estilos.overlay}>
+    <View
+      style={[estilos.overlay, terminoAnimacion && { display: 'none' }]}
+      pointerEvents={terminoAnimacion ? 'none' : 'auto'}
+    >
       <View
         style={[
           estilos.contenedor,

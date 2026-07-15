@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -185,34 +186,51 @@ export function AuthGate() {
     }
   }, [listo]);
 
-  if (decision === 'loading') {
-    return (
+  // El splash nativo de Expo (App.tsx) esta activo hasta que llamemos
+  // SplashScreen.hideAsync() desde el useEffect con [listo].
+  //
+  // Arquitectura correcta: SIEMPRE renderizar la pantalla real + el splash
+  // animado como overlay encima (position:absolute, zIndex alto). El splash
+  // se mantiene SIEMPRE MONTADO — cuando la animacion termina, NO se
+  // desmonta; se auto-oculta via `display:none`. Esto evita que el React
+  // cleanup cancele los setTimeouts de la animacion si el padre decide
+  // desmontar el splash por otra razon. Asi:
+  //   - decision='loading' → splash a pantalla completa (splashCompleto=false,
+  //     la animacion esta corriendo debajo, el splash cubre todo)
+  //   - decision cambia → app se renderiza DEBAJO del splash mientras la
+  //     animacion termina
+  //   - animacion termina → setSplashComplete(true), useEffect [listo]
+  //     dispara SplashScreen.hideAsync() del splash nativo
+
+  let contenido: React.ReactNode;
+  if (decision === 'sin_setup') {
+    contenido = <SetupInicial onComplete={handleSetupComplete} />;
+  } else if (decision === 'sin_sesion') {
+    contenido = (
+      <Login
+        onLoginSuccess={handleLoginSuccess}
+        mensajeInicial={mensajeInicial}
+      />
+    );
+  } else if (decision === 'con_sesion') {
+    contenido = (
+      <NavigationContainer>
+        <RootNavigator onLogoutRequested={handleLogoutRequested} />
+      </NavigationContainer>
+    );
+  } else {
+    // decision === 'loading' → cold boot puro (no decision aun). El splash
+    // se muestra a pantalla completa via el overlay que sigue montado.
+    contenido = null;
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {contenido}
       <SplashAnimado
         onAnimationEnd={() => setSplashComplete(true)}
         logo={require('../../assets/logo-epc.png')}
       />
-    );
-  }
-
-  if (decision === 'sin_setup') {
-    // Wizard de 2 pasos: paso 1 (datos del prestador) → paso 2 (datos del
-    // primer operario + consent). Al finalizar, bootstrapCompleto() crea
-    // prestador + acuerdo + parametros + operario atomicamente, persiste
-    // la sesion, sincroniza useWorkspace, y llama onComplete.
-    return <SetupInicial onComplete={handleSetupComplete} />;
-  }
-
-  if (decision === 'sin_sesion') {
-    // PUNTO C: pasamos mensajeInicial para que Login muestre el banner
-    // amarillo "Tu sesion anterior vencio" arriba del form cuando el
-    // estado clasificado fue 'vencida'. En cold-boot limpio o 'invalida',
-    // mensajeInicial queda undefined y Login rendea sin banner.
-    return <Login onLoginSuccess={handleLoginSuccess} mensajeInicial={mensajeInicial} />;
-  }
-
-  return (
-    <NavigationContainer>
-      <RootNavigator onLogoutRequested={handleLogoutRequested} />
-    </NavigationContainer>
+    </View>
   );
 }
