@@ -1,13 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 
 /**
  * Color de marca del splash — inline por scope cerrado del change.
@@ -20,85 +12,80 @@ const FASE_1_DURACION_MS = 500;
 const FASE_2_DURACION_MS = 700;
 const FASE_3_DURACION_MS = 400;
 
-/** Easing expo-out del material spec (curva de deceleracion fuerte). */
-const EASING_EXPO_OUT = Easing.bezier(0.16, 1, 0.3, 1);
-
 interface Props {
   readonly onAnimationEnd: () => void;
   readonly logo: ImageSourcePropType;
 }
 
 /**
- * Overlay de splash animado. Tres fases encadenadas:
- *   1. (0-500ms)   reveal: opacity 0->1, scale 0.92->1, easing expo-out.
- *   2. (500-1200ms) micro-pulse: scale 1 -> 1.02 -> 1, easing lineal.
- *   3. (1200-1600ms) fade-out: opacity 1->0, easing expo-out.
- * Sin rotacion, sin translateY.
+ * Overlay de splash animado. Tres fases encadenadas, 100% JS puro (sin
+ * reanimated/worklets) para no depender de native bindings que rompen
+ * Expo Go cuando se actualiza el bundle:
+ *   1. (0-500ms)   reveal: opacity 0->1, scale 0.92->1.
+ *   2. (500-1200ms) micro-pulse: scale 1 -> 1.02 -> 1.
+ *   3. (1200-1600ms) fade-out: opacity 1->0.
  *
- * Invoca `onAnimationEnd` cuando la fase 3 termina.
+ * Invoca `onAnimationEnd` cuando la fase 3 termina. Tambien tiene un
+ * fallback de 2500ms (max) por si alguna transicion se cuelga.
  */
 export function SplashAnimado({ onAnimationEnd, logo }: Props) {
-  const opacidad = useSharedValue(0);
-  const escala = useSharedValue(0.92);
+  const [opacidad, setOpacidad] = useState(0);
+  const [escala, setEscala] = useState(0.92);
   const callbackRef = useRef(onAnimationEnd);
   callbackRef.current = onAnimationEnd;
+  const disparadoRef = useRef(false);
 
   useEffect(() => {
-    opacidad.value = withTiming(1, {
-      duration: FASE_1_DURACION_MS,
-      easing: EASING_EXPO_OUT,
-    });
-    escala.value = withTiming(
-      1,
-      { duration: FASE_1_DURACION_MS, easing: EASING_EXPO_OUT },
-      (finFase1) => {
-        if (!finFase1) return;
-        escala.value = withTiming(
-          1.02,
-          { duration: FASE_2_DURACION_MS / 2, easing: Easing.linear },
-          (finFase2a) => {
-            if (!finFase2a) return;
-            escala.value = withTiming(
-              1,
-              { duration: FASE_2_DURACION_MS / 2, easing: Easing.linear },
-              (finFase2b) => {
-                if (!finFase2b) return;
-                opacidad.value = withTiming(
-                  0,
-                  { duration: FASE_3_DURACION_MS, easing: EASING_EXPO_OUT },
-                  (finFase3) => {
-                    if (finFase3) {
-                      runOnJS(callbackRef.current)();
-                    }
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
+    function dispararFin() {
+      if (disparadoRef.current) return;
+      disparadoRef.current = true;
+      callbackRef.current();
+    }
+
+    // FASE 1: reveal (opacity 0->1, scale 0.92->1) en 500ms
+    const t1 = setTimeout(() => setOpacidad(1), 16);
+    const t2 = setTimeout(() => setEscala(1), 16);
+
+    // FASE 2: micro-pulse en 700ms (350ms up, 350ms down)
+    const t3 = setTimeout(() => setEscala(1.02), FASE_1_DURACION_MS);
+    const t4 = setTimeout(() => setEscala(1), FASE_1_DURACION_MS + FASE_2_DURACION_MS / 2);
+
+    // FASE 3: fade-out en 400ms
+    const t5 = setTimeout(() => setOpacidad(0), FASE_1_DURACION_MS + FASE_2_DURACION_MS);
+
+    // Disparar fin de splash cuando termina la fase 3
+    const tFin = setTimeout(
+      dispararFin,
+      FASE_1_DURACION_MS + FASE_2_DURACION_MS + FASE_3_DURACION_MS,
     );
 
-    // Cleanup: cancelar worklets y animaciones pendientes en unmount.
-    // Sin esto, hot reload puede dejar referencias activas que disparan
-    // setState sobre componentes desmontados (React warning). Ver scenario
-    // 1.8 del spec splash-logo-animado.
+    // Fallback duro por si algo se cuelga
+    const tSafety = setTimeout(dispararFin, 2500);
+
     return () => {
-      cancelAnimation(opacidad);
-      cancelAnimation(escala);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t5);
+      clearTimeout(tFin);
+      clearTimeout(tSafety);
     };
   }, []);
 
-  const estiloAnimado = useAnimatedStyle(() => ({
-    opacity: opacidad.value,
-    transform: [{ scale: escala.value }],
-  }));
-
   return (
     <View style={estilos.overlay}>
-      <Animated.View style={[estilos.contenedor, estiloAnimado]}>
+      <View
+        style={[
+          estilos.contenedor,
+          {
+            opacity: opacidad,
+            transform: [{ scale: escala }],
+          },
+        ]}
+      >
         <Image source={logo} style={estilos.imagen} resizeMode="contain" />
-      </Animated.View>
+      </View>
     </View>
   );
 }
