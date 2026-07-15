@@ -337,7 +337,11 @@ CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
  * operario con password_hash real via bootstrapCompleto → operarioRepo.guardar.
  */
 const MIGRACION_017_OPERARIO_PASSWORD_HASH = `
-ALTER TABLE operarios ADD COLUMN password_hash TEXT NOT NULL DEFAULT '';
+-- Idempotente: la columna password_hash YA EXISTE dentro del CREATE TABLE de
+-- la migration 015 (operario está creado completo). El IF NOT EXISTS protege
+-- contra devices con DBs viejas donde la 015 original no incluía password_hash
+-- (pre-PUNTO-A del SDD setup-inicial-multi-tenant-auth).
+ALTER TABLE operarios ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '';
 `;
 
 const MIGRACIONES: readonly Migracion[] = [
