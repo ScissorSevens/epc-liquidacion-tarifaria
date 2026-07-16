@@ -27,8 +27,10 @@ describe('mapearMedidorParaBackend', () => {
     municipio: 'Bogotá',
     direccion: 'Cra 3 # 4-5',
     estrato: 2,
-    aplica_subsidio: false,
-    estado: 'activo',
+     aplica_subsidio: false,
+     id_prestador: 0,
+     categoria_uso: 'residencial',
+     estado: 'activo',
     created_at: '2026-04-01T00:00:00.000Z',
   };
 
