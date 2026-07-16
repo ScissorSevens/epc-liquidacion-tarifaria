@@ -1,34 +1,17 @@
 // mobile/src/adapters/persistir-y-encolar-alta-suscriptor.ts
 //
 // Adapter orquestador: alta atomica de SUSCRIPTOR + MEDIDOR desde la
-// pantalla `AltaSuscriptor.tsx`. Persiste en SQLite local + encola
-// para sync Camino 3, con compensacion si el medidor falla.
+// pantalla `AltaSuscriptor.tsx`. Persiste ambas entidades en SQLite local
+// y encola sus items para sync Camino 3 dentro de una sola transaccion.
 //
 // Por que existe:
-//   La pantalla actual hace persistencia inline (crear suscriptor →
-//   crear medidor → si falla medidor, eliminar suscriptor) pero NO
-//   encola para sync. El backend nunca ve el suscriptor nuevo. Este
-//   adapter cierra el gap reusando el mismo flujo + agregando
-//   encolado con `dependeDe` correcto.
+//   La pantalla actual necesita crear el par suscriptor/medidor y mantener
+//   sus items de cola consistentes. `withTransactionAsync` confirma las cuatro
+//   escrituras juntas o las revierte automaticamente si cualquiera falla.
+//   No hay compensaciones best-effort ni errores tragados.
 //
-// Compensacion (best effort):
-//   Si crear medidor falla:
-//     1. Intentar eliminar suscriptor de SQLite local.
-//     2. Intentar eliminar item SUSCRIPTOR de la cola.
-//     3. Relanzar el error original del medidor.
-//   Las dos compensaciones son independientes: si una falla, la otra
-//   se intenta igual. El error que ve el usuario es siempre el del
-//   medidor (la causa raiz), no errores de compensacion.
-//
-// Por que el item SUSCRIPTOR se encola ANTES de intentar el medidor:
-//   Necesitamos su `id` para setear `dependeDe` del MEDIDOR. Si fueramos
-//   a encolar todo despues, perderiamos la simetria con el adapter de
-//   importacion. Trade-off: si crear medidor falla, hay que "deshacer"
-//   el item — por eso el `colaRepo.eliminar`.
-//
-// `colaRepo.eliminar` NO esta en la interface dominio `ColaSincronizacion`
-// (congelada D33). Vive solo en `ColaRepositoryExpoSqlite` (mobile).
-// Ver `mobile/src/persistencia/expo-sqlite/cola-repository-expo-sqlite.ts`.
+// El item SUSCRIPTOR se encola antes del MEDIDOR porque su id de cola forma
+// `dependeDe` del item MEDIDOR. Todo ocurre en la misma transaccion SQLite.
 
 import type {
   Suscriptor,
@@ -46,7 +29,7 @@ export type MedidorBorradorSinSuscriptor = Omit<MedidorBorrador, 'id_suscriptor'
 
 export interface SuscriptorRepoAlta {
   crear(borrador: SuscriptorBorrador): Promise<Suscriptor>;
-  eliminar(idSuscriptor: number): Promise<void>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
 export interface MedidorRepoAlta {
@@ -55,7 +38,6 @@ export interface MedidorRepoAlta {
 
 export interface ColaRepoAlta {
   guardar(item: ItemCola): Promise<void>;
-  eliminar(idItem: string): Promise<void>;
 }
 
 export interface PersistirYEncolarAltaSuscriptorDeps {
@@ -87,69 +69,55 @@ export async function persistirYEncolarAltaSuscriptor(
     idGenerator,
     hasher,
   } = deps;
+  let resultado: PersistirYEncolarAltaSuscriptorResultado | undefined;
 
-  // 1. Crear suscriptor (puede tirar — lo dejamos propagar; nada que compensar).
-  const suscriptor = await suscriptorRepo.crear(borradorSuscriptor);
+  // expo-sqlite 16 no entrega `tx` a withTransactionAsync; los repos
+  // comparten la conexion y sus queries participan en la transaccion activa.
+  await suscriptorRepo.withTransactionAsync(async () => {
+    const suscriptor = await suscriptorRepo.crear(borradorSuscriptor);
 
-  // 2. Encolar SUSCRIPTOR (necesitamos su id para dependeDe del MEDIDOR).
-  const itemSus: ItemCola = {
-    id: idGenerator.uuid(),
-    tipo: 'SUSCRIPTOR',
-    payload: suscriptor,
-    hashLocal: hasher.sha256(JSON.stringify(suscriptor)),
-    estado: 'PENDIENTE',
-    intentos: 0,
-    ultimoError: null,
-    ultimoIntentoEn: null,
-    creadoEn: new Date(),
-  };
-  await colaRepo.guardar(itemSus);
+    const itemSus: ItemCola = {
+      id: idGenerator.uuid(),
+      tipo: 'SUSCRIPTOR',
+      payload: suscriptor,
+      hashLocal: hasher.sha256(JSON.stringify(suscriptor)),
+      estado: 'PENDIENTE',
+      intentos: 0,
+      ultimoError: null,
+      ultimoIntentoEn: null,
+      creadoEn: new Date(),
+    };
+    await colaRepo.guardar(itemSus);
 
-  // 3. Intentar crear MEDIDOR. Si falla → compensacion best-effort.
-  let medidor: Medidor;
-  try {
-    medidor = await medidorRepo.crear({
+    const medidor = await medidorRepo.crear({
       ...borradorMedidor,
       id_suscriptor: suscriptor.id_suscriptor,
     });
-  } catch (errMedidor) {
-    // Compensacion 1: borrar suscriptor de SQLite local.
-    try {
-      await suscriptorRepo.eliminar(suscriptor.id_suscriptor);
-    } catch {
-      // Swallowed: la causa que ve el usuario es la del medidor.
-      // El suscriptor huerfano queda local pero la cola NO lo va a
-      // sincronizar (lo borramos del paso siguiente).
-    }
-    // Compensacion 2: borrar item SUSCRIPTOR de la cola (independiente
-    // del exito de la compensacion 1).
-    try {
-      await colaRepo.eliminar(itemSus.id);
-    } catch {
-      // Idem: best effort.
-    }
-    throw errMedidor;
+
+    const itemMed: ItemCola = {
+      id: idGenerator.uuid(),
+      tipo: 'MEDIDOR',
+      payload: medidor,
+      hashLocal: hasher.sha256(JSON.stringify(medidor)),
+      estado: 'PENDIENTE',
+      intentos: 0,
+      ultimoError: null,
+      ultimoIntentoEn: null,
+      creadoEn: new Date(),
+      dependeDe: [itemSus.id],
+    };
+    await colaRepo.guardar(itemMed);
+
+    resultado = {
+      suscriptor,
+      medidor,
+      idItemSuscriptor: itemSus.id,
+      idItemMedidor: itemMed.id,
+    };
+  });
+
+  if (resultado === undefined) {
+    throw new Error('persistirYEncolarAltaSuscriptor: la transaccion finalizo sin resultado');
   }
-
-  // 4. Encolar MEDIDOR con dependeDe = [idItemSuscriptor].
-  const itemMed: ItemCola = {
-    id: idGenerator.uuid(),
-    tipo: 'MEDIDOR',
-    payload: medidor,
-    hashLocal: hasher.sha256(JSON.stringify(medidor)),
-    estado: 'PENDIENTE',
-    intentos: 0,
-    ultimoError: null,
-    ultimoIntentoEn: null,
-    creadoEn: new Date(),
-    dependeDe: [itemSus.id],
-  };
-  await colaRepo.guardar(itemMed);
-
-  return {
-    suscriptor,
-    medidor,
-    idItemSuscriptor: itemSus.id,
-    idItemMedidor: itemMed.id,
-  };
+  return resultado;
 }

@@ -31,6 +31,7 @@ import { mapearErrorExpoSqlite } from './traducir-error';
 export interface SuscriptorRepositoryExpoSqlite extends SuscriptorRepository {
   cerrar(): Promise<void>;
   toggleSubsidio(id: number, valor: boolean): Promise<Suscriptor>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
 interface SuscriptorRow {
@@ -146,6 +147,10 @@ export function crearSuscriptorRepositoryExpoSqlite(
   db: SQLite.SQLiteDatabase,
 ): SuscriptorRepositoryExpoSqlite {
   return {
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+      await db.withTransactionAsync(task);
+    },
+
     async crear(data: SuscriptorBorrador): Promise<Suscriptor> {
       let result: SQLite.SQLiteRunResult;
       try {
