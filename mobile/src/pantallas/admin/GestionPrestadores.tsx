@@ -10,7 +10,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
-import type { Prestador } from '../../dominio/prestadores/types';
+import type { Prestador } from '../../../dominio/prestadores/types';
 
 interface Props {
   readonly repo: {
@@ -122,7 +122,7 @@ export default function GestionPrestadores({ repo, onAbrirAcuerdo, onAbrirParame
                       );
                     }}
                   >
-                    <MaterialIcons name="block" size={16} color={COLORS.onError} />
+                    <MaterialIcons name="block" size={16} color={COLORS.onErrorContainer} />
                     <Text style={[estilos.botonLabel, estilos.botonLabelPeligro]}>
                       Suspender
                     </Text>
@@ -176,7 +176,7 @@ const estilos = StyleSheet.create({
     borderWidth: 2,
   },
   cardHeader: { gap: 2 },
-  cardTitulo: { ...TYPOGRAPHY.titleMd, color: COLORS.onSurface },
+  cardTitulo: { ...TYPOGRAPHY.headlineMd, color: COLORS.onSurface },
   cardSub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
   acciones: {
     flexDirection: 'row',
@@ -195,5 +195,5 @@ const estilos = StyleSheet.create({
   },
   botonPeligro: { backgroundColor: COLORS.errorContainer },
   botonLabel: { ...TYPOGRAPHY.labelMd, color: COLORS.onPrimary },
-  botonLabelPeligro: { color: COLORS.onError },
+  botonLabelPeligro: { color: COLORS.onErrorContainer },
 });
