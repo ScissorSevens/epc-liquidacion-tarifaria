@@ -13,20 +13,95 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
+import { useWorkspace } from '../../composicion/useWorkspace';
+import { getBootstrap } from '../../composition/get-bootstrap';
 import type { ParametrosTarifa } from '../../../dominio/parametros-tarifa/types';
 
+interface ParametrosTarifaRepo {
+  readonly guardar: (p: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>) => Promise<ParametrosTarifa>;
+  readonly buscarVigente: (id_prestador: number, fecha: string) => Promise<ParametrosTarifa | null>;
+}
+
+interface AcuerdoRepo {
+  readonly buscarVigente: (id_prestador: number, fecha: string) => Promise<{ id_acuerdo: number } | null>;
+}
+
 interface Props {
-  readonly id_prestador: number;
-  readonly id_acuerdo: number;
-  readonly parametrosActuales: ParametrosTarifa | null;
-  readonly repo: {
-    guardar: (p: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>) => Promise<ParametrosTarifa>;
-  };
+  /** Si no se provee, se toma del workspace (`useWorkspace.id_prestador_activo`). */
+  readonly id_prestador?: number;
+  /** Si no se provee, se busca via `acuerdoRepo.buscarVigente()` con la fecha actual. */
+  readonly id_acuerdo?: number;
+  /** Si no se provee, se busca via `repo.buscarVigente()` con la fecha actual. */
+  readonly parametrosActuales?: ParametrosTarifa | null;
+  /** Si no se provee, se resuelve via `getBootstrap()` (patrón del resto del código). */
+  readonly repo?: ParametrosTarifaRepo;
+  /** Si no se provee, se resuelve via `getBootstrap()` (requerido para derivar id_acuerdo). */
+  readonly acuerdoRepo?: AcuerdoRepo;
 }
 
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
 
-export default function ParametrosTarifaForm({ id_prestador, id_acuerdo, parametrosActuales, repo }: Props) {
+export default function ParametrosTarifaForm({
+  id_prestador: idProp,
+  id_acuerdo: idAcuerdoProp,
+  parametrosActuales: parametrosProp,
+  repo: repoProp,
+  acuerdoRepo: acuerdoRepoProp,
+}: Props) {
+  const { id_prestador_activo } = useWorkspace();
+  const id_prestador = idProp ?? id_prestador_activo;
+  const [repo, setRepo] = useState<ParametrosTarifaRepo | null>(repoProp ?? null);
+  const [acuerdoRepo, setAcuerdoRepo] = useState<AcuerdoRepo | null>(acuerdoRepoProp ?? null);
+  const [id_acuerdo, setIdAcuerdo] = useState<number>(idAcuerdoProp ?? 0);
+  const [parametrosActuales, setParametrosActuales] = useState<ParametrosTarifa | null>(parametrosProp ?? null);
+  const [cargando, setCargando] = useState(true);
+
+  // Resolver repos internamente si no vinieron inyectados desde el Stack.
+  useEffect(() => {
+    if (repo !== null && acuerdoRepo !== null) return;
+    let cancelado = false;
+    void (async () => {
+      const bs = await getBootstrap();
+      if (cancelado) return;
+      if (repo === null) setRepo(bs.parametrosTarifaRepo as unknown as ParametrosTarifaRepo);
+      if (acuerdoRepo === null) setAcuerdoRepo(bs.acuerdoMunicipalRepo as unknown as AcuerdoRepo);
+    })();
+    return () => { cancelado = true; };
+  }, [repo, acuerdoRepo]);
+
+  // Derivar id_acuerdo a partir del acuerdo vigente del prestador activo.
+  useEffect(() => {
+    if (idAcuerdoProp !== undefined) return;
+    if (acuerdoRepo === null || id_prestador <= 0) return;
+    let cancelado = false;
+    void (async () => {
+      const acuerdo = await acuerdoRepo.buscarVigente(id_prestador, new Date().toISOString());
+      if (!cancelado) {
+        setIdAcuerdo(acuerdo?.id_acuerdo ?? 0);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [acuerdoRepo, id_prestador, idAcuerdoProp]);
+
+  // Cargar parámetros tarifarios vigentes para el prestador activo.
+  useEffect(() => {
+    if (id_prestador <= 0 || repo === null) return;
+    let cancelado = false;
+    void (async () => {
+      setCargando(true);
+      try {
+        const params = await repo.buscarVigente(id_prestador, new Date().toISOString());
+        if (!cancelado) {
+          setParametrosActuales(params);
+          setCargando(false);
+        }
+      } catch {
+        if (!cancelado) setCargando(false);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [repo, id_prestador]);
+
   const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
   const [cma, setCma] = useState(String(parametrosActuales?.cma ?? 0));
   const [cmo, setCmo] = useState(String(parametrosActuales?.cmo ?? 0));
@@ -57,6 +132,10 @@ export default function ParametrosTarifaForm({ id_prestador, id_acuerdo, paramet
   };
 
   const guardar = async () => {
+    if (repo === null) {
+      Alert.alert('Error', 'El repositorio aún no está listo. Esperá un instante.');
+      return;
+    }
     setGuardando(true);
     try {
       await repo.guardar({
@@ -87,6 +166,9 @@ export default function ParametrosTarifaForm({ id_prestador, id_acuerdo, paramet
 
   return (
     <ScrollView style={estilos.root} contentContainerStyle={estilos.content}>
+      {id_prestador <= 0 || id_acuerdo <= 0 || (repo === null && cargando) ? (
+        <Text style={estilos.sub}>Cargando contexto del prestador...</Text>
+      ) : null}
       <Text style={estilos.titulo}>Parámetros Tarifarios · Prestador #{id_prestador}</Text>
       <Text style={estilos.sub}>Conforme a Res CRA 825/2017 + 907/2019 art. 14</Text>
 

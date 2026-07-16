@@ -5,28 +5,60 @@
  * (CSV con columnas: codigo, nombre, NIT, municipio, departamento, segmento,
  * num_suscriptores_urbanos, num_suscriptores_rurales).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
+import { getBootstrap } from '../../composition/get-bootstrap';
+import type { PrestadorRepositoryExpoSqlite } from '../../persistencia/expo-sqlite/prestador-repository-expo-sqlite';
+
+/**
+ * Shape del repo que la pantalla necesita. `importarCSV` aún no está en el
+ * `PrestadorRepositoryExpoSqlite` del dominio (es feature futura del módulo
+ * admin). Resolvemos via `getBootstrap()` y casteamos a este shape — cast
+ * tipado (no `as any`), localizado a esta pantalla admin.
+ */
+interface ImportarPrestadoresRepo {
+  readonly importarCSV: (csv: string) => Promise<{
+    insertados: number;
+    errores: Array<{ fila: number; motivo: string }>;
+  }>;
+}
 
 interface Props {
-  readonly repo: {
-    importarCSV: (csv: string) => Promise<{ insertados: number; errores: Array<{ fila: number; motivo: string }> }>;
-  };
+  /** Si no se provee, se resuelve via `getBootstrap()` (patrón del resto del código). */
+  readonly repo?: ImportarPrestadoresRepo;
 }
 
 const CSV_EJEMPLO = `codigo,nombre,NIT,municipio,departamento,segmento,num_suscriptores_urbanos,num_suscriptores_rurales
 ACU-001,Asociación Acueducto El Rosal,900123456-1,Facatativá,Cundinamarca,2,0,150
 ACU-002,Junta Acueducto La Esperanza,900234567-2,Girardot,Cundinamarca,2,0,80`;
 
-export default function ImportarPrestadores({ repo }: Props) {
+export default function ImportarPrestadores({ repo: repoProp }: Props) {
+  const [repo, setRepo] = useState<ImportarPrestadoresRepo | null>(repoProp ?? null);
   const [csv, setCsv] = useState(CSV_EJEMPLO);
   const [importando, setImportando] = useState(false);
   const [ultimoResultado, setUltimoResultado] = useState<{ insertados: number; errores: Array<{ fila: number; motivo: string }> } | null>(null);
 
+  // Resolver repo internamente si no vino inyectado desde el Stack.
+  useEffect(() => {
+    if (repo !== null) return;
+    let cancelado = false;
+    void (async () => {
+      const bs = await getBootstrap();
+      if (cancelado) return;
+      const prestadorRepo = bs.prestadorRepo as unknown as PrestadorRepositoryExpoSqlite & ImportarPrestadoresRepo;
+      setRepo(prestadorRepo);
+    });
+    return () => { cancelado = true; };
+  }, [repo]);
+
   const importar = async () => {
+    if (repo === null) {
+      Alert.alert('Error', 'El repositorio aún no está listo. Esperá un instante.');
+      return;
+    }
     setImportando(true);
     try {
       const resultado = await repo.importarCSV(csv);

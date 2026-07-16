@@ -7,27 +7,61 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
+import { getBootstrap } from '../../composition/get-bootstrap';
+import type { ConfigStackParamList } from '../../navegacion/types';
 import type { Prestador } from '../../../dominio/prestadores/types';
 
-interface Props {
-  readonly repo: {
-    listar: () => Promise<readonly Prestador[]>;
-    suspender: (id: number) => Promise<void>;
-  };
-  readonly onAbrirAcuerdo: (id: number) => void;
-  readonly onAbrirParametros: (id: number) => void;
+interface GestionPrestadoresRepo {
+  readonly listar: () => Promise<readonly Prestador[]>;
+  readonly suspender: (id: number) => Promise<void>;
 }
 
-export default function GestionPrestadores({ repo, onAbrirAcuerdo, onAbrirParametros }: Props) {
+interface Props {
+  /** Si no se provee, se resuelve via `getBootstrap()` (patrón del resto del código). */
+  readonly repo?: GestionPrestadoresRepo;
+  /** Si no se provee, navega internamente via `useNavigation()`. */
+  readonly onAbrirAcuerdo?: (id: number) => void;
+  /** Si no se provee, navega internamente via `useNavigation()`. */
+  readonly onAbrirParametros?: (id: number) => void;
+}
+
+export default function GestionPrestadores({
+  repo: repoProp,
+  onAbrirAcuerdo,
+  onAbrirParametros,
+}: Props) {
   const { id_prestador_activo } = useWorkspace();
+  const navigation = useNavigation<NativeStackNavigationProp<ConfigStackParamList>>();
+  const [repo, setRepo] = useState<GestionPrestadoresRepo | null>(repoProp ?? null);
   const [prestadores, setPrestadores] = useState<readonly Prestador[]>([]);
   const [filtro, setFiltro] = useState('');
   const [cargando, setCargando] = useState(true);
 
+  // Resolver repo internamente si no vino inyectado desde el Stack.
   useEffect(() => {
+    if (repo !== null) return;
+    let cancelado = false;
+    void (async () => {
+      const bs = await getBootstrap();
+      if (!cancelado) {
+        setRepo({
+          listar: () => bs.prestadorRepo.listar(),
+          suspender: async (id: number) => {
+            await bs.prestadorRepo.suspender(id);
+          },
+        });
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [repo]);
+
+  useEffect(() => {
+    if (repo === null) return;
     let cancelado = false;
     void (async () => {
       setCargando(true);
@@ -43,6 +77,22 @@ export default function GestionPrestadores({ repo, onAbrirAcuerdo, onAbrirParame
     })();
     return () => { cancelado = true; };
   }, [repo]);
+
+  const abrirAcuerdo = (id: number): void => {
+    if (onAbrirAcuerdo) {
+      onAbrirAcuerdo(id);
+      return;
+    }
+    navigation.navigate('AcuerdoMunicipal', { id_prestador: id });
+  };
+
+  const abrirParametros = (id: number): void => {
+    if (onAbrirParametros) {
+      onAbrirParametros(id);
+      return;
+    }
+    navigation.navigate('ParametrosTarifa', { id_prestador: id });
+  };
 
   const filtrados = prestadores.filter((p) => {
     const q = filtro.toLowerCase();
@@ -97,14 +147,14 @@ export default function GestionPrestadores({ repo, onAbrirAcuerdo, onAbrirParame
               <View style={estilos.acciones}>
                 <Pressable
                   style={estilos.boton}
-                  onPress={() => onAbrirAcuerdo(item.id_prestador)}
+                  onPress={() => abrirAcuerdo(item.id_prestador)}
                 >
                   <MaterialIcons name="gavel" size={16} color={COLORS.onPrimary} />
                   <Text style={estilos.botonLabel}>Acuerdo</Text>
                 </Pressable>
                 <Pressable
                   style={estilos.boton}
-                  onPress={() => onAbrirParametros(item.id_prestador)}
+                  onPress={() => abrirParametros(item.id_prestador)}
                 >
                   <MaterialIcons name="calculate" size={16} color={COLORS.onPrimary} />
                   <Text style={estilos.botonLabel}>Parámetros</Text>
@@ -113,6 +163,7 @@ export default function GestionPrestadores({ repo, onAbrirAcuerdo, onAbrirParame
                   <Pressable
                     style={[estilos.boton, estilos.botonPeligro]}
                     onPress={() => {
+                      if (repo === null) return;
                       void repo.suspender(item.id_prestador).then(() =>
                         setPrestadores((prev) =>
                           prev.map((p) =>
