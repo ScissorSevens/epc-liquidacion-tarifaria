@@ -10,7 +10,6 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
-import type { Prestador } from '../../dominio/prestadores/types';
 
 interface Props {
   readonly repo: {
@@ -93,7 +92,7 @@ export default function ImportarPrestadores({ repo }: Props) {
 const estilos = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.md, gap: SPACING.md },
-  titulo: { ...TYPOGRAPHY.titleLg, color: COLORS.onSurface },
+  titulo: { ...TYPOGRAPHY.headlineLg, color: COLORS.onSurface },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
   seccion: { gap: SPACING.xs },
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
@@ -127,7 +126,7 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
   },
-  resultadoHeader: { ...TYPOGRAPHY.titleSm, color: COLORS.onSurface, marginBottom: SPACING.xs },
+  resultadoHeader: { ...TYPOGRAPHY.headlineSm, color: COLORS.onSurface, marginBottom: SPACING.xs },
   resultadoLinea: { ...TYPOGRAPHY.bodyMd, color: COLORS.onSurface },
   listaErrores: { marginTop: SPACING.xs, gap: 2 },
   errorLinea: { ...TYPOGRAPHY.bodySm, color: COLORS.error, fontFamily: 'monospace' },
