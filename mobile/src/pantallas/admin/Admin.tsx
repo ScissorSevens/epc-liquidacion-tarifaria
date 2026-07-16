@@ -66,7 +66,20 @@ const OPCIONES: readonly OpcionMenu[] = [
 ];
 
 export default function Admin({ navigation }: Props) {
-  const { cambiarPrestadorYCargarContexto, id_prestador_activo } = useWorkspace();
+  // PER-05: selectores específicos. Suscripción limitada a los 2 campos
+  // del store que este componente lee: id_prestador_activo (state, para
+  // navegar con el id a AcuerdoMunicipal/ParametrosTarifa) y
+  // cambiarPrestadorYCargarContexto (acción, llamada desde el handler
+  // del WorkspaceSwitcher). Esta última tiene referencia ESTABLE en
+  // zustand (se define una sola vez en create()) — el selector no causa
+  // re-renders cuando el resto del store cambia.
+  //
+  // Cambios en acuerdo_vigente, parametros_vigentes, prestadores_disponibles,
+  // cargando o prestador NO causan re-render.
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
+  const cambiarPrestadorYCargarContexto = useWorkspace(
+    (s) => s.cambiarPrestadorYCargarContexto,
+  );
 
   /**
    * Handler del WorkspaceSwitcher: cambia el prestador activo Y recarga
