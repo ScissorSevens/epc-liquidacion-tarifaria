@@ -44,7 +44,11 @@ export default function AcuerdoMunicipalForm({
   acuerdoActual: acuerdoProp,
   repo: repoProp,
 }: Props) {
-  const { id_prestador_activo } = useWorkspace();
+  // PER-05: selector específico. Suscripción limitada a id_prestador_activo
+  // (único campo del store que este componente lee). Cambios en
+  // acuerdo_vigente, parametros_vigentes, prestadores_disponibles,
+  // cargando o prestador NO causan re-render.
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const id_prestador = idProp ?? id_prestador_activo;
   const [repo, setRepo] = useState<AcuerdoMunicipalRepo | null>(repoProp ?? null);
   const [acuerdoActual, setAcuerdoActual] = useState<AcuerdoMunicipal | null>(acuerdoProp ?? null);
