@@ -74,7 +74,7 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
 
 import { useWorkspace } from '../../../src/composicion/useWorkspace';
 import GestionPrestadores from '../../../src/pantallas/admin/GestionPrestadores';
-import type { Prestador } from '../../../../dominio/prestadores/types';
+import type { Prestador } from '../../../dominio/prestadores/types';
 
 /** Prestador de fixture. */
 const prestadorFixture: Prestador = {

@@ -61,7 +61,7 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
 
 import { useWorkspace } from '../../../src/composicion/useWorkspace';
 import AcuerdoMunicipalForm from '../../../src/pantallas/admin/AcuerdoMunicipal';
-import type { AcuerdoMunicipal } from '../../../../dominio/acuerdo-municipal/types';
+import type { AcuerdoMunicipal } from '../../../dominio/acuerdo-municipal/types';
 
 /** Acuerdo vigente de fixture. Solo necesitamos los campos que el form usa. */
 const acuerdoFixture: AcuerdoMunicipal = {

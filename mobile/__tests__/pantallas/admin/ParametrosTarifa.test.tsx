@@ -58,7 +58,7 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
 
 import { useWorkspace } from '../../../src/composicion/useWorkspace';
 import ParametrosTarifaForm from '../../../src/pantallas/admin/ParametrosTarifa';
-import type { ParametrosTarifa } from '../../../../dominio/parametros-tarifa/types';
+import type { ParametrosTarifa } from '../../../dominio/parametros-tarifa/types';
 
 /** Parámetros tarifarios de fixture. */
 const parametrosFixture: ParametrosTarifa = {
