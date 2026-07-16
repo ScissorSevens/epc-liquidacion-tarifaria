@@ -9,6 +9,7 @@
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import type { ComponentProps } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
@@ -18,10 +19,16 @@ import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
 
 type Props = NativeStackScreenProps<ConfigStackParamList, 'Admin'>;
+type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
+type AdminRoute =
+  | 'GestionPrestadores'
+  | 'AcuerdoMunicipal'
+  | 'ParametrosTarifa'
+  | 'ImportarPrestadores';
 
 interface OpcionMenu {
-  readonly key: keyof ConfigStackParamList;
-  readonly icono: string;
+  readonly key: AdminRoute;
+  readonly icono: MaterialIconName;
   readonly titulo: string;
   readonly descripcion: string;
   readonly colorFondo: string;
@@ -40,7 +47,7 @@ const OPCIONES: readonly OpcionMenu[] = [
     icono: 'gavel',
     titulo: 'Acuerdo Municipal',
     descripcion: 'Topes de subsidio y contribución aprobados por el Concejo',
-    colorFondo: COLORS.tertiary,
+    colorFondo: COLORS.warning,
   },
   {
     key: 'ParametrosTarifa',
@@ -54,7 +61,7 @@ const OPCIONES: readonly OpcionMenu[] = [
     icono: 'upload-file',
     titulo: 'Importar desde CSV',
     descripcion: 'Carga masiva de los 300 prestadores desde un spreadsheet',
-    colorFondo: COLORS.tertiaryContainer,
+    colorFondo: COLORS.warningContainer,
   },
 ];
 
@@ -99,7 +106,7 @@ export default function Admin({ navigation }: Props) {
           style={[estilos.opcion, { backgroundColor: op.colorFondo }]}
           onPress={() => navigation.navigate(op.key)}
         >
-          <MaterialIcons name={op.icone} size={32} color={COLORS.onPrimary} />
+          <MaterialIcons name={op.icono} size={32} color={COLORS.onPrimary} />
           <View style={estilos.opcionTexto}>
             <Text style={estilos.opcionTitulo}>{op.titulo}</Text>
             <Text style={estilos.opcionDesc}>{op.descripcion}</Text>
@@ -120,7 +127,7 @@ const estilos = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
-  titulo: { ...TYPOGRAPHY.titleLg, color: COLORS.onSurface },
+  titulo: { ...TYPOGRAPHY.headlineLg, color: COLORS.onSurface },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
   opcion: {
     flexDirection: 'row',
@@ -130,6 +137,6 @@ const estilos = StyleSheet.create({
     gap: SPACING.md,
   },
   opcionTexto: { flex: 1, gap: 2 },
-  opcionTitulo: { ...TYPOGRAPHY.titleSm, color: COLORS.onPrimary },
+  opcionTitulo: { ...TYPOGRAPHY.headlineSm, color: COLORS.onPrimary },
   opcionDesc: { ...TYPOGRAPHY.bodySm, color: COLORS.onPrimary, opacity: 0.85 },
 });
