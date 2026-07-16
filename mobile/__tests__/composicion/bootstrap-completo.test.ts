@@ -165,7 +165,7 @@ function buildRepos(state: RepoState) {
       },
     },
     operarioRepo: {
-      async guardar(borrador: OperarioBorrador): Promise<Operario> {
+      async crear(borrador: OperarioBorrador): Promise<Operario> {
         const id = state.operarioIdSeq++;
         const op: Operario = {
           id_operario: id,
@@ -456,7 +456,7 @@ describe('bootstrapCompleto()', () => {
 
     it('BC2.3 si crear operario falla, NO persiste prestador/acuerdo/parametros', async () => {
       const operarioRepoRoto = {
-        guardar: jest.fn().mockRejectedValue(new Error('operario write failed')),
+        crear: jest.fn().mockRejectedValue(new Error('operario write failed')),
       };
 
       await expect(

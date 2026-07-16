@@ -67,9 +67,9 @@ export interface ParametrosRepoPort {
   eliminar(id_parametros: number): Promise<void>;
 }
 
-/** Operario con `guardar()` (UPSERT del repo expo-sqlite) y `eliminar()` para rollback. */
+/** Operario con `crear()` para generar el id en SQLite y `eliminar()` para rollback. */
 export interface OperarioRepoPort {
-  guardar(borrador: OperarioBorrador): Promise<Operario>;
+  crear(borrador: OperarioBorrador): Promise<Operario>;
   eliminar(id_operario: number): Promise<void>;
 }
 
@@ -279,7 +279,7 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       estado: 'activo',
     });
 
-    operario = await deps.operarioRepo.guardar(borradorOperario);
+    operario = await deps.operarioRepo.crear(borradorOperario);
   } catch (err) {
     await Promise.all([
       deps.parametrosRepo.eliminar(parametros.id_parametros),
