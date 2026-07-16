@@ -22,10 +22,8 @@ import type {
   EntradaLectura,
   EvidenciaFoto,
 } from '@dominio/captura-lecturas/types';
-import type {
-  AcuerdoMunicipal,
-  ParametrosTarifa,
-} from '@dominio/parametros-tarifa';
+import type { ParametrosTarifa } from '@dominio/parametros-tarifa';
+import type { AcuerdoMunicipal } from '@dominio/acuerdo-municipal';
 import type { Prestador } from '@dominio/prestadores';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 
