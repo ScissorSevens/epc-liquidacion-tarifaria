@@ -10,7 +10,11 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 import { useWorkspace } from './useWorkspace';
-import type { Prestador } from '../dominio/prestadores/types';
+// Alias `@dominio/*` (mapeado en mobile/tsconfig.json → ../src/prestadores).
+// Era el path relativo roto `../dominio/prestadores/types` que apuntaba a
+// `mobile/src/dominio/...` (inexistente). Use el alias de la shared kernel
+// que ya usan otras pantallas (CapturarLectura, navegacion/types).
+import type { Prestador } from '@dominio/prestadores';
 
 interface Props {
   readonly onCambiar: (id: number) => Promise<void>;
