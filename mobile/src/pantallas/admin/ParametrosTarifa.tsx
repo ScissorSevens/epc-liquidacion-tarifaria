@@ -13,7 +13,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
-import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
+import type { ParametrosTarifa } from '../../../dominio/parametros-tarifa/types';
 
 interface Props {
   readonly id_prestador: number;
@@ -171,9 +171,9 @@ export default function ParametrosTarifaForm({ id_prestador, id_acuerdo, paramet
 const estilos = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.md, gap: SPACING.sm },
-  titulo: { ...TYPOGRAPHY.titleLg, color: COLORS.onSurface },
+  titulo: { ...TYPOGRAPHY.headlineLg, color: COLORS.onSurface },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
-  seccion: { ...TYPOGRAPHY.titleSm, color: COLORS.primary, marginTop: SPACING.md },
+  seccion: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, marginTop: SPACING.md },
   nota: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, fontStyle: 'italic', marginBottom: SPACING.xs },
   campo: { gap: SPACING.xs },
   campoFila: {
