@@ -35,7 +35,12 @@ export default function GestionPrestadores({
   onAbrirAcuerdo,
   onAbrirParametros,
 }: Props) {
-  const { id_prestador_activo } = useWorkspace();
+  // PER-05: selector específico. Suscripción limitada a id_prestador_activo
+  // (único campo del store que este componente lee — para resaltar el
+  // card del prestador activo). Cambios en acuerdo_vigente,
+  // parametros_vigentes, prestadores_disponibles, cargando o prestador
+  // NO causan re-render.
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const navigation = useNavigation<NativeStackNavigationProp<ConfigStackParamList>>();
   const [repo, setRepo] = useState<GestionPrestadoresRepo | null>(repoProp ?? null);
   const [prestadores, setPrestadores] = useState<readonly Prestador[]>([]);
