@@ -51,7 +51,7 @@ export type CrearSuscriptorInput = Omit<
 };
 
 export type ActualizarSuscriptorInput = Partial<
-  Pick<Suscriptor, 'nombre_apellidos' | 'direccion' | 'estrato' | 'matricula_inmobiliaria' | 'numero_catastral' | 'estado' | 'cedula' | 'municipio' | 'sector' | 'calle' | 'id_prestador' | 'categoria_uso'>
+  Pick<Suscriptor, 'nombre_apellidos' | 'direccion' | 'estrato' | 'matricula_inmobiliaria' | 'numero_catastral' | 'estado' | 'cedula' | 'municipio' | 'sector' | 'calle' | 'id_prestador' | 'categoria_uso' | 'aplica_subsidio'>
 >;
 
 /**
