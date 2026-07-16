@@ -52,10 +52,10 @@ function susCreado(id: number): Suscriptor {
     municipio: BORRADOR_SUS.municipio,
     direccion: BORRADOR_SUS.direccion,
     estrato: BORRADOR_SUS.estrato,
-     aplica_subsidio: false,
-     id_prestador: 0,
-     categoria_uso: 'residencial',
-     estado: BORRADOR_SUS.estado,
+    aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
+    estado: BORRADOR_SUS.estado,
     created_at: '2026-05-07T00:00:00.000Z',
   };
 }
