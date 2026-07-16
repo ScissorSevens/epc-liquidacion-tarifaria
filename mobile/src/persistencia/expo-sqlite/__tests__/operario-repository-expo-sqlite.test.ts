@@ -14,6 +14,7 @@
 
 import { crearOperarioRepositoryExpoSqlite } from '../operario-repository-expo-sqlite';
 import type { Operario } from '../../../operarios/types';
+import type { OperarioBorrador } from '../../../../dominio/operarios/types';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,54 @@ function buildDb(overrides: {
   } as unknown as import('expo-sqlite').SQLiteDatabase;
 }
 
-// ── inicializar ────────────────────────────────────────────────────────────
+function buildBorrador(overrides: Partial<OperarioBorrador> = {}): OperarioBorrador {
+  return {
+    id_prestador: 1,
+    numero_cedula: '12345678',
+    nombre: 'Ana',
+    email: 'ana@test.com',
+    password_hash: 'hash-ana',
+    rol: 'operario',
+    estado: 'activo',
+    ...overrides,
+  };
+}
+
+function buildPersistingDb(id = 42) {
+  let persistedRow: ReturnType<typeof buildRow> | null = null;
+  const runAsync = jest.fn().mockImplementation(
+    async (
+      _sql: string,
+      id_prestador: number,
+      numero_cedula: string,
+      nombre: string,
+      email: string,
+      password_hash: string,
+      rol: string,
+      estado: string,
+      dispositivo_id: string | null,
+    ) => {
+      persistedRow = buildRow({
+        id_operario: id,
+        id_prestador,
+        numero_cedula,
+        nombre,
+        email,
+        password_hash,
+        rol,
+        estado,
+        dispositivo_id,
+        created_at: '2026-07-16T12:00:00.000Z',
+      });
+      return { lastInsertRowId: id, changes: 1 };
+    },
+  );
+  const getFirstAsync = jest.fn().mockImplementation(async (_sql: string, requestedId: number) => {
+    return requestedId === id ? persistedRow : null;
+  });
+  return { db: buildDb({ runAsync, getFirstAsync }), runAsync, getFirstAsync };
+}
+
 
 describe('inicializar()', () => {
   it('llama execAsync con CREATE TABLE IF NOT EXISTS', async () => {
@@ -230,6 +278,77 @@ describe('buscarPorDispositivo() — compuesto por dispositivo_id + id_prestador
     const resultado = await repo.buscarPorDispositivo('tablet-99', 999);
 
     expect(resultado).toBeNull();
+  });
+});
+
+// ── crear ───────────────────────────────────────────────────────────────────
+
+describe('crear() — contrato real OperarioBorrador → Operario', () => {
+  it('T-CREAR-1: retorna un Operario con id_operario autogenerado por la DB', async () => {
+    const { db, getFirstAsync } = buildPersistingDb(42);
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    const resultado = await repo.crear(buildBorrador());
+
+    expect(resultado.id_operario).toBeGreaterThan(0);
+    expect(getFirstAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/WHERE id_operario\s*=\s*\?/i),
+      42,
+    );
+  });
+
+  it('T-CREAR-2: persiste el id_prestador recibido', async () => {
+    const { db, runAsync } = buildPersistingDb(43);
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    const resultado = await repo.crear(buildBorrador({ id_prestador: 5 }));
+
+    const [, idPrestador] = runAsync.mock.calls[0] as [string, number];
+    expect(idPrestador).toBe(5);
+    expect(resultado.id_prestador).toBe(5);
+  });
+
+  it('T-CREAR-3: persiste password_hash y luego lo lee con buscarPorId', async () => {
+    const { db } = buildPersistingDb(44);
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    await repo.crear(buildBorrador({ password_hash: 'sha256-secreto' }));
+    const resultado = await repo.buscarPorId(44);
+
+    expect(resultado).not.toBeNull();
+    expect(resultado!.password_hash).toBe('sha256-secreto');
+  });
+
+  it("T-CREAR-4: persiste dispositivo_id cuando recibe 'ABC'", async () => {
+    const { db, runAsync } = buildPersistingDb(45);
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    const resultado = await repo.crear(buildBorrador({ dispositivo_id: 'ABC' }));
+
+    const params = runAsync.mock.calls[0].slice(1) as unknown[];
+    expect(params).toContain('ABC');
+    expect(resultado.dispositivo_id).toBe('ABC');
+  });
+
+  it('T-CREAR-5: persiste dispositivo_id=NULL cuando no recibe dispositivo', async () => {
+    const { db, runAsync } = buildPersistingDb(46);
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+
+    const resultado = await repo.crear(buildBorrador({ dispositivo_id: undefined }));
+
+    const params = runAsync.mock.calls[0].slice(1) as unknown[];
+    expect(params).toContain(null);
+    expect(resultado.dispositivo_id).toBeUndefined();
+  });
+
+  it('T-CREAR-6: rechaza un borrador sin id_prestador para no crear un operario huérfano', async () => {
+    const runAsync = jest.fn();
+    const db = buildDb({ runAsync });
+    const repo = crearOperarioRepositoryExpoSqlite(db);
+    const borradorSinPrestador = { ...buildBorrador(), id_prestador: undefined } as unknown as OperarioBorrador;
+
+    await expect(repo.crear(borradorSinPrestador)).rejects.toThrow('id_prestador');
+    expect(runAsync).not.toHaveBeenCalled();
   });
 });
 
