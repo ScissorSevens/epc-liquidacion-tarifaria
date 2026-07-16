@@ -15,6 +15,7 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens
 import type { ConfigStackParamList } from '../../navegacion/types';
 import { WorkspaceSwitcher } from '../../composicion/WorkspaceSwitcher';
 import { useWorkspace } from '../../composicion/useWorkspace';
+import { getBootstrap } from '../../composition/get-bootstrap';
 
 type Props = NativeStackScreenProps<ConfigStackParamList, 'Admin'>;
 
@@ -58,11 +59,26 @@ const OPCIONES: readonly OpcionMenu[] = [
 ];
 
 export default function Admin({ navigation }: Props) {
-  const { setIdPrestadorActivo, cargarContexto } = useWorkspace();
+  const { cambiarPrestadorYCargarContexto } = useWorkspace();
 
+  /**
+   * Handler del WorkspaceSwitcher: cambia el prestador activo Y recarga
+   * el contexto tarifario (prestador, acuerdo_vigente, parametros_vigentes).
+   *
+   * COR-08 (reporte de calidad): el handler previo solo actualizaba
+   * `id_prestador_activo` y dejaba los datos tarifarios apuntando al
+   * prestador ANTERIOR. Si el operario cambiaba de prestador, una
+   * captura o liquidación posterior usaba los parámetros equivocados.
+   * `cambiarPrestadorYCargarContexto` resuelve esto en un solo paso.
+   */
   const onCambiarPrestador = async (id: number): Promise<void> => {
-    await setIdPrestadorActivo(id);
-    // El caller (en Configuracion u otro) puede invocar cargarContexto si lo necesita
+    const { prestadorRepo, acuerdoMunicipalRepo, parametrosTarifaRepo } =
+      await getBootstrap();
+    await cambiarPrestadorYCargarContexto(id, {
+      prestador: prestadorRepo,
+      acuerdo: acuerdoMunicipalRepo,
+      parametros: parametrosTarifaRepo,
+    });
   };
 
   return (
