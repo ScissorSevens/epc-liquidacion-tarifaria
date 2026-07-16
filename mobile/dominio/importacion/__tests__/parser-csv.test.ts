@@ -1,9 +1,12 @@
 /**
  * Tests del parser CSV de importacion suscriptor+medidor.
  *
- * Header esperado (en orden estricto):
- *   codigo,nombre_apellidos,direccion,estrato,matricula_inmobiliaria,
- *   numero_catastral,numero_medidor,fecha_instalacion,observaciones_medidor
+ * Headers aceptados (ver parser-csv.ts):
+ *   - LEGACY (9 cols con codigo + numero_medidor): backward compat con
+ *     CSVs generados por la app antes del multi-tenant (EPC-LEGACY).
+ *   - NUEVO (9 cols con cedula + municipio): desde COR-09 el dominio
+ *     `crearSuscriptor` exige ambos campos. La UI declara este header
+ *     en `ImportarCsv.tsx`.
  *
  * Politica de errores: un error por linea NO aborta el parseo; se
  * acumulan en `errores` y las filas validas siguen en `filas`.
@@ -136,5 +139,90 @@ describe('parsearCSV', () => {
     const r = parsearCSV(csv);
     expect(r.errores).toEqual([]);
     expect(r.filas).toHaveLength(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Header NUEVO con cedula + municipio (COR-09)
+  //
+  // Bug original: el dominio `crearSuscriptor` exige cedula y municipio
+  // NO vacíos, pero el header NUEVO (7 cols) anunciado por la UI no los
+  // traía. Cualquier CSV anunciado como "válido por la UI" fallaba al
+  // persistir. Fix: header nuevo pasa a 9 columnas con cedula y municipio
+  // en posiciones explícitas (entre nombre_apellidos y direccion), en
+  // línea con `SuscriptorBorrador` (types.ts).
+  // ─────────────────────────────────────────────────────────────────────
+  const HEADER_NUEVO_9 =
+    'nombre_apellidos,cedula,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
+
+  describe('header NUEVO con cedula + municipio (COR-09)', () => {
+    it('T-CSV-1 acepta header nuevo de 9 columnas y extrae cedula + municipio en cada fila', () => {
+      const csv =
+        HEADER_NUEVO_9 +
+        '\n' +
+        'Juan Perez,12345678,Bogotá,Calle 1,3,MAT-1,CAT-1,2024-01-15,obs uno';
+      const r = parsearCSV(csv);
+
+      expect(r.errores).toEqual([]);
+      expect(r.filas).toHaveLength(1);
+      expect(r.filas[0]).toMatchObject({
+        linea: 2,
+        nombre_apellidos: 'Juan Perez',
+        cedula: '12345678',
+        municipio: 'Bogotá',
+        direccion: 'Calle 1',
+        estrato: 3,
+        fecha_instalacion: '2024-01-15',
+        matricula_inmobiliaria: 'MAT-1',
+        numero_catastral: 'CAT-1',
+        observaciones_medidor: 'obs uno',
+      });
+    });
+
+    it('T-CSV-2 rechaza CSV sin columna cedula en el header (header mismatch)', () => {
+      // Header igual al NUEVO pero omitiendo `cedula` — debe ser rechazado.
+      const headerInvalido =
+        'nombre_apellidos,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
+      const csv = headerInvalido + '\nJuan,Bogota,Calle 1,3,,,2024-01-15,';
+      const r = parsearCSV(csv);
+
+      expect(r.filas).toEqual([]);
+      expect(r.errores).toHaveLength(1);
+      expect(r.errores[0]?.linea).toBe(1);
+      expect(r.errores[0]?.mensaje).toMatch(/header/i);
+    });
+
+    it('T-CSV-3 rechaza CSV sin columna municipio en el header (header mismatch)', () => {
+      // Header igual al NUEVO pero omitiendo `municipio` — debe ser rechazado.
+      const headerInvalido =
+        'nombre_apellidos,cedula,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
+      const csv =
+        headerInvalido + '\nJuan,12345678,Calle 1,3,,,2024-01-15,';
+      const r = parsearCSV(csv);
+
+      expect(r.filas).toEqual([]);
+      expect(r.errores).toHaveLength(1);
+      expect(r.errores[0]?.linea).toBe(1);
+      expect(r.errores[0]?.mensaje).toMatch(/header/i);
+    });
+
+    it('T-CSV-4 cuando cedula o municipio vienen vacíos en la fila, se preservan como string "" (no undefined)', () => {
+      // El parser NO valida semántica de cedula/municipio (cedula debe
+      // matchear /^\d{6,12}$/, municipio no vacío). Esa validación la
+      // hace `crearSuscriptor`. El parser SOLO preserva los strings para
+      // que el importador falle con MENSAJES_ERROR_SUSCRIPTOR.* en vez
+      // de con un "undefined" críptico.
+      const csv =
+        HEADER_NUEVO_9 +
+        '\n' +
+        'Juan Perez,,,Calle 1,3,,,2024-01-15,';
+      const r = parsearCSV(csv);
+
+      expect(r.errores).toEqual([]);
+      expect(r.filas).toHaveLength(1);
+      expect(r.filas[0]?.cedula).toBe('');
+      expect(r.filas[0]?.municipio).toBe('');
+      // Y NO debe haber error de parseo: la validación es de dominio,
+      // no sintáctica.
+    });
   });
 });
