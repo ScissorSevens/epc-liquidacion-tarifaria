@@ -55,8 +55,10 @@ function suscriptorDe(codigo: string, id: number): Suscriptor {
     municipio: 'Bogota',
     direccion: 'Direccion X',
     estrato: 2,
-    aplica_subsidio: false,
-    estado: 'activo',
+     aplica_subsidio: false,
+     id_prestador: 0,
+     categoria_uso: 'residencial',
+     estado: 'activo',
     created_at: '2026-05-07T00:00:00.000Z',
   };
 }
