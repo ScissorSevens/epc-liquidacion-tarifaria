@@ -160,6 +160,7 @@ function crearSesionValida(overrides: Partial<Sesion> = {}): Sesion {
     token: 'tok-' + 'a'.repeat(32),
     cedula: '1234567890',
     nombre: 'Operario Demo',
+    idOperario: 42, // auditoria legal (CRA 825/2017) — obligatorio
     idPrestador: 42,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     ...overrides,

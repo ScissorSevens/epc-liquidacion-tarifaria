@@ -271,5 +271,51 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       expect(sesionTipada.idPrestador).toBe(operario.id_prestador);
       expect(sesionTipada.cedula).toBe(operario.numero_cedula);
     });
+
+    // ── LL3.7 — idOperario en sesion (CRA 825/2017, auditoría legal) ──
+    //
+    // El reporte de calidad COR-04 detecto que CapturarLectura usaba
+    // id_operario hardcoded a 1 porque la Sesion no cargaba el id
+    // del operario real. Este test fija el contrato: loginLocal DEBE
+    // propagar operario.id_operario al campo sesion.idOperario para
+    // que la pantalla pueda atribuir legalmente cada lectura.
+    it('LL3.7 sesion.idOperario = operario.id_operario (NO hardcoded, NO ausente)', async () => {
+      const operario = buildOperarioValido(); // id_operario = 42
+      const repo = buildRepo(operario);
+      const hasher = buildHasher();
+
+      const resultado = await loginLocal({
+        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        hasher,
+        cedula: '51800012',
+        password: 'mi-clave',
+      });
+
+      expect(resultado.sesion.idOperario).toBe(42);
+      expect(resultado.sesion.idOperario).toBe(operario.id_operario);
+      // No es 1 hardcoded como antes del fix
+      expect(resultado.sesion.idOperario).not.toBe(1);
+    });
+
+    it('LL3.8 sesion.idOperario refleja el id_operario del operario autenticado (otro operario)', async () => {
+      // Triangulacion: NO todo operario tiene id 42. Verificamos que la
+      // propagacion funciona con cualquier id real (audit-friendly).
+      const operario: Operario = {
+        ...buildOperarioValido(),
+        id_operario: 7777,
+      };
+      const repo = buildRepo(operario);
+      const hasher = buildHasher();
+
+      const resultado = await loginLocal({
+        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        hasher,
+        cedula: '51800012',
+        password: 'mi-clave',
+      });
+
+      expect(resultado.sesion.idOperario).toBe(7777);
+      expect(resultado.sesion.idOperario).not.toBe(42);
+    });
   });
 });

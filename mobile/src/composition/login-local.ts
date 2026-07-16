@@ -80,10 +80,14 @@ export async function loginLocal(deps: LoginLocalInput): Promise<LoginLocalResul
 
   // 3. Construir la sesion con idPrestador REAL del operario.
   //    El token es placeholder hasta que llegue el backend (Fase 6).
+  //    idOperario es REQUERIDO en Sesion para que CapturarLectura pueda
+  //    atribuir legalmente cada lectura (CRA 825/2017) — antes estaba
+  //    ausente y CapturarLectura hardcodeaba id_operario=1 (COR-04).
   const sesion: Sesion = {
     token: `fake-token-${Date.now()}`,
     cedula: operario.numero_cedula,
     nombre: operario.nombre,
+    idOperario: operario.id_operario,
     idPrestador: operario.id_prestador,
     expiresAt: Date.now() + MS_EN_UN_DIA,
   };

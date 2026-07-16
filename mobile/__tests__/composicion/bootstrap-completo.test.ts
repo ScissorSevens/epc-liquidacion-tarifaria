@@ -380,6 +380,34 @@ describe('bootstrapCompleto()', () => {
       // El token es un string no vacio (placeholder hasta backend real)
       expect(resultado.sesion.token).toMatch(/^fake-token-/);
     });
+
+    // ── BC1.8 — idOperario en sesion (CRA 825/2017, auditoría legal) ──
+    //
+    // El reporte de calidad COR-04 detecto que CapturarLectura usaba
+    // id_operario hardcoded a 1. bootstrapCompleto es el otro lugar
+    // donde la Sesion se construye — DEBE llevar el id_operario del
+    // operario recien creado para que SetupInicial arranque con
+    // trazabilidad legal desde el primer login.
+    it('BC1.8 sesion.idOperario = operario.id_operario del operario creado (no ausente)', async () => {
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+      });
+
+      // El in-memory repo asigna correlativo 1 al primer operario (state.seq = 1).
+      expect(resultado.sesion.idOperario).toBe(resultado.operario.id_operario);
+      expect(resultado.sesion.idOperario).toBeGreaterThan(0);
+      // Triangulacion: NO es 0 (legacy) ni 1 (hardcoded accidental).
+      // Aqui el correlativo es 1 por el seed del fixture, pero si cambia
+      // el seed, el campo sigue siendo el id REAL del operario creado.
+      expect(typeof resultado.sesion.idOperario).toBe('number');
+      expect(Number.isInteger(resultado.sesion.idOperario)).toBe(true);
+    });
   });
 
   // ── rollback ante fallas ────────────────────────────────────────────────

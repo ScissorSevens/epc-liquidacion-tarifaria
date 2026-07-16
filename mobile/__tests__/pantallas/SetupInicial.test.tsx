@@ -358,6 +358,7 @@ const SESION_FAKE_VALIDA = {
   token: 'fake-token-12345',
   cedula: '12345678',
   nombre: 'Juan Perez',
+  idOperario: 1, // auditoria legal (CRA 825/2017) — obligatorio
   idPrestador: 42,
   expiresAt: Date.now() + 24 * 60 * 60 * 1000,
 };

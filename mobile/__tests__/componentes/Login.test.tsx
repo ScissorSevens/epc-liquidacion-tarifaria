@@ -117,6 +117,7 @@ const SESION_VALIDA: Sesion = {
   token: 'fake-token-12345',
   cedula: '51800012',
   nombre: 'Ana Lopez',
+  idOperario: 42, // auditoria legal (CRA 825/2017) — obligatorio
   idPrestador: 7,
   expiresAt: Date.now() + 24 * 60 * 60 * 1000,
 };

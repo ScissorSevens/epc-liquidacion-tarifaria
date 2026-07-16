@@ -347,6 +347,7 @@ export function buildE2EFixture(): E2EFixture {
  */
 export function buildSesionVigente(overrides: {
   idPrestador?: number;
+  idOperario?: number;
   cedula?: string;
   expiresAt?: number;
   token?: string;
@@ -356,6 +357,7 @@ export function buildSesionVigente(overrides: {
     token: overrides.token ?? 'tok-' + 'a'.repeat(32),
     cedula: overrides.cedula ?? '51800012',
     nombre: overrides.nombre ?? 'Ana López',
+    idOperario: overrides.idOperario ?? 1, // auditoria legal (CRA 825/2017)
     idPrestador: overrides.idPrestador ?? 7,
     expiresAt: overrides.expiresAt ?? Date.now() + 24 * 60 * 60 * 1000,
   };

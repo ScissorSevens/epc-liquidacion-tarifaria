@@ -47,6 +47,7 @@ function crearSesionValida(overrides: Partial<Sesion> = {}): Sesion {
     token: 'tok-' + 'a'.repeat(32),
     cedula: '1234567890',
     nombre: 'Operario Demo',
+    idOperario: 42, // auditoria legal (CRA 825/2017) — obligatorio
     idPrestador: 42,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000, // +24h
     ...overrides,
@@ -172,11 +173,12 @@ describe('constantes.ts (sesion multi-tenant)', () => {
       ]);
     });
 
-    it('T2.3 persiste el shape completo token/cedula/idPrestador/expiresAt sin alterarlo', async () => {
+    it('T2.3 persiste el shape completo token/cedula/idOperario/idPrestador/expiresAt sin alterarlo', async () => {
       const sesion: Sesion = {
         token: 'tok-completo',
         cedula: '1098765432',
         nombre: 'Operario Completo',
+        idOperario: 17,
         idPrestador: 7,
         expiresAt: 1_700_000_000_000,
       };
@@ -189,6 +191,7 @@ describe('constantes.ts (sesion multi-tenant)', () => {
       // nombres de campos en snake→camel contract:
       expect(parsed).toHaveProperty('token');
       expect(parsed).toHaveProperty('cedula');
+      expect(parsed).toHaveProperty('idOperario');
       expect(parsed).toHaveProperty('idPrestador');
       expect(parsed).toHaveProperty('expiresAt');
     });
@@ -265,15 +268,68 @@ describe('constantes.ts (sesion multi-tenant)', () => {
       expect(esSesionValida({ ...sesion, expiresAt: 0 })).toBe(false);
       expect(esSesionValida({ ...sesion, expiresAt: undefined as unknown as number })).toBe(false);
     });
+
+    // ── T4.2e — idOperario (CRA 825/2017, auditoría legal) ──────────────
+    //
+    // Cada lectura DEBE atribuirse al operario que la capturó (idOperario > 0).
+    // Hasta el commit previo, esSesionValida ignoraba este campo y todas las
+    // lecturas quedaban hardcoded como id_operario=1. Estos tests fijan el
+    // contrato: idOperario es requerido y debe ser entero > 0.
+    it('T4.2e1 acepta sesion con idOperario > 0 (atribución legal válida)', () => {
+      const sesion = crearSesionValida();
+      // crearSesionValida() ya devuelve idOperario: 42 por default una vez
+      // aplicados los cambios al fixture. Aqui verificamos explicitamente.
+      expect(sesion.idOperario).toBe(42);
+      expect(esSesionValida(sesion)).toBe(true);
+    });
+
+    it('T4.2e2 rechaza sesion con idOperario === 0', () => {
+      const sesion = crearSesionValida();
+      expect(
+        esSesionValida({ ...sesion, idOperario: 0 } as unknown as Partial<Sesion>),
+      ).toBe(false);
+    });
+
+    it('T4.2e3 rechaza sesion con idOperario negativo', () => {
+      const sesion = crearSesionValida();
+      expect(
+        esSesionValida({ ...sesion, idOperario: -1 } as unknown as Partial<Sesion>),
+      ).toBe(false);
+    });
+
+    it('T4.2e4 rechaza sesion con idOperario no entero', () => {
+      const sesion = crearSesionValida();
+      expect(
+        esSesionValida({ ...sesion, idOperario: 2.5 } as unknown as Partial<Sesion>),
+      ).toBe(false);
+    });
+
+    it('T4.2e5 rechaza sesion sin idOperario (campo ausente)', () => {
+      const sesion = crearSesionValida();
+      const sinOperario = { ...sesion };
+      delete (sinOperario as { idOperario?: number }).idOperario;
+      expect(esSesionValida(sinOperario as unknown as Partial<Sesion>)).toBe(false);
+    });
+
+    it('T4.2e6 rechaza sesion con idOperario === null/undefined', () => {
+      const sesion = crearSesionValida();
+      expect(
+        esSesionValida({ ...sesion, idOperario: null } as unknown as Partial<Sesion>),
+      ).toBe(false);
+      expect(
+        esSesionValida({ ...sesion, idOperario: undefined } as unknown as Partial<Sesion>),
+      ).toBe(false);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
   // Snapshot estructural de Sesion (type-level via runtime check)
   // ─────────────────────────────────────────────────────────────
-  it('Sesion expone los cinco campos del nuevo contrato multi-tenant', () => {
+  it('Sesion expone los seis campos del contrato multi-tenant + auditoria legal', () => {
     const sesion = crearSesionValida();
     expect(typeof sesion.token).toBe('string');
     expect(typeof sesion.cedula).toBe('string');
+    expect(typeof sesion.idOperario).toBe('number');
     expect(typeof sesion.idPrestador).toBe('number');
     expect(typeof sesion.expiresAt).toBe('number');
     // nombre es opcional pero presente en el fixture
@@ -434,6 +490,43 @@ describe('constantes.ts (sesion multi-tenant)', () => {
     it('E1.12 devuelve "invalida" y borra cuando cedula es string vacio', async () => {
       const sesionVacia: Sesion = crearSesionValida({ cedula: '' });
       mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionVacia));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    // ── E1.13 — idOperario en estadoSesionPersistida ───────────────────
+    //
+    // counterpart de T4.2e para el path de lectura defensiva. Si idOperario
+    // esta ausente / <= 0 / no-integer en AsyncStorage, la sesion se trata
+    // como corrupta y se borra (AuthGate mostrara Login directo).
+    it('E1.13 devuelve "invalida" y borra cuando falta el campo idOperario', async () => {
+      const sesionParcial = {
+        token: 'tok-algún-string',
+        cedula: '1234567890',
+        idPrestador: 42,
+        expiresAt: Date.now() + 60_000,
+        // falta idOperario
+      };
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionParcial));
+
+      const estado = await estadoSesionPersistida();
+
+      expect(estado).toBe('invalida');
+      expect(mockedRemoveItem).toHaveBeenCalledWith(clave_storage_sesion);
+    });
+
+    it('E1.14 devuelve "invalida" y borra cuando idOperario <= 0', async () => {
+      const sesionInvalida = {
+        token: 'tok-algún-string',
+        cedula: '1234567890',
+        idPrestador: 42,
+        idOperario: 0,
+        expiresAt: Date.now() + 60_000,
+      };
+      mockedGetItem.mockResolvedValueOnce(JSON.stringify(sesionInvalida));
 
       const estado = await estadoSesionPersistida();
 

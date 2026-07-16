@@ -7,10 +7,14 @@
  *
  * ⚠️ DEUDA DOCUMENTADA — TICKET-EPIC-LOGIN-001:
  * Shape de Sesion actual:
- *   { token: string; cedula: string; nombre?: string; idPrestador: number; expiresAt: number }
+ *   { token, cedula, nombre?, idOperario, idPrestador, expiresAt }
  * Token = GUID random que devuelve el backend de EPC (.NET) tras autenticar.
  * expiresAt = timestamp absoluto en ms (Date.now()); la sesion vence 24h
  * despues del login y `cargarSesion()` la descarta transparentemente.
+ * idOperario = id del operario en la DB local; requerido por ley para
+ * atribuir legalmente cada lectura capturada (CRA 825/2017 art. 1.3.1.5 +
+ * Res SSPD 2018). Sin este campo, las lecturas quedaban con `id_operario: 1`
+ * hardcoded y la auditoría era inservible (COR-04 reporte de calidad).
  *
  * FASE 4 TAREA 4.1 — reemplazo del placeholder `{ cedula }` por el shape real.
  * `esSesionValida` se exporta unicamente para tests (helper privado de hecho,
@@ -32,6 +36,12 @@ export interface Sesion {
   readonly token: string;
   readonly cedula: string;
   readonly nombre?: string;
+  /**
+   * ID del operario que inicio sesion (requerido por auditoria legal —
+   * cada lectura debe atribuirse al operario que la capturo).
+   * Entero estrictamente positivo (id_operario de la tabla `operarios`).
+   */
+  readonly idOperario: number;
   readonly idPrestador: number;
   /** Timestamp absoluto en ms desde epoch. La sesion vence cuando Date.now() >= expiresAt. */
   readonly expiresAt: number;
@@ -82,6 +92,7 @@ function limpiarStorageDefensivo(): void {
  *   - token: string no vacio.
  *   - cedula: string no vacio.
  *   - idPrestador: number entero > 0.
+ *   - idOperario: number entero > 0. (CRA 825/2017 — auditoria legal)
  *   - expiresAt: number.
  * A diferencia de `esSesionValida`, este helper considera 'vencida' cuando
  * `expiresAt <= Date.now()` (no `>`). El boundary se trata como vencida
@@ -115,6 +126,14 @@ export async function estadoSesionPersistida(): Promise<EstadoSesion> {
     limpiarStorageDefensivo();
     return 'invalida';
   }
+  if (
+    typeof parsed.idOperario !== 'number' ||
+    !Number.isInteger(parsed.idOperario) ||
+    parsed.idOperario <= 0
+  ) {
+    limpiarStorageDefensivo();
+    return 'invalida';
+  }
   if (typeof parsed.expiresAt !== 'number') {
     limpiarStorageDefensivo();
     return 'invalida';
@@ -129,10 +148,12 @@ export async function estadoSesionPersistida(): Promise<EstadoSesion> {
 
 /**
  * Type guard: devuelve true solo si TODOS los campos requeridos son validos.
- * Reglas (Fase 4.1 contrato):
+ * Reglas (Fase 4.1 contrato + Fase 7 auditoria legal):
  *   - token:      string no vacio
  *   - cedula:     string no vacio
  *   - idPrestador: number entero > 0
+ *   - idOperario:  number entero > 0  (CRA 825/2017 — cada lectura debe
+ *                     atribuirse al operario que la capturo, NO hardcoded)
  *   - expiresAt:  number, estrictamente futuro (Date.now() < expiresAt)
  *   - nombre:     opcional, string si esta presente
  *
@@ -148,6 +169,9 @@ export function esSesionValida(s: Partial<Sesion>): s is Sesion {
     typeof s.idPrestador === 'number' &&
     Number.isInteger(s.idPrestador) &&
     s.idPrestador > 0 &&
+    typeof s.idOperario === 'number' &&
+    Number.isInteger(s.idOperario) &&
+    s.idOperario > 0 &&
     typeof s.expiresAt === 'number' &&
     s.expiresAt > Date.now() &&
     (s.nombre === undefined || typeof s.nombre === 'string')

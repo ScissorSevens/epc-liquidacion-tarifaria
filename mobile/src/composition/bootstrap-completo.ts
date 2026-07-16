@@ -292,10 +292,14 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
   }
 
   // 5. Construir la sesion local (placeholder hasta que llegue el backend).
+  //    idOperario se propaga desde el operario recien creado — la Sesion
+  //    debe llevarlo para que CapturarLectura pueda atribuir legalmente
+  //    cada lectura (CRA 825/2017, ver COR-04 reporte de calidad).
   const sesion: Sesion = {
     token: `fake-token-${ahora.getTime()}`,
     cedula: operario.numero_cedula,
     nombre: operario.nombre,
+    idOperario: operario.id_operario,
     idPrestador: prestador.id_prestador,
     expiresAt: ahora.getTime() + MS_EN_UN_DIA,
   };
