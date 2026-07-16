@@ -40,6 +40,7 @@ interface SuscriptorRow {
   readonly cedula: string;
   readonly municipio: string;
   readonly sector: string | null;
+  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
@@ -66,6 +67,7 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
     ...(row.sector !== null && { sector: row.sector }),
+    ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
       matricula_inmobiliaria: row.matricula_inmobiliaria,
     }),
@@ -93,18 +95,34 @@ const SQL_MAX_CODIGO = `SELECT MAX(CAST(codigo AS INTEGER)) AS max_codigo FROM s
 const SQL_LISTAR = `SELECT * FROM suscriptor ORDER BY codigo ASC`;
 const SQL_UPDATE_SUBSIDIO = `UPDATE suscriptor SET aplica_subsidio = ? WHERE id_suscriptor = ?`;
 
-const SQL_UPDATE = `
-  UPDATE suscriptor
-  SET nombre_apellidos       = ?,
-      municipio              = ?,
-      sector                 = ?,
-      direccion              = ?,
-      estrato                = ?,
-      matricula_inmobiliaria = ?,
-      numero_catastral       = ?,
-      estado                 = ?
-  WHERE id_suscriptor        = ?
-`;
+/**
+ * Columnas permitidas en el UPDATE parcial. La whitelist es deliberada:
+ * `cambios` cruza un boundary de datos y no puede convertirse directamente
+ * en SQL sin controlar sus claves.
+ */
+const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof SuscriptorRow> = [
+  'nombre_apellidos',
+  'cedula',
+  'municipio',
+  'sector',
+  'calle',
+  'direccion',
+  'estrato',
+  'matricula_inmobiliaria',
+  'numero_catastral',
+  'aplica_subsidio',
+  'categoria_uso',
+  'id_prestador',
+  'estado',
+];
+
+function toSqlValue(
+  value: ActualizarSuscriptorInput[keyof ActualizarSuscriptorInput] | undefined,
+): string | number | null {
+  if (value === undefined) return null;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  return value;
+}
 
 /**
  * Traduce errores expo-sqlite a mensajes de dominio especificos para
@@ -186,25 +204,27 @@ export function crearSuscriptorRepositoryExpoSqlite(
     },
 
     async actualizar(id: number, cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
-      const result = await db.runAsync(
-        SQL_UPDATE,
-        cambios.nombre_apellidos ?? null,
-        cambios.municipio        ?? null,
-        cambios.sector           ?? null,
-        cambios.direccion        ?? null,
-        cambios.estrato          ?? null,
-        cambios.matricula_inmobiliaria ?? null,
-        cambios.numero_catastral ?? null,
-        cambios.estado           ?? null,
+      const camposActualizar = COLUMNAS_ACTUALIZABLES.filter((k) => k in cambios);
+
+      if (camposActualizar.length === 0) {
+        const row = await db.getFirstAsync<SuscriptorRow>(SQL_SELECT_BY_ID, id);
+        if (!row) throw new Error(`Suscriptor id=${id} no existe`);
+        return fromRow(row);
+      }
+
+      const setClauses = camposActualizar.map((k) => `${k} = ?`).join(', ');
+      const values = camposActualizar.map((k) =>
+        toSqlValue(cambios[k as keyof ActualizarSuscriptorInput]),
+      );
+
+      await db.runAsync(
+        `UPDATE suscriptor SET ${setClauses} WHERE id_suscriptor = ?`,
+        ...values,
         id,
       );
-      if (result.changes === 0) {
-        throw new Error(`actualizar: suscriptor ${id} no encontrado`);
-      }
+
       const row = await db.getFirstAsync<SuscriptorRow>(SQL_SELECT_BY_ID, id);
-      if (!row) {
-        throw new Error(`actualizar: suscriptor ${id} no encontrado tras UPDATE`);
-      }
+      if (!row) throw new Error(`Suscriptor id=${id} no existe`);
       return fromRow(row);
     },
 
