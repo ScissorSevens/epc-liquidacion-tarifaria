@@ -33,9 +33,14 @@ import {
 
 type Props = ConfigStackScreenProps<'ImportarCsv'>;
 
-// Header nuevo (7 columnas) — codigo y numero_medidor se asignan automáticamente.
-const HEADER_ESPERADO_TXT =
-  'nombre_apellidos,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
+// Header nuevo (9 columnas, desde COR-09) — `cedula` y `municipio`
+// son requeridos por el dominio `crearSuscriptor`. La constante DEBE
+// coincidir token-a-token con `HEADER_NUEVO` en `parser-csv.ts`.
+// El test de contrato `__tests__/pantallas/importar-csv-header.test.ts`
+// enforce esa sincronía — si la UI promete un formato distinto al
+// que el parser acepta, el test rompe.
+export const HEADER_ESPERADO_TXT =
+  'nombre_apellidos,cedula,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
 
 // Umbral a partir del cual pedimos confirmacion al usuario antes de
 // procesar. RN no tiene workers triviales y el bucle es JS thread, asi
@@ -73,6 +78,13 @@ type Estado =
  * Validacion del header: la hace `parsearCSV()` mismo. Si el header es
  * invalido devuelve `{ filas: [], errores: [{ linea: 1, ... }] }`. Lo
  * detectamos y vamos a fase `error` SIN llamar al importador con basura.
+ *
+ * Contrato del header: la constante `HEADER_ESPERADO_TXT` (arriba) DEBE
+ * coincidir token-a-token con `HEADER_NUEVO` en `parser-csv.ts`. El test
+ * `__tests__/pantallas/importar-csv-header.test.ts` enforce esta sincronía.
+ * Si la UI promete un header distinto al que el parser espera, el test
+ * rompe (COR-09: bug histórico donde la UI mostraba "7 columnas" sin
+ * cédula/municipio pero el dominio las exigía).
  *
  * Encoding: UTF-8 (default de `File.text()`). Si el CSV viene en
  * Windows-1252 o latin1 (Excel comun), se va a ver con caracteres raros
@@ -267,16 +279,19 @@ export default function ImportarCsv({ navigation }: Props) {
             <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
               <Text style={styles.modalBody}>
                 El archivo debe ser un CSV (separado por comas) con{'\n'}
-                <Text style={{ fontWeight: '700' }}>7 columnas</Text> en este orden:
+                <Text style={{ fontWeight: '700' }}>9 columnas</Text> en este orden:
               </Text>
               <Text style={styles.modalCode}>{HEADER_ESPERADO_TXT}</Text>
               <Text style={styles.modalBody}>
-                • Código y número de medidor se asignan automáticamente.{'\n'}
+                • Cédula y municipio son obligatorios (el dominio los exige NO vacíos).{'\n'}
+                • Cédula: entre 6 y 12 dígitos numéricos.{'\n'}
+                • Municipio: nombre real del municipio donde se presta el servicio.{'\n'}
+                • Código de suscriptor y número de medidor se asignan automáticamente.{'\n'}
                 • Encoding: UTF-8.{'\n'}
                 • Estrato: entero entre 1 y 6.{'\n'}
                 • Fecha de instalación: formato YYYY-MM-DD.{'\n'}
                 • Campos opcionales (matrícula, catastral, observaciones) pueden venir vacíos.{'\n'}
-                • También acepta el formato legado de 9 columnas con código y número de medidor.
+                • También acepta el formato legado de 9 columnas con código y número de medidor (sin cédula/municipio).
               </Text>
             </ScrollView>
             <View style={styles.modalFooter}>
@@ -353,7 +368,7 @@ function RenderIdle({
         </Text>
         <View style={styles.cardHint}>
           <MaterialIcons name="info" size={16} color={COLORS.secondary} />
-          <Text style={styles.cardHintTexto}>7 columnas separadas por coma · UTF-8</Text>
+          <Text style={styles.cardHintTexto}>9 columnas separadas por coma · UTF-8</Text>
         </View>
         <Pressable
           onPress={onSeleccionar}
