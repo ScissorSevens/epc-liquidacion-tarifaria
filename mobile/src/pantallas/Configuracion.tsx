@@ -121,6 +121,16 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
               numero_cedula: encontrado.numeroCedula,
               nombre: encontrado.nombre,
               email: encontrado.email,
+              /**
+               * El backend NUNCA devuelve `password_hash` por seguridad — la
+               * contraseña se valida en el endpoint de login y nunca viaja
+               * en el payload de listado/vinculación. Acá guardamos string
+               * vacío como placeholder porque esta pantalla NO autentica:
+               * solo muestra el perfil. Si el operario quiere entrar de
+               * nuevo con su cédula, el flujo de Login real usa el endpoint
+               * dedicado y obtiene un token opaco (no el hash).
+               */
+              password_hash: '',
               rol: encontrado.rol,
               estado: encontrado.estado,
               dispositivo_id: encontrado.dispositivoId,
@@ -201,6 +211,13 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
         numero_cedula: raw.numeroCedula,
         nombre: raw.nombre,
         email: raw.email,
+        /**
+         * El backend NUNCA devuelve `password_hash` por seguridad. Esta
+         * pantalla NO autentica, solo muestra el perfil y permite
+         * desasignar. Ver doc en el bloque anterior (cargarPerfil) para
+         * el rationale completo.
+         */
+        password_hash: '',
         rol: raw.rol,
         estado: raw.estado,
         dispositivo_id: raw.dispositivoId,
