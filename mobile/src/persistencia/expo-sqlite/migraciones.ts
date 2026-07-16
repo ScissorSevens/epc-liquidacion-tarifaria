@@ -334,7 +334,7 @@ CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
  * DEFAULT '': las filas pre-existentes quedan con hash vacío; un operario
  * legacy sin hash válido NO puede hacer login (PASSWORD_INCORRECTA). Esto
  * es aceptable porque el setup inicial (Fase 5.1) siempre crea el primer
- * operario con password_hash real via bootstrapCompleto → operarioRepo.guardar.
+ * operario con password_hash real via bootstrapCompleto → operarioRepo.crear.
  */
 const MIGRACION_017_OPERARIO_PASSWORD_HASH = `
 -- Agrega password_hash a operario para DBs pre-PUNTO-A del SDD

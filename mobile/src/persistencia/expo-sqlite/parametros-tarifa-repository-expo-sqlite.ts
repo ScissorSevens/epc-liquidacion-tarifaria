@@ -8,7 +8,7 @@ import type {
   FiltrosListarParametros,
   ParametrosTarifa,
   ParametrosTarifaRepository,
-} from '@dominio/parametros-tarifa';
+} from '../../../dominio/parametros-tarifa';
 
 export interface ParametrosTarifaRepositoryExpoSqlite extends ParametrosTarifaRepository {
   cerrar(): Promise<void>;

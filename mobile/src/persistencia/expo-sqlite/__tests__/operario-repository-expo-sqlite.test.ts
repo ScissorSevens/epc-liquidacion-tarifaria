@@ -107,6 +107,7 @@ function buildPersistingDb(id = 42) {
   return { db: buildDb({ runAsync, getFirstAsync }), runAsync, getFirstAsync };
 }
 
+// ── inicializar ────────────────────────────────────────────────────────────
 
 describe('inicializar()', () => {
   it('llama execAsync con CREATE TABLE IF NOT EXISTS', async () => {

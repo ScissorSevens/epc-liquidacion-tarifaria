@@ -51,9 +51,9 @@ import {
   crearOperarioRepositoryExpoSqlite,
   type OperarioRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
-import type { Prestador } from '@dominio/prestadores';
-import type { AcuerdoMunicipal } from '@dominio/acuerdo-municipal';
-import type { ParametrosTarifa } from '@dominio/parametros-tarifa';
+import type { Prestador } from '../../dominio/prestadores';
+import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal';
+import type { ParametrosTarifa } from '../../dominio/parametros-tarifa';
 import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
 import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
 import type { Hasher, IdGenerator } from '@dominio/shared/ports';

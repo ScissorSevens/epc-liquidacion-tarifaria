@@ -8,7 +8,7 @@ import type {
   AcuerdoMunicipalRepository,
   CrearAcuerdoMunicipalInput,
   FiltrosListarAcuerdos,
-} from '@dominio/acuerdo-municipal';
+} from '../../../dominio/acuerdo-municipal';
 
 export interface AcuerdoMunicipalRepositoryExpoSqlite extends AcuerdoMunicipalRepository {
   cerrar(): Promise<void>;

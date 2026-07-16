@@ -26,9 +26,6 @@ import {
 } from '../composition/validaciones-setup';
 import {
   bootstrapCompleto,
-  type PrestadorRepoPort,
-  type ParametrosRepoPort,
-  type OperarioRepoPort,
 } from '../composition/bootstrap-completo';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { guardarSesion } from '../composition/constantes';
@@ -109,10 +106,10 @@ export default function SetupInicial({ onComplete }: Props) {
       // 2. Bootstrap del tenant via getBootstrap (cached) + bootstrapCompleto.
       const bs = await getBootstrap();
       const resultado = await bootstrapCompleto({
-        prestadorRepo: bs.prestadorRepo as unknown as PrestadorRepoPort,
+        prestadorRepo: bs.prestadorRepo,
         acuerdoRepo: bs.acuerdoMunicipalRepo,
-        parametrosRepo: bs.parametrosTarifaRepo as unknown as ParametrosRepoPort,
-        operarioRepo: bs.operarioRepo as unknown as OperarioRepoPort,
+        parametrosRepo: bs.parametrosTarifaRepo,
+        operarioRepo: bs.operarioRepo,
         hasher: bs.hasher,
         idGenerator: bs.idGenerator,
         input: {

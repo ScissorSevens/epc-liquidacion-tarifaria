@@ -12,7 +12,7 @@ import type {
   FiltrosListarPrestador,
   Prestador,
   PrestadorRepository,
-} from '@dominio/prestadores';
+} from '../../../dominio/prestadores';
 
 export interface PrestadorRepositoryExpoSqlite extends PrestadorRepository {
   cerrar(): Promise<void>;
@@ -23,6 +23,8 @@ interface PrestadorRow {
   readonly codigo: string;
   readonly nombre: string;
   readonly nit: string;
+  readonly representante_legal: string;
+  readonly representante_legal_cedula: string;
   readonly municipio: string;
   readonly departamento: string;
   readonly segmento: number;
@@ -40,6 +42,8 @@ function fromRow(row: PrestadorRow): Prestador {
     codigo: row.codigo,
     nombre: row.nombre,
     nit: row.nit,
+    representante_legal: row.representante_legal,
+    representante_legal_cedula: row.representante_legal_cedula,
     municipio: row.municipio,
     departamento: row.departamento,
     segmento: row.segmento as Prestador['segmento'],
@@ -59,10 +63,12 @@ export function crearPrestadorRepositoryExpoSqlite(
     async crear(data: CrearPrestadorInput): Promise<Prestador> {
       const result = await db.runAsync(
         `INSERT INTO prestador (
-          codigo, nombre, nit, municipio, departamento, segmento,
+          codigo, nombre, nit, representante_legal, representante_legal_cedula,
+          municipio, departamento, segmento,
           num_suscriptores_urbanos, num_suscriptores_rurales, contacto, estado
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        data.codigo, data.nombre, data.nit, data.municipio, data.departamento, data.segmento,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        data.codigo, data.nombre, data.nit, data.representante_legal,
+        data.representante_legal_cedula, data.municipio, data.departamento, data.segmento,
         data.num_suscriptores_urbanos, data.num_suscriptores_rurales,
         data.contacto ?? null, data.estado ?? 'activo',
       );

@@ -44,7 +44,7 @@ interface OperarioRow {
 
 const SQL_CREATE_TABLE = `
 CREATE TABLE IF NOT EXISTS operarios (
-  id_operario    INTEGER PRIMARY KEY,
+  id_operario    INTEGER PRIMARY KEY AUTOINCREMENT,
   id_prestador   INTEGER NOT NULL DEFAULT 0,
   numero_cedula  TEXT NOT NULL UNIQUE,
   nombre         TEXT NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS operarios (
   rol            TEXT NOT NULL DEFAULT 'operario',
   estado         TEXT NOT NULL DEFAULT 'activo',
   dispositivo_id TEXT,
-  created_at     TEXT
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 )
 `;
 
