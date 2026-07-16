@@ -22,11 +22,6 @@ interface WorkspaceState {
   readonly parametros_vigentes: ParametrosTarifa | null;
   readonly cargando: boolean;
   setPrestadores: (prestadores: readonly Prestador[]) => void;
-  cargarContexto: (repo: {
-    prestador: { buscarPorId: (id: number) => Promise<Prestador | null> };
-    acuerdo: { buscarVigente: (id: number, fecha: string) => Promise<AcuerdoMunicipal | null> };
-    parametros: { buscarVigente: (id: number, periodo: number) => Promise<ParametrosTarifa | null> };
-  }) => Promise<void>;
   /**
    * Cambia el prestador activo y recarga el contexto tarifario (COR-08).
    *
@@ -55,8 +50,7 @@ interface WorkspaceState {
     id: number,
     repo: {
       // Alineado con los contratos reales:
-      //   - PrestadorRepository.obtenerPorId (no existe buscarPorId;
-      //     el legacy cargarContexto declaraba un tipo-fake).
+      //   - PrestadorRepository.obtenerPorId
       //   - AcuerdoMunicipalRepository.buscarVigente(id, fecha).
       //   - ParametrosTarifaRepository.buscarVigente(id, fecha).
       prestador: { obtenerPorId: (id: number) => Promise<Prestador | null> };
@@ -85,11 +79,9 @@ interface WorkspaceState {
   limpiarWorkspace: () => Promise<void>;
 }
 
-const periodoActual = (): number => Number(new Date().toISOString().slice(0, 4));
-
 export const useWorkspace = create<WorkspaceState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       id_prestador_activo: 0,
       prestador: null,
       prestadores_disponibles: [],
@@ -98,25 +90,6 @@ export const useWorkspace = create<WorkspaceState>()(
       cargando: false,
 
       setPrestadores: (prestadores) => set({ prestadores_disponibles: prestadores }),
-
-      cargarContexto: async (repo) => {
-        const id = get().id_prestador_activo;
-        set({ cargando: true });
-        try {
-          const prestador = await repo.prestador.buscarPorId(id);
-          const acuerdo = await repo.acuerdo.buscarVigente(id, new Date().toISOString());
-          const parametros = await repo.parametros.buscarVigente(id, periodoActual());
-          set({
-            prestador,
-            acuerdo_vigente: acuerdo,
-            parametros_vigentes: parametros,
-            cargando: false,
-          });
-        } catch (err) {
-          set({ cargando: false });
-          throw err;
-        }
-      },
 
       /**
        * Ver bloque de docs en la interface arriba (COR-08).
@@ -149,9 +122,6 @@ export const useWorkspace = create<WorkspaceState>()(
           const [prestador, acuerdo, parametros] = await Promise.all([
             repo.prestador.obtenerPorId(id),
             repo.acuerdo.buscarVigente(id, new Date().toISOString()),
-            // ParametrosTarifaRepository.buscarVigente toma `fecha: string`,
-            // NO `periodo: number`. El legacy cargarContexto pasaba el año
-            // numérico — bug que no propagamos.
             repo.parametros.buscarVigente(id, new Date().toISOString()),
           ]);
           // (4) Set final — los 3 campos poblados, spinner off.
