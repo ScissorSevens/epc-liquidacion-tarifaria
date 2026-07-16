@@ -77,6 +77,24 @@ describe('crearOperario — numero_cedula', () => {
 });
 
 describe('crearOperario — email', () => {
+  it('T-EMAIL-3 acepta email vacío y lo preserva', () => {
+    const resultado = crearOperario({ ...inputValido, email: '' });
+
+    expect(resultado.email).toBe('');
+  });
+
+  it('T-EMAIL-4 acepta un email válido y lo preserva', () => {
+    const resultado = crearOperario({ ...inputValido, email: 'juan@test.com' });
+
+    expect(resultado.email).toBe('juan@test.com');
+  });
+
+  it('T-EMAIL-5 rechaza email con dominio sin punto', () => {
+    expect(() =>
+      crearOperario({ ...inputValido, email: 'juan@local' }),
+    ).toThrow(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
+  });
+
   it('rechaza email sin arroba', () => {
     expect(() =>
       crearOperario({ ...inputValido, email: 'carlos.epc.co' }),

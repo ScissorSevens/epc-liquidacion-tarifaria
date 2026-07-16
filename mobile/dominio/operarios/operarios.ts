@@ -35,7 +35,7 @@ function validarEntrada(input: CrearOperarioInput): void {
   if (input.nombre.length > 150) {
     throw new Error(MENSAJES_ERROR_OPERARIO.NOMBRE_LARGO);
   }
-  if (!REGEX_EMAIL.test(input.email)) {
+  if (input.email !== '' && !REGEX_EMAIL.test(input.email)) {
     throw new Error(MENSAJES_ERROR_OPERARIO.EMAIL_INVALIDO);
   }
   if (input.password_hash === '') {

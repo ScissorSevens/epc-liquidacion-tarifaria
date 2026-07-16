@@ -390,6 +390,47 @@ describe('bootstrapCompleto()', () => {
       expect(resultado.operario.password_hash).not.toBe('mi-password-secreto');
     });
 
+    it('T-EMAIL-1 crea el operario cuando email es un string vacío', async () => {
+      const input = buildInputValido();
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: {
+          ...input,
+          operarioData: { ...input.operarioData, email: '' },
+        },
+      });
+
+      expect(resultado.operario.email).toBe('');
+      expect(Array.from(state.operarios.values())).toEqual([resultado.operario]);
+    });
+
+    it('T-EMAIL-2 crea el operario con email vacío cuando no se provee email', async () => {
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: {
+          prestadorData: INPUT_VALIDO_PRESTADOR,
+          operarioData: {
+            numero_cedula: '12345678',
+            nombre: 'Juan Pérez',
+            password: 'mi-password-secreto',
+          },
+        },
+      });
+
+      expect(resultado.operario.email).toBe('');
+      expect(Array.from(state.operarios.values())).toEqual([resultado.operario]);
+    });
+
     it('BC1.7 construye sesion con idPrestador del prestador y expiresAt ~24h', async () => {
       const antesDe = Date.now();
       const resultado = await bootstrapCompleto({

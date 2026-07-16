@@ -232,8 +232,7 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
 
     // 4. Crear el primer operario vinculado al prestador.
     const password_hash = deps.hasher.sha256(deps.input.operarioData.password);
-    const email =
-      deps.input.operarioData.email ?? `${deps.input.operarioData.numero_cedula}@local`;
+    const email = deps.input.operarioData.email ?? '';
     const borradorOperario = crearOperario({
       id_prestador: prestador.id_prestador,
       numero_cedula: deps.input.operarioData.numero_cedula,
