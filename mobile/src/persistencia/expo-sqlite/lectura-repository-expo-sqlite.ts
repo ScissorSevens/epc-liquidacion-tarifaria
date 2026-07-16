@@ -153,12 +153,17 @@ function aplicarFiltros(base: string, filtros?: FiltrosLectura): SqlConParams {
 export interface LecturaRepositoryExpoSqlite extends LecturaRepository {
   cerrar(): Promise<void>;
   listarPorMedidor(idMedidor: number): Promise<Lectura[]>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
 export function crearLecturaRepositoryExpoSqlite(
   db: SQLite.SQLiteDatabase,
 ): LecturaRepositoryExpoSqlite {
   return {
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+      await db.withTransactionAsync(task);
+    },
+
     async guardar(lectura: Lectura): Promise<Lectura> {
       let info: SQLite.SQLiteRunResult;
       try {

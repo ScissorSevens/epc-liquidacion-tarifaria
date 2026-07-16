@@ -25,6 +25,7 @@ const makeHasher = () => ({ sha256: jest.fn((_s: string) => 'hash-test') });
 const makeIdGen = () => ({ uuid: jest.fn(() => 'item-uuid-test') });
 
 const makeLecturaRepo = (persistida: Lectura) => ({
+  withTransactionAsync: jest.fn(async (task: () => Promise<void>): Promise<void> => task()),
   guardar: jest.fn(async (_l: Lectura) => persistida),
 });
 
@@ -118,7 +119,10 @@ describe('Flujo capturar-lectura (integracion)', () => {
     const err = Object.assign(new Error('ya existe'), {
       cause: { codigo: 'RESTRICCION_UNICIDAD' },
     });
-    const lecturaRepo = { guardar: jest.fn(async () => { throw err; }) };
+    const lecturaRepo = {
+      withTransactionAsync: jest.fn(async (task: () => Promise<void>): Promise<void> => task()),
+      guardar: jest.fn(async () => { throw err; }),
+    };
     const colaRepo = makeColaRepo([]);
 
     await expect(

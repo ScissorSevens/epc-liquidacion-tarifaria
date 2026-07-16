@@ -14,10 +14,9 @@
 //  - NO encolamos `EVIDENCIA` ni `LIQUIDACION` por separado: la
 //    evidencia viaja embebida en la lectura, la liquidación la deriva
 //    el backend.
-//  - El adapter NO atrapa errores: si falla `lecturaRepo.guardar`
-//    (p.ej. por `RESTRICCION_UNICIDAD`) el error sube tal cual y NO se
-//    encola nada (semántica all-or-nothing simple, sin transacción
-//    porque las repos no exponen una API transaccional unificada).
+//  - El adapter NO atrapa errores: `withTransactionAsync` hace COMMIT si
+//    guardar lectura + consultar dependencias + encolar resuelven, o ROLLBACK
+//    automatico si cualquiera rechaza. El error original sube al caller.
 
 import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Medidor } from '@dominio/medidores/types';
@@ -31,6 +30,7 @@ import type { Hasher, IdGenerator } from '@dominio/shared/ports';
  */
 export interface LecturaRepoGuardar {
   guardar(lectura: Lectura): Promise<Lectura>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
 /**
@@ -69,44 +69,50 @@ export interface PersistirYEncolarResultado {
  * Si NO hay item MEDIDOR pendiente (medidor ya sincronizado o nunca
  * estuvo en cola), encolamos sin `dependeDe`.
  *
- * Errores: si `lecturaRepo.guardar` lanza (p.ej. unicidad violada), el
- * error propaga y NO se encola nada. Si `colaRepo.guardar` lanza tras
- * persistir la lectura, el error propaga; la lectura ya quedó en disco
- * pero sin item de cola — el caller decide si reintentar.
+ * Errores: si cualquier operacion lanza, expo-sqlite revierte lectura e item
+ * de cola automaticamente y el error original se propaga al caller.
  */
 export async function persistirYEncolarLectura(
   deps: PersistirYEncolarDeps,
 ): Promise<PersistirYEncolarResultado> {
   const { lectura, lecturaRepo, colaRepo, idGenerator, hasher } = deps;
+  let resultado: PersistirYEncolarResultado | undefined;
 
-  const lecturaPersistida = await lecturaRepo.guardar(lectura);
+  // expo-sqlite 16 no entrega `tx` a withTransactionAsync; los repos
+  // comparten la conexion y sus queries participan en la transaccion activa.
+  await lecturaRepo.withTransactionAsync(async () => {
+    const lecturaPersistida = await lecturaRepo.guardar(lectura);
 
-  // Lookup MEDIDOR pendiente para armar dependeDe (Camino 3).
-  const itemsCola = await colaRepo.listar();
-  const itemMedidorPendiente = itemsCola.find((it) => {
-    if (it.tipo !== 'MEDIDOR') return false;
-    if (it.estado !== 'PENDIENTE' && it.estado !== 'ENVIANDO') return false;
-    const med = it.payload as Medidor | undefined;
-    return med?.id_medidor === lecturaPersistida.id_medidor;
+    // Lookup MEDIDOR pendiente para armar dependeDe (Camino 3).
+    const itemsCola = await colaRepo.listar();
+    const itemMedidorPendiente = itemsCola.find((it) => {
+      if (it.tipo !== 'MEDIDOR') return false;
+      if (it.estado !== 'PENDIENTE' && it.estado !== 'ENVIANDO') return false;
+      const med = it.payload as Medidor | undefined;
+      return med?.id_medidor === lecturaPersistida.id_medidor;
+    });
+
+    const idItemCola = idGenerator.uuid();
+    const hashLocal = hasher.sha256(JSON.stringify(lecturaPersistida));
+    const item: ItemCola = {
+      id: idItemCola,
+      tipo: 'LECTURA',
+      payload: lecturaPersistida,
+      hashLocal,
+      estado: 'PENDIENTE',
+      intentos: 0,
+      ultimoError: null,
+      ultimoIntentoEn: null,
+      creadoEn: new Date(),
+      ...(itemMedidorPendiente ? { dependeDe: [itemMedidorPendiente.id] } : {}),
+    };
+
+    await colaRepo.guardar(item);
+    resultado = { idItemCola, lectura: lecturaPersistida };
   });
 
-  const idItemCola = idGenerator.uuid();
-  const hashLocal = hasher.sha256(JSON.stringify(lecturaPersistida));
-
-  const item: ItemCola = {
-    id: idItemCola,
-    tipo: 'LECTURA',
-    payload: lecturaPersistida,
-    hashLocal,
-    estado: 'PENDIENTE',
-    intentos: 0,
-    ultimoError: null,
-    ultimoIntentoEn: null,
-    creadoEn: new Date(),
-    ...(itemMedidorPendiente ? { dependeDe: [itemMedidorPendiente.id] } : {}),
-  };
-
-  await colaRepo.guardar(item);
-
-  return { idItemCola, lectura: lecturaPersistida };
+  if (resultado === undefined) {
+    throw new Error('persistirYEncolarLectura: la transaccion finalizo sin resultado');
+  }
+  return resultado;
 }
