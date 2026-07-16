@@ -31,7 +31,12 @@ export default function ConfigStack({ onLogoutRequested }: Props) {
       <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />
       <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
       <Stack.Screen name="MiPerfil">
-        {() => <MiPerfil onLogoutRequested={onLogoutRequested} />}
+        {(props) => (
+          <MiPerfil
+            {...props}
+            onLogoutRequested={onLogoutRequested}
+          />
+        )}
       </Stack.Screen>
       <Stack.Screen name="Admin" component={Admin} />
       <Stack.Screen name="GestionPrestadores" component={GestionPrestadores} />
