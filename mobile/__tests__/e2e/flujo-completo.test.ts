@@ -75,7 +75,6 @@ import {
 } from '../../src/composition/constantes';
 import { limpiarDatosLegacyBypass, CLAVE_ASYNC_CEDULA_OPERARIO } from '../../src/composition/migracion-datos-legacy';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
-import type { OperarioRepositoryExpoSqlite } from '../../src/persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import { buildE2EFixture, buildBootstrapInputValido, buildSesionVigente, type E2EFixture } from './helpers/test-db';
 
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<typeof AsyncStorage.getItem>;
@@ -282,7 +281,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
       expect(await cargarSesion()).toBeNull();
 
       const resultado = await loginLocal({
-        operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: fixture.operarioRepo,
         hasher: fixture.hasher,
         cedula,
         password: 'mi-clave',
@@ -301,7 +300,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
       const { idPrestador, cedula } = await bootstrapPrevio();
 
       const { sesion } = await loginLocal({
-        operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: fixture.operarioRepo,
         hasher: fixture.hasher,
         cedula,
         password: 'mi-clave',
@@ -343,7 +342,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       await expect(
         loginLocal({
-          operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: fixture.operarioRepo,
           hasher: fixture.hasher,
           cedula: input.operarioData.numero_cedula,
           password: 'clave-equivocada',
@@ -368,7 +367,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       try {
         await loginLocal({
-          operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: fixture.operarioRepo,
           hasher: fixture.hasher,
           cedula: input.operarioData.numero_cedula,
           password: 'clave-equivocada',
@@ -403,7 +402,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       try {
         await loginLocal({
-          operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: fixture.operarioRepo,
           hasher: fixture.hasher,
           cedula: sesionPre.cedula,
           password: 'clave-equivocada',
@@ -436,7 +435,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
       // Buscar cedula que no existe.
       await expect(
         loginLocal({
-          operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: fixture.operarioRepo,
           hasher: fixture.hasher,
           cedula: '00000000',
           password: 'cualquier-password',
@@ -459,7 +458,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       try {
         await loginLocal({
-          operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: fixture.operarioRepo,
           hasher: fixture.hasher,
           cedula: '99999999',
           password: 'cualquier-password',
@@ -523,7 +522,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       // Re-login con el mismo operario (mismo bootstrap).
       const { sesion: sesionNueva } = await loginLocal({
-        operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: fixture.operarioRepo,
         hasher: fixture.hasher,
         cedula: input.operarioData.numero_cedula,
         password: 'mi-clave',
@@ -644,7 +643,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
     it('F7.1 operario dummy (id=0, cedula="placeholder") se borra via limpiarDatosLegacyBypass', async () => {
       // Sembrar 1 dummy legacy + 1 operario válido via el fixture.
       // El dummy tiene id=0 y cedula='placeholder' (datos del bypass viejo).
-      const dummy = await fixture.operarioRepo.guardar({
+      const dummy = await fixture.operarioRepo.crear({
         id_prestador: 0,
         numero_cedula: 'placeholder',
         nombre: 'Dummy Legacy',
@@ -653,7 +652,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
         rol: 'operario',
         estado: 'activo',
       });
-      const real = await fixture.operarioRepo.guardar({
+      const real = await fixture.operarioRepo.crear({
         id_prestador: 5,
         numero_cedula: '51800012',
         nombre: 'Ana Real',
@@ -666,7 +665,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       // Ejecutar cleanup.
       await limpiarDatosLegacyBypass(
-        fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        fixture.operarioRepo,
       );
 
       // Post-condicion: dummy borrado, real intacto.
@@ -683,7 +682,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
     it('F7.2 AsyncStorage clave "cedula_operario" se limpia tras el helper', async () => {
       await limpiarDatosLegacyBypass(
-        fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        fixture.operarioRepo,
       );
 
       expect(mockedRemoveItem).toHaveBeenCalledWith(CLAVE_ASYNC_CEDULA_OPERARIO);
@@ -691,14 +690,14 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
     it('F7.3 limpiarDatosLegacyBypass es idempotente (segunda corrida no rompe nada)', async () => {
       await limpiarDatosLegacyBypass(
-        fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        fixture.operarioRepo,
       );
       mockedRemoveItem.mockClear();
 
       // Segunda corrida: no debe tirar error ni escribir logs de warning.
       await expect(
         limpiarDatosLegacyBypass(
-          fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+          fixture.operarioRepo,
         ),
       ).resolves.toBeUndefined();
 
@@ -709,7 +708,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
     it('F7.4 tras legacy cleanup, login con operario válido sigue funcionando', async () => {
       // Semilla: dummy legacy + operario válido.
-      await fixture.operarioRepo.guardar({
+      await fixture.operarioRepo.crear({
         id_prestador: 0,
         numero_cedula: 'placeholder',
         nombre: 'Dummy',
@@ -718,7 +717,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
         rol: 'operario',
         estado: 'activo',
       });
-      await fixture.operarioRepo.guardar({
+      await fixture.operarioRepo.crear({
         id_prestador: 5,
         numero_cedula: '51800012',
         nombre: 'Ana Real',
@@ -730,12 +729,12 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       // Cleanup defensivo.
       await limpiarDatosLegacyBypass(
-        fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        fixture.operarioRepo,
       );
 
       // Login del operario válido debe seguir funcionando.
       const resultado = await loginLocal({
-        operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: fixture.operarioRepo,
         hasher: fixture.hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -812,7 +811,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       // Login como A → workspace sincronizado a A.
       const loginA = await loginLocal({
-        operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: fixture.operarioRepo,
         hasher: fixture.hasher,
         cedula: inputA.operarioData.numero_cedula,
         password: inputA.operarioData.password,
@@ -828,7 +827,7 @@ describe('E2E flujo completo del operario (PUNTO D)', () => {
 
       // Login como B → workspace sincronizado a B (idPrestador DISTINTO).
       const loginB = await loginLocal({
-        operarioRepo: fixture.operarioRepo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: fixture.operarioRepo,
         hasher: fixture.hasher,
         cedula: inputB.operarioData.numero_cedula,
         password: inputB.operarioData.password,

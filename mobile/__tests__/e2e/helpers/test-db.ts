@@ -19,12 +19,9 @@
  * COMPATIBILIDAD:
  *   - prestadorRepo + acuerdoRepo + parametrosRepo satisfacen los ports
  *     que `bootstrapCompleto()` requiere.
- *   - operarioRepo implementa TODA la interfaz `OperarioRepositoryExpoSqlite`
- *     (de `src/persistencia/expo-sqlite/operario-repository-expo-sqlite`),
- *     porque es el shape que `loginLocal` y `limpiarDatosLegacyBypass`
- *     consumen. Adicionalmente expone `guardar()` con shape
- *     `Promise<Operario>` para satisfacer el port
- *     `OperarioRepoPort` de `bootstrapCompleto`.
+ *   - operarioRepo implementa `crear()` para bootstrap y todos los métodos
+ *     de `OperarioRepositoryExpoSqlite` para login/limpieza legacy. `guardar()`
+ *     queda disponible como UPSERT de compatibilidad para semillas remotas.
  *
  * HASHER + ID GENERATOR:
  *   - `hasher.sha256(input)` => `'sha256(' + input + ')'`. Determinístico:
@@ -54,19 +51,17 @@ import type { ParametrosTarifa } from '../../../dominio/parametros-tarifa/types'
  *   - `src/operarios/types.ts` (mobile-local, `rol: string` permisivo)
  *   - `dominio/operarios/types.ts` (dominio puro, `rol: RolOperario` enum)
  *
- * El fixture usa el de dominio porque satisface estructuralmente el
- * `OperarioRepoPort` de `bootstrapCompleto` (enums strictos). Para los
- * consumidores que esperan el shape mobile-local (loginLocal,
- * limpiarDatosLegacyBypass, OperarioRepositoryExpoSqlite), el test hace
- * cast a `unknown as OperarioRepositoryExpoSqlite` en el call site.
- *
- * Referencia: TS2741 en flujo-completo.test.ts antes de este cambio.
+ * El fixture usa el tipo de dominio porque es el contrato que consume
+ * `bootstrapCompleto`. El método `guardar` de compatibilidad recibe el tipo
+ * mobile-local completo, igual que el adapter real.
+
  */
 import type {
   ActualizarOperarioInput,
   Operario,
   OperarioBorrador,
 } from '../../../dominio/operarios/types';
+import type { Operario as OperarioMobile } from '../../../src/operarios/types';
 import type { Hasher, IdGenerator } from '../../../dominio/shared/ports';
 
 /**
@@ -117,27 +112,22 @@ export interface E2EFixture {
     eliminar(id_parametros: number): Promise<void>;
   };
   /**
-   * Repo de operarios — satisface `OperarioRepositoryExpoSqlite`
-   * (usado por loginLocal + limpiarDatosLegacyBypass) Y expone
-   * `guardar(borrador)` con shape `Promise<Operario>` +
-   * `eliminar(id_operario)` para `bootstrapCompleto.OperarioRepoPort`
-   * (que requiere rollback por id en caso de falla de creacion).
+   * Repo de operarios — satisface `OperarioRepositoryExpoSqlite` y el
+   * `OperarioRepoPort` de `bootstrapCompleto`.
    *
-   * NOTA sobre la doble interfaz: el repo expo-sqlite real solo tiene
-   * `eliminarPorCedula` (no `eliminar`), pero `bootstrapCompleto`
-   * define su propio port con `eliminar` para rollback. Mi fixture es
-   * un superset de ambos — los tests E2E no necesitan el repo real,
-   * solo una implementacion coherente.
+   * `crear()` recibe un borrador y asigna el id; `guardar()` se conserva como
+   * UPSERT de compatibilidad para las semillas de login/legacy.
    */
   readonly operarioRepo: {
     inicializar(): Promise<void>;
+    crear(borrador: OperarioBorrador): Promise<Operario>;
     listar(): Promise<Operario[]>;
     listarPorPrestador(idPrestador: number): Promise<Operario[]>;
     buscarPorId(id: number): Promise<Operario | null>;
     buscarPorCedula(cedula: string): Promise<Operario | null>;
     buscarPorDispositivoId(id: string): Promise<Operario | null>;
     buscarPorDispositivo(dispositivoId: string, idPrestador: number): Promise<Operario | null>;
-    guardar(borrador: OperarioBorrador): Promise<Operario>;
+    guardar(operario: OperarioMobile): Promise<void>;
     actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario>;
     eliminar(id_operario: number): Promise<void>;
     eliminarPorCedula(cedula: string): Promise<void>;
@@ -223,15 +213,27 @@ export function buildE2EFixture(): E2EFixture {
     },
   };
 
-  /**
-   * operarioRepo: doble-cara. Tiene TODOS los métodos de
-   * `OperarioRepositoryExpoSqlite` (para login + limpieza legacy) Y
-   * `guardar(borrador)` con shape `Promise<Operario>` (para bootstrap).
-   *
-   * Los tests lo pasan a `loginLocal()` y a `limpiarDatosLegacyBypass()`
-   * via `as unknown as OperarioRepositoryExpoSqlite` (mismo patrón que
-   * login-local.test.ts y limpiar-datos-legacy-bypass.test.ts).
-   */
+  /** Repo in-memory: crea con id correlativo y expone guardar para compatibilidad. */
+  const crearOperarioEnMemoria = async (borrador: OperarioBorrador): Promise<Operario> => {
+    const id = state.operarioIdSeq++;
+    const op: Operario = {
+      id_operario: id,
+      id_prestador: borrador.id_prestador,
+      numero_cedula: borrador.numero_cedula,
+      nombre: borrador.nombre,
+      email: borrador.email,
+      password_hash: borrador.password_hash,
+      rol: borrador.rol,
+      estado: borrador.estado,
+      ...(borrador.dispositivo_id !== undefined
+        ? { dispositivo_id: borrador.dispositivo_id }
+        : {}),
+      created_at: new Date().toISOString(),
+    };
+    state.operarios.set(id, op);
+    return op;
+  };
+
   const operarioRepo = {
     async inicializar(): Promise<void> {
       // noop en in-memory — no hay schema que crear.
@@ -269,24 +271,16 @@ export function buildE2EFixture(): E2EFixture {
       }
       return null;
     },
-    async guardar(borrador: OperarioBorrador): Promise<Operario> {
-      const id = state.operarioIdSeq++;
-      const op: Operario = {
-        id_operario: id,
-        id_prestador: borrador.id_prestador,
-        numero_cedula: borrador.numero_cedula,
-        nombre: borrador.nombre,
-        email: borrador.email,
-        password_hash: borrador.password_hash,
-        rol: borrador.rol,
-        estado: borrador.estado,
-        ...(borrador.dispositivo_id !== undefined
-          ? { dispositivo_id: borrador.dispositivo_id }
-          : {}),
-        created_at: new Date().toISOString(),
-      };
-      state.operarios.set(id, op);
-      return op;
+    async crear(borrador: OperarioBorrador): Promise<Operario> {
+      return crearOperarioEnMemoria(borrador);
+    },
+    async guardar(operario: OperarioMobile): Promise<void> {
+      state.operarios.set(operario.id_operario, {
+        ...operario,
+        rol: operario.rol as Operario['rol'],
+        estado: operario.estado as Operario['estado'],
+        created_at: operario.created_at ?? new Date().toISOString(),
+      });
     },
     async actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario> {
       const op = state.operarios.get(id);

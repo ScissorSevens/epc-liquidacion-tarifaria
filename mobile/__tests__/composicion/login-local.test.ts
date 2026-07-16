@@ -35,7 +35,6 @@
 //   GREEN → el helper se implementa y los 8 tests pasan.
 
 import { loginLocal } from '../../src/composition/login-local';
-import type { OperarioRepositoryExpoSqlite } from '../../src/persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import type { Operario } from '../../src/operarios/types';
 import type { Hasher } from '../../dominio/shared/ports';
 import type { Sesion } from '../../src/composition/constantes';
@@ -86,7 +85,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
 
       await expect(
         loginLocal({
-          operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: repo,
           hasher,
           cedula: '00000000',
           password: 'mi-clave',
@@ -103,7 +102,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '  51800012  ',
         password: 'mi-clave',
@@ -125,7 +124,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
 
       await expect(
         loginLocal({
-          operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+          operarioRepo: repo,
           hasher,
           cedula: '51800012',
           password: 'clave-equivocada',
@@ -143,7 +142,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -166,7 +165,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -183,7 +182,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -198,7 +197,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -214,7 +213,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -237,7 +236,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -258,7 +257,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -285,7 +284,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',
@@ -308,7 +307,7 @@ describe('loginLocal() — helper puro de validacion offline', () => {
       const hasher = buildHasher();
 
       const resultado = await loginLocal({
-        operarioRepo: repo as unknown as OperarioRepositoryExpoSqlite,
+        operarioRepo: repo,
         hasher,
         cedula: '51800012',
         password: 'mi-clave',

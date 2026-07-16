@@ -28,7 +28,6 @@
  *   de sesion opaco + autenticacion contra backend.
  */
 import type { Hasher } from '../../dominio/shared/ports';
-import type { OperarioRepositoryExpoSqlite } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import type { Operario } from '../operarios/types';
 import type { Sesion } from './constantes';
 
@@ -39,8 +38,12 @@ export const ERROR_PASSWORD_INCORRECTA = 'PASSWORD_INCORRECTA';
 /** 24h en ms — la sesion local vence al dia siguiente del login. */
 const MS_EN_UN_DIA = 24 * 60 * 60 * 1000;
 
+export interface LoginLocalOperarioRepoPort {
+  buscarPorCedula(cedula: string): Promise<Operario | null>;
+}
+
 export interface LoginLocalInput {
-  readonly operarioRepo: OperarioRepositoryExpoSqlite;
+  readonly operarioRepo: LoginLocalOperarioRepoPort;
   readonly hasher: Hasher;
   readonly cedula: string;
   readonly password: string;
