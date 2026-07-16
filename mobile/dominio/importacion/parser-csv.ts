@@ -7,13 +7,27 @@
  *
  * Formatos aceptados:
  *
- * NUEVO (7 columnas — codigo y numero_medidor se auto-generan):
- *   nombre_apellidos,direccion,estrato,matricula_inmobiliaria,
- *   numero_catastral,fecha_instalacion,observaciones_medidor
+ * NUEVO (9 columnas — desde COR-09):
+ *   nombre_apellidos,cedula,municipio,direccion,estrato,
+ *   matricula_inmobiliaria,numero_catastral,fecha_instalacion,
+ *   observaciones_medidor
  *
- * LEGACY (9 columnas — backward compat con CSVs anteriores):
+ *   `cedula` y `municipio` son requeridos por el dominio
+ *   `crearSuscriptor` (el suscriptor es una persona ubicada
+ *   geográficamente — sin estos datos el dominio rechaza el alta).
+ *   Si vienen vacíos en una fila, el parser los preserva como `''`
+ *   para que el importador falle con `MENSAJES_ERROR_SUSCRIPTOR.*`
+ *   y el operador vea el motivo claro, no un "undefined" críptico.
+ *
+ * LEGACY (9 columnas — backward compat con CSVs anteriores al
+ * multi-tenant / antes de COR-09):
  *   codigo,nombre_apellidos,direccion,estrato,matricula_inmobiliaria,
  *   numero_catastral,numero_medidor,fecha_instalacion,observaciones_medidor
+ *
+ *   En este formato `cedula` y `municipio` quedan como `undefined` en
+ *   la FilaCSV, y el importador los rellena con `''` antes de
+ *   invocar `crearSuscriptor`, que los rechaza (la migración de esos
+ *   datos legacy es tarea de una fase posterior, no de este parser).
  *
  * Politica de errores: un error por linea NO aborta. Se acumulan en
  * `errores` y las filas validas siguen en `filas`. Asi el usuario ve
@@ -27,9 +41,16 @@
 
 import type { ErrorParseo, FilaCSV, ResultadoParseo } from './types';
 
-/** Header nuevo (7 columnas): codigo y numero_medidor se auto-generan. */
+/**
+ * Header NUEVO (9 columnas, desde COR-09): cedula y municipio son
+ * posiciones explícitas. El dominio `crearSuscriptor` los exige NO
+ * vacíos, así que el CSV debe traerlos por fila. Verificado por los
+ * tests T-CSV-1..4 en `parser-csv.test.ts`.
+ */
 const HEADER_NUEVO = [
   'nombre_apellidos',
+  'cedula',
+  'municipio',
   'direccion',
   'estrato',
   'matricula_inmobiliaria',
@@ -38,7 +59,8 @@ const HEADER_NUEVO = [
   'observaciones_medidor',
 ] as const;
 
-/** Header legacy (9 columnas): backward compat con CSVs anteriores. */
+/** Header legacy (9 columnas): backward compat con CSVs anteriores
+ *  a COR-09. Cedula y municipio quedan `undefined` en FilaCSV. */
 const HEADER_LEGACY = [
   'codigo',
   'nombre_apellidos',
@@ -51,7 +73,7 @@ const HEADER_LEGACY = [
   'observaciones_medidor',
 ] as const;
 
-/** Alias para el header esperado por defecto (nuevo de 7 cols). */
+/** Alias para el header esperado por defecto (nuevo de 9 cols). */
 const HEADER_ESPERADO = HEADER_NUEVO;
 
 const REGEX_FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -119,7 +141,7 @@ export function parsearCSV(texto: string): ResultadoParseo {
       errores: [
         {
           linea: 1,
-          mensaje: `header invalido: se esperaba '${HEADER_ESPERADO.join(',')}' (7 cols) o el formato legado de 9 columnas`,
+          mensaje: `header invalido: se esperaba '${HEADER_ESPERADO.join(',')}' (9 cols) o el formato legado de 9 columnas`,
         },
       ],
     };
@@ -142,6 +164,8 @@ export function parsearCSV(texto: string): ResultadoParseo {
 
     let codigo: string | undefined;
     let nombre_apellidos: string;
+    let cedula: string;
+    let municipio: string;
     let direccion: string;
     let estratoCrudo: string;
     let matricula: string;
@@ -163,17 +187,23 @@ export function parsearCSV(texto: string): ResultadoParseo {
         fecha_instalacion,
         observaciones,
       ] = trimmed as [string, string, string, string, string, string, string, string, string];
+      // En LEGACY cedula/municipio no existen: los dejamos `undefined`.
+      // El importador rellena con `''` antes de invocar crearSuscriptor.
+      cedula = '' as string;
+      municipio = '' as string;
     } else {
       const trimmed = campos.map((c) => c.trim());
       [
         nombre_apellidos,
+        cedula,
+        municipio,
         direccion,
         estratoCrudo,
         matricula,
         catastral,
         fecha_instalacion,
         observaciones,
-      ] = trimmed as [string, string, string, string, string, string, string];
+      ] = trimmed as [string, string, string, string, string, string, string, string, string];
       codigo = undefined;
       numero_medidor = undefined;
     }
@@ -201,6 +231,10 @@ export function parsearCSV(texto: string): ResultadoParseo {
 
     // Construimos sin claves opcionales si vienen vacias, para que
     // `Object.keys` y deep-equal en tests no las vean como undefined.
+    // EXCEPCION: cedula y municipio del header NUEVO se preservan como
+    // string ('' si vienen vacíos) para que `crearSuscriptor` falle con
+    // MENSAJES_ERROR_SUSCRIPTOR.* y el operador vea el motivo claro.
+    // Ver tests T-CSV-1 y T-CSV-4 en parser-csv.test.ts (COR-09).
     const fila: Mutable<FilaCSV> = {
       linea: numLinea,
       nombre_apellidos: nombre_apellidos!,
@@ -213,6 +247,13 @@ export function parsearCSV(texto: string): ResultadoParseo {
     if (matricula) fila.matricula_inmobiliaria = matricula;
     if (catastral) fila.numero_catastral = catastral;
     if (observaciones) fila.observaciones_medidor = observaciones;
+    if (!esLegacy) {
+      // Cedula y municipio del NUEVO header: SIEMPRE se setean (aún si
+      // vacíos). En LEGACY no se setean (quedan undefined), y el
+      // importador rellena con '' antes de `crearSuscriptor`.
+      fila.cedula = cedula!;
+      fila.municipio = municipio!;
+    }
 
     filas.push(fila);
   }
