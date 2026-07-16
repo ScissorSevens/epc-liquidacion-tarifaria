@@ -59,6 +59,16 @@ const HEADER_NUEVO = [
   'observaciones_medidor',
 ] as const;
 
+/**
+ * Header nuevo exportado: lo usa `ImportarCsv.tsx` (UI) para anunciar
+ * las 9 columnas que el parser espera. Exportar la misma constante
+ * desde ambos lados y comparar token-a-token en tests mantiene el
+ * contrato vivo — si la UI cambia una columna sin actualizar el
+ * parser (o viceversa), el test de contrato en
+ * `__tests__/pantallas/importar-csv.test.tsx` rompe (COR-09).
+ */
+export { HEADER_NUEVO };
+
 /** Header legacy (9 columnas): backward compat con CSVs anteriores
  *  a COR-09. Cedula y municipio quedan `undefined` en FilaCSV. */
 const HEADER_LEGACY = [
