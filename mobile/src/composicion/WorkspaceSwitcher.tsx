@@ -21,7 +21,11 @@ interface Props {
 }
 
 export function WorkspaceSwitcher({ onCambiar }: Props) {
-  const { prestadores_disponibles, id_prestador_activo, prestador } = useWorkspace();
+  // PER-05: selectores específicos. Suscripción limitada a los 2 campos
+  // que usamos. Cambios en acuerdo_vigente / parametros_vigentes /
+  // cargando / prestador NO disparan re-render de este componente.
+  const prestadores_disponibles = useWorkspace((s) => s.prestadores_disponibles);
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const [abierto, setAbierto] = useState(false);
 
   // Oculto si solo hay un prestador

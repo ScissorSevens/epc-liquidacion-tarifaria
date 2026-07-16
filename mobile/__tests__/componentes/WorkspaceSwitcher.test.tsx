@@ -32,7 +32,8 @@
 //          llama `cambiarPrestadorYCargarContexto`, ambos verificables
 //          en este test.
 
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Profiler } from 'react';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn().mockResolvedValue(undefined),
@@ -242,6 +243,130 @@ describe('WorkspaceSwitcher', () => {
 
       // Cleanup del spy para no afectar otros tests.
       spyCambiar.mockRestore();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // PER-05 — selectores específicos en useWorkspace()
+  //
+  // El componente debe suscribirse SOLO a los campos que usa
+  // (prestadores_disponibles, id_prestador_activo). Cambios en campos
+  // que NO usa (acuerdo_vigente, parametros_vigentes, cargando, prestador)
+  // NO deben disparar re-renders — sino cualquier acción sobre el store
+  // (incluso setPrestadores o cargarContexto) hace cascada de re-renders
+  // en todas las pantallas que usan useWorkspace().
+  //
+  // Firma del callback de React.Profiler (React 19):
+  //   (id, phase, actualDuration, baseDuration, startTime, commitTime)
+  // phase = 'mount' | 'update' | 'nested-update'.
+  // ─────────────────────────────────────────────────────────────
+  describe('PER-05 selectores específicos (no re-render en campos no usados)', () => {
+    /** Cuenta cuántos commits tuvieron phase='update'. */
+    function contarUpdates(spy: jest.Mock): number {
+      return spy.mock.calls.filter(([, phase]) => phase === 'update').length;
+    }
+
+    it('T-PER05-WS-1 NO se re-renderiza cuando cambia acuerdo_vigente (campo no usado)', () => {
+      useWorkspace.setState({
+        prestadores_disponibles: [prestadorA, prestadorB] as never[],
+        id_prestador_activo: 7,
+      });
+      const spy = jest.fn();
+      const onCambiar = jest.fn();
+
+      render(
+        <Profiler id="ws" onRender={spy}>
+          <WorkspaceSwitcher onCambiar={onCambiar} />
+        </Profiler>,
+      );
+
+      const baselineUpdates = contarUpdates(spy);
+
+      // Cambiamos un campo que el WorkspaceSwitcher NO usa.
+      act(() => {
+        useWorkspace.setState({
+          acuerdo_vigente: { id_acuerdo: 999, factor_subsidio_e1: -0.5 } as never,
+        });
+      });
+
+      const updatesPostCambio = contarUpdates(spy);
+      // PER-05: el cambio en acuerdo_vigente NO debe disparar un nuevo
+      // render del WorkspaceSwitcher. Si lo dispara, es porque está
+      // suscrito al store ENTERO.
+      expect(updatesPostCambio).toBe(baselineUpdates);
+    });
+
+    it('T-PER05-WS-2 NO se re-renderiza cuando cambia parametros_vigentes (campo no usado)', () => {
+      useWorkspace.setState({
+        prestadores_disponibles: [prestadorA, prestadorB] as never[],
+        id_prestador_activo: 7,
+      });
+      const spy = jest.fn();
+      const onCambiar = jest.fn();
+
+      render(
+        <Profiler id="ws" onRender={spy}>
+          <WorkspaceSwitcher onCambiar={onCambiar} />
+        </Profiler>,
+      );
+
+      const baselineUpdates = contarUpdates(spy);
+
+      act(() => {
+        useWorkspace.setState({
+          parametros_vigentes: { id_parametros: 1, cma: 12345 } as never,
+        });
+      });
+
+      expect(contarUpdates(spy)).toBe(baselineUpdates);
+    });
+
+    it('T-PER05-WS-3 NO se re-renderiza cuando cambia cargando (campo no usado)', () => {
+      useWorkspace.setState({
+        prestadores_disponibles: [prestadorA, prestadorB] as never[],
+        id_prestador_activo: 7,
+      });
+      const spy = jest.fn();
+      const onCambiar = jest.fn();
+
+      render(
+        <Profiler id="ws" onRender={spy}>
+          <WorkspaceSwitcher onCambiar={onCambiar} />
+        </Profiler>,
+      );
+
+      const baselineUpdates = contarUpdates(spy);
+
+      act(() => {
+        useWorkspace.setState({ cargando: true });
+      });
+
+      expect(contarUpdates(spy)).toBe(baselineUpdates);
+    });
+
+    it('T-PER05-WS-4 SÍ re-renderiza cuando cambia id_prestador_activo (campo usado)', () => {
+      useWorkspace.setState({
+        prestadores_disponibles: [prestadorA, prestadorB] as never[],
+        id_prestador_activo: 5, // A activo
+      });
+      const spy = jest.fn();
+      const onCambiar = jest.fn();
+
+      render(
+        <Profiler id="ws" onRender={spy}>
+          <WorkspaceSwitcher onCambiar={onCambiar} />
+        </Profiler>,
+      );
+
+      const baselineUpdates = contarUpdates(spy);
+
+      act(() => {
+        useWorkspace.setState({ id_prestador_activo: 7 });
+      });
+
+      // El cambio en id_prestador_activo SÍ debe re-renderizar porque
+      // el componente lo usa para encontrar el prestadorActual.
+      expect(contarUpdates(spy)).toBeGreaterThan(baselineUpdates);
     });
   });
 });
