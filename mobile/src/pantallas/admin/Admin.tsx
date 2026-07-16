@@ -66,7 +66,7 @@ const OPCIONES: readonly OpcionMenu[] = [
 ];
 
 export default function Admin({ navigation }: Props) {
-  const { cambiarPrestadorYCargarContexto } = useWorkspace();
+  const { cambiarPrestadorYCargarContexto, id_prestador_activo } = useWorkspace();
 
   /**
    * Handler del WorkspaceSwitcher: cambia el prestador activo Y recarga
@@ -104,7 +104,15 @@ export default function Admin({ navigation }: Props) {
         <Pressable
           key={op.key}
           style={[estilos.opcion, { backgroundColor: op.colorFondo }]}
-          onPress={() => navigation.navigate(op.key)}
+          onPress={() => {
+            // AcuerdoMunicipal y ParametrosTarifa requieren `id_prestador` en su
+            // ParamList. GestionPrestadores e ImportarPrestadores no.
+            if (op.key === 'AcuerdoMunicipal' || op.key === 'ParametrosTarifa') {
+              navigation.navigate(op.key, { id_prestador: id_prestador_activo });
+              return;
+            }
+            navigation.navigate(op.key);
+          }}
         >
           <MaterialIcons name={op.icono} size={32} color={COLORS.onPrimary} />
           <View style={estilos.opcionTexto}>
