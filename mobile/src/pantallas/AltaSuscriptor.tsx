@@ -251,6 +251,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
         direccion: form.direccion.trim(),
         estrato: estratoNum,
         aplica_subsidio: form.aplica_subsidio,
+        id_prestador: 0,
         categoria_uso: form.categoria_uso,
         matricula_inmobiliaria:
           form.matricula_inmobiliaria.trim() === ''
