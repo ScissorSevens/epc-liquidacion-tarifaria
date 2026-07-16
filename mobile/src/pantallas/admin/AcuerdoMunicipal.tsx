@@ -13,7 +13,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
-import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal/types';
+import type { AcuerdoMunicipal } from '../../../dominio/acuerdo-municipal/types';
 
 interface Props {
   readonly id_prestador: number;
@@ -164,9 +164,9 @@ export default function AcuerdoMunicipalForm({ id_prestador, acuerdoActual, repo
 const estilos = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.md, gap: SPACING.sm },
-  titulo: { ...TYPOGRAPHY.titleLg, color: COLORS.onSurface },
+  titulo: { ...TYPOGRAPHY.headlineLg, color: COLORS.onSurface },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
-  seccion: { ...TYPOGRAPHY.titleSm, color: COLORS.primary, marginTop: SPACING.md },
+  seccion: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, marginTop: SPACING.md },
   campo: { gap: SPACING.xs },
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
   input: {
