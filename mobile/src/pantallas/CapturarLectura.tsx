@@ -32,6 +32,7 @@ import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
 import { photoCaptureStore } from '../composition/photo-capture-store';
+import { cargarSesion } from '../composition/constantes';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -129,7 +130,8 @@ function validarCampo(nombre: CampoForm, valor: string): string | undefined {
  *     del medidor (si existe) via `lecturaRepo.listar({ id_medidor })`.
  *  2) Carga el Suscriptor via `suscriptorRepo.buscarPorId` para mostrar
  *     nombre + dirección + estado en la card superior. Si falla, placeholders.
- *  3) Construye `EntradaLectura` con `id_operario: 1` (sin módulo de auth).
+ *  3) Construye `EntradaLectura` con `id_operario: sesion.idOperario`
+ *     (CRA 825/2017 — auditoria legal; antes del fix COR-04 estaba hardcoded a 1).
  *  4) Llama `registrarLectura` y `liquidarLectura` igual que antes.
  *  5) Navega a `ResultadoCalculo` con todo el contexto.
  *  6) Snackbar inline con mensajes del dominio si error.
@@ -168,6 +170,10 @@ export default function CapturarLectura({ navigation, route }: Props) {
     undefined,
   );
   const [errorContexto, setErrorContexto] = useState<string | undefined>(undefined);
+  // Sesion del operario autenticado. Se carga al mount para que el id del
+  // operario real quede atribuido en cada lectura (CRA 825/2017 — auditoria
+  // legal). Antes del fix COR-04 esto era `id_operario: 1` hardcoded.
+  const [idOperarioSesion, setIdOperarioSesion] = useState<number | null>(null);
 
   // Recibe la evidencia cuando `CapturarFoto` llama `goBack()` y depositó
   // la evidencia en `photoCaptureStore`. El listener de 'focus' garantiza
@@ -181,6 +187,37 @@ export default function CapturarLectura({ navigation, route }: Props) {
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Carga del id del operario autenticado (CRA 825/2017 — auditoria legal).
+  // AuthGate ya garantiza que el usuario esta logueado al llegar aqui, pero
+  // defensivamente hacemos el load y mostramos un snack si la sesion es null.
+  // Sin este idOperario, NO podemos construir EntradaLectura — antes del fix
+  // COR-04 quedo hardcoded a 1 en onCalcular.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const sesion = await cargarSesion();
+        if (cancelado) return;
+        if (sesion === null) {
+          // Caso defensivo: AuthGate no deberia permitir llegar aca sin sesion.
+          // Si pasa (carrera, sesion caducada entre mount y accion, etc.),
+          // mostramos el snack y bloqueamos la accion en onCalcular.
+          setIdOperarioSesion(null);
+          mostrarSnack('No hay sesión activa. Vuelve a iniciar sesión.', 'error');
+        } else {
+          setIdOperarioSesion(sesion.idOperario);
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[CapturarLectura] no se pudo cargar sesion:', e);
+        if (!cancelado) setIdOperarioSesion(null);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   // Prefill de lectura anterior usando el historial del medidor. Si no
   // hay registros previos asumimos primera lectura y dejamos vacio.
@@ -300,13 +337,24 @@ export default function CapturarLectura({ navigation, route }: Props) {
       );
       return;
     }
+    // COR-04 fix: la sesion DEBE tener un idOperario real. Si llegamos aca
+    // sin el (caso defensivo, AuthGate normalmente bloca esto), rehusamos
+    // construir EntradaLectura con un id hardcoded — seria peor aun que el
+    // bug original.
+    if (idOperarioSesion === null || idOperarioSesion <= 0) {
+      mostrarSnack(
+        'No hay sesión activa del operario. Vuelve a iniciar sesión para registrar lecturas.',
+        'error',
+      );
+      return;
+    }
     setCalculando(true);
     try {
       const obs = form.observaciones.trim();
       const entrada: EntradaLectura = {
         id_medidor,
         id_periodo: form.id_periodo.trim(),
-        id_operario: 1, // sin módulo de auth activo.
+        id_operario: idOperarioSesion, // sesion.idOperario — auditoria legal
         lectura_actual: Number.parseFloat(form.lectura_actual),
         lectura_anterior: Number.parseFloat(form.lectura_anterior),
         ...(obs !== '' && { observaciones: obs }),
