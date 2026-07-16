@@ -75,9 +75,40 @@ function buildRepoState(): RepoState {
   };
 }
 
+function restaurarMap<K, V>(destino: Map<K, V>, snapshot: Map<K, V>): void {
+  destino.clear();
+  snapshot.forEach((valor, clave) => destino.set(clave, valor));
+}
+
 function buildRepos(state: RepoState) {
   return {
     prestadorRepo: {
+      withTransactionAsync: jest.fn(async (task: () => Promise<void>): Promise<void> => {
+        const snapshot = {
+          prestadores: new Map(state.prestadores),
+          acuerdos: new Map(state.acuerdos),
+          parametros: new Map(state.parametros),
+          operarios: new Map(state.operarios),
+          prestadorIdSeq: state.prestadorIdSeq,
+          acuerdoIdSeq: state.acuerdoIdSeq,
+          parametrosIdSeq: state.parametrosIdSeq,
+          operarioIdSeq: state.operarioIdSeq,
+        };
+
+        try {
+          await task();
+        } catch (error) {
+          restaurarMap(state.prestadores, snapshot.prestadores);
+          restaurarMap(state.acuerdos, snapshot.acuerdos);
+          restaurarMap(state.parametros, snapshot.parametros);
+          restaurarMap(state.operarios, snapshot.operarios);
+          state.prestadorIdSeq = snapshot.prestadorIdSeq;
+          state.acuerdoIdSeq = snapshot.acuerdoIdSeq;
+          state.parametrosIdSeq = snapshot.parametrosIdSeq;
+          state.operarioIdSeq = snapshot.operarioIdSeq;
+          throw error;
+        }
+      }),
       async crear(data: CrearPrestadorInput): Promise<Prestador> {
         const id = state.prestadorIdSeq++;
         const now = new Date().toISOString();
@@ -104,9 +135,9 @@ function buildRepos(state: RepoState) {
       async listar(): Promise<readonly Prestador[]> {
         return Array.from(state.prestadores.values());
       },
-      async eliminar(id_prestador: number): Promise<void> {
+      eliminar: jest.fn(async (id_prestador: number): Promise<void> => {
         state.prestadores.delete(id_prestador);
-      },
+      }),
     },
     acuerdoRepo: {
       async crear(data: CrearAcuerdoMunicipalInput): Promise<AcuerdoMunicipal> {
@@ -130,9 +161,9 @@ function buildRepos(state: RepoState) {
         state.acuerdos.set(id, a);
         return a;
       },
-      async eliminar(id_acuerdo: number): Promise<void> {
+      eliminar: jest.fn(async (id_acuerdo: number): Promise<void> => {
         state.acuerdos.delete(id_acuerdo);
-      },
+      }),
     },
     parametrosRepo: {
       async crear(data: CrearParametrosTarifaInput): Promise<ParametrosTarifa> {
@@ -160,9 +191,9 @@ function buildRepos(state: RepoState) {
         state.parametros.set(id, p);
         return p;
       },
-      async eliminar(id_parametros: number): Promise<void> {
+      eliminar: jest.fn(async (id_parametros: number): Promise<void> => {
         state.parametros.delete(id_parametros);
-      },
+      }),
     },
     operarioRepo: {
       async crear(borrador: OperarioBorrador): Promise<Operario> {
@@ -182,9 +213,9 @@ function buildRepos(state: RepoState) {
         state.operarios.set(id, op);
         return op;
       },
-      async eliminar(id_operario: number): Promise<void> {
+      eliminar: jest.fn(async (id_operario: number): Promise<void> => {
         state.operarios.delete(id_operario);
-      },
+      }),
     },
   };
 }
@@ -407,6 +438,81 @@ describe('bootstrapCompleto()', () => {
       // el seed, el campo sigue siendo el id REAL del operario creado.
       expect(typeof resultado.sesion.idOperario).toBe('number');
       expect(Number.isInteger(resultado.sesion.idOperario)).toBe(true);
+    });
+  });
+
+  describe('transaccion SQLite', () => {
+    it('T-TX-1 crea prestador, acuerdo, parametros y operario en una sola transaccion', async () => {
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+      });
+
+      expect(deps.prestadorRepo.withTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(Array.from(state.prestadores.values())).toEqual([resultado.prestador]);
+      expect(Array.from(state.acuerdos.values())).toEqual([resultado.acuerdo]);
+      expect(Array.from(state.parametros.values())).toEqual([resultado.parametros]);
+      expect(Array.from(state.operarios.values())).toEqual([resultado.operario]);
+    });
+
+    it('T-TX-2 si crear acuerdo falla, SQLite revierte el prestador sin rollback manual', async () => {
+      const errorAcuerdo = new Error('acuerdo write failed');
+      const acuerdoRepoRoto = {
+        ...deps.acuerdoRepo,
+        crear: jest.fn().mockRejectedValue(errorAcuerdo),
+      };
+      deps.prestadorRepo.eliminar.mockRejectedValue(new Error('rollback manual no disponible'));
+
+      await expect(
+        bootstrapCompleto({
+          prestadorRepo: deps.prestadorRepo,
+          acuerdoRepo: acuerdoRepoRoto,
+          parametrosRepo: deps.parametrosRepo,
+          operarioRepo: deps.operarioRepo,
+          hasher: deps.hasher,
+          idGenerator: deps.idGenerator,
+          input: buildInputValido(),
+        }),
+      ).rejects.toBe(errorAcuerdo);
+
+      expect(state.prestadores.size).toBe(0);
+      expect(deps.prestadorRepo.eliminar).not.toHaveBeenCalled();
+    });
+
+    it('T-TX-3 si crear operario falla, SQLite revierte las cuatro entidades', async () => {
+      const errorOperario = new Error('operario write failed');
+      const operarioRepoRoto = {
+        ...deps.operarioRepo,
+        crear: jest.fn().mockRejectedValue(errorOperario),
+      };
+      deps.parametrosRepo.eliminar.mockRejectedValue(new Error('rollback manual parametros'));
+      deps.acuerdoRepo.eliminar.mockRejectedValue(new Error('rollback manual acuerdo'));
+      deps.prestadorRepo.eliminar.mockRejectedValue(new Error('rollback manual prestador'));
+
+      await expect(
+        bootstrapCompleto({
+          prestadorRepo: deps.prestadorRepo,
+          acuerdoRepo: deps.acuerdoRepo,
+          parametrosRepo: deps.parametrosRepo,
+          operarioRepo: operarioRepoRoto,
+          hasher: deps.hasher,
+          idGenerator: deps.idGenerator,
+          input: buildInputValido(),
+        }),
+      ).rejects.toBe(errorOperario);
+
+      expect(state.prestadores.size).toBe(0);
+      expect(state.acuerdos.size).toBe(0);
+      expect(state.parametros.size).toBe(0);
+      expect(state.operarios.size).toBe(0);
+      expect(deps.parametrosRepo.eliminar).not.toHaveBeenCalled();
+      expect(deps.acuerdoRepo.eliminar).not.toHaveBeenCalled();
+      expect(deps.prestadorRepo.eliminar).not.toHaveBeenCalled();
     });
   });
 

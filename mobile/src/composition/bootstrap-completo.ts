@@ -26,17 +26,11 @@
  * sin depender del backend .NET.
  *
  * ATOMICIDAD:
- *   No usamos transacciones SQLite explícitas (los repos del proyecto
- *   no las exponen todavía). Confiamos en el orden + rollback manual
- *   de las filas creadas si una creacion posterior falla:
- *
- *     crear prestador → crear acuerdo → crear parametros → crear operario
- *                       (si falla)        (si falla)        (si falla)
- *                       borra prest.     borra prest.+ac.  borra los 3
- *
- *   Asi, en cualquier punto de falla, la DB queda en el mismo estado
- *   que estaba antes de invocar el helper. La UI puede re-intentar
- *   el wizard sin acumular basura.
+ *   Las 4 inserciones se ejecutan dentro de `withTransactionAsync` sobre
+ *   la misma conexion SQLite compartida por los repositorios. expo-sqlite
+ *   confirma la transaccion si el callback resuelve y hace rollback
+ *   automatico si cualquier repositorio rechaza. El error original se
+ *   propaga al caller; no hay compensaciones ni errores tragados.
  */
 
 import type { Prestador, CrearPrestadorInput } from '../../dominio/prestadores/types';
@@ -48,29 +42,26 @@ import { crearOperario } from '../../dominio/operarios/operarios';
 import type { Sesion } from './constantes';
 import type { Hasher, IdGenerator } from '../../dominio/shared/ports';
 
-/** Prestador con `crear()`, `listar()` y (opcional) `obtenerPorId()` para rollback. */
+/** Prestador con acceso a la transaccion de la conexion SQLite compartida. */
 export interface PrestadorRepoPort {
   crear(data: CrearPrestadorInput): Promise<Prestador>;
   listar(): Promise<readonly Prestador[]>;
-  eliminar(id_prestador: number): Promise<void>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
-/** Acuerdo con `crear()` y `eliminar()` para rollback. */
+/** Acuerdo municipal requerido por el bootstrap. */
 export interface AcuerdoRepoPort {
   crear(data: Omit<AcuerdoMunicipal, 'id_acuerdo' | 'created_at'>): Promise<AcuerdoMunicipal>;
-  eliminar(id_acuerdo: number): Promise<void>;
 }
 
-/** Parametros tarifa con `crear()` y `eliminar()` para rollback. */
+/** Parametros tarifa requeridos por el bootstrap. */
 export interface ParametrosRepoPort {
   crear(data: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>): Promise<ParametrosTarifa>;
-  eliminar(id_parametros: number): Promise<void>;
 }
 
-/** Operario con `crear()` para generar el id en SQLite y `eliminar()` para rollback. */
+/** Operario con `crear()` para generar el id en SQLite. */
 export interface OperarioRepoPort {
   crear(borrador: OperarioBorrador): Promise<Operario>;
-  eliminar(id_operario: number): Promise<void>;
 }
 
 /** Datos crudos del operario que la UI envia al bootstrap. */
@@ -175,33 +166,34 @@ function calcularVigencia5Anios(ahora: Date): { desde: string; hasta: string } {
 
 /**
  * Crea el tenant completo (prestador + acuerdo + parametros + operario)
- * con rollback manual si alguna creacion falla. Devuelve la sesion local
- * para que la UI arme el `useWorkspace.setSesionCompleta()`.
+ * dentro de una unica transaccion SQLite. Devuelve la sesion local para
+ * que la UI arme el `useWorkspace.setSesionCompleta()`.
  *
- * @throws `Error` con el mensaje del repo que fallo, si alguno falla.
- *          En ese caso, todas las filas creadas previamente se eliminan.
+ * expo-sqlite 16 define `withTransactionAsync(task)` sin parametro `tx`;
+ * los repositorios ya estan enlazados a la misma conexion y sus queries
+ * participan en la transaccion activa.
+ *
+ * @throws El error original del repositorio que falle. SQLite revierte
+ *         automaticamente todas las escrituras de la transaccion.
  */
 export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<BootstrapCompletoResultado> {
-  const ahora = (deps.ahora ?? (() => new Date()))();
-  const { desde: fecha_vigencia_desde, hasta: fecha_vigencia_hasta } = calcularVigencia5Anios(ahora);
+  let resultado: BootstrapCompletoResultado | undefined;
 
-  // 1. Generar codigo correlativo y crear el prestador via factory del dominio
-  //    (que valida todas las reglas de creacion: nombre, nit, cedula rep, etc.)
-  const prestadoresExistentes = await deps.prestadorRepo.listar();
-  const codigo = siguienteCodigoPrestador(prestadoresExistentes);
+  await deps.prestadorRepo.withTransactionAsync(async () => {
+    const ahora = (deps.ahora ?? (() => new Date()))();
+    const { desde: fecha_vigencia_desde, hasta: fecha_vigencia_hasta } = calcularVigencia5Anios(ahora);
 
-  const borradorPrestador = crearPrestador({
-    ...deps.input.prestadorData,
-    codigo,
-  });
+    // 1. Generar codigo correlativo y crear el prestador via factory del dominio.
+    const prestadoresExistentes = await deps.prestadorRepo.listar();
+    const codigo = siguienteCodigoPrestador(prestadoresExistentes);
+    const borradorPrestador = crearPrestador({
+      ...deps.input.prestadorData,
+      codigo,
+    });
+    const prestador = await deps.prestadorRepo.crear(borradorPrestador);
 
-  const prestador = await deps.prestadorRepo.crear(borradorPrestador);
-
-  // 2. Crear acuerdo municipal con los defaults L142/1994.
-  //    Si falla, hacemos rollback del prestador.
-  let acuerdo: AcuerdoMunicipal;
-  try {
-    acuerdo = await deps.acuerdoRepo.crear({
+    // 2. Crear acuerdo municipal con defaults L142/1994.
+    const acuerdo = await deps.acuerdoRepo.crear({
       id_prestador: prestador.id_prestador,
       factor_subsidio_e1: ACUERDO_DEFAULTS.factor_subsidio_e1,
       factor_subsidio_e2: ACUERDO_DEFAULTS.factor_subsidio_e2,
@@ -215,26 +207,14 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       acto_administrativo_url: null,
       observaciones: 'Acuerdo creado automáticamente por el wizard de setup inicial.',
     });
-  } catch (err) {
-    await deps.prestadorRepo.eliminar(prestador.id_prestador).catch(() => {
-      // Si el rollback falla, no propagamos — el error original es el relevante.
-    });
-    throw err;
-  }
 
-  // 3. Crear parametros tarifa vinculados al acuerdo.
-  //    Si falla, hacemos rollback de prestador + acuerdo.
-  let parametros: ParametrosTarifa;
-  try {
-    // suscriptores_promedio del año base = urbanos + rurales
+    // 3. Crear parametros tarifa vinculados al acuerdo.
     const suscriptoresPromedio =
       borradorPrestador.num_suscriptores_urbanos + borradorPrestador.num_suscriptores_rurales;
-    const periodo = ahora.getFullYear();
-
-    parametros = await deps.parametrosRepo.crear({
+    const parametros = await deps.parametrosRepo.crear({
       id_prestador: prestador.id_prestador,
       id_acuerdo: acuerdo.id_acuerdo,
-      periodo,
+      periodo: ahora.getFullYear(),
       cma: PARAMETROS_DEFAULTS.cma,
       cmo: PARAMETROS_DEFAULTS.cmo,
       cmi: PARAMETROS_DEFAULTS.cmi,
@@ -249,26 +229,11 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       vigente_desde: fecha_vigencia_desde,
       vigente_hasta: fecha_vigencia_hasta,
     });
-  } catch (err) {
-    await Promise.all([
-      deps.acuerdoRepo.eliminar(acuerdo.id_acuerdo),
-      deps.prestadorRepo.eliminar(prestador.id_prestador),
-    ]).catch(() => {
-      // Si el rollback falla, el error original manda.
-    });
-    throw err;
-  }
 
-  // 4. Crear el primer operario vinculado al prestador.
-  //    Si falla, hacemos rollback completo de prestador + acuerdo + parametros.
-  let operario: Operario;
-  try {
+    // 4. Crear el primer operario vinculado al prestador.
     const password_hash = deps.hasher.sha256(deps.input.operarioData.password);
-    // Si no se proporcioona email, el dominio exige uno valido (REGEX_EMAIL);
-    // usamos el numero de cedula + '@local' como placeholder offline.
     const email =
       deps.input.operarioData.email ?? `${deps.input.operarioData.numero_cedula}@local`;
-
     const borradorOperario = crearOperario({
       id_prestador: prestador.id_prestador,
       numero_cedula: deps.input.operarioData.numero_cedula,
@@ -278,31 +243,22 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       rol: 'operario',
       estado: 'activo',
     });
+    const operario = await deps.operarioRepo.crear(borradorOperario);
 
-    operario = await deps.operarioRepo.crear(borradorOperario);
-  } catch (err) {
-    await Promise.all([
-      deps.parametrosRepo.eliminar(parametros.id_parametros),
-      deps.acuerdoRepo.eliminar(acuerdo.id_acuerdo),
-      deps.prestadorRepo.eliminar(prestador.id_prestador),
-    ]).catch(() => {
-      // Si el rollback falla, el error original manda.
-    });
-    throw err;
+    const sesion: Sesion = {
+      token: `fake-token-${ahora.getTime()}`,
+      cedula: operario.numero_cedula,
+      nombre: operario.nombre,
+      idOperario: operario.id_operario,
+      idPrestador: prestador.id_prestador,
+      expiresAt: ahora.getTime() + MS_EN_UN_DIA,
+    };
+
+    resultado = { prestador, acuerdo, parametros, operario, sesion };
+  });
+
+  if (resultado === undefined) {
+    throw new Error('bootstrapCompleto: la transaccion finalizo sin resultado');
   }
-
-  // 5. Construir la sesion local (placeholder hasta que llegue el backend).
-  //    idOperario se propaga desde el operario recien creado — la Sesion
-  //    debe llevarlo para que CapturarLectura pueda atribuir legalmente
-  //    cada lectura (CRA 825/2017, ver COR-04 reporte de calidad).
-  const sesion: Sesion = {
-    token: `fake-token-${ahora.getTime()}`,
-    cedula: operario.numero_cedula,
-    nombre: operario.nombre,
-    idOperario: operario.id_operario,
-    idPrestador: prestador.id_prestador,
-    expiresAt: ahora.getTime() + MS_EN_UN_DIA,
-  };
-
-  return { prestador, acuerdo, parametros, operario, sesion };
+  return resultado;
 }

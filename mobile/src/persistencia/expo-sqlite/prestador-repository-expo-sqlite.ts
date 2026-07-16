@@ -16,6 +16,7 @@ import type {
 
 export interface PrestadorRepositoryExpoSqlite extends PrestadorRepository {
   cerrar(): Promise<void>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
 interface PrestadorRow {
@@ -60,6 +61,10 @@ export function crearPrestadorRepositoryExpoSqlite(
   db: SQLite.SQLiteDatabase,
 ): PrestadorRepositoryExpoSqlite {
   return {
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+      await db.withTransactionAsync(task);
+    },
+
     async crear(data: CrearPrestadorInput): Promise<Prestador> {
       const result = await db.runAsync(
         `INSERT INTO prestador (

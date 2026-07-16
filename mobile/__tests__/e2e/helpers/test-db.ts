@@ -100,6 +100,7 @@ export interface E2EFixture {
     crear(data: CrearPrestadorInput): Promise<Prestador>;
     listar(): Promise<readonly Prestador[]>;
     eliminar(id_prestador: number): Promise<void>;
+    withTransactionAsync(task: () => Promise<void>): Promise<void>;
   };
   /** Repo de acuerdos — satisface `bootstrapCompleto.AcuerdoRepoPort`. */
   readonly acuerdoRepo: {
@@ -150,6 +151,32 @@ export function buildE2EFixture(): E2EFixture {
   };
 
   const prestadorRepo = {
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+      const snapshot = {
+        prestadores: new Map(state.prestadores),
+        acuerdos: new Map(state.acuerdos),
+        parametros: new Map(state.parametros),
+        operarios: new Map(state.operarios),
+        prestadorIdSeq: state.prestadorIdSeq,
+        acuerdoIdSeq: state.acuerdoIdSeq,
+        parametrosIdSeq: state.parametrosIdSeq,
+        operarioIdSeq: state.operarioIdSeq,
+      };
+
+      try {
+        await task();
+      } catch (error) {
+        state.prestadores = snapshot.prestadores;
+        state.acuerdos = snapshot.acuerdos;
+        state.parametros = snapshot.parametros;
+        state.operarios = snapshot.operarios;
+        state.prestadorIdSeq = snapshot.prestadorIdSeq;
+        state.acuerdoIdSeq = snapshot.acuerdoIdSeq;
+        state.parametrosIdSeq = snapshot.parametrosIdSeq;
+        state.operarioIdSeq = snapshot.operarioIdSeq;
+        throw error;
+      }
+    },
     async crear(data: CrearPrestadorInput): Promise<Prestador> {
       const id = state.prestadorIdSeq++;
       const now = new Date().toISOString();
