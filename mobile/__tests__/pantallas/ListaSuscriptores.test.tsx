@@ -1,5 +1,6 @@
 import './__mocks__/use-focus-effect-mock';
 import React from 'react';
+import { FlatList, ScrollView } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ListaSuscriptores from '../../src/pantallas/ListaSuscriptores';
@@ -117,5 +118,89 @@ describe('ListaSuscriptores', () => {
     expect(screen.queryByText('Ana García')).toBeNull();
     expect(screen.queryByText('Carlos López')).toBeNull();
     expect(screen.queryByText('María Torres')).toBeNull();
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // PER-02 — FlatList sin ScrollView contenedor (virtualización OK)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // T-FLAT-1: FlatList renderizada con data={filtrados}
+  it('T-FLAT-1: renderiza FlatList con data igual a los suscriptores cargados', async () => {
+    configurarBootstrap();
+    renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    const flatList = screen.UNSAFE_queryByType(FlatList as unknown as React.ComponentType<unknown>);
+    expect(flatList).not.toBeNull();
+    const data = (flatList as unknown as { props: { data: unknown[] } }).props.data;
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(3);
+  });
+
+  // T-FLAT-2: ListHeaderComponent configurado (buscador arriba de la lista)
+  it('T-FLAT-2: ListHeaderComponent está configurado (input de búsqueda arriba)', async () => {
+    configurarBootstrap();
+    renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    const flatList = screen.UNSAFE_queryByType(FlatList as unknown as React.ComponentType<unknown>);
+    expect(flatList).not.toBeNull();
+    const props = (flatList as unknown as { props: { ListHeaderComponent: unknown } }).props;
+    expect(props.ListHeaderComponent).toBeDefined();
+  });
+
+  // T-FLAT-3: ListFooterComponent configurado (FooterApp abajo)
+  it('T-FLAT-3: ListFooterComponent está configurado', async () => {
+    configurarBootstrap();
+    renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    const flatList = screen.UNSAFE_queryByType(FlatList as unknown as React.ComponentType<unknown>);
+    expect(flatList).not.toBeNull();
+    const props = (flatList as unknown as { props: { ListFooterComponent: unknown } }).props;
+    expect(props.ListFooterComponent).toBeDefined();
+  });
+
+  // T-FLAT-4: keyExtractor extrae id_suscriptor (no el index)
+  it('T-FLAT-4: keyExtractor extrae el id_suscriptor de cada suscriptor', async () => {
+    configurarBootstrap();
+    renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    const flatList = screen.UNSAFE_queryByType(FlatList as unknown as React.ComponentType<unknown>);
+    expect(flatList).not.toBeNull();
+    const keyExtractor = (flatList as unknown as {
+      props: { keyExtractor: (item: { id_suscriptor: number }) => string };
+    }).props.keyExtractor;
+    expect(typeof keyExtractor).toBe('function');
+    expect(keyExtractor(SUSCRIPTORES_DEFECTO[0]!)).toBe('1');
+    expect(keyExtractor(SUSCRIPTORES_DEFECTO[1]!)).toBe('2');
+    expect(keyExtractor(SUSCRIPTORES_DEFECTO[2]!)).toBe('3');
+  });
+
+  // T-FLAT-5: NO hay ScrollView ANCESTRO de la FlatList (la virtualización
+// requiere un ScrollView INTERNO a la FlatList — eso es correcto; el bug
+// era tener un ScrollView PADRE que forzara render eager de todas las filas).
+  it('T-FLAT-5: NO hay ScrollView ancestro de la FlatList (virtualización OK)', async () => {
+    configurarBootstrap();
+    renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    const flatList = screen.UNSAFE_queryByType(FlatList as unknown as React.ComponentType<unknown>) as
+      | { _fiber: { return: { type?: unknown } | null } }
+      | null;
+    expect(flatList).not.toBeNull();
+    // Walk up from FlatList to root. None of those ancestors should be a ScrollView.
+    let cursor: { return: { type?: unknown; return?: unknown } | null } | null = flatList!._fiber;
+    while (cursor) {
+      const type = cursor.return?.type;
+      expect(type).not.toBe(ScrollView);
+      cursor = (cursor.return ?? null) as typeof cursor;
+    }
+  });
+
+  // T-FLAT-6: lista vacía usa ListEmptyComponent
+  it('T-FLAT-6: lista vacía tiene ListEmptyComponent configurado', async () => {
+    configurarBootstrap([]);
+    renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
+    const flatList = screen.UNSAFE_queryByType(FlatList as unknown as React.ComponentType<unknown>);
+    expect(flatList).not.toBeNull();
+    const props = (flatList as unknown as { props: { ListEmptyComponent: unknown } }).props;
+    expect(props.ListEmptyComponent).toBeDefined();
   });
 });

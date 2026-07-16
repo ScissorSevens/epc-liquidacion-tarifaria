@@ -4,7 +4,6 @@ import {
   FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +26,13 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+
+// PER-02 — virtualización óptima para 300+ prestadores × N suscriptores.
+// Sin ScrollView padre que fuerce eager mount, FlatList perezosa es la que
+// controla qué filas se montan.
+const FLATLIST_INITIAL_NUM_TO_RENDER = 10;
+const FLATLIST_MAX_TO_RENDER_PER_BATCH = 10;
+const FLATLIST_WINDOW_SIZE = 10;
 
 type Props = LecturasStackScreenProps<'ListaSuscriptores'>;
 
@@ -137,13 +143,22 @@ export default function ListaSuscriptores({ navigation }: Props) {
         }
       />
 
-      <ScrollView
+      {/*
+       * PER-02: FlatList como contenedor raíz del scroll.
+       * Sin ScrollView padre, la virtualización de RN funciona: solo se montan
+       * las filas visibles (initialNumToRender + windowSize).
+       * ListHeaderComponent → buscador (siempre arriba).
+       * ListFooterComponent → FooterApp (slot reservado).
+       * ListEmptyComponent → estados loading / error / vacío / sin resultados.
+       */}
+      <FlatList
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Buscador (siempre visible) */}
-        <View style={styles.buscadorContainer}>
+        data={filtrados}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <View style={styles.buscadorContainer}>
             <MaterialIcons name="search" size={20} color={COLORS.outline} style={styles.buscadorIcono} />
             <TextInput
               style={[TYPOGRAPHY.bodyMd, styles.buscador]}
@@ -155,44 +170,37 @@ export default function ListaSuscriptores({ navigation }: Props) {
               autoCorrect={false}
             />
           </View>
-
-        {/* Contenido */}
-        {loading ? (
+        }
+        ListFooterComponent={<FooterApp />}
+        ListEmptyComponent={
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
+            {loading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : error !== null ? (
+              <>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
+                  onPress={() => void cargar()}
+                >
+                  <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>REINTENTAR</Text>
+                </Pressable>
+              </>
+            ) : suscriptores.length === 0 ? (
+              <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>
+                No hay suscriptores. Usá el botón + para agregar uno.
+              </Text>
+            ) : (
+              <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>Sin resultados</Text>
+            )}
           </View>
-        ) : error !== null ? (
-          <View style={styles.center}>
-            <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
-            <Pressable
-              style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
-              onPress={() => void cargar()}
-            >
-              <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>REINTENTAR</Text>
-            </Pressable>
-          </View>
-        ) : suscriptores.length === 0 ? (
-          <View style={styles.center}>
-            <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>
-              No hay suscriptores. Usá el botón + para agregar uno.
-            </Text>
-          </View>
-        ) : filtrados.length === 0 ? (
-          <View style={styles.center}>
-            <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>Sin resultados</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filtrados}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            scrollEnabled={false}
-            contentContainerStyle={styles.lista}
-          />
-        )}
-
-        <FooterApp />
-      </ScrollView>
+        }
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={FLATLIST_INITIAL_NUM_TO_RENDER}
+        maxToRenderPerBatch={FLATLIST_MAX_TO_RENDER_PER_BATCH}
+        windowSize={FLATLIST_WINDOW_SIZE}
+        removeClippedSubviews
+      />
 
       {/* FAB Speed Dial */}
       {fabAbierto && (
@@ -310,6 +318,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingHorizontal: SPACING.margin,
     paddingBottom: 120, // espacio para FAB
+    rowGap: SPACING.sm + 4, // gap entre filas (PER-02)
   },
 
   // ── Buscador ───────────────────────────────────────────────────────────────
@@ -331,11 +340,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.primary,
     paddingVertical: 0,
-  },
-
-  // ── Lista ──────────────────────────────────────────────────────────────────
-  lista: {
-    gap: SPACING.sm + 4,
   },
 
   // ── Botones compartidos (usados también en el estado de error/retry) ────────
