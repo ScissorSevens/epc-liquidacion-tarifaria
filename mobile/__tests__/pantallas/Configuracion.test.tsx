@@ -161,6 +161,38 @@ describe('Configuracion — perfil mobile-first', () => {
     expect(queryByText('Sin operario asignado')).toBeNull();
     expect(queryByText('ASIGNAR OPERARIO')).toBeNull();
   });
+
+  it('T-NEW-2 muestra un fallback mínimo cuando el operario no se encuentra', async () => {
+    mockedGetItem.mockImplementation(async (key: string) => {
+      if (key === 'cedula_operario') return OPERARIO_LOGUEADO.numero_cedula;
+      if (key === 'device_uuid') return OPERARIO_LOGUEADO.dispositivo_id ?? null;
+      return null;
+    });
+    mockOperarioRepo.buscarPorDispositivoId.mockResolvedValue(null);
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as never);
+
+    try {
+      const { findByText, queryByPlaceholderText, queryByText } = render(
+        <Configuracion
+          navigation={nav as never}
+          route={crearRouteMock() as never}
+          onLogoutRequested={mockOnLogoutRequested}
+        />,
+      );
+
+      expect(await findByText('Cargando perfil...')).toBeTruthy();
+      expect(queryByText('Sin operario asignado')).toBeNull();
+      expect(queryByText('ASIGNAR OPERARIO')).toBeNull();
+      expect(queryByPlaceholderText('Número de cédula')).toBeNull();
+      expect(queryByPlaceholderText('Contraseña')).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });
 
 describe('Configuracion — cerrar sesión (Punto B)', () => {

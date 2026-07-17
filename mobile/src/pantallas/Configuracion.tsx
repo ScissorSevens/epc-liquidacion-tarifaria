@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   Pressable,
   Alert,
@@ -50,8 +49,7 @@ function obtenerIniciales(nombre: string): string {
 
 type EstadoPerfil =
   | { tipo: 'cargando' }
-  | { tipo: 'sin-operario' }
-  | { tipo: 'asignando' }
+  | { tipo: 'no-encontrado' }
   | { tipo: 'operario'; operario: Operario }
   | { tipo: 'error'; mensaje: string };
 
@@ -60,9 +58,6 @@ type EstadoPerfil =
  */
 export default function Configuracion({ navigation, onLogoutRequested }: Props) {
   const [perfil, setPerfil] = useState<EstadoPerfil>({ tipo: 'cargando' });
-  const [cedula, setCedula] = useState('');
-  const [password, setPassword] = useState('');
-  const [asignando, setAsignando] = useState(false);
 
   const cargarPerfil = useCallback(async () => {
     setPerfil({ tipo: 'cargando' });
@@ -124,7 +119,7 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
         // Sin red
       }
 
-      setPerfil({ tipo: 'sin-operario' });
+      setPerfil({ tipo: 'no-encontrado' });
     } catch (e) {
       setPerfil({
         tipo: 'error',
@@ -134,118 +129,6 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
   }, []);
 
   useFocusEffect(useCallback(() => { cargarPerfil(); }, [cargarPerfil]));
-
-  async function asignarOperario(): Promise<void> {
-    if (!cedula.trim()) {
-      Alert.alert('Campo requerido', 'Ingresá tu número de cédula.');
-      return;
-    }
-    if (!password.trim()) {
-      Alert.alert('Campo requerido', 'Ingresá tu contraseña.');
-      return;
-    }
-
-    setAsignando(true);
-
-    // ── 1. Llamada al backend ─────────────────────────────────────────────────
-    let operario: Operario;
-    try {
-      const deviceId = await obtenerOCrearDeviceId();
-      const baseUrl = obtenerApiBaseUrl();
-
-      const resp = await fetch(`${baseUrl}/api/v1/operarios/vincular-dispositivo`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cedula: cedula.trim(),
-          password: password.trim(),
-          dispositivoId: deviceId,
-        }),
-      });
-
-      if (resp.status === 401 || resp.status === 404) {
-        Alert.alert('Error', 'Cédula o contraseña incorrectos.');
-        setAsignando(false);
-        return;
-      }
-      if (resp.status === 409) {
-        Alert.alert('Dispositivo ocupado', 'Este dispositivo ya está vinculado a otro operario. Contactá al administrador.');
-        setAsignando(false);
-        return;
-      }
-      if (!resp.ok) {
-        Alert.alert('Error', `No se pudo asignar el operario (${resp.status}).`);
-        setAsignando(false);
-        return;
-      }
-
-      const raw = (await resp.json()) as {
-        id: number; idPrestador: number; numeroCedula: string; nombre: string;
-        email: string; rol: string; estado: string;
-        dispositivoId?: string; createdAt?: string;
-      };
-      operario = {
-        id_operario: raw.id,
-        id_prestador: raw.idPrestador,
-        numero_cedula: raw.numeroCedula,
-        nombre: raw.nombre,
-        email: raw.email,
-        /**
-         * El backend NUNCA devuelve `password_hash` por seguridad. Esta
-         * pantalla NO autentica, solo muestra el perfil y permite
-         * desasignar. Ver doc en el bloque anterior (cargarPerfil) para
-         * el rationale completo.
-         */
-        password_hash: '',
-        rol: raw.rol,
-        estado: raw.estado,
-        dispositivo_id: raw.dispositivoId,
-        created_at: raw.createdAt,
-      };
-    } catch {
-      Alert.alert('Sin conexión', 'No se pudo conectar al servidor. Verificá la red e intentá de nuevo.');
-      setAsignando(false);
-      return;
-    }
-
-    // ── 2. Persistencia local ─────────────────────────────────────────────────
-    try {
-      await AsyncStorage.setItem(CLAVE_CEDULA, cedula.trim());
-      const bootstrap = await getBootstrap();
-      const repo = crearOperarioRepositoryExpoSqlite(bootstrap.db);
-      await repo.inicializar();
-      await repo.guardar(operario);
-
-      setCedula('');
-      setPassword('');
-      setPerfil({ tipo: 'operario', operario });
-    } catch {
-      // Vinculado en backend pero falló persistencia local — mostramos igual
-      setPerfil({ tipo: 'operario', operario });
-    } finally {
-      setAsignando(false);
-    }
-  }
-
-  async function desasignarOperario(): Promise<void> {
-    Alert.alert(
-      'Cambiar de operario',
-      '¿Seguro que querés desasignar este dispositivo? Necesitarás conexión para volver a asignarlo.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cambiar',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.removeItem(CLAVE_CEDULA);
-            setCedula('');
-            setPassword('');
-            setPerfil({ tipo: 'sin-operario' });
-          },
-        },
-      ],
-    );
-  }
 
   function handleCerrarSesion(): void {
     Alert.alert(
@@ -259,8 +142,6 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
           onPress: async () => {
             await limpiarSesion();
             await useWorkspace.getState().limpiarWorkspace();
-            setCedula('');
-            setPassword('');
             setPerfil({ tipo: 'cargando' });
             await onLogoutRequested();
           },
@@ -295,60 +176,12 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
           </View>
         )}
 
-        {/* ── Estado: sin operario → formulario de asignación ──────── */}
-        {(perfil.tipo === 'sin-operario' || perfil.tipo === 'asignando') && (
-          <View style={styles.formularioWrap}>
-            {/* Ilustración */}
-            <View style={styles.avatarVacio}>
-              <MaterialIcons name="person-off" size={40} color={COLORS.outline} />
-            </View>
-            <Text style={[TYPOGRAPHY.headlineSm, styles.formularioTitulo]}>
-              Sin operario asignado
+        {/* ── Fallback defensivo: la vinculación ocurre antes de Mi Perfil ── */}
+        {perfil.tipo === 'no-encontrado' && (
+          <View style={styles.cargandoWrap}>
+            <Text style={[TYPOGRAPHY.bodyMd, styles.cargandoTexto]}>
+              Cargando perfil...
             </Text>
-            <Text style={[TYPOGRAPHY.bodySm, styles.formularioSubtitulo]}>
-              Ingresá tus credenciales para vincular este dispositivo
-            </Text>
-
-            <View style={styles.formularioCampos}>
-              <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CÉDULA</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Número de cédula"
-                placeholderTextColor={COLORS.outline}
-                value={cedula}
-                onChangeText={setCedula}
-                keyboardType="numeric"
-                autoCapitalize="none"
-                editable={!asignando}
-              />
-
-              <Text style={[TYPOGRAPHY.labelMd, styles.inputLabel]}>CONTRASEÑA</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Contraseña"
-                placeholderTextColor={COLORS.outline}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                editable={!asignando}
-              />
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.botonAsignar,
-                  pressed && styles.botonAsignarPressed,
-                  asignando && styles.botonAsignarDisabled,
-                ]}
-                onPress={asignarOperario}
-                disabled={asignando}
-              >
-                {asignando
-                  ? <ActivityIndicator size="small" color={COLORS.background} />
-                  : <Text style={styles.botonAsignarTexto}>ASIGNAR OPERARIO</Text>
-                }
-              </Pressable>
-            </View>
           </View>
         )}
 
@@ -435,15 +268,6 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
                 <MaterialIcons name="chevron-right" size={24} color={COLORS.outline} />
               </Pressable>
             </View>
-
-            {/* Danger zone */}
-            <Pressable
-              style={({ pressed }) => [styles.botonCambiar, pressed && styles.botonCambiarPressed]}
-              onPress={desasignarOperario}
-            >
-              <MaterialIcons name="logout" size={20} color={COLORS.error} />
-              <Text style={styles.botonCambiarTexto}>CAMBIAR DE OPERARIO</Text>
-            </Pressable>
           </>
         )}
 
@@ -468,6 +292,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xl * 2,
     alignItems: 'center',
   },
+  cargandoTexto: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
   errorWrap: {
     paddingHorizontal: SPACING.margin,
     paddingVertical: SPACING.xl * 2,
@@ -487,65 +315,6 @@ const styles = StyleSheet.create({
   },
   botonReintentarTexto: {
     color: COLORS.primary,
-    ...(TYPOGRAPHY.labelMd as object),
-  },
-
-  // ── Formulario sin operario ─────────────────────────────────────────
-  formularioWrap: {
-    paddingHorizontal: SPACING.margin,
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
-  },
-  avatarVacio: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLORS.surfaceLight,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  formularioTitulo: {
-    color: COLORS.primary,
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
-  },
-  formularioSubtitulo: {
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-  },
-  formularioCampos: {
-    width: '100%',
-  },
-  inputLabel: {
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    color: COLORS.primary,
-    backgroundColor: COLORS.background,
-    marginBottom: SPACING.md,
-    ...(TYPOGRAPHY.bodyMd as object),
-  },
-  botonAsignar: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.sm,
-    height: 48,
-  },
-  botonAsignarPressed: { opacity: 0.8 },
-  botonAsignarDisabled: { opacity: 0.5 },
-  botonAsignarTexto: {
-    color: COLORS.background,
     ...(TYPOGRAPHY.labelMd as object),
   },
 
@@ -636,27 +405,5 @@ const styles = StyleSheet.create({
   },
   itemMenuValor: {
     color: COLORS.textSecondary,
-  },
-
-  // ── Danger zone ─────────────────────────────────────────────────────
-  botonCambiar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    marginHorizontal: SPACING.margin,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.xl,
-    height: 52,
-    borderWidth: 2,
-    borderColor: COLORS.error,
-    backgroundColor: COLORS.background,
-  },
-  botonCambiarPressed: {
-    backgroundColor: '#fff0f0',
-  },
-  botonCambiarTexto: {
-    color: COLORS.error,
-    ...(TYPOGRAPHY.labelMd as object),
   },
 });
