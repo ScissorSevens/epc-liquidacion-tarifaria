@@ -9,7 +9,8 @@
 //     1. Prestador (con codigo auto-generado correlativo)
 //     2. Acuerdo Municipal vigente (con topes default L142/1994)
 //     3. Parametros Tarifa vigentes (con costos medios CRA 825/2017)
-//     4. Operario vinculado al prestador (con password hasheado)
+//     4. Operario vinculado al prestador (con password hasheado y
+//        dispositivo_id auto-vinculado al dispositivo actual)
 //
 //   Devuelve { prestador, acuerdo, parametros, operario, sesion } para
 //   que la UI arme la sesion multi-tenant.
@@ -20,6 +21,10 @@
 //     codigo legacy 'EPC-LEGACY' que la migration 009 inserta.
 //   - Operario se vincula al prestador creado (id_prestador consistente).
 //   - Password se hashea via Hasher (no se guarda en claro).
+//   - Operario auto-vinculado al dispositivo actual via
+//     obtenerOCrearDeviceId() (T-DEV-3, T-DEV-4) — esto es lo que evita
+//     que despues del setup el usuario vea la pantalla de "vincular
+//     dispositivo" en Mi Perfil.
 //   - Sesion devuelta tiene idPrestador = prestador.id_prestador y
 //     expiresAt = ~now + 24h.
 //   - Si la creacion del Acuerdo falla, NO se queda el prestador huerfano
@@ -35,19 +40,35 @@
 //   - Hasher: stub deterministico (no js-sha256 real, asi no dependemos
 //     de import de runtime en el test).
 //   - IdGenerator: stub que devuelve un id correlativo por invocacion.
+//   - `obtenerOCrearDeviceId()` se mockea a nivel de modulo para que
+//     los tests T-DEV-3/4 sean deterministas y no dependan del bridge
+//     AsyncStorage nativo.
 //
 // TDD Evidence:
 //   RED  → estos tests son la primera implementacion del helper.
 //          Antes de este commit, el archivo `bootstrap-completo.ts`
 //          no existe. Los 11 tests fallan al importar el modulo.
 //   GREEN → el helper se implementa y los 11 tests pasan.
+//   T-DEV-3 / T-DEV-4 (device-link) → introducidos en el fix del bug
+//          "bootstrapCompleto crea operario sin dispositivo_id".
+
+jest.mock('../../src/composition/device-id', () => ({
+  obtenerOCrearDeviceId: jest.fn(),
+  CLAVE_DEVICE_ID: 'device_uuid',
+  generarUuid: jest.fn(),
+}));
 
 import { bootstrapCompleto, type BootstrapCompletoInput } from '../../src/composition/bootstrap-completo';
+import { obtenerOCrearDeviceId } from '../../src/composition/device-id';
 import type { Prestador, CrearPrestadorInput } from '../../dominio/prestadores/types';
 import type { AcuerdoMunicipal, CrearAcuerdoMunicipalInput } from '../../dominio/acuerdo-municipal/types';
 import type { ParametrosTarifa, CrearParametrosTarifaInput } from '../../dominio/parametros-tarifa/types';
 import type { Operario, OperarioBorrador } from '../../dominio/operarios/types';
 import type { Hasher, IdGenerator } from '../../dominio/shared/ports';
+
+const mockObtenerOCrearDeviceId = obtenerOCrearDeviceId as jest.MockedFunction<
+  typeof obtenerOCrearDeviceId
+>;
 
 // ── In-memory repos ──────────────────────────────────────────────────────────
 
@@ -273,6 +294,13 @@ describe('bootstrapCompleto()', () => {
       hasher: buildHasher(),
       idGenerator: buildIdGenerator(),
     };
+    // Default para el mock de obtenerOCrearDeviceId: un UUID estable
+    // por corrida. Los tests T-DEV-3/T-DEV-4 lo sobreescriben cuando
+    // necesitan validar el contrato de "mismo device_id".
+    mockObtenerOCrearDeviceId.mockReset();
+    mockObtenerOCrearDeviceId.mockResolvedValue(
+      'aabbccdd-eeff-4011-8222-334455667788',
+    );
   });
 
   // ── happy path ──────────────────────────────────────────────────────────
@@ -479,6 +507,78 @@ describe('bootstrapCompleto()', () => {
       // el seed, el campo sigue siendo el id REAL del operario creado.
       expect(typeof resultado.sesion.idOperario).toBe('number');
       expect(Number.isInteger(resultado.sesion.idOperario)).toBe(true);
+    });
+
+    // ── T-DEV-3 / T-DEV-4 — auto-vinculación de dispositivo al operario ──
+    //
+    // El bug que motiva este bloque: `bootstrapCompleto` creaba el primer
+    // operario sin pasar `dispositivo_id`, dejando el campo NULL. Después
+    // del wizard de setup el usuario aterrizaba en Mi Perfil y veía la
+    // pantalla de "vincular dispositivo" (porque Configuracion detecta
+    // `dispositivo_id === null` y muestra el formulario de asignación).
+    //
+    // Contrato verificado:
+    //   T-DEV-3 → bootstrapCompleto guarda el operario con dispositivo_id
+    //             NO-VACÍO (string de longitud > 0).
+    //   T-DEV-4 → bootstrapCompleto guarda el operario con el MISMO
+    //             dispositivo_id que retorna obtenerOCrearDeviceId().
+    //             Si esos dos valores difieren, el operario queda con un
+    //             device_id que NO se va a usar nunca y Mi Perfil sigue
+    //             mostrando el formulario de vinculación.
+    it('T-DEV-3 guarda el operario con dispositivo_id no-vacío', async () => {
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+      });
+
+      // Antes del fix este campo era undefined → Configuracion.tsx no
+      // encontraba al operario por dispositivo_id y mostraba "Sin
+      // operario asignado". Ahora debe ser un string no-vacío.
+      expect(typeof resultado.operario.dispositivo_id).toBe('string');
+      expect(resultado.operario.dispositivo_id).not.toBe('');
+      expect(resultado.operario.dispositivo_id).toBeDefined();
+
+      // Tambien persistido en el repo (no solo en el retorno): un eventual
+      // lookup por `buscarPorDispositivoId` en `Configuracion` debe
+      // encontrarlo.
+      const [operarioPersistido] = Array.from(state.operarios.values());
+      expect(operarioPersistido?.dispositivo_id).toBe(
+        resultado.operario.dispositivo_id,
+      );
+    });
+
+    it('T-DEV-4 guarda el operario con el mismo dispositivo_id que retorna obtenerOCrearDeviceId', async () => {
+      // Forzamos un device_uuid conocido para que la aserción sea
+      // deterministica y NO dependa del formato que genere Math.random.
+      const deviceIdEsperado =
+        '11112222-3333-4444-5555-666677778888';
+      mockObtenerOCrearDeviceId.mockResolvedValueOnce(deviceIdEsperado);
+
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+      });
+
+      // El operario creado en SQLite local debe tener EXACTAMENTE el
+      // mismo device_uuid que se leyo/genero para este dispositivo.
+      // Si difiere (ej: uno generado ad-hoc en bootstrap y otro leido
+      // del storage), Mi Perfil nunca va a encontrar al operario.
+      expect(resultado.operario.dispositivo_id).toBe(deviceIdEsperado);
+
+      // Confirmamos que el helper fue invocado una sola vez por la
+      // transaccion completa (no hay doble generacion ni nada raro).
+      // Esto tambien documenta el contrato de la API.
+      expect(mockObtenerOCrearDeviceId).toHaveBeenCalledTimes(1);
     });
   });
 

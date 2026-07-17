@@ -40,6 +40,7 @@ import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
 import type { Operario, OperarioBorrador } from '../../dominio/operarios/types';
 import { crearOperario } from '../../dominio/operarios/operarios';
 import type { Sesion } from './constantes';
+import { obtenerOCrearDeviceId } from './device-id';
 import type { Hasher, IdGenerator } from '../../dominio/shared/ports';
 
 /** Prestador con acceso a la transaccion de la conexion SQLite compartida. */
@@ -230,15 +231,23 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       vigente_hasta: fecha_vigencia_hasta,
     });
 
-    // 4. Crear el primer operario vinculado al prestador.
+    // 4. Crear el primer operario vinculado al prestador Y al
+    //    dispositivo actual. Sin `dispositivo_id`, Configuracion.tsx
+    //    no encuentra al operario al aterrizar en Mi Perfil y muestra
+    //    el formulario de "Sin operario asignado" en vez del perfil
+    //    real. El helper `obtenerOCrearDeviceId()` es idempotente: en
+    //    cold starts siguientes retorna el mismo UUID que ya esta en
+    //    AsyncStorage bajo la clave `device_uuid`.
     const password_hash = deps.hasher.sha256(deps.input.operarioData.password);
     const email = deps.input.operarioData.email ?? '';
+    const dispositivo_id = await obtenerOCrearDeviceId();
     const borradorOperario = crearOperario({
       id_prestador: prestador.id_prestador,
       numero_cedula: deps.input.operarioData.numero_cedula,
       nombre: deps.input.operarioData.nombre,
       email,
       password_hash,
+      dispositivo_id,
       rol: 'operario',
       estado: 'activo',
     });

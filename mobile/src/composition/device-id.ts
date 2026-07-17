@@ -61,7 +61,11 @@ export function generarUuid(): string {
  */
 export async function obtenerOCrearDeviceId(): Promise<string> {
   const existente = await AsyncStorage.getItem(CLAVE_DEVICE_ID);
-  if (existente !== null && existente.length > 0) {
+  // Cubrimos `null`, `undefined` y string vacío — los tres casos son
+  // equivalentes a "no hay device_uuid persistido". El check `existente`
+  // truthy es lo que usaba la copia inline original en Configuracion.tsx,
+  // preservado al extraer el helper.
+  if (existente) {
     return existente;
   }
   const nuevo = generarUuid();
