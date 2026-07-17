@@ -34,10 +34,22 @@
 //          no existe. Los 8 tests fallan al importar el modulo.
 //   GREEN → el helper se implementa y los 8 tests pasan.
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn().mockResolvedValue(undefined),
+  removeItem: jest.fn().mockResolvedValue(undefined),
+}));
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginLocal } from '../../src/composition/login-local';
+import type { ActualizarOperarioInput } from '../../dominio/operarios/types';
 import type { Operario } from '../../src/operarios/types';
 import type { Hasher } from '../../dominio/shared/ports';
 import type { Sesion } from '../../src/composition/constantes';
+
+const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<
+  typeof AsyncStorage.getItem
+>;
 
 // ── Stubs deterministas ──────────────────────────────────────────────────────
 
@@ -50,11 +62,23 @@ function buildHasher(): Hasher {
 
 interface FakeOperarioRepo {
   buscarPorCedula: jest.Mock<Promise<Operario | null>, [string]>;
+  actualizar: jest.Mock<Promise<Operario>, [number, ActualizarOperarioInput]>;
 }
 
 function buildRepo(operario: Operario | null): FakeOperarioRepo {
+  // Default: si actualizar() es invocado, devuelve el mismo operario con
+  // un patch vacio (los tests T-LOGIN-VINC-* que necesiten otro return
+  // lo sobreescriben explicitamente).
   return {
     buscarPorCedula: jest.fn().mockResolvedValue(operario),
+    actualizar: jest.fn().mockImplementation(
+      async (_id: number, _cambios: ActualizarOperarioInput): Promise<Operario> => {
+        if (operario === null) {
+          throw new Error('buildRepo: operario null — actualizar no deberia llamarse');
+        }
+        return operario;
+      },
+    ),
   };
 }
 
@@ -315,6 +339,150 @@ describe('loginLocal() — helper puro de validacion offline', () => {
 
       expect(resultado.sesion.idOperario).toBe(7777);
       expect(resultado.sesion.idOperario).not.toBe(42);
+    });
+  });
+
+  // ── Auto-vinculacion de dispositivo (T-LOGIN-VINC-*) ──────────────────────
+  //
+  // Bug: operarios creados ANTES del fix 22d8f2c (bootstrap auto-vincula)
+  // quedaron con `dispositivo_id=NULL` persistido en la DB. Cuando van a
+  // Mi Perfil, Configuracion.tsx busca por dispositivo y no encuentra
+  // nada, mostrando el form de "vincular dispositivo" en vez del perfil.
+  //
+  // Fix: en loginLocal, despues de validar el password, si el operario
+  // tiene dispositivo_id === undefined/'' (equivalente a NULL en DB),
+  // auto-vincularlo al dispositivo actual (generar o recuperar
+  // device_uuid via obtenerOCrearDeviceId) y persistir el cambio via
+  // operarioRepo.actualizar. Asi la proxima vez que Configuracion
+  // busque por dispositivo, lo encuentra directo.
+  //
+  // Si el operario YA tiene dispositivo_id, no se modifica — no se
+  // sobreescribe la vinculacion existente.
+
+  describe('auto-vinculacion de dispositivo para operarios legacy (sin dispositivo_id)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // Default para los tests de auto-vinculacion: AsyncStorage tiene
+      // un device_uuid persistido. Los tests que necesiten otro valor
+      // lo sobreescriben explicitamente.
+      mockedGetItem.mockResolvedValue('device-uuid-fijo');
+    });
+
+    it('T-LOGIN-VINC-1: operario SIN dispositivo_id lo auto-vincula al deviceId del AsyncStorage via repo.actualizar()', async () => {
+      // Operario legacy: creado antes del fix 22d8f2c, sin dispositivo_id.
+      const operarioLegacy: Operario = {
+        ...buildOperarioValido(),
+        // dispositivo_id omitido → undefined (fromRow lo excluye si DB es NULL)
+        dispositivo_id: undefined,
+      };
+      const repo = buildRepo(operarioLegacy);
+      // Simula la DB devolviendo el operario con el dispositivo_id nuevo
+      // tras actualizar() (ejecutarActualizacion en el repo real relee la fila).
+      repo.actualizar.mockResolvedValue({
+        ...operarioLegacy,
+        dispositivo_id: 'device-uuid-fijo',
+      });
+      const hasher = buildHasher();
+
+      await loginLocal({
+        operarioRepo: repo,
+        hasher,
+        cedula: '51800012',
+        password: 'mi-clave',
+      });
+
+      // Real assertion: actualizar DEBE haberse llamado con el id del operario
+      // y el deviceId obtenido de AsyncStorage. Si loginLocal hardcodea
+      // un UUID, este assert falla.
+      expect(repo.actualizar).toHaveBeenCalledTimes(1);
+      expect(repo.actualizar).toHaveBeenCalledWith(42, {
+        dispositivo_id: 'device-uuid-fijo',
+      });
+    });
+
+    it('T-LOGIN-VINC-2: operario CON dispositivo_id preexistente NO invoca repo.actualizar() (no se sobreescribe)', async () => {
+      // Operario ya vinculado a otro dispositivo (o al mismo) — login NO
+      // debe pisar la vinculacion existente.
+      const operarioVinculado: Operario = {
+        ...buildOperarioValido(),
+        dispositivo_id: 'dispositivo-previo',
+      };
+      const repo = buildRepo(operarioVinculado);
+      const hasher = buildHasher();
+
+      const resultado = await loginLocal({
+        operarioRepo: repo,
+        hasher,
+        cedula: '51800012',
+        password: 'mi-clave',
+      });
+
+      // Real assertion: actualizar NO debe llamarse si ya tiene dispositivo.
+      expect(repo.actualizar).not.toHaveBeenCalled();
+      // Y el operario retornado conserva el dispositivo_id original.
+      expect(resultado.operario.dispositivo_id).toBe('dispositivo-previo');
+    });
+
+    it('T-LOGIN-VINC-3: sesion.idOperario refleja el operarioVinculado (no el operario previo)', async () => {
+      // Triangulacion: si el repo devuelve un operario con id_operario
+      // distinto tras actualizar (escenario real: la fila releida tiene
+      // columnas recalculadas, timestamps, etc.), la sesion DEBE usar el
+      // nuevo. Esto prueba que sesion se construye desde operarioVinculado,
+      // NO desde operario.
+      const operarioLegacy: Operario = {
+        ...buildOperarioValido(),
+        id_operario: 42,
+        dispositivo_id: undefined,
+      };
+      const repo = buildRepo(operarioLegacy);
+      repo.actualizar.mockResolvedValue({
+        ...operarioLegacy,
+        id_operario: 99, // DB devuelve id distinto tras UPDATE (edge case real)
+        dispositivo_id: 'device-uuid-fijo',
+      });
+      const hasher = buildHasher();
+
+      const resultado = await loginLocal({
+        operarioRepo: repo,
+        hasher,
+        cedula: '51800012',
+        password: 'mi-clave',
+      });
+
+      // sesion.idOperario debe ser el del operarioVinculado (99), NO el
+      // del operario previo (42). Esto cubre la atribucion legal CRA 825/2017.
+      expect(resultado.sesion.idOperario).toBe(99);
+      expect(resultado.sesion.idOperario).not.toBe(42);
+    });
+
+    it('T-LOGIN-VINC-4: resultado.operario es el operarioVinculado (con dispositivo_id nuevo), no el operario previo', async () => {
+      // Triangulacion: el return expone operarioVinculado, no operario.
+      // La UI consume resultado.operario para mostrar info del perfil —
+      // si retornamos el viejo (sin dispositivo), Mi Perfil seguiria
+      // mostrando datos stale.
+      const operarioLegacy: Operario = {
+        ...buildOperarioValido(),
+        dispositivo_id: undefined,
+      };
+      const repo = buildRepo(operarioLegacy);
+      repo.actualizar.mockResolvedValue({
+        ...operarioLegacy,
+        dispositivo_id: 'device-uuid-fijo',
+      });
+      const hasher = buildHasher();
+
+      const resultado = await loginLocal({
+        operarioRepo: repo,
+        hasher,
+        cedula: '51800012',
+        password: 'mi-clave',
+      });
+
+      // El operario retornado tiene el dispositivo_id del operarioVinculado.
+      expect(resultado.operario.dispositivo_id).toBe('device-uuid-fijo');
+      // Y NO es la misma referencia que el operario previo (defensa contra
+      // un bug tipo "return operario" en vez de "return operarioVinculado").
+      expect(resultado.operario).not.toBe(operarioLegacy);
     });
   });
 });

@@ -28,7 +28,9 @@
  *   de sesion opaco + autenticacion contra backend.
  */
 import type { Hasher } from '../../dominio/shared/ports';
+import type { ActualizarOperarioInput } from '../../dominio/operarios/types';
 import type { Operario } from '../operarios/types';
+import { obtenerOCrearDeviceId } from './device-id';
 import type { Sesion } from './constantes';
 
 /** Codigos de error canonicos del helper. La UI los traduce a mensajes. */
@@ -40,6 +42,7 @@ const MS_EN_UN_DIA = 24 * 60 * 60 * 1000;
 
 export interface LoginLocalOperarioRepoPort {
   buscarPorCedula(cedula: string): Promise<Operario | null>;
+  actualizar(id: number, cambios: ActualizarOperarioInput): Promise<Operario>;
 }
 
 export interface LoginLocalInput {
@@ -56,6 +59,16 @@ export interface LoginLocalResultado {
 
 /**
  * Valida cedula + password contra la DB local.
+ *
+ * Auto-vincula el dispositivo actual al operario si este no tiene
+ * `dispositivo_id` persistido. Esto cubre operarios creados ANTES del
+ * fix `22d8f2c` (bootstrap auto-vincula dispositivo), que quedaron con
+ * `dispositivo_id=NULL` en la DB y rompian Mi Perfil (Configuracion.tsx
+ * buscaba por dispositivo y no encontraba nada, mostrando el form de
+ * "vincular dispositivo" en vez del perfil real).
+ *
+ * Si el operario YA tiene `dispositivo_id`, no se modifica — no se
+ * sobreescribe la vinculacion existente.
  *
  * @throws Error con `message === 'OPERARIO_NO_ENCONTRADO'` si la cedula
  *         no esta en la DB.
@@ -81,19 +94,39 @@ export async function loginLocal(deps: LoginLocalInput): Promise<LoginLocalResul
     throw new Error(ERROR_PASSWORD_INCORRECTA);
   }
 
-  // 3. Construir la sesion con idPrestador REAL del operario.
-  //    El token es placeholder hasta que llegue el backend (Fase 6).
-  //    idOperario es REQUERIDO en Sesion para que CapturarLectura pueda
-  //    atribuir legalmente cada lectura (CRA 825/2017) — antes estaba
-  //    ausente y CapturarLectura hardcodeaba id_operario=1 (COR-04).
+  // 3. Auto-vincular dispositivo si el operario no tiene.
+  //
+  //    `dispositivo_id` en `Operario` (mobile type) es `string | undefined`
+  //    — el repo `fromRow()` lo OMITE cuando la DB tiene NULL, asi que
+  //    llega como `undefined`. Tambien cubrimos `''` por defensa
+  //    (historicos donde alguien persistio string vacio).
+  //
+  //    Cuando se vincula, el operario retornado por `actualizar()` es la
+  //    fila releida de la DB (ejecutarActualizacion hace SELECT tras UPDATE),
+  //    asi que a partir de aca usamos `operarioVinculado` para sesion +
+  //    return.
+  let operarioVinculado = operario;
+  if (operario.dispositivo_id === undefined || operario.dispositivo_id === '') {
+    const deviceId = await obtenerOCrearDeviceId();
+    operarioVinculado = await deps.operarioRepo.actualizar(operario.id_operario, {
+      dispositivo_id: deviceId,
+    });
+  }
+
+  // 4. Construir la sesion con idPrestador REAL del operario (vinculado si
+  //    hubo auto-vinculacion, sino el mismo). El token es placeholder hasta
+  //    que llegue el backend (Fase 6). idOperario es REQUERIDO en Sesion
+  //    para que CapturarLectura pueda atribuir legalmente cada lectura
+  //    (CRA 825/2017) — antes estaba ausente y CapturarLectura hardcodeaba
+  //    id_operario=1 (COR-04).
   const sesion: Sesion = {
     token: `fake-token-${Date.now()}`,
-    cedula: operario.numero_cedula,
-    nombre: operario.nombre,
-    idOperario: operario.id_operario,
-    idPrestador: operario.id_prestador,
+    cedula: operarioVinculado.numero_cedula,
+    nombre: operarioVinculado.nombre,
+    idOperario: operarioVinculado.id_operario,
+    idPrestador: operarioVinculado.id_prestador,
     expiresAt: Date.now() + MS_EN_UN_DIA,
   };
 
-  return { sesion, operario };
+  return { sesion, operario: operarioVinculado };
 }
