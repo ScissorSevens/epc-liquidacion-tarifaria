@@ -7,7 +7,9 @@
 // disponible antes de cablear las repos SQLite.
 
 import { calcularLiquidacion } from '@dominio/motor-tarifario';
-import type { EntradaCalculo, ParametrosTarifa, AcuerdoMunicipal } from '@dominio/motor-tarifario';
+import type { EntradaCalculo } from '@dominio/motor-tarifario';
+import type { ParametrosTarifa } from '@dominio/parametros-tarifa';
+import type { AcuerdoMunicipal } from '@dominio/acuerdo-municipal';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 
 export interface ResultadoSmokeDominio {
