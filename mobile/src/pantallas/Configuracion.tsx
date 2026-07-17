@@ -25,6 +25,7 @@ import { TopBar } from '../componentes/TopBar';
 import { obtenerApiBaseUrl } from '../config/api';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { limpiarSesion } from '../composition/constantes';
+import { obtenerOCrearDeviceId } from '../composition/device-id';
 import { useWorkspace } from '../composicion/useWorkspace';
 import {
   crearOperarioRepositoryExpoSqlite,
@@ -35,25 +36,7 @@ type Props = ConfigStackScreenProps<'Configuracion'> & {
   readonly onLogoutRequested: () => void;
 };
 
-/** Genera un UUID v4 simple sin dependencias externas. */
-function generarUuid(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-const CLAVE_DEVICE_ID = 'device_uuid';
 const CLAVE_CEDULA = 'cedula_operario';
-
-async function obtenerOCrearDeviceId(): Promise<string> {
-  const existente = await AsyncStorage.getItem(CLAVE_DEVICE_ID);
-  if (existente) return existente;
-  const nuevo = generarUuid();
-  await AsyncStorage.setItem(CLAVE_DEVICE_ID, nuevo);
-  return nuevo;
-}
 
 /** Extrae las iniciales del nombre (hasta 2 letras). */
 function obtenerIniciales(nombre: string): string {
