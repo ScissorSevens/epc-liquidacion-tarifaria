@@ -68,10 +68,6 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
     setPerfil({ tipo: 'cargando' });
     try {
       const cedulaGuardada = await AsyncStorage.getItem(CLAVE_CEDULA);
-      if (!cedulaGuardada) {
-        setPerfil({ tipo: 'sin-operario' });
-        return;
-      }
 
       const deviceId = await obtenerOCrearDeviceId();
 

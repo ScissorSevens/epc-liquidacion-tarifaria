@@ -1,34 +1,12 @@
-// mobile/__tests__/pantallas/Configuracion.test.tsx
-//
-// Tests de REGRESION para la pantalla `Configuracion` (Fase 4 Tarea 4.3.1).
-//
-// QUE CUBREN:
-//   Verifican que el bypass viejo (que auto-creaba un operarioDummy con
-//   id_operario=0 y numero_cedula='placeholder' cuando NO habia
-//   cedulaGuardada) YA NO existe en el codigo.
-//
-//   Si alguien re-introduce ese bypass en el futuro, estos tests fallan
-//   en el RED phase, evitando que la regresion llegue a produccion.
-//
-// ESTADO DEL BYPASS:
-//   La pantalla Configuracion.tsx actual NO contiene el bypass (eliminado
-//   antes de esta task — el summary del user estaba desactualizado).
-//   Estos tests son la red de seguridad para que no vuelva.
-//
-// ESTRATEGIA:
-//   - Mockeamos AsyncStorage para que 'cedula_operario' devuelva null.
-//   - Mockeamos getBootstrap() con un operario repo espia.
-//   - Renderizamos <Configuracion />.
-//   - Verificamos:
-//     * Render: muestra "Sin operario asignado" + formulario de asignacion.
-//     * AsyncStorage: setItem con 'cedula_operario' NO fue llamado.
-//     * Repo: guardar() NO fue llamado con id_operario=0 ni
-//       numero_cedula='placeholder'.
+// Tests de comportamiento para Mi Perfil en el flujo mobile-first.
+// El bootstrap y el login vinculan el dispositivo antes de entrar a esta
+// pantalla, por lo que Configuracion debe resolver el perfil por device_uuid
+// sin ofrecer un segundo flujo de autenticación o vinculación.
 
 import './__mocks__/use-focus-effect-mock';
 import React from 'react';
 import { Alert } from 'react-native';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 
 import Configuracion from '../../src/pantallas/Configuracion';
 import { crearNavMock, crearRouteMock } from './__mocks__/nav';
@@ -109,9 +87,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<
   typeof AsyncStorage.getItem
 >;
-const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<
-  typeof AsyncStorage.setItem
->;
 
 const OPERARIO_LOGUEADO: Operario = {
   id_operario: 7,
@@ -143,14 +118,12 @@ function prepararOperarioLogueado(): void {
   mockOperarioRepo.buscarPorDispositivoId.mockResolvedValue(OPERARIO_LOGUEADO);
 }
 
-describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () => {
+describe('Configuracion — perfil mobile-first', () => {
   let nav: ReturnType<typeof crearNavMock>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     nav = crearNavMock();
-    // operarioRepo mockeado: nunca debe ser llamado en el camino "sin
-    // cedula guardada" porque no hay nada que buscar.
     mockOperarioRepo = {
       inicializar: jest.fn().mockResolvedValue(undefined),
       buscarPorDispositivoId: jest.fn().mockResolvedValue(null),
@@ -165,16 +138,17 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
       operarioRepo: mockOperarioRepo,
       db: {} as never,
     } as never);
-    // getItem default: NO hay cedula guardada, NO hay device UUID.
+  });
+
+  it('T-NEW-1 siempre muestra el perfil vinculado al dispositivo aunque no haya cédula almacenada', async () => {
     mockedGetItem.mockImplementation(async (key: string) => {
       if (key === 'cedula_operario') return null;
-      if (key === 'device_uuid') return null;
+      if (key === 'device_uuid') return OPERARIO_LOGUEADO.dispositivo_id ?? null;
       return null;
     });
-  });
+    mockOperarioRepo.buscarPorDispositivoId.mockResolvedValue(OPERARIO_LOGUEADO);
 
-  it('R1.1 muestra el formulario "Sin operario asignado" cuando no hay cedula guardada', async () => {
-    const { findByText } = render(
+    const { findByText, queryByText } = render(
       <Configuracion
         navigation={nav as never}
         route={crearRouteMock() as never}
@@ -182,90 +156,10 @@ describe('Configuracion — regression del bypass eliminado (Fase 4.3.1)', () =>
       />,
     );
 
-    await findByText(/Sin operario asignado/i);
-    await findByText(/Ingresá tus credenciales/i);
-  });
-
-  it('R1.2 NO setea automaticamente "cedula_operario" en AsyncStorage sin input del usuario', async () => {
-    render(
-      <Configuracion
-        navigation={nav as never}
-        route={crearRouteMock() as never}
-        onLogoutRequested={mockOnLogoutRequested}
-      />,
-    );
-
-    // Esperamos a que la pantalla termine su ciclo de carga (estado sin-operario).
-    await waitFor(() => {
-      // setItem con la clave 'cedula_operario' NO debe haber sido llamado.
-      const escriturasCedula = mockedSetItem.mock.calls.filter(
-        ([clave]) => clave === 'cedula_operario',
-      );
-      expect(escriturasCedula).toHaveLength(0);
-    });
-  });
-
-  it('R1.3 NO crea un operario dummy en la DB con id_operario = 0 o cedula = "placeholder"', async () => {
-    let guardarLlamado = false;
-    // Mockeamos operarioRepo.guardar con un espia que detecta el bypass
-    // si alguien lo re-introduce.
-    const operarioRepo = {
-      inicializar: jest.fn().mockResolvedValue(undefined),
-      buscarPorDispositivoId: jest.fn().mockResolvedValue(null),
-      guardar: jest.fn().mockImplementation((op: { id_operario?: number; numero_cedula?: string }) => {
-        guardarLlamado = true;
-        if (op.id_operario === 0) {
-          throw new Error('REGRESION: operario creado con id_operario=0');
-        }
-        if (op.numero_cedula === 'placeholder') {
-          throw new Error('REGRESION: operario creado con cedula=placeholder');
-        }
-        return Promise.resolve();
-      }),
-      listar: jest.fn().mockResolvedValue([]),
-    };
-    mockGetBootstrap.mockResolvedValue({
-      operarioRepo,
-      db: {} as never,
-    } as never);
-
-    render(
-      <Configuracion
-        navigation={nav as never}
-        route={crearRouteMock() as never}
-        onLogoutRequested={mockOnLogoutRequested}
-      />,
-    );
-
-    // Damos tiempo para que cualquier副作用 del bypass hipotetico ocurra.
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(guardarLlamado).toBe(false);
-  });
-
-  it('R1.4 NO llama a fetch al backend para auto-asignar cuando no hay cedula', async () => {
-    // Si el bypass hace fetch a /api/v1/operarios sin autorizacion,
-    // este test lo detecta (mock de fetch).
-    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => [],
-    } as never);
-
-    render(
-      <Configuracion
-        navigation={nav as never}
-        route={crearRouteMock() as never}
-        onLogoutRequested={mockOnLogoutRequested}
-      />,
-    );
-
-    await new Promise((r) => setTimeout(r, 50));
-
-    // El flujo sin cedula debe corto-circuitear ANTES de fetch (linea 84-87
-    // del componente). Si el bypass se re-introduce, fetch seria llamado.
-    expect(fetchSpy).not.toHaveBeenCalled();
-    fetchSpy.mockRestore();
+    expect(await findByText(OPERARIO_LOGUEADO.nombre)).toBeTruthy();
+    expect(await findByText(OPERARIO_LOGUEADO.numero_cedula)).toBeTruthy();
+    expect(queryByText('Sin operario asignado')).toBeNull();
+    expect(queryByText('ASIGNAR OPERARIO')).toBeNull();
   });
 });
 
@@ -303,21 +197,6 @@ describe('Configuracion — cerrar sesión (Punto B)', () => {
     );
 
     expect(await findByText('Cerrar sesión')).toBeTruthy();
-  });
-
-  it('B1.2 NO muestra "Cerrar sesión" cuando no hay operario logueado', async () => {
-    mockedGetItem.mockResolvedValue(null);
-
-    const { findByText, queryByText } = render(
-      <Configuracion
-        navigation={nav as never}
-        route={crearRouteMock() as never}
-        onLogoutRequested={mockOnLogoutRequested}
-      />,
-    );
-
-    await findByText('Sin operario asignado');
-    expect(queryByText('Cerrar sesión')).toBeNull();
   });
 
   it('B1.3 pide confirmación antes de cerrar la sesión', async () => {
