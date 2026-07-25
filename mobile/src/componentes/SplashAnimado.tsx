@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 
-/**
- * Color de marca del splash — inline por scope cerrado del change.
- * NO mover a skeletal-tokens.ts. Es identidad visual del splash,
- * no parte del sistema de diseño reusable.
- */
-const COLOR_FONDO_SPLASH = '#3596C8';
+import { COLORS } from '../theme/skeletal-tokens';
 
 const FASE_1_DURACION_MS = 500;
 const FASE_2_DURACION_MS = 700;
@@ -103,7 +98,7 @@ export function SplashAnimado({ onAnimationEnd, logo }: Props) {
 const estilos = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLOR_FONDO_SPLASH,
+    backgroundColor: COLORS.brandAzulOscuro,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

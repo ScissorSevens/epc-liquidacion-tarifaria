@@ -27,4 +27,21 @@ describe('SplashAnimado', () => {
     render(<SplashAnimado onAnimationEnd={onAnimationEnd} logo={logoFixture} />);
     expect(onAnimationEnd).not.toHaveBeenCalled();
   });
+
+  it('usa el color institucional brandAzulOscuro (#093C5D) en el overlay', () => {
+    const { UNSAFE_root } = render(
+      <SplashAnimado onAnimationEnd={jest.fn()} logo={logoFixture} />,
+    );
+    // El primer hijo del root es el overlay (View con backgroundColor)
+    const overlay = UNSAFE_root.children[0];
+    // El style puede ser array u objeto, normalizarlo
+    const raw = overlay.props.style;
+    const flat = Array.isArray(raw)
+      ? raw.flatMap((s: unknown) =>
+          typeof s === 'object' && s !== null ? [s] : [],
+        )
+      : [raw];
+    const merged = Object.assign({}, ...flat);
+    expect(merged.backgroundColor).toBe('#093C5D');
+  });
 });

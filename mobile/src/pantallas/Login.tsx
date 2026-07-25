@@ -369,7 +369,7 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: COLORS.brandAmarillo,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
     marginTop: SPACING.md,
@@ -379,7 +379,7 @@ const estilos = StyleSheet.create({
   },
   textoBoton: {
     ...TYPOGRAPHY.headlineSm,
-    color: COLORS.onPrimary,
+    color: COLORS.brandAzulOscuro,
   },
   divisor: {
     height: 1,
