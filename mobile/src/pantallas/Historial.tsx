@@ -130,7 +130,7 @@ export default function Historial({ navigation, route }: Props) {
             onPress={() => void cargar()}
             style={({ pressed }) => [styles.btnReintentar, pressed && { opacity: 0.8 }]}
           >
-            <Text style={styles.btnReintentarTexto}>REINTENTAR</Text>
+            <Text style={styles.btnReintentarTexto}>Reintentar</Text>
           </Pressable>
         </View>
       ) : (
@@ -138,20 +138,20 @@ export default function Historial({ navigation, route }: Props) {
 
           {/* ── KPI Card ── */}
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiTitulo}>MÉTRICAS GENERALES</Text>
+            <Text style={styles.kpiTitulo}>Métricas generales</Text>
             <View style={styles.kpiFila}>
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiEtiqueta}>PROMEDIO</Text>
+                <Text style={styles.kpiEtiqueta}>Promedio</Text>
                 <Text style={styles.kpiValor}>{promedioConsumo.toFixed(1)}</Text>
                 <Text style={styles.kpiUnidad}>m³</Text>
               </View>
               <View style={[styles.kpiItem, styles.kpiItemBordes]}>
-                <Text style={styles.kpiEtiqueta}>PICO</Text>
+                <Text style={styles.kpiEtiqueta}>Pico</Text>
                 <Text style={styles.kpiValor}>{picoConsumo.toFixed(1)}</Text>
                 <Text style={styles.kpiUnidad}>m³</Text>
               </View>
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiEtiqueta}>TOTAL</Text>
+                <Text style={styles.kpiEtiqueta}>Total</Text>
                 <Text style={styles.kpiValor}>{totalConsumo.toFixed(0)}</Text>
                 <Text style={styles.kpiUnidad}>m³</Text>
               </View>
@@ -236,7 +236,7 @@ export default function Historial({ navigation, route }: Props) {
             style={({ pressed }) => [styles.btnVolver, pressed && { opacity: 0.85 }]}
           >
             <MaterialIcons name="arrow-back" size={20} color={COLORS.onPrimary} />
-            <Text style={styles.btnVolverTexto}>VOLVER</Text>
+            <Text style={styles.btnVolverTexto}>Volver</Text>
           </Pressable>
 
           <FooterApp />
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryContainer,
     borderRadius: RADIUS.lg,
   },
-  btnReintentarTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onPrimary, letterSpacing: 0.8 },
+  btnReintentarTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onPrimary },
 
   // Scroll
   scroll: {
@@ -287,7 +287,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
     textAlign: 'center',
-    letterSpacing: 0.8,
     marginBottom: SPACING.lg,
   },
   kpiFila: { flexDirection: 'row' },
@@ -301,7 +300,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.5,
   },
   kpiValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, fontWeight: '700' },
   kpiUnidad: { fontSize: 10, color: COLORS.onSurfaceVariant, fontWeight: '500' },
@@ -387,7 +385,5 @@ const styles = StyleSheet.create({
   btnVolverTexto: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onPrimary,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
   },
 });
