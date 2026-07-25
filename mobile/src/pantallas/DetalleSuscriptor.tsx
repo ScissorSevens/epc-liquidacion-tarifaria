@@ -75,7 +75,7 @@ function HistorialLecturas({ lecturas, periodoActual, periodoAnterior, loading }
         style={stylesHistorial.headerRow}
       >
         <View style={stylesHistorial.headerLeft}>
-          <Text style={stylesHistorial.titulo}>HISTORIAL</Text>
+          <Text style={stylesHistorial.titulo}>Historial</Text>
           {tieneActual && (
             <View style={stylesHistorial.badgeActual}>
               <Text style={stylesHistorial.badgeActualText}>mes actual</Text>
@@ -117,7 +117,7 @@ function HistorialLecturas({ lecturas, periodoActual, periodoAnterior, loading }
                 {lectura && (
                   <View style={[stylesHistorial.badgeSync, { backgroundColor: badgeColorSync(lectura.estado_sync).bg }]}>
                     <Text style={[stylesHistorial.badgeSyncText, { color: badgeColorSync(lectura.estado_sync).text }]}>
-                      {lectura.estado_sync.toUpperCase()}
+                      {titleCase(lectura.estado_sync)}
                     </Text>
                   </View>
                 )}
@@ -151,7 +151,6 @@ const stylesHistorial = StyleSheet.create({
   titulo: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.secondary,
-    letterSpacing: 1.5,
     fontWeight: '600',
   },
   badgeActual: {
@@ -182,7 +181,6 @@ const stylesHistorial = StyleSheet.create({
   filaPeriodo: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.5,
   },
   filaValor: {
     ...TYPOGRAPHY.bodyMd,
@@ -206,7 +204,6 @@ const stylesHistorial = StyleSheet.create({
   },
   badgeSyncText: {
     ...TYPOGRAPHY.labelSm,
-    letterSpacing: 0.5,
   },
 });
 
@@ -218,10 +215,19 @@ type Props = LecturasStackScreenProps<'DetalleSuscriptor'>;
 function Campo({ label, valor }: { label: string; valor: string }) {
   return (
     <View style={styles.campo}>
-      <Text style={styles.campoLabel}>{label.toUpperCase()}</Text>
+      <Text style={styles.campoLabel}>{label}</Text>
       <Text style={styles.campoValor}>{valor}</Text>
     </View>
   );
+}
+
+/** Capitaliza la primera letra de cada palabra ('sin_registro' -> 'Sin registro'). */
+function titleCase(s: string): string {
+  return s
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map((w) => (w.length === 0 ? w : w[0]!.toUpperCase() + w.slice(1).toLowerCase()))
+    .join(' ');
 }
 
 /**
@@ -328,7 +334,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             onPress={() => void cargar()}
             style={styles.snackRetry}
           >
-            <Text style={styles.snackRetryText}>REINTENTAR</Text>
+            <Text style={styles.snackRetryText}>Reintentar</Text>
           </Pressable>
           <Text style={styles.snackClose}>×</Text>
         </Pressable>
@@ -341,12 +347,12 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
         </View>
       ) : suscriptor === null ? (
         <View style={styles.center}>
-          <Text style={styles.notFoundText}>SUSCRIPTOR NO ENCONTRADO</Text>
+          <Text style={styles.notFoundText}>Suscriptor no encontrado</Text>
           <Pressable
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
           >
-            <Text style={styles.btnPrimaryText}>VOLVER</Text>
+            <Text style={styles.btnPrimaryText}>Volver</Text>
           </Pressable>
         </View>
       ) : (
@@ -355,14 +361,14 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           <View style={styles.card}>
             {/* Cabecera de la card con badge de estado y chip de estrato */}
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>DATOS DEL SUSCRIPTOR</Text>
+              <Text style={styles.cardTitle}>Datos del suscriptor</Text>
               <View style={styles.cardHeaderBadges}>
                 <View style={styles.chipEstrato}>
                   <Text style={styles.chipEstratoText}>E{suscriptor.estrato}</Text>
                 </View>
                 <View style={styles.badgeEstado}>
                   <Text style={styles.badgeEstadoText}>
-                    {suscriptor.estado.toUpperCase()}
+                    {titleCase(suscriptor.estado)}
                   </Text>
                 </View>
               </View>
@@ -397,7 +403,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             {/* Toggle subsidio */}
             <View style={styles.subsidioRow}>
               <View style={styles.subsidioInfo}>
-                <Text style={styles.campoLabel}>SUBSIDIO TARIFARIO</Text>
+                <Text style={styles.campoLabel}>Subsidio tarifario</Text>
                 <Text style={styles.subsidioDesc}>
                   {suscriptor.aplica_subsidio ? 'Aplica subsidio' : 'No aplica subsidio'}
                 </Text>
@@ -415,7 +421,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           {/* Card 2 — Medidores asociados */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>MEDIDORES ASOCIADOS</Text>
+              <Text style={styles.cardTitle}>Medidores asociados</Text>
               <View style={styles.badgeEstado}>
                 <Text style={styles.badgeEstadoText}>{medidores.length}</Text>
               </View>
@@ -423,7 +429,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             <View style={styles.divider} />
 
             {medidores.length === 0 ? (
-              <Text style={styles.sinMedidores}>SIN MEDIDORES ASOCIADOS</Text>
+              <Text style={styles.sinMedidores}>Sin medidores asociados</Text>
             ) : (
               medidores.map((m, idx) => (
                 <View key={m.id_medidor}>
@@ -434,10 +440,10 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                     <Campo label="Fecha instalación" valor={m.fecha_instalacion} />
                     <View style={styles.divider} />
                     <View style={styles.medidorEstadoRow}>
-                      <Text style={styles.campoLabel}>ESTADO</Text>
+                      <Text style={styles.campoLabel}>Estado</Text>
                       <View style={styles.badgeEstado}>
                         <Text style={styles.badgeEstadoText}>
-                          {m.estado.toUpperCase()}
+                          {titleCase(m.estado)}
                         </Text>
                       </View>
                     </View>
@@ -459,7 +465,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                         pressed && styles.pressedDark,
                       ]}
                     >
-                      <Text style={styles.btnCapturarText}>CAPTURAR LECTURA</Text>
+                      <Text style={styles.btnCapturarText}>Capturar lectura</Text>
                     </Pressable>
                     {/* Botón historial completo */}
                     <Pressable
@@ -475,7 +481,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                       ]}
                     >
                       <MaterialIcons name="history" size={18} color={COLORS.primary} />
-                      <Text style={styles.btnHistorialText}>VER HISTORIAL COMPLETO</Text>
+                      <Text style={styles.btnHistorialText}>Ver historial completo</Text>
                       <MaterialIcons name="chevron-right" size={18} color={COLORS.onSurfaceVariant} />
                     </Pressable>
                   </View>
@@ -496,7 +502,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.btnVolver, styles.btnHalf, pressed && styles.pressedLight]}
           >
-            <Text style={styles.btnVolverText}>VOLVER</Text>
+            <Text style={styles.btnVolverText}>Volver</Text>
           </Pressable>
           {suscriptor !== null && (
             <Pressable
@@ -504,7 +510,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
               style={({ pressed }) => [styles.btnEditar, styles.btnHalf, pressed && styles.pressedDark]}
             >
               <MaterialIcons name="edit" size={16} color={COLORS.onPrimary} />
-              <Text style={styles.btnEditarText}>EDITAR</Text>
+              <Text style={styles.btnEditarText}>Editar suscriptor</Text>
             </Pressable>
           )}
         </View>
@@ -531,7 +537,6 @@ const styles = StyleSheet.create({
   notFoundText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 1.5,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
@@ -569,7 +574,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    letterSpacing: 0.5,
   },
 
   /* ── Badge estado ── */
@@ -582,7 +586,6 @@ const styles = StyleSheet.create({
   badgeEstadoText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.onPrimary,
-    letterSpacing: 1,
   },
 
   /* ── Chip estrato ── */
@@ -623,7 +626,6 @@ const styles = StyleSheet.create({
   campoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 1.5,
     marginBottom: 2,
   },
   campoValor: {
@@ -656,7 +658,6 @@ const styles = StyleSheet.create({
   sinMedidores: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 1.5,
     paddingVertical: SPACING.sm,
     textAlign: 'center',
   },
@@ -672,7 +673,6 @@ const styles = StyleSheet.create({
   btnCapturarText: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onPrimary,
-    letterSpacing: 2,
   },
 
   /* ── Botón primario genérico ── */
@@ -686,7 +686,6 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onPrimary,
-    letterSpacing: 2,
   },
 
   /* ── Bottom bar ── */
@@ -710,7 +709,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   btnVolver: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.primaryContainer,
     borderRadius: RADIUS.full,
     paddingVertical: SPACING.md,
@@ -719,8 +718,6 @@ const styles = StyleSheet.create({
   btnVolverText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primaryContainer,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
   },
   btnEditar: {
     backgroundColor: COLORS.primary,
@@ -734,8 +731,6 @@ const styles = StyleSheet.create({
   btnEditarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
   },
 
   /* ── Pressed states ── */
@@ -772,7 +767,6 @@ const styles = StyleSheet.create({
   snackRetryText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.errorContainer,
-    letterSpacing: 1,
   },
   snackClose: {
     ...TYPOGRAPHY.labelLg,
@@ -785,7 +779,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     fontSize: 8,
     color: COLORS.textTertiary,
-    letterSpacing: 2,
     textAlign: 'center',
     paddingTop: SPACING.sm,
   },
@@ -805,6 +798,5 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
     flex: 1,
-    letterSpacing: 0.5,
   },
 });
