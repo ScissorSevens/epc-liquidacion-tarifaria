@@ -36,6 +36,7 @@
 
 import { Alert } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn().mockResolvedValue(undefined),
@@ -65,6 +66,10 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
     warning: '#f90',
     warningContainer: '#fff4e0',
     onWarningContainer: '#5a3500',
+    // Tokens institucionales EPC (paleta institucional).
+    brandAmarillo: '#FFDC26',
+    brandAzulOscuro: '#093C5D',
+    brandAzulDigital: '#0092FF',
   },
   RADIUS: { md: 8, xl: 16 },
   SHADOWS: { card: {} },
@@ -537,6 +542,32 @@ describe('Login (PUNTO A — Login real contra SQLite)', () => {
       expect(banner.props.style.borderWidth).toBe(1);
       expect(banner.props.style.borderColor).toBe(COLORS.warning);
       expect(banner.props.style.backgroundColor).toBe(COLORS.warningContainer);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Paleta institucional EPC — CTAs secundarios del Login usan azul
+  // digital institucional (brandAzulDigital, NO amarillo — ese se reserva
+  // para CTAs primarios destacados como el botón Ingresar).
+  //
+  // El link "¿Olvidaste tu contraseña?" es el único CTA secundario del
+  // Login: vive debajo del botón Ingresar y permite al operario iniciar
+  // el flujo de recuperacion de credenciales (placeholder de implementacion
+  // — el flujo real escapa al alcance de este commit).
+  // ──────────────────────────────────────────────────────────────────
+  describe('paleta institucional — CTA secundario "¿Olvidaste tu contraseña?"', () => {
+    it('L5.1 el link "¿Olvidaste tu contraseña?" esta presente debajo del boton Ingresar', () => {
+      const { getByText } = render(<Login onLoginSuccess={onLoginSuccess} />);
+      expect(getByText(/¿Olvidaste tu contraseña\?/i)).toBeTruthy();
+    });
+
+    it('L5.2 el link usa brandAzulDigital (#0092FF) como color — CTA secundario, NO amarillo', () => {
+      const { getByText } = render(<Login onLoginSuccess={onLoginSuccess} />);
+      const link = getByText(/¿Olvidaste tu contraseña\?/i);
+      const estilo = link.props.style;
+      const estiloFinal =
+        Array.isArray(estilo) ? StyleSheet.flatten(estilo) : estilo;
+      expect(estiloFinal.color).toBe('#0092FF');
     });
   });
 });

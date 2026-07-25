@@ -248,7 +248,29 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
             onPress={handleIngresar}
           >
             <Text style={estilos.textoBoton}>Ingresar</Text>
-            <MaterialIcons name="login" size={20} color={COLORS.onPrimary} />
+            <MaterialIcons name="login" size={20} color={COLORS.brandAzulOscuro} />
+          </Pressable>
+
+          {/* CTA secundario — recuperacion de credenciales.
+              Color brandAzulDigital (azul digital institucional): el amarillo
+              se reserva para CTAs primarios destacados (boton Ingresar). */}
+          <Pressable
+            onPress={() => {
+              // Placeholder: el flujo de recuperacion real escapa al alcance
+              // de este commit. Se deja el onPress vacio para no romper el
+              // flujo actual; un commit posterior implementara la navegacion
+              // a la pantalla de recuperacion.
+            }}
+            style={({ pressed }) => [
+              estilos.linkRecuperar,
+              pressed && estilos.botonPresionado,
+            ]}
+            accessibilityRole="link"
+            accessibilityLabel="Recuperar contraseña"
+          >
+            <Text style={estilos.linkRecuperarTexto}>
+              ¿Olvidaste tu contraseña?
+            </Text>
           </Pressable>
         </View>
 
@@ -376,6 +398,19 @@ const estilos = StyleSheet.create({
   },
   botonPresionado: {
     opacity: 0.85,
+  },
+  // CTA secundario — link "¿Olvidaste tu contraseña?".
+  // Color brandAzulDigital: el amarillo se reserva para CTAs primarios.
+  linkRecuperar: {
+    marginTop: SPACING.md,
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+  },
+  linkRecuperarTexto: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.brandAzulDigital,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   textoBoton: {
     ...TYPOGRAPHY.headlineSm,
