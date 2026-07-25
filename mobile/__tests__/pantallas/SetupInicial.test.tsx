@@ -14,7 +14,7 @@
 //   - Validacion pura del paso 2 (funcion `validarPaso2`).
 //   - Render del paso 1: campos visibles, paso 2 oculto.
 //   - Render del paso 2: campos visibles, consent checkbox.
-//   - Al tocar [FINALIZAR] con form valido: llama bootstrapCompleto +
+//   - Al tocar [Finalizar] con form valido: llama bootstrapCompleto +
 //     guardarSesion + useWorkspace.setSesionCompleta + onComplete.
 //
 // MOCKS:
@@ -309,7 +309,7 @@ describe('SetupInicial (integracion paso 1)', () => {
     // Al menos un campo del prestador: NOMBRE
     expect(getByPlaceholderText('Ej: Asociacion de Usuarios La Esperanza')).toBeTruthy();
     // El boton de siguiente
-    expect(getByText('SIGUIENTE')).toBeTruthy();
+    expect(getByText('Siguiente')).toBeTruthy();
   });
 
   it('I1.2 NO muestra los campos del operario en el paso 1', () => {
@@ -365,7 +365,7 @@ const SESION_FAKE_VALIDA = {
 
 /**
  * Avanza del paso 1 al paso 2 rellenando el form del prestador
- * con valores validos y tocando SIGUIENTE.
+ * con valores validos y tocando Siguiente.
  */
 function avanzarAPaso2PasandoPrestador(
   getAllByPlaceholderText: (text: RegExp | string) => readonly import('react-native').TextInput[],
@@ -406,12 +406,12 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     });
   });
 
-  it('I2.1 avanza al paso 2 al tocar SIGUIENTE con form del prestador valido', () => {
+  it('I2.1 avanza al paso 2 al tocar Siguiente con form del prestador valido', () => {
     const { getByText, getAllByPlaceholderText } = render(
       <SetupInicial onComplete={onCompleteMock} />,
     );
     avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     // Paso 2 visible
     expect(getByText('Paso 2 de 2')).toBeTruthy();
@@ -429,7 +429,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     fireEvent.changeText(inputs[3], '123');
     fireEvent.changeText(inputs[4], 'Caqueza');
 
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     // No avanzo al paso 2
     expect(queryByText('Paso 2 de 2')).toBeNull();
@@ -440,18 +440,18 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
       <SetupInicial onComplete={onCompleteMock} />,
     );
     avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     // Campo password visible en paso 2
     expect(getByPlaceholderText('Mínimo 8 caracteres')).toBeTruthy();
   });
 
-  it('I2.4 al tocar FINALIZAR con form valido llama bootstrapCompleto con los datos correctos', async () => {
+  it('I2.4 al tocar Finalizar con form valido llama bootstrapCompleto con los datos correctos', async () => {
     const { getByText, getByPlaceholderText, getAllByPlaceholderText } = render(
       <SetupInicial onComplete={onCompleteMock} />,
     );
     avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     // Llenamos paso 2
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
@@ -464,7 +464,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     // Consentimiento: tocamos el checkbox
     fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
 
-    fireEvent.press(getByText('FINALIZAR'));
+    fireEvent.press(getByText('Finalizar'));
 
     await waitFor(() => {
       expect(mockedBootstrapCompleto).toHaveBeenCalledTimes(1);
@@ -476,7 +476,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
       <SetupInicial onComplete={onCompleteMock} />,
     );
     avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
@@ -485,7 +485,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
     fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
     fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
-    fireEvent.press(getByText('FINALIZAR'));
+    fireEvent.press(getByText('Finalizar'));
 
     await waitFor(() => {
       const escritura = mockedSetItem.mock.calls.find(([k]) => k === clave_storage_sesion);
@@ -499,7 +499,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
       <SetupInicial onComplete={onCompleteMock} />,
     );
     avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
@@ -508,7 +508,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
     fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
     fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
-    fireEvent.press(getByText('FINALIZAR'));
+    fireEvent.press(getByText('Finalizar'));
 
     await waitFor(() => {
       expect(spySetSesion).toHaveBeenCalledWith(SESION_FAKE_VALIDA);
@@ -525,7 +525,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
       <SetupInicial onComplete={onCompleteMock} />,
     );
     avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
-    fireEvent.press(getByText('SIGUIENTE'));
+    fireEvent.press(getByText('Siguiente'));
 
     fireEvent.changeText(getByPlaceholderText('6 a 12 dígitos'), '12345678');
     fireEvent.changeText(getByPlaceholderText('Nombre completo del operario'), 'Juan Perez');
@@ -534,7 +534,7 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     const confirmarIdx = inputs.findIndex((i) => i.props.placeholder === 'Repetir contraseña');
     fireEvent.changeText(inputs[confirmarIdx], 'miclave123');
     fireEvent.press(getByText(/Acepto el tratamiento de mis datos/i));
-    fireEvent.press(getByText('FINALIZAR'));
+    fireEvent.press(getByText('Finalizar'));
 
     await waitFor(() => {
       expect(getByText(/SQLITE FULL/i)).toBeTruthy();

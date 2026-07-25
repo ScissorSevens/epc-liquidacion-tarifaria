@@ -47,7 +47,7 @@ interface Props {
  *   PASO 2 — Datos del primer operario (5 campos) + consent (Ley 1581/2012).
  *            Ver `validarPaso2`.
  *
- * Al tocar [FINALIZAR] con form valido:
+ * Al tocar [Finalizar] con form valido:
  *   1. Revalida todo.
  *   2. Llama `bootstrapCompleto()` (crea prestador + acuerdo + parametros
  *      + operario atomicamente con rollback).
@@ -158,7 +158,7 @@ export default function SetupInicial({ onComplete }: Props) {
 
           <View style={styles.card}>
             <CampoTexto
-              etiqueta="NOMBRE DEL PRESTADOR"
+              etiqueta="Nombre del prestador"
               placeholder="Ej: Asociacion de Usuarios La Esperanza"
               value={prestadorForm.nombre}
               onChangeText={(v) => setCampoPrestador('nombre', v)}
@@ -174,14 +174,14 @@ export default function SetupInicial({ onComplete }: Props) {
               maxLength={20}
             />
             <CampoTexto
-              etiqueta="REPRESENTANTE LEGAL"
+              etiqueta="Representante legal"
               placeholder="Nombre completo"
               value={prestadorForm.representante_legal}
               onChangeText={(v) => setCampoPrestador('representante_legal', v)}
               error={erroresPrestador.representante_legal}
             />
             <CampoTexto
-              etiqueta="CÉDULA DEL REPRESENTANTE"
+              etiqueta="Cédula del representante"
               placeholder="6 a 12 dígitos"
               value={prestadorForm.representante_legal_cedula}
               onChangeText={(v) => setCampoPrestador('representante_legal_cedula', v.replace(/\D/g, ''))}
@@ -190,7 +190,7 @@ export default function SetupInicial({ onComplete }: Props) {
               maxLength={12}
             />
             <CampoTexto
-              etiqueta="MUNICIPIO"
+              etiqueta="Municipio"
               placeholder="Ej: Caqueza"
               value={prestadorForm.municipio}
               onChangeText={(v) => setCampoPrestador('municipio', v)}
@@ -198,7 +198,7 @@ export default function SetupInicial({ onComplete }: Props) {
               maxLength={100}
             />
             <CampoTexto
-              etiqueta="DEPARTAMENTO"
+              etiqueta="Departamento"
               placeholder="Ej: Cundinamarca"
               value={prestadorForm.departamento}
               onChangeText={(v) => setCampoPrestador('departamento', v)}
@@ -207,7 +207,7 @@ export default function SetupInicial({ onComplete }: Props) {
             />
 
             <View style={styles.campoContenedor}>
-              <Text style={styles.etiqueta}>SEGMENTO (Res CRA 825/2017)</Text>
+              <Text style={styles.etiqueta}>Segmento</Text>
               <View style={styles.chipsRow}>
                 {([1, 2] as const).map((s) => (
                   <Pressable
@@ -233,7 +233,7 @@ export default function SetupInicial({ onComplete }: Props) {
             <View style={styles.filaDosColumnas}>
               <View style={styles.colMitad}>
                 <CampoNumero
-                  etiqueta="SUSCRIPTORES URBANOS"
+                  etiqueta="Suscriptores urbanos"
                   value={prestadorForm.num_suscriptores_urbanos}
                   onChangeNumber={(v) => setCampoPrestador('num_suscriptores_urbanos', v)}
                   error={erroresPrestador.num_suscriptores_urbanos}
@@ -241,7 +241,7 @@ export default function SetupInicial({ onComplete }: Props) {
               </View>
               <View style={styles.colMitad}>
                 <CampoNumero
-                  etiqueta="SUSCRIPTORES RURALES"
+                  etiqueta="Suscriptores rurales"
                   value={prestadorForm.num_suscriptores_rurales}
                   onChangeNumber={(v) => setCampoPrestador('num_suscriptores_rurales', v)}
                   error={erroresPrestador.num_suscriptores_rurales}
@@ -250,7 +250,7 @@ export default function SetupInicial({ onComplete }: Props) {
             </View>
 
             <CampoTexto
-              etiqueta="EMAIL CORPORATIVO (opcional)"
+              etiqueta="Email corporativo (opcional)"
               placeholder="contacto@ejemplo.com"
               value={prestadorForm.email}
               onChangeText={(v) => setCampoPrestador('email', v)}
@@ -258,7 +258,7 @@ export default function SetupInicial({ onComplete }: Props) {
               autoCapitalize="none"
             />
             <CampoTexto
-              etiqueta="TELÉFONO (opcional)"
+              etiqueta="Teléfono (opcional)"
               placeholder="Ej: 311 222 3344"
               value={prestadorForm.telefono}
               onChangeText={(v) => setCampoPrestador('telefono', v)}
@@ -276,7 +276,7 @@ export default function SetupInicial({ onComplete }: Props) {
             onPress={handleSiguiente}
             style={({ pressed }) => [styles.botonPrimario, pressed && styles.botonPresionado]}
           >
-            <Text style={styles.textoBotonPrimario}>SIGUIENTE</Text>
+            <Text style={styles.textoBotonPrimario}>Siguiente</Text>
             <MaterialIcons name="arrow-forward" size={20} color={COLORS.onPrimary} />
           </Pressable>
         </ScrollView>
@@ -299,7 +299,7 @@ export default function SetupInicial({ onComplete }: Props) {
 
         <View style={styles.card}>
           <CampoTexto
-            etiqueta="CÉDULA"
+            etiqueta="Cédula"
             placeholder="6 a 12 dígitos"
             value={operarioForm.cedula}
             onChangeText={(v) => setCampoOperario('cedula', v.replace(/\D/g, ''))}
@@ -308,14 +308,14 @@ export default function SetupInicial({ onComplete }: Props) {
             maxLength={12}
           />
           <CampoTexto
-            etiqueta="NOMBRE COMPLETO"
+            etiqueta="Nombre completo"
             placeholder="Nombre completo del operario"
             value={operarioForm.nombre}
             onChangeText={(v) => setCampoOperario('nombre', v)}
             error={erroresOperario.nombre}
           />
           <CampoTexto
-            etiqueta="EMAIL (opcional)"
+            etiqueta="Email (opcional)"
             placeholder="contacto@ejemplo.com"
             value={operarioForm.email}
             onChangeText={(v) => setCampoOperario('email', v)}
@@ -324,7 +324,7 @@ export default function SetupInicial({ onComplete }: Props) {
             autoCapitalize="none"
           />
           <CampoTexto
-            etiqueta="CONTRASEÑA"
+            etiqueta="Contraseña"
             placeholder="Mínimo 8 caracteres"
             value={operarioForm.password}
             onChangeText={(v) => setCampoOperario('password', v)}
@@ -332,7 +332,7 @@ export default function SetupInicial({ onComplete }: Props) {
             secureTextEntry
           />
           <CampoTexto
-            etiqueta="CONFIRMAR CONTRASEÑA"
+            etiqueta="Confirmar contraseña"
             placeholder="Repetir contraseña"
             value={operarioForm.confirmar_password}
             onChangeText={(v) => setCampoOperario('confirmar_password', v)}
@@ -378,7 +378,7 @@ export default function SetupInicial({ onComplete }: Props) {
             disabled={cargando}
           >
             <MaterialIcons name="arrow-back" size={20} color={COLORS.primary} />
-            <Text style={styles.textoBotonSecundario}>ATRÁS</Text>
+            <Text style={styles.textoBotonSecundario}>Atrás</Text>
           </Pressable>
           <Pressable
             onPress={() => void handleFinalizar()}
@@ -394,7 +394,7 @@ export default function SetupInicial({ onComplete }: Props) {
               <ActivityIndicator color={COLORS.onPrimary} size="small" />
             ) : (
               <>
-                <Text style={styles.textoBotonPrimario}>FINALIZAR</Text>
+                <Text style={styles.textoBotonPrimario}>Finalizar</Text>
                 <MaterialIcons name="check" size={20} color={COLORS.onPrimary} />
               </>
             )}
@@ -522,7 +522,6 @@ const styles = StyleSheet.create({
   etiqueta: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.8,
     marginBottom: SPACING.xs,
   },
   input: {
@@ -561,6 +560,7 @@ const styles = StyleSheet.create({
   chipSel: {
     backgroundColor: COLORS.surfaceLight,
     borderColor: COLORS.primary,
+    borderWidth: 0,
   },
   chipText: {
     ...TYPOGRAPHY.labelLg,
@@ -607,14 +607,10 @@ const styles = StyleSheet.create({
   textoBotonPrimario: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   textoBotonSecundario: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   botonPresionado: {
     opacity: 0.85,
