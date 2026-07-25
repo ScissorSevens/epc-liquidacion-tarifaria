@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useIsFocused } from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { COLORS, RADIUS } from '../theme/skeletal-tokens';
 import type { TabParamList } from './types';
 import ConfigStack from './stacks/ConfigStack';
@@ -34,6 +35,10 @@ interface TabIconProps {
 
 function TabIcon({ name, label }: TabIconProps) {
   const focused = useIsFocused();
+  // Regla de impecable: "Reduced motion is not optional". Si el OS tiene
+  // Reduce Motion activado, los iconos cambian de foco instantaneamente
+  // (sin spring ni timing) — crossfade instantaneo.
+  const reducedMotion = useReducedMotion();
 
   const translateY    = useRef(new Animated.Value(focused ? -6 : 0)).current;
   const scale         = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
@@ -41,6 +46,18 @@ function TabIcon({ name, label }: TabIconProps) {
   const iconOpacity   = useRef(new Animated.Value(focused ? 0 : 1)).current;
 
   useEffect(() => {
+    if (reducedMotion) {
+      // Sin transicion — seteamos el valor final directamente. El
+      // `useRef` arriba ya inicializa el estado de mount correctamente;
+      // esto cubre los cambios de `focused` mientras reducedMotion esta
+      // activo.
+      translateY.setValue(focused ? -6 : 0);
+      scale.setValue(focused ? 1 : 0.6);
+      bubbleOpacity.setValue(focused ? 1 : 0);
+      iconOpacity.setValue(focused ? 0 : 1);
+      return;
+    }
+
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: focused ? -6 : 0,
@@ -65,7 +82,7 @@ function TabIcon({ name, label }: TabIconProps) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [focused, translateY, scale, bubbleOpacity, iconOpacity]);
+  }, [focused, reducedMotion, translateY, scale, bubbleOpacity, iconOpacity]);
 
   return (
     <View style={tabIconStyles.wrapper}>
