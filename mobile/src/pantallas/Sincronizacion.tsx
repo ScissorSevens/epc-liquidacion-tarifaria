@@ -245,7 +245,7 @@ export default function Sincronizacion(_props: Props) {
           </Text>
           <View style={styles.estadoPill}>
             <Text style={[TYPOGRAPHY.labelLg, styles.estadoPillText]}>
-              OPERACIÓN {sincronizando ? 'EN CURSO' : 'EN ESPERA'}
+              Operación {sincronizando ? 'en curso' : 'en espera'}
             </Text>
           </View>
         </View>
@@ -266,19 +266,19 @@ export default function Sincronizacion(_props: Props) {
           {/* Exitosos */}
           <View style={styles.statCard}>
             <MaterialIcons name="check-circle" size={22} color={COLORS.secondary} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>EXITOSOS</Text>
+            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>Exitosos</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.exitosos}</Text>
           </View>
           {/* Fallidos */}
           <View style={styles.statCard}>
             <MaterialIcons name="error" size={22} color={COLORS.error} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.statLabelError]}>FALLIDOS</Text>
+            <Text style={[TYPOGRAPHY.labelLg, styles.statLabelError]}>Fallidos</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.statValorError]}>{contadores.fallidos}</Text>
           </View>
           {/* Pendientes */}
           <View style={styles.statCard}>
             <MaterialIcons name="pending" size={22} color={COLORS.onSurfaceVariant} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>PENDIENTE</Text>
+            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>Pendiente</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.pendientes}</Text>
           </View>
         </View>
@@ -319,7 +319,7 @@ export default function Sincronizacion(_props: Props) {
           >
             <MaterialIcons name="sync" size={22} color={COLORS.onPrimary} />
             <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>
-              {sincronizando ? 'SINCRONIZANDO…' : 'SINCRONIZAR AHORA'}
+              {sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}
             </Text>
           </Pressable>
 
@@ -336,7 +336,7 @@ export default function Sincronizacion(_props: Props) {
             >
               <MaterialIcons name="signal-cellular-alt" size={20} color={COLORS.primary} />
               <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>
-                {cargando === 'health' ? 'PROBANDO…' : 'PROBAR CONEXIÓN'}
+                {cargando === 'health' ? 'Probando…' : 'Probar conexión'}
               </Text>
             </Pressable>
 
@@ -351,7 +351,7 @@ export default function Sincronizacion(_props: Props) {
             >
               <MaterialIcons name="list-alt" size={20} color={COLORS.primary} />
               <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>
-                {cargando === 'cola' ? 'LEYENDO…' : 'VER COLA'}
+                {cargando === 'cola' ? 'Leyendo…' : 'Ver cola'}
               </Text>
             </Pressable>
           </View>
@@ -451,7 +451,6 @@ const styles = StyleSheet.create({
   },
   estadoPillText: {
     color: COLORS.secondary,
-    letterSpacing: 1.5,
   },
 
   // ── Progreso ──────────────────────────────────────────────────────────────
@@ -517,13 +516,11 @@ const styles = StyleSheet.create({
   statLabel: {
     color: COLORS.onSurfaceVariant,
     fontSize: 10,
-    letterSpacing: 0.5,
     textAlign: 'center',
   },
   statLabelError: {
     color: COLORS.error,
     fontSize: 10,
-    letterSpacing: 0.5,
     textAlign: 'center',
   },
   statValor: {
@@ -627,8 +624,6 @@ const styles = StyleSheet.create({
   },
   btnPrimarioText: {
     color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   btnGrid: {
     flexDirection: 'row',
@@ -650,8 +645,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 11,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   btnPressed: {
     opacity: 0.7,
