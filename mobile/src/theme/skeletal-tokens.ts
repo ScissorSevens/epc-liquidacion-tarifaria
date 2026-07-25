@@ -18,6 +18,18 @@
  */
 
 export const COLORS = {
+  // === COLORES INSTITUCIONALES EPC (fuente de verdad: identidad visual) ===
+  // 4 colores principales: azul oscuro (identidad), azul claro (complementario),
+  // amarillo y rojo.
+  // 3 complementarios: verde, azul digital y gris claro.
+  brandAzulOscuro: '#093C5D',     // color principal de la identidad
+  brandAzulClaro: '#359CC8',     // complementario
+  brandAmarillo: '#FFDC26',
+  brandRojo: '#D5212A',
+  brandVerde: '#76B718',
+  brandAzulDigital: '#0092FF',
+  brandGrisClaro: '#DADADA',
+
   // Capa de fondo — el lienzo "papel".
   background: '#F8F9FF',
   // Superficies elevadas (cards, inputs activos en hover).
@@ -26,13 +38,14 @@ export const COLORS = {
   surfaceMuted: '#E5EEFF',
   surfaceMuted2: '#E4E4E7',
   // Tinta primaria — bordes, texto principal, botones primarios.
-  primary: '#031632',
+  // Mapeado al brandAzulOscuro institucional.
+  primary: '#093C5D',
   onPrimary: '#FFFFFF',
   // Contenedor primario y sobre contenedor primario.
   primaryContainer: '#1A2B48',
-  onPrimaryContainer: '#8293B5',
-  // Color secundario (teal).
-  secondary: '#00677F',
+  onPrimaryContainer: '#B3C5D8',
+  // Color secundario — mapeado al brandAzulDigital institucional.
+  secondary: '#0092FF',
   secondaryContainer: '#00CCF9',
   onSecondaryContainer: '#005266',
   // Superficies de contenedor.
@@ -64,10 +77,10 @@ export const COLORS = {
   warning: '#EF6C00',
   warningContainer: '#FFEDD5',
   onWarningContainer: '#5A3500',
-  // Estados de error (heredados del DESIGN.md).
+  // Estados de error — mapeado al brandRojo institucional.
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',
-  error: '#ba1a1a',
+  error: '#D5212A',
 } as const;
 
 /**
