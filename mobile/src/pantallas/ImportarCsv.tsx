@@ -218,7 +218,7 @@ export default function ImportarCsv({ navigation }: Props) {
           >
             <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
           </Pressable>
-          <Text style={styles.headerTitle}>IMPORTAR CSV</Text>
+          <Text style={styles.headerTitle}>Importar CSV</Text>
         </View>
         <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
@@ -271,7 +271,7 @@ export default function ImportarCsv({ navigation }: Props) {
         <Pressable style={styles.modalOverlay} onPress={() => setDialogFormatoVisible(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitulo}>FORMATO ESPERADO</Text>
+              <Text style={styles.modalTitulo}>Formato esperado</Text>
               <Pressable onPress={() => setDialogFormatoVisible(false)} hitSlop={8}>
                 <MaterialIcons name="close" size={20} color={COLORS.primary} />
               </Pressable>
@@ -299,7 +299,7 @@ export default function ImportarCsv({ navigation }: Props) {
                 onPress={() => setDialogFormatoVisible(false)}
                 style={styles.modalBtn}
               >
-                <Text style={styles.modalBtnText}>ENTENDIDO</Text>
+                <Text style={styles.modalBtnText}>Entendido</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -318,7 +318,7 @@ export default function ImportarCsv({ navigation }: Props) {
           onPress={() => setDialogConfirmGrande({ visible: false, archivo: null })}
         >
           <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitulo}>ARCHIVO GRANDE</Text>
+            <Text style={styles.modalTitulo}>Archivo grande</Text>
             <Text style={styles.modalBody}>
               El archivo tiene {dialogConfirmGrande.archivo?.filas.length ?? 0} filas válidas.
               Procesarlas puede tardar varios segundos y la app puede sentirse lenta.
@@ -329,7 +329,7 @@ export default function ImportarCsv({ navigation }: Props) {
                 onPress={() => setDialogConfirmGrande({ visible: false, archivo: null })}
                 style={[styles.modalBtn, styles.modalBtnSecondary]}
               >
-                <Text style={styles.modalBtnSecondaryText}>CANCELAR</Text>
+                <Text style={styles.modalBtnSecondaryText}>Cancelar</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -339,7 +339,7 @@ export default function ImportarCsv({ navigation }: Props) {
                 }}
                 style={styles.modalBtn}
               >
-                <Text style={styles.modalBtnText}>CONTINUAR</Text>
+                <Text style={styles.modalBtnText}>Continuar</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -361,7 +361,7 @@ function RenderIdle({
   return (
     <>
       <View style={styles.card}>
-        <Text style={styles.cardTitulo}>IMPORTAR SUSCRIPTORES DESDE CSV</Text>
+        <Text style={styles.cardTitulo}>Importar suscriptores desde CSV</Text>
         <Text style={styles.cardBody}>
           Cargá un archivo .csv con tus suscriptores y medidores. El sistema
           valida cada fila y reporta duplicados y errores sin abortar el lote.
@@ -375,13 +375,13 @@ function RenderIdle({
           style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
         >
           <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>SELECCIONAR ARCHIVO CSV</Text>
+          <Text style={styles.btnPrimaryText}>Seleccionar archivo CSV</Text>
         </Pressable>
         <Pressable
           onPress={onVerFormato}
           style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
         >
-          <Text style={styles.btnSecondaryText}>VER FORMATO ESPERADO</Text>
+          <Text style={styles.btnSecondaryText}>Ver formato esperado</Text>
         </Pressable>
       </View>
       {/* Status placeholder */}
@@ -420,7 +420,7 @@ function RenderPreview({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitulo}>VISTA PREVIA</Text>
+      <Text style={styles.cardTitulo}>Vista previa</Text>
       <Text style={styles.cardBody}>
         Archivo: <Text style={styles.bold}>{archivo.nombre}</Text>
       </Text>
@@ -464,7 +464,7 @@ function RenderPreview({
           onPress={onCancelar}
           style={({ pressed }) => [styles.btnSecondary, styles.flex1, pressed && styles.pressedLight]}
         >
-          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+          <Text style={styles.btnSecondaryText}>Cancelar</Text>
         </Pressable>
         <Pressable
           onPress={onConfirmar}
@@ -477,7 +477,7 @@ function RenderPreview({
           ]}
         >
           <MaterialIcons name="cloud-upload" size={18} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>IMPORTAR</Text>
+          <Text style={styles.btnPrimaryText}>Importar suscriptores</Text>
         </Pressable>
       </View>
     </View>
@@ -506,34 +506,34 @@ function RenderResultado({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitulo}>RESULTADO DE LA IMPORTACIÓN</Text>
+      <Text style={styles.cardTitulo}>Resultado de la importación</Text>
       <Text style={styles.cardHint}>{archivoNombre}</Text>
       <View style={styles.separador} />
 
       <View style={styles.metricRow}>
-        <Text style={styles.metricLabel}>SUSCRIPTORES CREADOS</Text>
+        <Text style={styles.metricLabel}>Suscriptores creados</Text>
         <Text style={styles.metricValorOk}>{reporte.suscriptoresCreados}</Text>
       </View>
       <View style={styles.metricRow}>
-        <Text style={styles.metricLabel}>MEDIDORES CREADOS</Text>
+        <Text style={styles.metricLabel}>Medidores creados</Text>
         <Text style={styles.metricValorOk}>{reporte.medidoresCreados}</Text>
       </View>
 
       {dupSus.length > 0 && (
         <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>SUSCRIPTORES DUPLICADOS</Text>
+          <Text style={styles.metricLabel}>Suscriptores duplicados</Text>
           <Text style={styles.metricValorWarn}>{dupSus.length}</Text>
         </View>
       )}
       {dupMed.length > 0 && (
         <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>MEDIDORES DUPLICADOS</Text>
+          <Text style={styles.metricLabel}>Medidores duplicados</Text>
           <Text style={styles.metricValorWarn}>{dupMed.length}</Text>
         </View>
       )}
       {reporte.errores.length > 0 && (
         <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>ERRORES</Text>
+          <Text style={styles.metricLabel}>Errores</Text>
           <Text style={styles.metricValorErr}>{reporte.errores.length}</Text>
         </View>
       )}
@@ -548,14 +548,14 @@ function RenderResultado({
           onPress={onImportarOtro}
           style={({ pressed }) => [styles.btnSecondary, styles.flex1, pressed && styles.pressedLight]}
         >
-          <Text style={styles.btnSecondaryText}>IMPORTAR OTRO</Text>
+          <Text style={styles.btnSecondaryText}>Importar otro</Text>
         </Pressable>
         <Pressable
           onPress={onVolverInicio}
           style={({ pressed }) => [styles.btnPrimary, styles.flex1, pressed && styles.pressedDark]}
         >
           <MaterialIcons name="home" size={18} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>INICIO</Text>
+          <Text style={styles.btnPrimaryText}>Ir al inicio</Text>
         </Pressable>
       </View>
     </View>
@@ -613,14 +613,14 @@ function RenderError({
 }) {
   return (
     <View style={styles.errorCard}>
-      <Text style={styles.errorTitulo}>✗ NO SE PUDO PROCESAR EL ARCHIVO</Text>
+      <Text style={styles.errorTitulo}>No se pudo procesar el archivo</Text>
       <Text style={styles.errorBody}>{mensaje}</Text>
       <Pressable
         onPress={onReintentar}
         style={({ pressed }) => [styles.btnPrimary, { marginTop: SPACING.md }, pressed && styles.pressedDark]}
       >
         <MaterialIcons name="refresh" size={18} color={COLORS.onPrimary} />
-        <Text style={styles.btnPrimaryText}>REINTENTAR</Text>
+        <Text style={styles.btnPrimaryText}>Reintentar</Text>
       </Pressable>
     </View>
   );
@@ -648,7 +648,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
-    letterSpacing: 1.2,
   },
 
   // Scroll
@@ -707,15 +706,13 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   btnSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
@@ -726,8 +723,6 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   btnDisabled: { backgroundColor: COLORS.onSurfaceVariant, opacity: 0.4 },
   botonesRow: { flexDirection: 'row', gap: SPACING.sm },
@@ -784,7 +779,6 @@ const styles = StyleSheet.create({
   metricLabel: {
     ...TYPOGRAPHY.bodySm,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.5,
   },
   metricValorOk: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
   metricValorWarn: { ...TYPOGRAPHY.headlineSm, color: COLORS.warning },
@@ -863,16 +857,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  modalBtnText: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary, textTransform: 'uppercase' },
+  modalBtnText: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary },
   modalBtnSecondary: {
     backgroundColor: 'transparent',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.outlineVariant,
   },
   modalBtnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
   },
   modalBtnsRow: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
 
