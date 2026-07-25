@@ -265,19 +265,19 @@ export default function Sincronizacion(_props: Props) {
         <View style={styles.statsGrid}>
           {/* Exitosos */}
           <View style={styles.statCard}>
-            <MaterialIcons name="check-circle" size={22} color={COLORS.secondary} />
+            <MaterialIcons name="check-circle" size={22} color={COLORS.brandVerde} testID="icono-exitosos" />
             <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>Exitosos</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.exitosos}</Text>
           </View>
           {/* Fallidos */}
           <View style={styles.statCard}>
-            <MaterialIcons name="error" size={22} color={COLORS.error} />
+            <MaterialIcons name="error" size={22} color={COLORS.error} testID="icono-fallidos" />
             <Text style={[TYPOGRAPHY.labelLg, styles.statLabelError]}>Fallidos</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.statValorError]}>{contadores.fallidos}</Text>
           </View>
           {/* Pendientes */}
           <View style={styles.statCard}>
-            <MaterialIcons name="pending" size={22} color={COLORS.onSurfaceVariant} />
+            <MaterialIcons name="pending" size={22} color={COLORS.onSurfaceVariant} testID="icono-pendientes" />
             <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>Pendiente</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.pendientes}</Text>
           </View>
