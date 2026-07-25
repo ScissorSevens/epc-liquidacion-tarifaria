@@ -40,28 +40,28 @@ const OPCIONES: readonly OpcionMenu[] = [
     icono: 'business',
     titulo: 'Ver prestadores',
     descripcion: 'Lista de los 300 prestadores vinculados',
-    colorFondo: COLORS.primary,
+    colorFondo: COLORS.brandAzulOscuro,
   },
   {
     key: 'AcuerdoMunicipal',
     icono: 'gavel',
     titulo: 'Editar acuerdo',
     descripcion: 'Topes de subsidio y contribución por prestador',
-    colorFondo: COLORS.warning,
+    colorFondo: COLORS.brandAzulDigital,
   },
   {
     key: 'ParametrosTarifa',
     icono: 'calculate',
     titulo: 'Configurar tarifas',
     descripcion: 'Costo fijo, bloques y mínimo vital por prestador',
-    colorFondo: COLORS.secondary,
+    colorFondo: COLORS.brandAzulDigital,
   },
   {
     key: 'ImportarPrestadores',
     icono: 'upload-file',
     titulo: 'Importar prestadores',
     descripcion: 'Carga masiva desde un spreadsheet',
-    colorFondo: COLORS.warningContainer,
+    colorFondo: COLORS.brandVerde,
   },
 ];
 
@@ -126,6 +126,7 @@ export default function Admin({ navigation }: Props) {
             }
             navigation.navigate(op.key);
           }}
+          testID={`menu-${op.key}`}
         >
           <MaterialIcons name={op.icono} size={32} color={COLORS.onPrimary} />
           <View style={estilos.opcionTexto}>

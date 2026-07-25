@@ -20,6 +20,7 @@
 
 import { Profiler } from 'react';
 import { render, act } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import type { ComponentProps, ReactElement } from 'react';
 
 jest.mock('expo-splash-screen', () => ({
@@ -37,16 +38,22 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
   BORDERS: { thin: { borderWidth: 1 } },
   COLORS: {
     background: '#fff',
-    primary: '#031632',
+    primary: '#093C5D',
     onPrimary: '#fff',
-    primaryContainer: '#3596C8',
-    warning: '#f80',
-    warningContainer: '#fff3cd',
-    secondary: '#888',
+    primaryContainer: '#1A2B48',
+    warning: '#EF6C00',
+    warningContainer: '#FFEDD5',
+    secondary: '#0092FF',
     surfaceContainerLowest: '#fff',
     outlineVariant: '#ccc',
     onSurface: '#000',
     onSurfaceVariant: '#555',
+    // Tokens institucionales EPC (paleta institucional).
+    brandAzulOscuro: '#093C5D',
+    brandAzulDigital: '#0092FF',
+    brandVerde: '#76B718',
+    brandAmarillo: '#FFDC26',
+    brandRojo: '#D5212A',
   },
   RADIUS: { sm: 4, md: 8, full: 999 },
   SHADOWS: { card: {} },
@@ -223,6 +230,47 @@ describe('Admin', () => {
       });
 
       expect(contarUpdates(spy)).toBe(baselineUpdates);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Paleta institucional EPC — cada item del submenú tiene un color
+  // semánticamente coherente con la acción:
+  //   - Ver prestadores: brandAzulOscuro (identidad).
+  //   - Editar acuerdo + Configurar tarifas: brandAzulDigital (config).
+  //   - Importar prestadores: brandVerde (agregar datos, semantica "agregar").
+  // ─────────────────────────────────────────────────────────────
+  describe('paleta institucional — colores semanticos del submenu', () => {
+    it('AD-COLOR-1 "Ver prestadores" usa brandAzulOscuro (#093C5D) — identidad EPC', () => {
+      useWorkspace.setState({ id_prestador_activo: 5 });
+      const { getByTestId } = render(<Admin {...crearProps()} />);
+      const item = getByTestId('menu-GestionPrestadores');
+      const estilo = StyleSheet.flatten(item.props.style) as { backgroundColor?: string };
+      expect(estilo.backgroundColor).toBe('#093C5D');
+    });
+
+    it('AD-COLOR-2 "Editar acuerdo" usa brandAzulDigital (#0092FF) — accion de configuracion', () => {
+      useWorkspace.setState({ id_prestador_activo: 5 });
+      const { getByTestId } = render(<Admin {...crearProps()} />);
+      const item = getByTestId('menu-AcuerdoMunicipal');
+      const estilo = StyleSheet.flatten(item.props.style) as { backgroundColor?: string };
+      expect(estilo.backgroundColor).toBe('#0092FF');
+    });
+
+    it('AD-COLOR-3 "Configurar tarifas" usa brandAzulDigital (#0092FF) — accion de configuracion', () => {
+      useWorkspace.setState({ id_prestador_activo: 5 });
+      const { getByTestId } = render(<Admin {...crearProps()} />);
+      const item = getByTestId('menu-ParametrosTarifa');
+      const estilo = StyleSheet.flatten(item.props.style) as { backgroundColor?: string };
+      expect(estilo.backgroundColor).toBe('#0092FF');
+    });
+
+    it('AD-COLOR-4 "Importar prestadores" usa brandVerde (#76B718) — semantica "agregar datos"', () => {
+      useWorkspace.setState({ id_prestador_activo: 5 });
+      const { getByTestId } = render(<Admin {...crearProps()} />);
+      const item = getByTestId('menu-ImportarPrestadores');
+      const estilo = StyleSheet.flatten(item.props.style) as { backgroundColor?: string };
+      expect(estilo.backgroundColor).toBe('#76B718');
     });
   });
 });
