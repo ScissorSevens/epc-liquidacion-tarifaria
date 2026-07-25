@@ -139,10 +139,10 @@ describe('Admin', () => {
       // Titulo.
       expect(getByText('Administración EPC')).toBeTruthy();
       // Las 4 opciones del menú.
-      expect(getByText('Gestión de Prestadores')).toBeTruthy();
-      expect(getByText('Acuerdo Municipal')).toBeTruthy();
-      expect(getByText('Parámetros Tarifarios')).toBeTruthy();
-      expect(getByText('Importar desde CSV')).toBeTruthy();
+      expect(getByText('Ver prestadores')).toBeTruthy();
+      expect(getByText('Editar acuerdo')).toBeTruthy();
+      expect(getByText('Configurar tarifas')).toBeTruthy();
+      expect(getByText('Importar prestadores')).toBeTruthy();
     });
   });
 
