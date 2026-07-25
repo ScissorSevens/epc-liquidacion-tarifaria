@@ -148,6 +148,7 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
         {/* Banner PUNTO C: sesion vencida, dismissable con X */}
         {mensajeVisible !== undefined && (
           <View
+            testID="banner"
             style={estilos.banner}
             accessibilityRole="alert"
             accessibilityLabel={`Aviso: ${mensajeVisible}`}
@@ -283,12 +284,16 @@ const estilos = StyleSheet.create({
   // Por que warningContainer / warning: tokens ya existentes en
   // skeletal-tokens (no agregamos paleta nueva). Fondo amarillo suave
   // + texto/borde naranja para asegurar contraste WCAG AA.
+  //
+  // impecable v1: rehacemos como "alert pill" — borde uniforme 1px +
+  // fondo tinted. Sin stripe lateral (borderLeftWidth > 1px como acento
+  // coloreado es BAN explicito de impecable).
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.warningContainer,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.warning,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
     borderRadius: RADIUS.md,
     marginHorizontal: SPACING.margin,
     marginTop: SPACING.md,

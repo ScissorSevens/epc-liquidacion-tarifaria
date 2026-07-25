@@ -104,6 +104,7 @@ import Login from '../../src/pantallas/Login';
 import { clave_storage_sesion } from '../../src/composition/constantes';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
 import { loginLocal } from '../../src/composition/login-local';
+import { COLORS } from '../../src/theme/skeletal-tokens';
 import type { Sesion } from '../../src/composition/constantes';
 import type { LoginLocalResultado } from '../../src/composition/login-local';
 
@@ -496,6 +497,46 @@ describe('Login (PUNTO A — Login real contra SQLite)', () => {
       await waitFor(() => {
         expect(onLoginSuccess).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Bloque 1 — craft UI: side-stripe BAN removal.
+  //
+  // impecable veta bordes laterales gruesos usados como acento coloreado
+  // (borderLeft/Right > 1px sobre cards / banners / alerts). El banner
+  // amarillo de sesion vencida tenia borderLeftWidth: 4 con
+  // borderLeftColor: COLORS.warning — ese patron esta prohibido.
+  //
+  // Refactor: banner como "alert pill" con borde completo 1px + fondo
+  // tinted. Misma semantica, sin stripe lateral.
+  // ──────────────────────────────────────────────────────────────────
+  describe('Bloque 1 craft UI — side-stripe BAN (banner amarillo)', () => {
+    const MENSAJE =
+      'Tu sesión anterior venció. Volvé a ingresar tu cédula y contraseña.';
+
+    it('T-LOGIN-A1 el banner NO usa borderLeft como acento coloreado (veta impecable)', () => {
+      const { getByTestId } = render(
+        <Login onLoginSuccess={onLoginSuccess} mensajeInicial={MENSAJE} />,
+      );
+      const banner = getByTestId('banner');
+      // El estilo mergeado no debe tener borderLeftWidth > 1 — la veta
+      // impecable es contra "stripe de color" > 1px. Tener borderLeftWidth: 0
+      // o no definido es OK; tener borderLeftWidth: 4 (lo que tenia antes)
+      // NO esta permitido.
+      expect(banner.props.style.borderLeftWidth).toBeUndefined();
+    });
+
+    it('T-LOGIN-A2 el banner usa borde completo 1px + fondo tinted de warningContainer', () => {
+      const { getByTestId } = render(
+        <Login onLoginSuccess={onLoginSuccess} mensajeInicial={MENSAJE} />,
+      );
+      const banner = getByTestId('banner');
+      // El banner debe ser un "alert pill" moderno: borde uniforme + tint,
+      // no stripe lateral.
+      expect(banner.props.style.borderWidth).toBe(1);
+      expect(banner.props.style.borderColor).toBe(COLORS.warning);
+      expect(banner.props.style.backgroundColor).toBe(COLORS.warningContainer);
     });
   });
 });
