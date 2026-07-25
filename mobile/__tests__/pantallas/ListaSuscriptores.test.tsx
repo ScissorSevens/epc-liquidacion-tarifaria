@@ -100,11 +100,11 @@ describe('ListaSuscriptores', () => {
     expect(screen.getByText('Sin resultados')).toBeTruthy();
   });
 
-  // SC-SYS-09: error en carga muestra REINTENTAR
-  it('SC-SYS-09: error en carga muestra botón REINTENTAR', async () => {
+  // SC-SYS-09: error en carga muestra Reintentar
+  it('SC-SYS-09: error en carga muestra botón Reintentar', async () => {
     mockGetBootstrap.mockRejectedValue(new Error('db error'));
     renderConProviders(<ListaSuscriptores navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText('REINTENTAR')).toBeTruthy();
+    expect(await screen.findByText('Reintentar')).toBeTruthy();
   });
 
   // SC-SYS-10: lista vacía — no muestra suscriptores y conserva input de búsqueda

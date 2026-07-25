@@ -183,7 +183,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
                   style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
                   onPress={() => void cargar()}
                 >
-                  <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>REINTENTAR</Text>
+                  <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>Reintentar</Text>
                 </Pressable>
               </>
             ) : suscriptores.length === 0 ? (
@@ -208,7 +208,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           {/* Opción: Nuevo Suscriptor */}
           <View style={styles.fabOpcion}>
             <View style={styles.fabEtiqueta}>
-              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Nuevo Suscriptor</Text>
+              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Agregar suscriptor</Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
@@ -223,7 +223,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
           {/* Opción: Importar CSV */}
           <View style={styles.fabOpcion}>
             <View style={styles.fabEtiqueta}>
-              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Importar CSV</Text>
+              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Importar suscriptores</Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
@@ -290,7 +290,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
               style={({ pressed }) => [styles.btnCancelar, pressed && { opacity: 0.6 }]}
               onPress={() => setSelectorVisible(false)}
             >
-              <Text style={styles.btnCancelarTexto}>CANCELAR</Text>
+              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -356,7 +356,6 @@ const styles = StyleSheet.create({
     color: COLORS.onPrimary,
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
 
   // ── Estados centro ─────────────────────────────────────────────────────────
@@ -485,6 +484,5 @@ const styles = StyleSheet.create({
   btnCancelarTexto: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.5,
   },
 });
