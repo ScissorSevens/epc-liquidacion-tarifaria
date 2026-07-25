@@ -342,7 +342,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Nombre */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>NOMBRE Y APELLIDOS</Text>
+              <Text style={styles.fieldLabel}>Nombre y apellidos</Text>
               <TextInput
                 style={[styles.input, errores.nombre_apellidos !== undefined && styles.inputError]}
                 value={form.nombre_apellidos}
@@ -360,7 +360,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Cédula */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>CÉDULA</Text>
+              <Text style={styles.fieldLabel}>Cédula</Text>
               <TextInput
                 style={[styles.input, errores.cedula !== undefined && styles.inputError]}
                 value={form.cedula}
@@ -379,7 +379,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Dirección */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>DIRECCIÓN</Text>
+              <Text style={styles.fieldLabel}>Dirección</Text>
               <TextInput
                 style={[styles.input, errores.direccion !== undefined && styles.inputError]}
                 value={form.direccion}
@@ -397,7 +397,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Estrato */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>ESTRATO</Text>
+              <Text style={styles.fieldLabel}>Estrato</Text>
               <View style={styles.chipsRow}>
                 {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
                   <Pressable
@@ -441,7 +441,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Categoría de uso (multi-tenant Q10 spec) */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>CATEGORÍA DE USO</Text>
+              <Text style={styles.fieldLabel}>Categoría de uso</Text>
               <View style={styles.chipsRowCategoria}>
                 {CATEGORIAS_USO.map((cat) => (
                   <Pressable
@@ -466,7 +466,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
                 ))}
               </View>
               <Text style={styles.helperTextCategoria}>
-                Define cómo el motor tarifario aplica subsidios o contribuciones (ver Res CRA 825/2017).
+                Define cómo el motor tarifario aplica subsidios o contribuciones.
               </Text>
             </View>
           </View>
@@ -480,7 +480,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Municipio */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>MUNICIPIO</Text>
+              <Text style={styles.fieldLabel}>Municipio</Text>
               <TextInput
                 style={[styles.input, errores.municipio !== undefined && styles.inputError]}
                 value={form.municipio}
@@ -498,7 +498,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Sector */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>SECTOR <Text style={styles.opcional}>(opcional)</Text></Text>
+              <Text style={styles.fieldLabel}>Sector <Text style={styles.opcional}>(opcional)</Text></Text>
               <TextInput
                 style={[styles.input, errores.sector !== undefined && styles.inputError]}
                 value={form.sector}
@@ -516,7 +516,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Calle */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>CALLE <Text style={styles.opcional}>(opcional)</Text></Text>
+              <Text style={styles.fieldLabel}>Calle <Text style={styles.opcional}>(opcional)</Text></Text>
               <TextInput
                 style={[styles.input, errores.calle !== undefined && styles.inputError]}
                 value={form.calle}
@@ -542,7 +542,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Matrícula */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>MATRÍCULA INMOBILIARIA</Text>
+              <Text style={styles.fieldLabel}>Matrícula inmobiliaria</Text>
               <TextInput
                 style={[styles.input, errores.matricula_inmobiliaria !== undefined && styles.inputError]}
                 value={form.matricula_inmobiliaria}
@@ -559,7 +559,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Catastral */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>NÚMERO CATASTRAL</Text>
+              <Text style={styles.fieldLabel}>Número catastral</Text>
               <TextInput
                 style={[styles.input, errores.numero_catastral !== undefined && styles.inputError]}
                 value={form.numero_catastral}
@@ -586,7 +586,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Fecha instalación */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>FECHA DE INSTALACIÓN</Text>
+              <Text style={styles.fieldLabel}>Fecha de instalación</Text>
               <FechaPicker
                 value={form.fecha_instalacion}
                 onChange={(v) => setCampo('fecha_instalacion', v)}
@@ -601,7 +601,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
             {/* Observaciones */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>OBSERVACIONES DEL MEDIDOR</Text>
+              <Text style={styles.fieldLabel}>Observaciones del medidor</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -655,7 +655,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
           disabled={enviando}
           style={({ pressed }) => [styles.btnCancelar, pressed && styles.pressed]}
         >
-          <Text style={styles.btnCancelarText}>CANCELAR</Text>
+          <Text style={styles.btnCancelarText}>Cancelar</Text>
         </Pressable>
         <Pressable
           onPress={() => void onSubmit()}
@@ -669,7 +669,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
           {enviando ? (
             <ActivityIndicator color={COLORS.onPrimary} size="small" />
           ) : (
-            <Text style={styles.btnGuardarText}>GUARDAR</Text>
+            <Text style={styles.btnGuardarText}>Guardar suscriptor</Text>
           )}
         </Pressable>
       </View>
@@ -739,7 +739,6 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.8,
   },
   input: {
     height: 48,
@@ -890,7 +889,7 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     borderRadius: RADIUS.lg,
     backgroundColor: 'transparent',
@@ -898,8 +897,6 @@ const styles = StyleSheet.create({
   btnCancelarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   btnGuardar: {
     flex: 1,
@@ -917,8 +914,6 @@ const styles = StyleSheet.create({
   btnGuardarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   btnDisabled: {
     backgroundColor: COLORS.onSurfaceVariant,
