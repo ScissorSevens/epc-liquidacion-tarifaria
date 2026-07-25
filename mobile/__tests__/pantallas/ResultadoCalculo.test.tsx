@@ -76,24 +76,24 @@ describe('ResultadoCalculo', () => {
     expect(elemento).toBeTruthy();
   });
 
-  // SC-SYS-02: botón VER HISTORIAL navega a Historial
-  it('SC-SYS-02: VER HISTORIAL llama navigation.navigate con Historial', () => {
+  // SC-SYS-02: botón Ver historial navega a Historial
+  it('SC-SYS-02: Ver historial llama navigation.navigate con Historial', () => {
     renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
-    fireEvent.press(screen.getByText('VER HISTORIAL'));
+    fireEvent.press(screen.getByText('Ver historial'));
     expect(nav.navigate).toHaveBeenCalledWith('Historial', {
       id_suscriptor: paramsBase.id_suscriptor,
       nombre: paramsBase.nombre_suscriptor,
     });
   });
 
-  // SC-SYS-03: botón VOLVER A LA RUTA llama replace con CapturarLectura
-  it('SC-SYS-03: VOLVER A LA RUTA llama navigation.replace con CapturarLectura', () => {
+  // SC-SYS-03: botón Volver a la ruta llama replace con CapturarLectura
+  it('SC-SYS-03: Volver a la ruta llama navigation.replace con CapturarLectura', () => {
     renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
-    fireEvent.press(screen.getByText('VOLVER A LA RUTA'));
+    fireEvent.press(screen.getByText('Volver a la ruta'));
     expect(nav.replace).toHaveBeenCalledWith('CapturarLectura', {
       id_medidor: paramsBase.lectura.id_medidor,
       id_suscriptor: paramsBase.id_suscriptor,

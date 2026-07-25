@@ -137,19 +137,19 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Bento grid: total + anterior/actual + consumo */}
         <View style={[styles.bentoColFull, styles.bentoColFullTotal]}>
-          <Text style={[styles.bentoLabel, styles.bentoLabelTotal]}>MONTO TOTAL</Text>
+          <Text style={[styles.bentoLabel, styles.bentoLabelTotal]}>Monto total</Text>
           <Text style={[styles.bentoTotal, styles.bentoTotalBlanco]}>{formatearCOP(resultado.total)}</Text>
         </View>
         <View style={styles.bentoRow}>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>
-            <Text style={styles.bentoLabelSm}>ANTERIOR</Text>
+            <Text style={styles.bentoLabelSm}>Anterior</Text>
             <Text style={styles.bentoMid}>
               {lectura.lectura_anterior}{' '}
               <Text style={styles.bentoUnit}>m³</Text>
             </Text>
           </View>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>
-            <Text style={styles.bentoLabelSm}>ACTUAL</Text>
+            <Text style={styles.bentoLabelSm}>Actual</Text>
             <Text style={styles.bentoMid}>
               {lectura.lectura_actual}{' '}
               <Text style={styles.bentoUnit}>m³</Text>
@@ -228,7 +228,7 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
           >
             <MaterialIcons name="history" size={20} color={COLORS.onPrimary} />
-            <Text style={styles.btnPrimaryText}>VER HISTORIAL</Text>
+            <Text style={styles.btnPrimaryText}>Ver historial</Text>
           </Pressable>
           <Pressable
             onPress={() =>
@@ -240,40 +240,40 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
           >
             <MaterialIcons name="map" size={20} color={COLORS.primary} />
-            <Text style={styles.btnSecondaryText}>VOLVER A LA RUTA</Text>
+            <Text style={styles.btnSecondaryText}>Volver a la ruta</Text>
           </Pressable>
         </View>
 
         {/* Metadata footer */}
         <View style={styles.metaWrap}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>FECHA</Text>
+            <Text style={styles.metaLabel}>Fecha</Text>
             <Text style={styles.metaVal}>{fechaTxt}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>PRESTADOR</Text>
+            <Text style={styles.metaLabel}>Prestador</Text>
             <Text style={styles.metaVal} numberOfLines={1}>
               {prestador?.nombre ?? '—'}
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>MUNICIPIO</Text>
+            <Text style={styles.metaLabel}>Municipio</Text>
             <Text style={styles.metaVal} numberOfLines={1}>
               {prestador?.municipio ?? '—'}
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>OPERADOR</Text>
+            <Text style={styles.metaLabel}>Operador</Text>
             <Text style={styles.metaVal}>
               Operador #{lectura.id_operario}
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>ESTRATO</Text>
+            <Text style={styles.metaLabel}>Estrato</Text>
             <Text style={styles.metaVal}>{estrato}</Text>
           </View>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>HASH DE VERIFICACIÓN</Text>
+            <Text style={styles.metaLabel}>Hash de verificación</Text>
             <Text style={styles.metaHash}>{hashTxt}</Text>
           </View>
         </View>
@@ -354,7 +354,6 @@ const styles = StyleSheet.create({
   subtituloMeta: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 1,
     textAlign: 'center',
     marginTop: SPACING.sm,
   },
@@ -377,7 +376,6 @@ const styles = StyleSheet.create({
   bentoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 2,
     marginBottom: SPACING.xs,
   },
   bentoLabelTotal: {
@@ -408,7 +406,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
     marginBottom: SPACING.xs,
-    letterSpacing: 1,
   },
   bentoMid: {
     ...TYPOGRAPHY.headlineSm,
@@ -533,8 +530,6 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnSecondary: {
     width: '100%',
@@ -556,8 +551,6 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnDisabled: {
     opacity: 0.5,
@@ -593,7 +586,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 1,
   },
   metaVal: {
     ...TYPOGRAPHY.bodySm,
