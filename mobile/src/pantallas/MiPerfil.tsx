@@ -57,22 +57,22 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         </View>
 
         {/* Actividad Reciente */}
-        <Text style={estilos.seccionTitulo}>ACTIVIDAD RECIENTE</Text>
+        <Text style={estilos.seccionTitulo}>Actividad reciente</Text>
         <View style={estilos.gridFila}>
           <View style={[estilos.gridCard, estilos.gridCardMitad]}>
             <MaterialIcons name="edit-note" size={24} color={COLORS.secondary} />
-            <Text style={estilos.gridEtiqueta}>LECTURAS</Text>
+            <Text style={estilos.gridEtiqueta}>Lecturas</Text>
             <Text style={estilos.gridValor}>{PERFIL.lecturas}</Text>
           </View>
           <View style={[estilos.gridCard, estilos.gridCardMitad]}>
             <MaterialIcons name="sync" size={24} color={COLORS.secondary} />
-            <Text style={estilos.gridEtiqueta}>SINCRO</Text>
+            <Text style={estilos.gridEtiqueta}>Última sincronización</Text>
             <Text style={estilos.gridValor}>{PERFIL.ultimaSincro}</Text>
           </View>
         </View>
 
         {/* Información Personal */}
-        <Text style={estilos.seccionTitulo}>INFORMACIÓN PERSONAL</Text>
+        <Text style={estilos.seccionTitulo}>Información personal</Text>
         <View style={estilos.listaCard}>
           <FilaInfo etiqueta="ID Operario" valor={PERFIL.idOperario} borde />
           <FilaInfo etiqueta="Teléfono" valor={PERFIL.telefono} borde />
@@ -80,7 +80,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         </View>
 
         {/* Configuración */}
-        <Text style={estilos.seccionTitulo}>CONFIGURACIÓN</Text>
+        <Text style={estilos.seccionTitulo}>Configuración</Text>
         <View style={estilos.listaCard}>
           <View style={estilos.filaConfig}>
             <Pressable style={estilos.filaConfigIzq} onPress={mostrarToast} accessibilityLabel="Notificaciones — próximamente">
@@ -105,7 +105,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           }}
         >
           <MaterialIcons name="logout" size={20} color={COLORS.error} />
-          <Text style={estilos.botonCerrarTexto}>CAMBIAR DE OPERARIO</Text>
+          <Text style={estilos.botonCerrarTexto}>Cerrar sesión</Text>
         </Pressable>
 
         <FooterApp />
@@ -179,7 +179,6 @@ const estilos = StyleSheet.create({
   seccionTitulo: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 1.2,
     marginHorizontal: SPACING.margin,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
@@ -203,7 +202,6 @@ const estilos = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     color: COLORS.onSurfaceVariant,
     marginTop: SPACING.xs,
-    letterSpacing: 0.5,
   },
   gridValor: {
     ...TYPOGRAPHY.headlineSm,
@@ -277,7 +275,7 @@ const estilos = StyleSheet.create({
     marginTop: SPACING.xl,
     height: 56,
     borderRadius: RADIUS.xl,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.errorContainer,
     backgroundColor: COLORS.surfaceContainerLowest,
     ...SHADOWS.card,
@@ -288,7 +286,6 @@ const estilos = StyleSheet.create({
   botonCerrarTexto: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.error,
-    letterSpacing: 0.8,
   },
   toast: {
     position: 'absolute',
