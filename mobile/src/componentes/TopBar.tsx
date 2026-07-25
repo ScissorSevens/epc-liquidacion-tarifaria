@@ -40,7 +40,7 @@ export function TopBar({ titulo, subtitulo, onBack, accionDerecha }: TopBarProps
             <MaterialIcons
               name="arrow-back"
               size={22}
-              color={esDetalle ? COLORS.primary : COLORS.onPrimary}
+              color={esDetalle ? COLORS.brandAzulOscuro : COLORS.onPrimary}
             />
           </Pressable>
         )}
@@ -73,9 +73,13 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.sm + 4,
   },
 
-  // ── Variante raíz: fondo primario, título blanco, sin flecha ──────────────
+  // ── Variante raíz: fondo brandAzulOscuro, título blanco, sin flecha ──────
+  // Usamos COLORS.brandAzulOscuro (identidad institucional explicita) en vez
+  // de COLORS.primary (semantico generico). Ambos resuelven al mismo #093C5D
+  // pero el token brand hace visible la intencion institucional — principio
+  // de color con proposito semantico de impecable.
   topBarRaiz: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.brandAzulOscuro,
   },
 
   // ── Variante detalle: fondo claro, título oscuro, con flecha ─────────────
@@ -114,7 +118,7 @@ const styles = StyleSheet.create({
   tituloDetalle: {
     ...TYPOGRAPHY.bodyLg,
     fontWeight: '600' as const,
-    color: COLORS.primary,
+    color: COLORS.brandAzulOscuro,
     letterSpacing: -0.2,
   },
 
@@ -123,9 +127,12 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
   },
 
+  // ── Boton de icono: WCAG 2.5.5 touch target >= 44x44 ────────────────────
+  // Antes era 36x36 → fallaba auditoria a11y y el PRODUCT.md non-negotiable.
+  // hitSlop=12 expande hit area total a 68x68, holgura amplia para dedos.
   iconBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.full,
