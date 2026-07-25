@@ -449,7 +449,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <View style={styles.cardSuscriptorTop}>
               <View style={styles.flex}>
                 <Text style={styles.abonadoLabel}>
-                  SUSCRIPTOR #{id_suscriptor}
+                  Suscriptor #{id_suscriptor}
                 </Text>
                 <Text style={styles.abonadoNombre} numberOfLines={1}>
                   {nombreSuscriptor}
@@ -488,7 +488,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
 
           {/* Input lectura actual */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>LECTURA ACTUAL (m³)</Text>
+            <Text style={styles.fieldLabel}>Lectura actual (m³)</Text>
             <View style={styles.inputBigWrapper}>
               <TextInput
                 value={form.lectura_actual}
@@ -605,7 +605,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
                 <View style={styles.camCirculo}>
                   <MaterialIcons name="camera-alt" size={36} color={COLORS.onPrimary} />
                 </View>
-                <Text style={styles.camLabel}>TOMAR FOTO DEL MEDIDOR</Text>
+                <Text style={styles.camLabel}>Tomar foto del medidor</Text>
               </Pressable>
               <Text style={styles.camHint}>
                 Foto opcional para validación de consumo inusual
@@ -620,7 +620,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
               <View style={styles.evidenciaInfo}>
                 <View style={styles.evidenciaOkRow}>
                   <MaterialIcons name="check-circle" size={16} color={COLORS.secondary} />
-                  <Text style={styles.evidenciaOk}>FOTO CAPTURADA</Text>
+                  <Text style={styles.evidenciaOk}>Foto capturada</Text>
                 </View>
                 {evidencia.foto_hash !== undefined && (
                   <Text style={styles.evidenciaHash}>
@@ -635,7 +635,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
                     pressed && styles.pressedLight,
                   ]}
                 >
-                  <Text style={styles.replaceBtnText}>REEMPLAZAR</Text>
+                  <Text style={styles.replaceBtnText}>Reemplazar foto</Text>
                 </Pressable>
               </View>
             </View>
@@ -677,7 +677,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
             pressed && styles.pressedLight,
           ]}
         >
-          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+          <Text style={styles.btnSecondaryText}>Cancelar</Text>
         </Pressable>
         <Pressable
           onPress={onCalcular}
@@ -689,7 +689,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           ]}
         >
           <Text style={styles.btnPrimaryText}>
-            {calculando ? 'CALCULANDO…' : 'GUARDAR Y CALCULAR'}
+            {calculando ? 'Calculando…' : 'Guardar y calcular'}
           </Text>
         </Pressable>
       </View>
@@ -732,7 +732,6 @@ const styles = StyleSheet.create({
   abonadoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 1.5,
   },
   abonadoNombre: {
     ...TYPOGRAPHY.headlineSm,
@@ -768,7 +767,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
-    letterSpacing: 1,
   },
 
   // Loader
@@ -826,7 +824,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 80,
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.primaryContainer,
     borderRadius: RADIUS.xl,
     paddingHorizontal: SPACING.md,
@@ -879,8 +877,6 @@ const styles = StyleSheet.create({
   camLabel: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
   },
   camHint: {
     ...TYPOGRAPHY.labelSm,
@@ -932,8 +928,6 @@ const styles = StyleSheet.create({
   replaceBtnText: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 
   // Snack inline
@@ -971,7 +965,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     fontSize: 8,
     color: COLORS.textTertiary,
-    letterSpacing: 2,
     textAlign: 'center',
     marginTop: SPACING.lg,
   },
@@ -1005,8 +998,6 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnPrimary: {
     flex: 1,
@@ -1024,8 +1015,6 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnDisabled: {
     opacity: 0.5,

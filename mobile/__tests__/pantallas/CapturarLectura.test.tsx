@@ -12,7 +12,7 @@
 //
 // QUE CUBRE ESTE ARCHIVO:
 //   - C6.1  CapturarLectura llama cargarSesion() al mount y, al ejecutar
-//           "GUARDAR Y CALCULAR", construye la EntradaLectura con el
+//           "Guardar y calcular", construye la EntradaLectura con el
 //           idOperario de la sesion (id=42) — NO con id=1 hardcoded.
 //   - C6.2  Triangulacion: con sesion de otro operario (id=7777), el campo
 //           idOperario fluye correctamente al persistir la lectura.
@@ -283,8 +283,8 @@ describe('CapturarLectura — idOperario desde sesion (COR-04)', () => {
 
     // Periodo ya viene prellenado por el componente — no lo tocamos.
 
-    // Presionamos GUARDAR Y CALCULAR
-    fireEvent.press(screen.getByText(/GUARDAR Y CALCULAR/));
+    // Presionamos Guardar y calcular (Title Case CTA)
+    fireEvent.press(screen.getByText(/Guardar y calcular/));
 
     // Esperamos a que el persist se invoque.
     await waitFor(
@@ -330,7 +330,7 @@ describe('CapturarLectura — idOperario desde sesion (COR-04)', () => {
     fireEvent.changeText(inputsAll[0], '1150');
     fireEvent.changeText(inputsAll[1], '1000');
 
-    fireEvent.press(screen.getByText(/GUARDAR Y CALCULAR/));
+    fireEvent.press(screen.getByText(/Guardar y calcular/));
 
     await waitFor(
       () => {
@@ -373,7 +373,7 @@ describe('CapturarLectura — idOperario desde sesion (COR-04)', () => {
     fireEvent.changeText(inputsAll[0], '1150');
     fireEvent.changeText(inputsAll[1], '1000');
 
-    fireEvent.press(screen.getByText(/GUARDAR Y CALCULAR/));
+    fireEvent.press(screen.getByText(/Guardar y calcular/));
 
     // Damos tiempo para que onCalcular corra y se bloquee.
     await waitFor(
