@@ -554,11 +554,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.outlineVariant,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
   },
   cardHeader: {
     flexDirection: 'row',

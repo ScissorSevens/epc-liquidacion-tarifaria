@@ -462,11 +462,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
   },
   progresoRow: {
     flexDirection: 'row',
@@ -507,11 +502,6 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
   },
   statLabel: {
     color: COLORS.onSurfaceVariant,
