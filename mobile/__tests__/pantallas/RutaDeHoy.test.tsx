@@ -120,10 +120,10 @@ describe('RutaDeHoy', () => {
   // (la pantalla actual NO renderiza un botón SINCRONIZAR — sólo lleva el
   // conteo de pendientes a la tab Sincronizacion). Verificamos que el conteo
   // del mes se incrementa cuando hay lecturas.
-  it('SC-SYS-13: contador LECTURAS DEL MES refleja capturas', async () => {
+  it('SC-SYS-13: contador Lecturas del mes refleja capturas', async () => {
     configurarBootstrap();
     renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText('LECTURAS DEL MES')).toBeTruthy();
+    expect(await screen.findByText('Lecturas del mes')).toBeTruthy();
     // El contador "1 / 3" se renderiza como Text fragmentado.
     // Buscamos el Text hijo "/ 3" que es único del contador.
     expect(screen.getByText('/ 3')).toBeTruthy();
@@ -134,21 +134,21 @@ describe('RutaDeHoy', () => {
     configurarBootstrap({ cola: [] });
     renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
     await screen.findByText('Ana García');
-    expect(screen.queryByText(/SINCRONIZAR/)).toBeNull();
+    expect(screen.queryByText(/SINCRONIZAR/i)).toBeNull();
   });
 
-  // SC-SYS-15: error en carga muestra REINTENTAR
-  it('SC-SYS-15: error en carga muestra REINTENTAR', async () => {
+  // SC-SYS-15: error en carga muestra Reintentar
+  it('SC-SYS-15: error en carga muestra Reintentar', async () => {
     mockGetBootstrap.mockRejectedValue(new Error('fallo de red'));
     renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText('REINTENTAR')).toBeTruthy();
+    expect(await screen.findByText('Reintentar')).toBeTruthy();
   });
 
   // SC-SYS-16: 1 de 3 suscriptores con lectura → contador 1 / 3
   it('SC-SYS-16: muestra el progreso correcto 1 / 3', async () => {
     configurarBootstrap();
     renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    expect(await screen.findByText(/LECTURAS DEL MES/)).toBeTruthy();
+    expect(await screen.findByText(/Lecturas del mes/)).toBeTruthy();
     // El contador muestra "1 / 3" (Text fragmentado por el span interior)
     expect(screen.getByText('/ 3')).toBeTruthy();
   });

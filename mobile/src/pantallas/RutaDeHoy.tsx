@@ -148,7 +148,7 @@ export default function RutaDeHoy({ navigation }: Props) {
           Error al cargar: {error}
         </Text>
         <Pressable onPress={() => void cargar()} style={styles.btnRetry}>
-          <Text style={[TYPOGRAPHY.labelLg, styles.btnRetryText]}>REINTENTAR</Text>
+          <Text style={[TYPOGRAPHY.labelLg, styles.btnRetryText]}>Reintentar</Text>
         </Pressable>
       </View>
     );
@@ -197,7 +197,7 @@ export default function RutaDeHoy({ navigation }: Props) {
         {/* Sección de progreso */}
         <View style={styles.progresoCard}>
           <View style={styles.progresoRow}>
-            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>LECTURAS DEL MES</Text>
+            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>Lecturas del mes</Text>
             <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNumero]}>
               {capturasHoy}{' '}
               <Text style={[TYPOGRAPHY.bodySm, styles.progresoTotal]}>/ {suscriptores.length}</Text>
@@ -326,7 +326,7 @@ export default function RutaDeHoy({ navigation }: Props) {
               style={({ pressed }) => [styles.btnCancelar, pressed && { opacity: 0.6 }]}
               onPress={() => setSelectorVisible(false)}
             >
-              <Text style={styles.btnCancelarTexto}>CANCELAR</Text>
+              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -425,7 +425,6 @@ const styles = StyleSheet.create({
   },
   progresoLabel: {
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 1,
   },
   progresoNumero: {
     color: COLORS.primary,
@@ -458,7 +457,6 @@ const styles = StyleSheet.create({
   },
   grupoTitulo: {
     color: COLORS.secondary,
-    letterSpacing: 1.5,
     fontWeight: '700',
   },
   grupoDivisor: {
@@ -607,6 +605,5 @@ const styles = StyleSheet.create({
   btnCancelarTexto: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.5,
   },
 });
