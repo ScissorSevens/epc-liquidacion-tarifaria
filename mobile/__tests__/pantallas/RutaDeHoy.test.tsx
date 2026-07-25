@@ -5,6 +5,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RutaDeHoy from '../../src/pantallas/RutaDeHoy';
 import { crearNavMock } from './__mocks__/nav';
 import { getBootstrap } from '../../src/composition/get-bootstrap';
+import { useWorkspace } from '../../src/composicion/useWorkspace';
+
+// useWorkspace importa @react-native-async-storage/async-storage (persist
+// middleware de Zustand). El módulo nativo no está disponible en Jest —
+// mockeamos con stubs in-memory.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
+  removeItem: jest.fn().mockResolvedValue(undefined),
+}));
 
 jest.mock('../../src/composition/get-bootstrap');
 const mockGetBootstrap = getBootstrap as jest.MockedFunction<typeof getBootstrap>;
@@ -95,9 +105,37 @@ function configurarBootstrap(opciones: {
 describe('RutaDeHoy', () => {
   let nav: ReturnType<typeof crearNavMock>;
 
+  // Estado base del workspace. Por defecto, prestador activo
+  // (Acueducto La Esperanza) con NIT y segmento visibles.
+  const PRESTADOR_BASE = {
+    id_prestador: 5,
+    codigo: 'P005',
+    nombre: 'Acueducto La Esperanza',
+    nit: '900123456-7',
+    representante_legal: 'Pedro Pérez',
+    representante_legal_cedula: '12345678',
+    municipio: 'Fusagasugá',
+    departamento: 'Cundinamarca',
+    segmento: 2 as const,
+    num_suscriptores_urbanos: 40,
+    num_suscriptores_rurales: 110,
+    contacto: null,
+    estado: 'activo' as const,
+    created_at: '',
+    updated_at: '',
+  };
+
   beforeEach(() => {
     nav = crearNavMock();
     jest.clearAllMocks();
+    useWorkspace.setState({
+      id_prestador_activo: 5,
+      prestador: PRESTADOR_BASE,
+      prestadores_disponibles: [PRESTADOR_BASE],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
   });
 
   // SC-SYS-11: suscriptor con lectura este mes muestra "Capturado este mes"
@@ -152,4 +190,138 @@ describe('RutaDeHoy', () => {
     // El contador muestra "1 / 3" (Text fragmentado por el span interior)
     expect(screen.getByText('/ 3')).toBeTruthy();
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TDD Red 2026-07-25 — Identidad del prestador (Option A + Option B)
+  //
+  // User pidió "más cercana con el prestador" — que el operario vea
+  // con quién está trabajando, no una lista genérica de "suscriptores".
+  //
+  // Cambios:
+  //   - TopBar recibe nombre del prestador como subtitulo.
+  //   - Banner de identidad (NIT, segmento, total suscriptores, %).
+  //   - Banner de conectividad ELIMINADO.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // T-ID-A1: TopBar muestra el nombre del prestador como subtitulo
+  it('T-ID-A1: TopBar muestra el nombre del prestador activo como subtitulo', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    // El TopBar subtitulo + el banner de identidad renderizan el nombre
+    // del prestador — al menos uno debe estar visible.
+    const matches = screen.getAllByText(/Acueducto La Esperanza/);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // T-ID-B1: Banner de identidad muestra el NIT del prestador
+  it('T-ID-B1: banner de identidad muestra el NIT del prestador', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    expect(screen.getByText(/900123456-7/)).toBeTruthy();
+  });
+
+  // T-ID-B2: Banner de identidad muestra el segmento
+  it('T-ID-B2: banner de identidad muestra el segmento del prestador', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    // segmento 2 = rural según dominio/tipos
+    expect(screen.getByText(/segmento 2/i)).toBeTruthy();
+  });
+
+  // T-ID-B3: Banner de identidad muestra total suscriptores del prestador
+  it('T-ID-B3: banner de identidad muestra total suscriptores del prestador', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    // urban 40 + rural 110 = 150
+    expect(screen.getByText(/150/)).toBeTruthy();
+  });
+
+  // T-ID-B4: Banner de identidad muestra % capturado del mes
+  it('T-ID-B4: banner de identidad muestra porcentaje capturado del mes', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    // 1 capturado / 3 suscriptores = 33%
+    expect(screen.getByText(/33%/)).toBeTruthy();
+  });
+
+  // T-ID-NET-1: Banner de conectividad "Sin conexión" ELIMINADO
+  it('T-ID-NET-1: NO muestra el banner "Sin conexión" (funcionalidad de sync deshabilitada)', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    expect(screen.queryByText(/Sin conexi[oó]n/i)).toBeNull();
+  });
+
+  // T-ID-NET-2: Banner de conectividad "Conectado" ELIMINADO
+  it('T-ID-NET-2: NO muestra el banner "Conectado" (funcionalidad de sync deshabilitada)', async () => {
+    configurarBootstrap();
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    expect(screen.queryByText(/Conectado/i)).toBeNull();
+  });
+
+  // T-DESIGN-1: Las cards de suscriptores NO usan el anti-pattern
+  // "border + shadow combo" (ghost-card). Sin elevation, sin shadowColor.
+  // Verificamos via toJSON() que las cards (Views con borderRadius >= 12)
+  // NO tienen shadowColor/elevation.
+  it('T-DESIGN-1: cards de suscriptores sin shadow + border combo (anti-pattern ghost-card)', async () => {
+    configurarBootstrap();
+    const { toJSON } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    await screen.findByText('Ana García');
+
+    // Las cards (borderRadius 16) no deben tener shadow + border combo.
+    // El iconCircleCheck (borderRadius full) y la handleBar del modal
+    // (borderRadius full) tienen radius >=12 pero no son cards.
+    // Filtramos por borderWidth 1 (que solo tienen las cards).
+    const cards = collectViewsWithBorderWidthAndRadius(toJSON(), 12);
+    expect(cards.length).toBeGreaterThan(0);
+    // Todas las cards NO deben tener shadowColor ni elevation
+    for (const card of cards) {
+      expect(card.style.shadowColor).toBeUndefined();
+      expect(card.style.elevation).toBeUndefined();
+    }
+  });
 });
+
+/** Helper: aplana arrays de style a un solo objeto. */
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return Object.assign({}, ...style.map((s) => flattenStyle(s)));
+  }
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+  return {};
+}
+
+/** Helper: recolecta Views con borderWidth=1 y borderRadius >= min. */
+function collectViewsWithBorderWidthAndRadius(
+  node: unknown,
+  min: number,
+): Array<{ style: Record<string, unknown> }> {
+  const out: Array<{ style: Record<string, unknown> }> = [];
+  const visit = (n: unknown): void => {
+    if (n === null || typeof n !== 'object') return;
+    const obj = n as { type?: string; props?: { style?: unknown }; children?: unknown[] };
+    if (obj.type === 'View' && obj.props?.style) {
+      const style = flattenStyle(obj.props.style);
+      const br = style.borderRadius;
+      const bw = style.borderWidth;
+      if (typeof br === 'number' && br >= min && bw === 1) {
+        out.push({ style });
+      }
+    }
+    if (Array.isArray(obj.children)) {
+      for (const c of obj.children) visit(c);
+    }
+  };
+  visit(node);
+  return out;
+}

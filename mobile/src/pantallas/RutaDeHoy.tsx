@@ -14,10 +14,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
-import { useNetInfo } from '../hooks/useNetInfo';
 import type { InicioStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
@@ -25,14 +23,21 @@ import {
 } from '../theme/skeletal-tokens';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
+import { useWorkspace } from '../composicion/useWorkspace';
 
 type Props = InicioStackScreenProps<'RutaDeHoy'>;
 
 /**
  * Pantalla INICIO — muestra la ruta de lecturas del día.
  *
- * Carga suscriptores y calcula el progreso de lecturas capturadas hoy.
- * El banner de conectividad reacciona en tiempo real: muestra "Sin conexión"
+ * Identidad del prestador (Opción A + B):
+ *   - TopBar recibe el nombre del prestador activo como subtitulo.
+ *   - Banner de identidad con NIT, segmento, total suscriptores y %
+ *     capturado del mes — acerca al operario al prestador con el que
+ *     trabaja (no una lista genérica de "suscriptores").
+ *
+ * Banner de conectividad removido temporalmente. La funcionalidad de
+ * sync se deshabilita por ahora (2026-07-25).
  */
 export default function RutaDeHoy({ navigation }: Props) {
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
@@ -48,7 +53,10 @@ export default function RutaDeHoy({ navigation }: Props) {
   const [medidoresSelector, setMedidoresSelector] = useState<Medidor[]>([]);
   const [suscriptorSelector, setSuscriptorSelector] = useState<{ id: number; nombre: string } | null>(null);
 
-  const { isConnected } = useNetInfo();
+  // PER-05: selectores específicos en useWorkspace. Cambios en otros
+  // campos (acuerdo_vigente, parametros_vigentes, cargando) NO disparan
+  // re-render de RutaDeHoy.
+  const prestador = useWorkspace((s) => s.prestador);
 
   const cargar = useCallback(async (esPrimeraCarga = false) => {
     if (esPrimeraCarga) {
@@ -157,11 +165,28 @@ export default function RutaDeHoy({ navigation }: Props) {
   const progreso = suscriptores.length > 0 ? capturasHoy / suscriptores.length : 0;
   const porcentaje = Math.round(progreso * 100);
 
+  // ── Identidad del prestador (TopBar subtitulo + banner) ──────────────────
+  // El TopBar recibe el nombre del prestador (Opción A):
+  //   titulo:    "Ruta de hoy" — el identificador de la pantalla, estable.
+  //   subtitulo: "Acueducto La Esperanza · Fusagasugá" — contexto del
+  //              prestador activo, cambia con el workspace.
+  // El banner muestra NIT, segmento, total suscriptores y % (Opción B).
+  const prestadorNombre = prestador?.nombre ?? 'Prestador sin nombre';
+  const prestadorSubtitulo = prestador
+    ? `${prestador.nombre} · ${prestador.municipio}`
+    : 'Sin prestador activo';
+
+  // Total suscriptores = urbanos + rurales (lo que el prestador declara).
+  const totalSuscriptoresPrestador = prestador
+    ? prestador.num_suscriptores_urbanos + prestador.num_suscriptores_rurales
+    : 0;
+
   return (
     <View style={styles.container}>
-      {/* TopAppBar */}
+      {/* TopAppBar — Opción A: nombre del prestador como subtitulo */}
       <TopBar
         titulo="Ruta de hoy"
+        subtitulo={prestadorSubtitulo}
         accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
@@ -176,21 +201,72 @@ export default function RutaDeHoy({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner conectividad */}
-        {isConnected === false && (
-          <View style={[styles.banner, styles.bannerOffline]}>
-            <MaterialIcons name="cloud-off" size={20} color={COLORS.error} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOffline]}>
-              Sin conexión — los datos se guardarán localmente
-            </Text>
-          </View>
-        )}
-        {isConnected === true && (
-          <View style={[styles.banner, styles.bannerOnline]}>
-            <MaterialIcons name="cloud-done" size={20} color={COLORS.secondary} />
-            <Text style={[TYPOGRAPHY.bodySm, styles.bannerText, styles.bannerTextOnline]}>
-              Conectado — sincronización disponible
-            </Text>
+        {/* Banner de identidad del prestador (Opción B) — reemplaza al
+            banner de conectividad, removido temporalmente. La
+            funcionalidad de sync se deshabilita por ahora (2026-07-25). */}
+        {prestador && (
+          <View
+            style={styles.identidadCard}
+            accessibilityRole="summary"
+            accessibilityLabel={`Prestador ${prestadorNombre}, NIT ${prestador.nit}, segmento ${prestador.segmento}, ${totalSuscriptoresPrestador} suscriptores, ${porcentaje} porciento capturado del mes`}
+          >
+            {/* Fila 1: nombre del prestador (headline) */}
+            <View style={styles.identidadHeader}>
+              <MaterialIcons
+                name="business"
+                size={22}
+                color={COLORS.primary}
+              />
+              <Text
+                style={styles.identidadNombre}
+                numberOfLines={1}
+              >
+                {prestadorNombre}
+              </Text>
+            </View>
+
+            {/* Fila 2: NIT · Segmento (label) */}
+            <View style={styles.identidadMeta}>
+              <MaterialIcons
+                name="label-outline"
+                size={14}
+                color={COLORS.onSurfaceVariant}
+              />
+              <Text style={styles.identidadMetaTexto}>
+                NIT {prestador.nit} · Segmento {prestador.segmento}{' '}
+                {prestador.segmento === 1 ? 'urbano' : 'rural'}
+              </Text>
+            </View>
+
+            {/* Fila 3: total suscriptores (stat) + barra de progreso (%) */}
+            <View style={styles.identidadStats}>
+              <View style={styles.identidadStat}>
+                <MaterialIcons
+                  name="people"
+                  size={18}
+                  color={COLORS.secondary}
+                />
+                <Text style={styles.identidadStatNumero}>
+                  {totalSuscriptoresPrestador}
+                </Text>
+                <Text style={styles.identidadStatLabel}>
+                  suscriptores
+                </Text>
+              </View>
+              <View style={styles.identidadProgreso}>
+                <View style={styles.identidadBarraContainer}>
+                  <View
+                    style={[
+                      styles.identidadBarraFill,
+                      { width: `${porcentaje}%` as `${number}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.identidadProcentaje}>
+                  {porcentaje}% lecturas del mes
+                </Text>
+              </View>
+            </View>
           </View>
         )}
 
@@ -375,48 +451,91 @@ const styles = StyleSheet.create({
     gap: SPACING.lg,
   },
 
-  // ── Banner conectividad ───────────────────────────────────────────────────
-  banner: {
+  // ── Banner de identidad del prestador (Opción B) ─────────────────────────
+  // Reemplaza al banner de conectividad (removido temporalmente — sync
+  // deshabilitado 2026-07-25).
+  //
+  // Bento-style: una card con 3 stats (nombre / NIT·segmento /
+  // total suscriptores + barra de progreso).
+  // Sin border+shadow combo (anti-pattern): solo borderWidth 1 con
+  // outlineVariant. Border radius 16 (RADIUS.lg, no xl).
+  identidadCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+  },
+  identidadHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
+    gap: SPACING.xs + 2, // 6
   },
-  bannerOffline: {
-    backgroundColor: COLORS.errorContainer,
-    borderColor: 'rgba(186,26,26,0.1)',
+  identidadNombre: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.onSurface,
+    flexShrink: 1,
   },
-  bannerOnline: {
-    backgroundColor: '#EBF7F0',
-    borderColor: 'rgba(0,103,127,0.15)',
+  identidadMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
-  bannerText: {
-    flex: 1,
-    fontWeight: '500',
+  identidadMetaTexto: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+    flexShrink: 1,
   },
-  bannerTextOffline: {
-    color: COLORS.onErrorContainer,
+  identidadStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginTop: SPACING.xs,
   },
-  bannerTextOnline: {
+  identidadStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  identidadStatNumero: {
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.secondary,
+  },
+  identidadStatLabel: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.onSurfaceVariant,
+  },
+  identidadProgreso: {
+    flex: 1,
+    gap: SPACING.xs,
+  },
+  identidadBarraContainer: {
+    height: 8,
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  identidadBarraFill: {
+    height: '100%',
+    backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.full,
+  },
+  identidadProcentaje: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
   },
 
   // ── Progreso ──────────────────────────────────────────────────────────────
+  // Sin border+shadow combo: solo border 1 con outlineVariant. Sin
+  // elevación ni sombra (anti-pattern ghost-card).
   progresoCard: {
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.xl,
+    borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     gap: SPACING.sm,
     borderWidth: 1,
-    borderColor: 'rgba(197,198,206,0.3)',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
+    borderColor: COLORS.outlineVariant,
   },
   progresoRow: {
     flexDirection: 'row',
@@ -466,21 +585,17 @@ const styles = StyleSheet.create({
   },
 
   // ── Cards ─────────────────────────────────────────────────────────────────
+  // Sin border+shadow combo: solo border 1 con outlineVariant. Sin
+  // elevación ni sombra (anti-pattern ghost-card).
   card: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.xl,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(197,198,206,0.2)',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
+    borderColor: COLORS.outlineVariant,
   },
   cardCapturada: {
-    backgroundColor: 'rgba(211,228,254,0.3)',
-    borderColor: 'rgba(197,198,206,0.1)',
-    opacity: 0.8,
+    backgroundColor: COLORS.surfaceContainerLow,
+    opacity: 0.7,
   },
   cardPressed: {
     backgroundColor: COLORS.surfaceContainer,
