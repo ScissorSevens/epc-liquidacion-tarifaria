@@ -161,7 +161,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
 
             {/* Cédula — solo lectura */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>CÉDULA</Text>
+              <Text style={styles.fieldLabel}>Cédula</Text>
               <View style={styles.readonlyField}>
                 <Text style={styles.readonlyText}>{suscriptor.cedula}</Text>
               </View>
@@ -170,7 +170,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
 
             {/* Nombre y apellidos */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>NOMBRE Y APELLIDOS</Text>
+              <Text style={styles.fieldLabel}>Nombre y apellidos</Text>
               <TextInput
                 style={styles.input}
                 value={form.nombre_apellidos}
@@ -184,7 +184,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
 
             {/* Estrato */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>ESTRATO</Text>
+              <Text style={styles.fieldLabel}>Estrato</Text>
               <View style={styles.chipsRow}>
                 {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
                   <Pressable
@@ -206,7 +206,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
 
             {/* Categoría de uso (Q10 spec, multi-tenant) */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>CATEGORÍA DE USO</Text>
+              <Text style={styles.fieldLabel}>Categoría de uso</Text>
               <View style={styles.chipsRowCategoria}>
                 {CATEGORIAS_USO.map((cat) => (
                   <Pressable
@@ -230,13 +230,13 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                 ))}
               </View>
               <Text style={styles.helperTextCategoria}>
-                Define cómo el motor tarifario aplica subsidios o contribuciones (ver Res CRA 825/2017).
+                Define cómo el motor tarifario aplica subsidios o contribuciones.
               </Text>
             </View>
 
             {/* Estado */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>ESTADO</Text>
+              <Text style={styles.fieldLabel}>Estado</Text>
               <View style={styles.chipsRowEstado}>
                 {(['activo', 'inactivo', 'suspendido'] as EstadoSuscriptor[]).map((est) => (
                   <Pressable
@@ -278,7 +278,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
 
             {/* Municipio */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>MUNICIPIO</Text>
+              <Text style={styles.fieldLabel}>Municipio</Text>
               <TextInput
                 style={styles.input}
                 value={form.municipio}
@@ -292,7 +292,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
 
             {/* Dirección */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>DIRECCIÓN</Text>
+              <Text style={styles.fieldLabel}>Dirección</Text>
               <TextInput
                 style={styles.input}
                 value={form.direccion}
@@ -307,7 +307,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             {/* Sector */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>
-                SECTOR <Text style={styles.opcional}>(opcional)</Text>
+                Sector <Text style={styles.opcional}>(opcional)</Text>
               </Text>
               <TextInput
                 style={styles.input}
@@ -331,7 +331,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             {/* Matrícula inmobiliaria */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>
-                MATRÍCULA INMOBILIARIA <Text style={styles.opcional}>(opcional)</Text>
+                Matrícula inmobiliaria <Text style={styles.opcional}>(opcional)</Text>
               </Text>
               <TextInput
                 style={styles.input}
@@ -346,7 +346,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             {/* Número catastral */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>
-                NÚMERO CATASTRAL <Text style={styles.opcional}>(opcional)</Text>
+                Número catastral <Text style={styles.opcional}>(opcional)</Text>
               </Text>
               <TextInput
                 style={styles.input}
@@ -381,7 +381,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
           disabled={enviando}
           style={({ pressed }) => [styles.btnCancelar, pressed && styles.pressed]}
         >
-          <Text style={styles.btnCancelarText}>CANCELAR</Text>
+          <Text style={styles.btnCancelarText}>Cancelar</Text>
         </Pressable>
         <Pressable
           onPress={() => void onGuardar()}
@@ -395,7 +395,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
           {enviando ? (
             <ActivityIndicator color={COLORS.onPrimary} size="small" />
           ) : (
-            <Text style={styles.btnGuardarText}>GUARDAR</Text>
+            <Text style={styles.btnGuardarText}>Guardar cambios</Text>
           )}
         </Pressable>
       </View>
@@ -452,7 +452,6 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.8,
   },
   input: {
     height: 48,
@@ -623,7 +622,7 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     borderRadius: RADIUS.lg,
     backgroundColor: 'transparent',
@@ -631,8 +630,6 @@ const styles = StyleSheet.create({
   btnCancelarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   btnGuardar: {
     flex: 1,
@@ -650,8 +647,6 @@ const styles = StyleSheet.create({
   btnGuardarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   btnDisabled: {
     backgroundColor: COLORS.onSurfaceVariant,
