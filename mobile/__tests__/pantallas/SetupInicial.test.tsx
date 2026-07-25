@@ -34,6 +34,7 @@
 //   GREEN → la pantalla y los validadores se implementan y los tests pasan.
 
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn().mockResolvedValue(undefined),
@@ -62,6 +63,9 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
     onSurfaceVariant: '#555',
     error: '#f00',
     errorContainer: '#fee',
+    // Tokens institucionales EPC (paleta institucional).
+    brandAmarillo: '#FFDC26',
+    brandAzulOscuro: '#093C5D',
   },
   RADIUS: { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 },
   SHADOWS: { card: {} },
@@ -541,5 +545,58 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     });
     // onComplete NO se invoca
     expect(onCompleteMock).not.toHaveBeenCalled();
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Paleta institucional EPC — CTA destacado del wizard usa amarillo
+  // institucional como fondo y azul oscuro como texto (contraste WCAG AA
+  // verificado en __tests__/theme/institutional-palette.test.ts).
+  //
+  // Esto reemplaza el uso previo de `primaryContainer` (azul oscuro
+  // genérico) para que el CTA principal del wizard salte a la vista con
+  // la identidad cromática de la EPC.
+  // ──────────────────────────────────────────────────────────────────
+  describe('paleta institucional — CTA del wizard', () => {
+    it('I-CTA-1 el botón "Finalizar" del paso 2 usa brandAmarillo (#FFDC26) como fondo', () => {
+      const { getByText, getByTestId, getAllByPlaceholderText } = render(
+        <SetupInicial onComplete={onCompleteMock} />,
+      );
+      // Avanzar al paso 2 con form del prestador valido.
+      avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+      fireEvent.press(getByText('Siguiente'));
+
+      // El botón "Finalizar" debe estar montado con testID.
+      const finalizarBtn = getByTestId('finalizar-btn');
+      const estiloFinalizar = StyleSheet.flatten(finalizarBtn.props.style) as {
+        backgroundColor?: string;
+      };
+      expect(estiloFinalizar.backgroundColor).toBe('#FFDC26');
+    });
+
+    it('I-CTA-2 el texto "Finalizar" usa brandAzulOscuro (#093C5D) como color', () => {
+      const { getByText, getAllByPlaceholderText } = render(
+        <SetupInicial onComplete={onCompleteMock} />,
+      );
+      avanzarAPaso2PasandoPrestador(getAllByPlaceholderText);
+      fireEvent.press(getByText('Siguiente'));
+
+      const textoFinalizar = getByText('Finalizar');
+      const estiloTexto = StyleSheet.flatten(textoFinalizar.props.style) as {
+        color?: string;
+      };
+      expect(estiloTexto.color).toBe('#093C5D');
+    });
+
+    it('I-CTA-3 el botón "Siguiente" del paso 1 tambien usa brandAmarillo (#FFDC26) como fondo (CTA destacado del wizard)', () => {
+      const { getByTestId } = render(
+        <SetupInicial onComplete={onCompleteMock} />,
+      );
+      // Estamos en paso 1 por default → "Siguiente" debe estar visible.
+      const siguienteBtn = getByTestId('siguiente-btn');
+      const estiloSiguiente = StyleSheet.flatten(siguienteBtn.props.style) as {
+        backgroundColor?: string;
+      };
+      expect(estiloSiguiente.backgroundColor).toBe('#FFDC26');
+    });
   });
 });

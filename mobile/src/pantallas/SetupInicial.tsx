@@ -275,9 +275,10 @@ export default function SetupInicial({ onComplete }: Props) {
           <Pressable
             onPress={handleSiguiente}
             style={({ pressed }) => [styles.botonPrimario, pressed && styles.botonPresionado]}
+            testID="siguiente-btn"
           >
-            <Text style={styles.textoBotonPrimario}>Siguiente</Text>
-            <MaterialIcons name="arrow-forward" size={20} color={COLORS.onPrimary} />
+            <Text style={styles.textoBotonDestacado}>Siguiente</Text>
+            <MaterialIcons name="arrow-forward" size={20} color={COLORS.brandAzulOscuro} />
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -389,13 +390,14 @@ export default function SetupInicial({ onComplete }: Props) {
               pressed && styles.botonPresionado,
             ]}
             disabled={cargando}
+            testID="finalizar-btn"
           >
             {cargando ? (
-              <ActivityIndicator color={COLORS.onPrimary} size="small" />
+              <ActivityIndicator color={COLORS.brandAzulOscuro} size="small" />
             ) : (
               <>
-                <Text style={styles.textoBotonPrimario}>Finalizar</Text>
-                <MaterialIcons name="check" size={20} color={COLORS.onPrimary} />
+                <Text style={styles.textoBotonDestacado}>Finalizar</Text>
+                <MaterialIcons name="check" size={20} color={COLORS.brandAzulOscuro} />
               </>
             )}
           </Pressable>
@@ -586,7 +588,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     height: 48,
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: COLORS.brandAmarillo,
     borderRadius: RADIUS.md,
   },
   botonPrimarioFlexible: {
@@ -604,9 +606,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.outlineVariant,
   },
-  textoBotonPrimario: {
+  textoBotonDestacado: {
     ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
+    color: COLORS.brandAzulOscuro,
   },
   textoBotonSecundario: {
     ...TYPOGRAPHY.labelLg,
