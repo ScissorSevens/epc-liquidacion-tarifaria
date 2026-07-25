@@ -56,7 +56,39 @@ export default function RutaDeHoy({ navigation }: Props) {
   // PER-05: selectores específicos en useWorkspace. Cambios en otros
   // campos (acuerdo_vigente, parametros_vigentes, cargando) NO disparan
   // re-render de RutaDeHoy.
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const prestador = useWorkspace((s) => s.prestador);
+
+  // ── Carga lazy del prestador activo (fix bug) ─────────────────────────────
+  // En cold-boot, `useWorkspace.setSesionCompleta(sesion)` setea
+  // `id_prestador_activo` pero NO el objeto `prestador` (queda null).
+  // Si llegamos acá con `prestador === null` pero `id_prestador_activo !== 0`,
+  // cargamos el objeto del repo SQLite local. Cuando el repo devuelve null
+  // (id huérfano / borrado) dejamos `prestador` en null y la UI se encarga
+  // de mostrar el estado vacío con CTA — nunca el fallback "Sin prestador
+  // activo".
+  useEffect(() => {
+    if (prestador) return;
+    if (id_prestador_activo === 0) return;
+    let cancelado = false;
+    void (async () => {
+      try {
+        const { prestadorRepo } = await getBootstrap();
+        const p = await prestadorRepo.obtenerPorId(id_prestador_activo);
+        if (cancelado) return;
+        if (p) {
+          useWorkspace.setState({ prestador: p });
+        }
+      } catch (e) {
+        // Silencioso: si falla la carga del prestador, la UI mostrará el
+        // estado vacío con CTA. NO propagamos para no romper la pantalla.
+        console.warn('[RutaDeHoy] cargar prestador:', e);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [id_prestador_activo, prestador]);
 
   const cargar = useCallback(async (esPrimeraCarga = false) => {
     if (esPrimeraCarga) {
@@ -165,16 +197,13 @@ export default function RutaDeHoy({ navigation }: Props) {
   const progreso = suscriptores.length > 0 ? capturasHoy / suscriptores.length : 0;
   const porcentaje = Math.round(progreso * 100);
 
-  // ── Identidad del prestador (TopBar subtitulo + banner) ──────────────────
-  // El TopBar recibe el nombre del prestador (Opción A):
-  //   titulo:    "Ruta de hoy" — el identificador de la pantalla, estable.
-  //   subtitulo: "Acueducto La Esperanza · Fusagasugá" — contexto del
-  //              prestador activo, cambia con el workspace.
-  // El banner muestra NIT, segmento, total suscriptores y % (Opción B).
-  const prestadorNombre = prestador?.nombre ?? 'Prestador sin nombre';
+  // ── Identidad del prestador (TopBar subtitulo + banner Nequi) ────────────
+  // TopBar subtitulo: pasamos null si no hay prestador, así NO cae en el
+  // fallback histórico "Sin prestador activo" — el TopBar simplemente no
+  // renderiza la segunda línea.
   const prestadorSubtitulo = prestador
     ? `${prestador.nombre} · ${prestador.municipio}`
-    : 'Sin prestador activo';
+    : undefined;
 
   // Total suscriptores = urbanos + rurales (lo que el prestador declara).
   const totalSuscriptoresPrestador = prestador
@@ -183,7 +212,7 @@ export default function RutaDeHoy({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* TopAppBar — Opción A: nombre del prestador como subtitulo */}
+      {/* TopAppBar — subtitulo: nombre del prestador activo. */}
       <TopBar
         titulo="Ruta de hoy"
         subtitulo={prestadorSubtitulo}
@@ -201,51 +230,41 @@ export default function RutaDeHoy({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner de identidad del prestador (Opción B) — reemplaza al
-            banner de conectividad, removido temporalmente. La
-            funcionalidad de sync se deshabilita por ahora (2026-07-25). */}
-        {prestador && (
+        {/* Banner de identidad (estilo Nequi) o estado vacío con CTA.
+            Si NO hay prestador activo (id=0, repo=null, etc.), mostramos un
+            card claro con CTA "Configurar prestador" en vez del fallback
+            histórico "Sin prestador activo". */}
+        {prestador ? (
           <View
             style={styles.identidadCard}
             accessibilityRole="summary"
-            accessibilityLabel={`Prestador ${prestadorNombre}, NIT ${prestador.nit}, segmento ${prestador.segmento}, ${totalSuscriptoresPrestador} suscriptores, ${porcentaje} porciento capturado del mes`}
+            accessibilityLabel={`Prestador ${prestador.nombre}, NIT ${prestador.nit}, segmento ${prestador.segmento}, ${totalSuscriptoresPrestador} suscriptores, ${porcentaje} por ciento capturado del mes`}
           >
-            {/* Fila 1: nombre del prestador (headline) */}
-            <View style={styles.identidadHeader}>
-              <MaterialIcons
-                name="business"
-                size={22}
-                color={COLORS.primary}
-              />
-              <Text
-                style={styles.identidadNombre}
-                numberOfLines={1}
-              >
-                {prestadorNombre}
-              </Text>
+            {/* Forma geométrica: círculo decorativo de marca (Nequi-like)
+                en la esquina superior derecha del banner. */}
+            <View style={styles.identidadDecorCircle} pointerEvents="none" />
+
+            <View style={styles.identidadFilaIcono}>
+              <View style={styles.identidadIconCircle}>
+                <MaterialIcons name="business" size={24} color={COLORS.onSecondaryContainer} />
+              </View>
+              <View style={styles.identidadTitulos}>
+                <Text
+                  style={styles.identidadNombre}
+                  numberOfLines={1}
+                >
+                  {prestador.nombre}
+                </Text>
+                <Text style={styles.identidadMetaTexto} numberOfLines={1}>
+                  NIT {prestador.nit} · Segmento {prestador.segmento}{' '}
+                  {prestador.segmento === 1 ? 'urbano' : 'rural'}
+                </Text>
+              </View>
             </View>
 
-            {/* Fila 2: NIT · Segmento (label) */}
-            <View style={styles.identidadMeta}>
-              <MaterialIcons
-                name="label-outline"
-                size={14}
-                color={COLORS.onSurfaceVariant}
-              />
-              <Text style={styles.identidadMetaTexto}>
-                NIT {prestador.nit} · Segmento {prestador.segmento}{' '}
-                {prestador.segmento === 1 ? 'urbano' : 'rural'}
-              </Text>
-            </View>
-
-            {/* Fila 3: total suscriptores (stat) + barra de progreso (%) */}
+            {/* 2 stat columns: total suscriptores + % capturado */}
             <View style={styles.identidadStats}>
               <View style={styles.identidadStat}>
-                <MaterialIcons
-                  name="people"
-                  size={18}
-                  color={COLORS.secondary}
-                />
                 <Text style={styles.identidadStatNumero}>
                   {totalSuscriptoresPrestador}
                 </Text>
@@ -253,20 +272,55 @@ export default function RutaDeHoy({ navigation }: Props) {
                   suscriptores
                 </Text>
               </View>
-              <View style={styles.identidadProgreso}>
-                <View style={styles.identidadBarraContainer}>
-                  <View
-                    style={[
-                      styles.identidadBarraFill,
-                      { width: `${porcentaje}%` as `${number}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.identidadProcentaje}>
-                  {porcentaje}% lecturas del mes
+              <View style={styles.identidadStatDerecha}>
+                <Text style={styles.identidadStatNumeroMd}>
+                  {porcentaje}%
+                </Text>
+                <Text style={styles.identidadStatLabel}>
+                  lecturas del mes
                 </Text>
               </View>
             </View>
+
+            <View style={styles.identidadBarraContainer}>
+              <View
+                style={[
+                  styles.identidadBarraFill,
+                  { width: `${porcentaje}%` as `${number}%` },
+                ]}
+              />
+            </View>
+          </View>
+        ) : (
+          <View
+            style={styles.identidadVaciaCard}
+            accessibilityRole="alert"
+            accessibilityLabel="No hay prestador activo. Configurá uno para ver la ruta."
+          >
+            <View style={styles.identidadVaciaIconCircle}>
+              <MaterialIcons name="storefront" size={26} color={COLORS.onSecondaryContainer} />
+            </View>
+            <Text style={styles.identidadVaciaTitulo}>
+              Configurá tu prestador
+            </Text>
+            <Text style={styles.identidadVaciaCopy}>
+              Necesitamos un prestador activo para mostrar la ruta de hoy y
+              los suscriptores asignados.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.identidadVaciaCTA,
+                pressed && styles.identidadVaciaCTAPressed,
+              ]}
+              onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
+              accessibilityRole="button"
+              accessibilityLabel="Configurar prestador"
+            >
+              <MaterialIcons name="arrow-forward" size={18} color={COLORS.onPrimary} />
+              <Text style={styles.identidadVaciaCTATexto}>
+                Configurar prestador
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -310,41 +364,46 @@ export default function RutaDeHoy({ navigation }: Props) {
                   ]}
                   onPress={() => { void navegarACapturar(item); }}
                   disabled={capturado}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${capturado ? 'Capturado' : 'Pendiente'}: suscriptor ${item.codigo} ${item.nombre_apellidos}`}
                 >
                   <View style={styles.cardContent}>
                     <View style={styles.cardInfo}>
-                      {/* ID */}
-                      <Text style={[TYPOGRAPHY.labelMd, styles.cardCodigo]}>
-                        ID: {item.codigo.toUpperCase()}
-                      </Text>
-                      {/* Nombre */}
+                      {/* Fila 1: ID + estado (mismo renglón, distribute=space-between
+                          se logra con el slot del icono derecho arriba) */}
+                      <View style={styles.cardFilaMeta}>
+                        <Text style={[TYPOGRAPHY.labelMd, styles.cardCodigo]}>
+                          {item.codigo}
+                        </Text>
+                        {capturado ? (
+                          <View style={styles.statusRow}>
+                            <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
+                            <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
+                              Capturado este mes
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={styles.statusRow}>
+                            <MaterialIcons name="schedule" size={14} color={COLORS.onSurfaceVariant} />
+                            <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>
+                              Lectura pendiente
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      {/* Fila 2: nombre prominente (headlineSm) */}
                       <Text
                         style={[
                           TYPOGRAPHY.headlineSm,
                           capturado ? styles.cardNombreCapturado : styles.cardNombre,
                         ]}
+                        numberOfLines={1}
                       >
                         {item.nombre_apellidos}
                       </Text>
-                      {/* Estado */}
-                      {capturado ? (
-                        <View style={styles.statusRow}>
-                          <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
-                            <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
-                            Capturado este mes
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={styles.statusRow}>
-                          <MaterialIcons name="schedule" size={14} color={COLORS.onSurfaceVariant} />
-                          <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>
-                            Lectura pendiente
-                          </Text>
-                        </View>
-                      )}
                     </View>
 
-                    {/* Icono derecho */}
+                    {/* Icono derecho (chevron si pendiente, círculo con check si capturado) */}
                     {capturado ? (
                       <View style={styles.iconCircleCheck}>
                         <MaterialIcons name="task-alt" size={22} color={COLORS.secondary} />
@@ -451,36 +510,63 @@ const styles = StyleSheet.create({
     gap: SPACING.lg,
   },
 
-  // ── Banner de identidad del prestador (Opción B) ─────────────────────────
+  // ── Banner de identidad del prestador — estilo Nequi ─────────────────────
+  // Inspiración: cards curvas + círculo de color de marca como forma
+  // geométrica distintiva (Nequi usa formas orgánicas como backgrounds).
+  //
+  // Reglas de impeccable aplicadas:
+  //   - Border radius 20 (entre lg y xl — sin pasar 24).
+  //   - Sin border + shadow combo (solo border 1 con outlineVariant).
+  //   - Sin ALL CAPS (todo el copy es oracion).
+  //   - Tipografia con jerarquia: headlineMd (nombre) + bodySm (meta).
+  //   - Padding generoso (lg, no sm/md).
+  //   - El círculo decorativo es un View absoluto: posicion absolute,
+  //     top: -32, right: -32, tamaño 96x96, color secondaryContainer.
+  //     Esto evita gradientes y shapes SVG — geometría pura con Views.
+  //
   // Reemplaza al banner de conectividad (removido temporalmente — sync
   // deshabilitado 2026-07-25).
-  //
-  // Bento-style: una card con 3 stats (nombre / NIT·segmento /
-  // total suscriptores + barra de progreso).
-  // Sin border+shadow combo (anti-pattern): solo borderWidth 1 con
-  // outlineVariant. Border radius 16 (RADIUS.lg, no xl).
   identidadCard: {
+    position: 'relative',
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.lg,
+    borderRadius: 20, // RADIUS.lg + 4 — sin pasar RADIUS.xl (24)
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    padding: SPACING.md,
-    gap: SPACING.sm,
+    padding: SPACING.lg, // padding generoso
+    gap: SPACING.md,
+    overflow: 'hidden', // clipea el círculo decorativo a la card
   },
-  identidadHeader: {
+  identidadDecorCircle: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 120,
+    height: 120,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    opacity: 0.18,
+  },
+  identidadFilaIcono: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs + 2, // 6
+    gap: SPACING.md,
+  },
+  identidadIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identidadTitulos: {
+    flex: 1,
+    gap: 2,
   },
   identidadNombre: {
-    ...TYPOGRAPHY.headlineSm,
+    ...TYPOGRAPHY.headlineMd, // más prominente que headlineSm
     color: COLORS.onSurface,
     flexShrink: 1,
-  },
-  identidadMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
   },
   identidadMetaTexto: {
     ...TYPOGRAPHY.bodySm,
@@ -489,26 +575,28 @@ const styles = StyleSheet.create({
   },
   identidadStats: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
     gap: SPACING.md,
-    marginTop: SPACING.xs,
   },
   identidadStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
+    gap: 2,
+  },
+  identidadStatDerecha: {
+    gap: 2,
+    alignItems: 'flex-end',
   },
   identidadStatNumero: {
     ...TYPOGRAPHY.headlineSm,
     color: COLORS.secondary,
   },
+  identidadStatNumeroMd: {
+    ...TYPOGRAPHY.headlineMd,
+    color: COLORS.primary,
+  },
   identidadStatLabel: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
-  },
-  identidadProgreso: {
-    flex: 1,
-    gap: SPACING.xs,
   },
   identidadBarraContainer: {
     height: 8,
@@ -521,9 +609,54 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.secondary,
     borderRadius: RADIUS.full,
   },
-  identidadProcentaje: {
-    ...TYPOGRAPHY.labelSm,
+
+  // ── Estado vacío: sin prestador activo (CTA) ──────────────────────────────
+  // Mismo lenguaje visual (círculo decorativo + radio 20) que el banner de
+  // identidad, pero con icono storefront y CTA primario.
+  identidadVaciaCard: {
+    position: 'relative',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING.lg,
+    gap: SPACING.sm,
+    overflow: 'hidden',
+  },
+  identidadVaciaIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identidadVaciaTitulo: {
+    ...TYPOGRAPHY.headlineMd,
+    color: COLORS.onSurface,
+  },
+  identidadVaciaCopy: {
+    ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurfaceVariant,
+  },
+  identidadVaciaCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm + 2, // 10
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.xs,
+    minHeight: 44, // touch target accesible
+  },
+  identidadVaciaCTAPressed: {
+    opacity: 0.85,
+  },
+  identidadVaciaCTATexto: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
   },
 
   // ── Progreso ──────────────────────────────────────────────────────────────
@@ -584,18 +717,20 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceDim,
   },
 
-  // ── Cards ─────────────────────────────────────────────────────────────────
-  // Sin border+shadow combo: solo border 1 con outlineVariant. Sin
-  // elevación ni sombra (anti-pattern ghost-card).
+  // ── Cards de suscriptores ─────────────────────────────────────────────────
+  // Estilo Nequi: una card con 2 filas (meta + nombre), border 1 outline
+  // (sin shadow + border combo), border radius 16 (RADIUS.lg).
+  // Sin ALL CAPS — el codigo se muestra como viene.
   card: {
     backgroundColor: COLORS.surfaceContainerLowest,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
+    minHeight: 64, // touch target minimo (ya viene de paddings + content)
   },
   cardCapturada: {
     backgroundColor: COLORS.surfaceContainerLow,
-    opacity: 0.7,
+    opacity: 0.65,
   },
   cardPressed: {
     backgroundColor: COLORS.surfaceContainer,
@@ -609,11 +744,17 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    gap: SPACING.xs,
+    gap: 2, // 2px entre meta y nombre
+  },
+  cardFilaMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
   },
   cardCodigo: {
     color: COLORS.secondary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   cardNombre: {
     color: COLORS.onSurface,
@@ -637,7 +778,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(0,103,127,0.1)',
+    backgroundColor: 'rgba(0,103,127,0.10)', // tinte del secondary teal
     alignItems: 'center',
     justifyContent: 'center',
   },

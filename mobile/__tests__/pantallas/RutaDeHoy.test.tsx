@@ -86,12 +86,14 @@ function configurarBootstrap(opciones: {
   lecturas?: typeof LECTURAS_UNA_HOY;
   cola?: { id: number; estado: string }[];
   medidores?: typeof MEDIDORES;
+  prestadorPorId?: jest.Mock<Promise<unknown | null>, [number]>;
 } = {}) {
   const {
     suscriptores = SUSCRIPTORES,
     lecturas = LECTURAS_UNA_HOY,
     cola = [],
     medidores = MEDIDORES,
+    prestadorPorId = jest.fn().mockResolvedValue(null),
   } = opciones;
 
   mockGetBootstrap.mockResolvedValue({
@@ -99,6 +101,7 @@ function configurarBootstrap(opciones: {
     lecturaRepo: { listar: jest.fn().mockResolvedValue(lecturas) },
     colaRepo: { listar: jest.fn().mockResolvedValue(cola) },
     medidorRepo: { listar: jest.fn().mockResolvedValue(medidores) },
+    prestadorRepo: { obtenerPorId: prestadorPorId },
   } as any);
 }
 
@@ -265,6 +268,182 @@ describe('RutaDeHoy', () => {
     expect(screen.queryByText(/Conectado/i)).toBeNull();
   });
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // TDD Red 2026-07-25 — Bug del prestador activo
+  //
+  // El bug:
+  //   - En `useWorkspace.setSesionCompleta(sesion)` solo se setea
+  //     `id_prestador_activo` (no el objeto `prestador`).
+  //   - En cold-boot, `useWorkspace.getState().prestador === null` aunque
+  //     haya un prestador en la DB local.
+  //   - `RutaDeHoy` lee `prestador` del store y cuando es null renderiza
+  //     el fallback "Sin prestador activo" como subtítulo del TopBar Y
+  //     oculta el banner de identidad aunque el operario trabaje con un
+  //     prestador real.
+  //
+  // El fix:
+  //   - Agregar selector `useWorkspace((s) => s.id_prestador_activo)`.
+  //   - useEffect: si `prestador === null && id_prestador_activo !== 0`,
+  //     cargar `prestadorRepo.obtenerPorId(id)` y guardarlo en el store.
+  //   - Si `id_prestador_activo === 0`, mostrar estado vacío claro con CTA
+  //     "Configurar prestador" (en vez de "Sin prestador activo").
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // T-ID-PRES-1: cuando el store tiene id_prestador_activo pero NO el
+  // objeto prestador (estado cold-boot real), la pantalla debe cargarlo
+  // del repo y mostrar el banner de identidad con el nombre.
+  it('T-ID-PRES-1: carga prestador del repo cuando store tiene solo id', async () => {
+    // Simulamos cold-boot: setSesionCompleta setea id pero NO el objeto.
+    useWorkspace.setState({
+      id_prestador_activo: 5,
+      prestador: null, // <-- el bug
+      prestadores_disponibles: [],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
+    const prestadorPorId = jest.fn().mockResolvedValue(PRESTADOR_BASE);
+    configurarBootstrap({ prestadorPorId });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    // 1) El banner muestra el nombre del prestador cargado del repo.
+    //    Usamos string exact (no regex) para NO matchear el subtitulo del
+    //    TopBar "Acueducto La Esperanza · Fusagasugá".
+    expect(await screen.findByText('Acueducto La Esperanza')).toBeTruthy();
+    // 2) El repo fue invocado con el id correcto.
+    expect(prestadorPorId).toHaveBeenCalledWith(5);
+    // 3) El store fue hidratado (sin esto, la proxima render volveria a null).
+    expect(useWorkspace.getState().prestador?.nombre).toBe('Acueducto La Esperanza');
+  });
+
+  // T-ID-PRES-2: si el repo no encuentra el prestador (id huérfano),
+  // la pantalla muestra estado vacío claro (NO el fallback histórico
+  // "Sin prestador activo") con un CTA para que el operario pueda
+  // configurar otro prestador.
+  it('T-ID-PRES-2: si repo no encuentra el prestador, muestra estado vacío con CTA', async () => {
+    useWorkspace.setState({
+      id_prestador_activo: 5,
+      prestador: null,
+      prestadores_disponibles: [],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
+    // El repo devuelve null (id huérfano o borrado).
+    configurarBootstrap({ prestadorPorId: jest.fn().mockResolvedValue(null) });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    // 1) NO debe quedar el fallback "Sin prestador activo" en ningún lado.
+    expect(screen.queryByText(/Sin prestador activo/i)).toBeNull();
+    // 2) Debe haber un CTA claro de "Configurar prestador".
+    //    Usamos string exact porque el boton se llama igual que el heading
+    //    de la empty card ("Configurá tu prestador") NO matchea este text.
+    expect(await screen.findByText('Configurar prestador')).toBeTruthy();
+  });
+
+  // T-ID-PRES-3: si el workspace está sin prestador activo
+  // (id_prestador_activo === 0), la pantalla NO debe mostrar el
+  // fallback "Sin prestador activo" sino un estado vacío con CTA.
+  it('T-ID-PRES-3: si id_prestador_activo = 0, muestra estado vacío con CTA', async () => {
+    useWorkspace.setState({
+      id_prestador_activo: 0,
+      prestador: null,
+      prestadores_disponibles: [],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
+    const prestadorPorId = jest.fn().mockResolvedValue(null);
+    configurarBootstrap({ prestadorPorId });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    // Sin "Sin prestador activo" como subtítulo.
+    expect(screen.queryByText(/Sin prestador activo/i)).toBeNull();
+    // Con CTA claro (string exact).
+    expect(await screen.findByText('Configurar prestador')).toBeTruthy();
+    // Nunca llamamos al repo si id = 0 (cheapest branch).
+    expect(prestadorPorId).not.toHaveBeenCalled();
+  });
+
+  // T-ID-PRES-4: si el prestador YA está en el store, NO se debe llamar
+  // al repo (re-fetch redundante). Evita loops de carga en el ciclo de
+  // vida de la pantalla.
+  it('T-ID-PRES-4: NO carga del repo si prestador ya esta en el store', async () => {
+    useWorkspace.setState({
+      id_prestador_activo: 5,
+      prestador: PRESTADOR_BASE, // ya cargado
+      prestadores_disponibles: [PRESTADOR_BASE],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
+    const prestadorPorId = jest.fn().mockResolvedValue(PRESTADOR_BASE);
+    configurarBootstrap({ prestadorPorId });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    await screen.findByText('Ana García');
+    // No se invoca el repo cuando ya tenemos el objeto.
+    expect(prestadorPorId).not.toHaveBeenCalled();
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TDD Red 2026-07-25 — Estilo Nequi en el banner de identidad
+  //
+  // El rediseño pide jerarquía visual y formas geométricas suaves:
+  //   - headlineMd para el nombre (más prominente que headlineSm).
+  //   - NIT + segmento como metadato (labelMd / bodySm, NO en MAYÚSCULAS).
+  //   - Un círculo de color de marca como elemento geométrico distintivo
+  //     alrededor del icono business.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // T-NEQUI-1: el banner usa headlineMd (no headlineSm) para que el
+  // nombre del prestador sea el elemento tipográfico más prominente.
+  it('T-NEQUI-1: nombre del prestador usa headlineMd (jerarquía prominente)', async () => {
+    configurarBootstrap();
+    const { toJSON } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    await screen.findByText('Ana García');
+    // Buscamos un Text cuyo style incluya fontSize=24 (headlineMd)
+    // y cuyo contenido sea el nombre del prestador.
+    const json = toJSON() as { children?: unknown };
+    const textsConHeadlineMd = collectTextNodesByFontSize(json, 24);
+    const conNombre = textsConHeadlineMd.find((n) =>
+      /Acueducto La Esperanza/.test(n.content),
+    );
+    expect(conNombre).toBeDefined();
+  });
+
+  // T-NEQUI-2: el banner NO usa `textTransform: 'uppercase'` en ningún
+  // Text. Regla de impecable: ALL CAPS solo para badges cortos.
+  it('T-NEQUI-2: el banner NO usa textTransform uppercase', async () => {
+    configurarBootstrap();
+    const { toJSON } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    await screen.findByText('Acueducto La Esperanza');
+    const violations = collectNodesWithUppercase(toJSON());
+    expect(violations).toEqual([]);
+  });
+
+  // T-NEQUI-3: el banner incluye un elemento geométrico visual (un
+  // contenedor con borderRadius "full" ocurriendo en un elemento con
+  // tinte de color — ej. el círculo del icono business). Esto valida
+  // que el rediseño introdujo la "forma geométrica de fondo" pedida
+  // por el user (inspiración Nequi).
+  it('T-NEQUI-3: el banner tiene un circulo de color de marca (forma geometrica)', async () => {
+    configurarBootstrap();
+    const { toJSON } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    await screen.findByText('Acueducto La Esperanza');
+    const circles = collectViewsWithFullRadius(toJSON());
+    // Al menos 2 círculos en la pantalla: el del icono del prestador +
+    // el del check de captura en cards (si hubiera); o más. Buscamos
+    // que el rediseño introdujo el círculo del icono.
+    expect(circles.length).toBeGreaterThanOrEqual(1);
+    // Y debe haber al menos uno con un backgroundColor de marca
+    // (no transparente / sin color).
+    const conColorDeMarca = circles.filter((c) => Boolean(c.backgroundColor));
+    expect(conColorDeMarca.length).toBeGreaterThanOrEqual(1);
+  });
+
   // T-DESIGN-1: Las cards de suscriptores NO usan el anti-pattern
   // "border + shadow combo" (ghost-card). Sin elevation, sin shadowColor.
   // Verificamos via toJSON() que las cards (Views con borderRadius >= 12)
@@ -316,6 +495,101 @@ function collectViewsWithBorderWidthAndRadius(
       const bw = style.borderWidth;
       if (typeof br === 'number' && br >= min && bw === 1) {
         out.push({ style });
+      }
+    }
+    if (Array.isArray(obj.children)) {
+      for (const c of obj.children) visit(c);
+    }
+  };
+  visit(node);
+  return out;
+}
+
+/** Helper: extrae texto de nodos recursivamente. */
+function extractText(node: unknown, acc: string[]): void {
+  if (node === null || typeof node !== 'object') return;
+  const obj = node as { type?: string; props?: { children?: unknown }; children?: unknown[] };
+  if (obj.type === 'Text') {
+    if (typeof obj.props?.children === 'string') acc.push(obj.props.children);
+    if (Array.isArray(obj.props?.children)) {
+      for (const c of obj.props.children) extractText(c, acc);
+    }
+  }
+  if (Array.isArray(obj.children)) {
+    for (const c of obj.children) extractText(c, acc);
+  }
+}
+
+/** Helper: recolecta Texts cuyo style tiene fontSize === esperado. */
+function collectTextNodesByFontSize(
+  node: unknown,
+  fontSize: number,
+): Array<{ content: string; style: Record<string, unknown> }> {
+  const out: Array<{ content: string; style: Record<string, unknown> }> = [];
+  const visit = (n: unknown, parentStyle: Record<string, unknown> | null): void => {
+    if (n === null || typeof n !== 'object') return;
+    const obj = n as { type?: string; props?: { style?: unknown }; children?: unknown[] };
+    const style = obj.props?.style
+      ? Object.assign({}, parentStyle ?? {}, flattenStyle(obj.props.style))
+      : parentStyle;
+    if (obj.type === 'Text') {
+      const fs = (style as Record<string, unknown>)?.fontSize;
+      if (fs === fontSize) {
+        // El text content vive en `obj.children` (RNSpy format para
+        // React Native), no en `obj.props.children`. Es un array de
+        // strings (textos que React concatena) o un solo string.
+        const ch = obj.children;
+        let content = '';
+        if (typeof ch === 'string') content = ch;
+        else if (Array.isArray(ch)) content = ch.filter((s) => typeof s === 'string').join('');
+        out.push({ content, style: (style ?? {}) as Record<string, unknown> });
+      }
+    }
+    if (Array.isArray(obj.children)) {
+      for (const c of obj.children) visit(c, style);
+    }
+  };
+  visit(node, null);
+  return out;
+}
+
+/** Helper: recolecta nodos con `textTransform: 'uppercase'` en el style. */
+function collectNodesWithUppercase(node: unknown): Array<{ path: string }> {
+  const out: Array<{ path: string }> = [];
+  const visit = (n: unknown, path: string): void => {
+    if (n === null || typeof n !== 'object') return;
+    const obj = n as { type?: string; props?: { style?: unknown }; children?: unknown[] };
+    if (obj.props?.style) {
+      const style = flattenStyle(obj.props.style);
+      if (style.textTransform === 'uppercase') {
+        out.push({ path: `${path}/${obj.type ?? 'node'}` });
+      }
+    }
+    if (Array.isArray(obj.children)) {
+      obj.children.forEach((c, i) => visit(c, `${path}/${obj.type ?? 'node'}[${i}]`));
+    }
+  };
+  visit(node, '');
+  return out;
+}
+
+/** Helper: recolecta Views con borderRadius = full (RADIUS.full = 9999). */
+function collectViewsWithFullRadius(
+  node: unknown,
+): Array<{ backgroundColor?: string }> {
+  const out: Array<{ backgroundColor?: string }> = [];
+  const visit = (n: unknown): void => {
+    if (n === null || typeof n !== 'object') return;
+    const obj = n as { type?: string; props?: { style?: unknown }; children?: unknown[] };
+    if (obj.type === 'View' && obj.props?.style) {
+      const style = flattenStyle(obj.props.style);
+      // Aceptamos RADIUS.full (9999) o cualquier numero >= 100 (pill).
+      const br = style.borderRadius;
+      if (typeof br === 'number' && br >= 100) {
+        const backgroundColor = typeof style.backgroundColor === 'string'
+          ? style.backgroundColor
+          : undefined;
+        out.push({ backgroundColor });
       }
     }
     if (Array.isArray(obj.children)) {
