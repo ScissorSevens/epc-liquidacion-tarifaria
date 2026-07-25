@@ -186,7 +186,7 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
 
           {/* Campo Cédula */}
           <View style={estilos.campoContenedor}>
-            <Text style={estilos.etiqueta}>CÉDULA</Text>
+            <Text style={estilos.etiqueta}>Cédula</Text>
             <View style={[estilos.inputFila, { borderColor: errores.cedula ? COLORS.error : COLORS.outlineVariant }]}>
               <MaterialIcons
                 name="badge"
@@ -209,7 +209,7 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
 
           {/* Campo Contraseña */}
           <View style={estilos.campoContenedor}>
-            <Text style={estilos.etiqueta}>CONTRASEÑA</Text>
+            <Text style={estilos.etiqueta}>Contraseña</Text>
             <View style={[estilos.inputFila, { borderColor: errores.contrasena ? COLORS.error : COLORS.outlineVariant }]}>
               <MaterialIcons
                 name="lock"
@@ -333,7 +333,6 @@ const estilos = StyleSheet.create({
   etiqueta: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.8,
     marginBottom: SPACING.xs,
   },
   inputFila: {
