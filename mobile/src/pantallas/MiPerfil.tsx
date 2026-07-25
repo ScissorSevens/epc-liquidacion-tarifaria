@@ -48,7 +48,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
       <ScrollView contentContainerStyle={estilos.scroll}>
         {/* Avatar */}
         <View style={estilos.avatarSeccion}>
-          <View style={estilos.avatar}>
+          <View style={estilos.avatar} testID="avatar">
             <Text style={estilos.avatarTexto}>{PERFIL.iniciales}</Text>
           </View>
           <Text style={estilos.nombre}>{PERFIL.nombre}</Text>
@@ -95,15 +95,16 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           </View>
         </View>
 
-        {/* Cerrar sesión */}
+{/* Cerrar sesión */}
         <Pressable
           style={({ pressed }) => [estilos.botonCerrar, pressed && estilos.botonPresionado]}
           onPress={async () => {
             await limpiarSesion();
             onLogoutRequested();
           }}
+          testID="boton-cerrar-sesion"
         >
-          <MaterialIcons name="logout" size={20} color={COLORS.error} />
+          <MaterialIcons name="logout" size={20} color={COLORS.brandRojo} />
           <Text style={estilos.botonCerrarTexto}>Cerrar sesión</Text>
         </Pressable>
 
@@ -154,16 +155,16 @@ const estilos = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: COLORS.brandAzulOscuro,
     borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderColor: COLORS.brandAzulOscuro,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.md,
   },
   avatarTexto: {
     ...TYPOGRAPHY.headlineLg,
-    color: COLORS.primary,
+    color: COLORS.onPrimary,
   },
   nombre: {
     ...TYPOGRAPHY.headlineMd,
@@ -273,7 +274,7 @@ const estilos = StyleSheet.create({
     height: 56,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: COLORS.errorContainer,
+    borderColor: COLORS.brandRojo,
     backgroundColor: COLORS.surfaceContainerLowest,
   },
   botonPresionado: {
@@ -281,7 +282,7 @@ const estilos = StyleSheet.create({
   },
   botonCerrarTexto: {
     ...TYPOGRAPHY.labelLg,
-    color: COLORS.error,
+    color: COLORS.brandRojo,
   },
   toast: {
     position: 'absolute',
