@@ -8,7 +8,6 @@ import { limpiarSesion } from '../composition/constantes';
 import {
   COLORS,
   RADIUS,
-  SHADOWS,
   SPACING,
   TYPOGRAPHY,
   BORDERS,
@@ -161,7 +160,6 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.md,
-    ...SHADOWS.card,
   },
   avatarTexto: {
     ...TYPOGRAPHY.headlineLg,
@@ -193,7 +191,6 @@ const estilos = StyleSheet.create({
     borderRadius: RADIUS.xl,
     ...BORDERS.thin,
     padding: SPACING.md,
-    ...SHADOWS.card,
   },
   gridCardMitad: {
     flex: 1,
@@ -212,7 +209,6 @@ const estilos = StyleSheet.create({
     backgroundColor: COLORS.surfaceContainerLowest,
     borderRadius: RADIUS.xl,
     ...BORDERS.thin,
-    ...SHADOWS.card,
     overflow: 'hidden',
   },
   fila: {
@@ -264,7 +260,8 @@ const estilos = StyleSheet.create({
     height: 16,
     borderRadius: RADIUS.full,
     backgroundColor: COLORS.surfaceContainerLowest,
-    ...SHADOWS.card,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   botonCerrar: {
     flexDirection: 'row',
@@ -278,7 +275,6 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.errorContainer,
     backgroundColor: COLORS.surfaceContainerLowest,
-    ...SHADOWS.card,
   },
   botonPresionado: {
     opacity: 0.8,

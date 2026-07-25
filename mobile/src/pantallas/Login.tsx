@@ -21,7 +21,7 @@ import {
 } from '../composition/login-local';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { useWorkspace } from '../composicion/useWorkspace';
-import { BORDERS, COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
 interface Props {
   readonly onLoginSuccess: () => void;
@@ -318,7 +318,6 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     padding: SPACING.xl,
-    ...SHADOWS.card,
   },
   tituloCard: {
     ...TYPOGRAPHY.headlineMd,

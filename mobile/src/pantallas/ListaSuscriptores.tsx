@@ -401,7 +401,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     borderRadius: RADIUS.lg,
-    ...SHADOWS.card,
   },
   fabEtiquetaTexto: {
     color: COLORS.primary,
@@ -415,7 +414,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.card,
+    ...SHADOWS.float,
   },
 
   // ── Util ───────────────────────────────────────────────────────────────────

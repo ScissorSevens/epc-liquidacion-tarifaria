@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { Suscriptor } from '@dominio/suscriptores/types';
-import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
 type PropsFila = {
   item: Suscriptor;
@@ -72,7 +72,6 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm + 4,
     gap: SPACING.xs,
-    ...SHADOWS.card,
   },
   cardCodigo: {
     fontSize: 11,

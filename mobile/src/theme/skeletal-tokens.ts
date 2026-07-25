@@ -192,17 +192,16 @@ export const BORDERS = {
 } as const;
 
 /**
- * Sombras para elevación. `card` es para cards normales, `float` para FABs
- * o modales flotantes.
+ * Sombras para elevación FUNCIONAL. `float` es para FABs, bottom-bars y
+ * popovers que necesitan sombra para separarse del contenido scrolleable.
+ *
+ * Antes existia `card` (elevation: 2, shadowRadius: 4) pensado como
+ * decoracion de cards normales. Pero combinada con `borderWidth: 1`
+ * producia el patron "ghost-card" que veta impecable v1. Cards de
+ * contenido usan solo borderWidth + borderColor; la sombra se reserva
+ * para superficies REALMENTE elevadas del scroll.
  */
 export const SHADOWS = {
-  card: {
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
   float: {
     elevation: 8,
     shadowColor: '#000',
