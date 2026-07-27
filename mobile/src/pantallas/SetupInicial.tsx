@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -8,7 +7,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -30,6 +28,7 @@ import {
 import { getBootstrap } from '../composition/get-bootstrap';
 import { guardarSesion } from '../composition/constantes';
 import { BotonPrimario } from '../componentes/BotonPrimario';
+import { FormField } from '../componentes/FormField';
 import { useWorkspace } from '../composicion/useWorkspace';
 import { logger } from '../composicion/logger';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
@@ -61,6 +60,13 @@ interface Props {
  *
  * Por ahora, `bootstrapCompleto` se implementa como una funcion local
  * mobile (no llama al backend todavia — eso es Fase 6).
+ *
+ * Migracion a FormField (Commit 4 — impeccable craft):
+ *   - Reemplaza los helpers locales CampoTexto y CampoNumero.
+ *   - 14 inputs de texto/numericos migrados al FormField reusable.
+ *   - Validacion del componente ya viene del callsite via prop `error`.
+ *   - Toques de craft: required asterisk, accesibilidad, touch target.
+ *   - Elimina 50+ lineas de StyleSheet inline duplicadas.
  */
 export default function SetupInicial({ onComplete }: Props) {
   const [paso, setPaso] = useState<1 | 2>(1);
@@ -158,57 +164,79 @@ export default function SetupInicial({ onComplete }: Props) {
           </View>
 
           <View style={styles.card}>
-            <CampoTexto
-              etiqueta="Nombre del prestador"
-              placeholder="Ej: Asociacion de Usuarios La Esperanza"
+            <FormField
+              label="Nombre del prestador"
+              required
               value={prestadorForm.nombre}
               onChangeText={(v) => setCampoPrestador('nombre', v)}
               error={erroresPrestador.nombre}
               maxLength={200}
+              editable={!cargando}
+              placeholder="Ej: Asociacion de Usuarios La Esperanza"
+              testID="setup-prestador-nombre"
             />
-            <CampoTexto
-              etiqueta="NIT"
-              placeholder="Ej: 900123456-7"
+            <FormField
+              label="NIT"
+              required
               value={prestadorForm.nit}
               onChangeText={(v) => setCampoPrestador('nit', v)}
               error={erroresPrestador.nit}
               maxLength={20}
+              editable={!cargando}
+              placeholder="Ej: 900123456-7"
+              testID="setup-prestador-nit"
             />
-            <CampoTexto
-              etiqueta="Representante legal"
-              placeholder="Nombre completo"
+            <FormField
+              label="Representante legal"
+              required
               value={prestadorForm.representante_legal}
               onChangeText={(v) => setCampoPrestador('representante_legal', v)}
               error={erroresPrestador.representante_legal}
+              editable={!cargando}
+              placeholder="Nombre completo"
+              testID="setup-prestador-rep-legal"
             />
-            <CampoTexto
-              etiqueta="Cédula del representante"
-              placeholder="6 a 12 dígitos"
+            <FormField
+              label="Cédula del representante"
+              required
               value={prestadorForm.representante_legal_cedula}
-              onChangeText={(v) => setCampoPrestador('representante_legal_cedula', v.replace(/\D/g, ''))}
+              onChangeText={(v) =>
+                setCampoPrestador('representante_legal_cedula', v.replace(/\D/g, ''))
+              }
               error={erroresPrestador.representante_legal_cedula}
               keyboardType="numeric"
               maxLength={12}
+              editable={!cargando}
+              placeholder="6 a 12 dígitos"
+              testID="setup-prestador-rep-cedula"
             />
-            <CampoTexto
-              etiqueta="Municipio"
-              placeholder="Ej: Caqueza"
+            <FormField
+              label="Municipio"
+              required
               value={prestadorForm.municipio}
               onChangeText={(v) => setCampoPrestador('municipio', v)}
               error={erroresPrestador.municipio}
               maxLength={100}
+              editable={!cargando}
+              placeholder="Ej: Caqueza"
+              testID="setup-prestador-municipio"
             />
-            <CampoTexto
-              etiqueta="Departamento"
-              placeholder="Ej: Cundinamarca"
+            <FormField
+              label="Departamento"
+              required
               value={prestadorForm.departamento}
               onChangeText={(v) => setCampoPrestador('departamento', v)}
               error={erroresPrestador.departamento}
               maxLength={100}
+              editable={!cargando}
+              placeholder="Ej: Cundinamarca"
+              testID="setup-prestador-departamento"
             />
 
             <View style={styles.campoContenedor}>
-              <Text style={styles.etiqueta}>Segmento</Text>
+              <Text style={styles.etiqueta}>
+                Segmento <Text style={styles.requerido}>*</Text>
+              </Text>
               <View style={styles.chipsRow}>
                 {([1, 2] as const).map((s) => (
                   <Pressable
@@ -219,6 +247,9 @@ export default function SetupInicial({ onComplete }: Props) {
                       prestadorForm.segmento === s && styles.chipSel,
                       pressed && styles.pressed,
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Segmento ${s === 1 ? 'urbano' : 'rural'}`}
+                    accessibilityState={{ selected: prestadorForm.segmento === s }}
                   >
                     <Text style={[styles.chipText, prestadorForm.segmento === s && styles.chipTextSel]}>
                       {s === 1 ? '1 — Urbano' : '2 — Rural'}
@@ -233,37 +264,65 @@ export default function SetupInicial({ onComplete }: Props) {
 
             <View style={styles.filaDosColumnas}>
               <View style={styles.colMitad}>
-                <CampoNumero
-                  etiqueta="Suscriptores urbanos"
-                  value={prestadorForm.num_suscriptores_urbanos}
-                  onChangeNumber={(v) => setCampoPrestador('num_suscriptores_urbanos', v)}
+                <FormField
+                  label="Suscriptores urbanos"
+                  required
+                  value={String(prestadorForm.num_suscriptores_urbanos)}
+                  onChangeText={(v) => {
+                    const n = Number.parseInt(v, 10);
+                    setCampoPrestador(
+                      'num_suscriptores_urbanos',
+                      Number.isFinite(n) && n >= 0 ? n : 0,
+                    );
+                  }}
                   error={erroresPrestador.num_suscriptores_urbanos}
+                  keyboardType="numeric"
+                  editable={!cargando}
+                  placeholder="0"
+                  testID="setup-prestador-suscriptores-urbanos"
                 />
               </View>
               <View style={styles.colMitad}>
-                <CampoNumero
-                  etiqueta="Suscriptores rurales"
-                  value={prestadorForm.num_suscriptores_rurales}
-                  onChangeNumber={(v) => setCampoPrestador('num_suscriptores_rurales', v)}
+                <FormField
+                  label="Suscriptores rurales"
+                  required
+                  value={String(prestadorForm.num_suscriptores_rurales)}
+                  onChangeText={(v) => {
+                    const n = Number.parseInt(v, 10);
+                    setCampoPrestador(
+                      'num_suscriptores_rurales',
+                      Number.isFinite(n) && n >= 0 ? n : 0,
+                    );
+                  }}
                   error={erroresPrestador.num_suscriptores_rurales}
+                  keyboardType="numeric"
+                  editable={!cargando}
+                  placeholder="0"
+                  testID="setup-prestador-suscriptores-rurales"
                 />
               </View>
             </View>
 
-            <CampoTexto
-              etiqueta="Email corporativo (opcional)"
-              placeholder="contacto@ejemplo.com"
+            <FormField
+              label="Email corporativo (opcional)"
               value={prestadorForm.email}
               onChangeText={(v) => setCampoPrestador('email', v)}
+              error={erroresPrestador.email}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!cargando}
+              placeholder="contacto@ejemplo.com"
+              testID="setup-prestador-email"
             />
-            <CampoTexto
-              etiqueta="Teléfono (opcional)"
-              placeholder="Ej: 311 222 3344"
+            <FormField
+              label="Teléfono (opcional)"
               value={prestadorForm.telefono}
               onChangeText={(v) => setCampoPrestador('telefono', v)}
+              error={erroresPrestador.telefono}
               keyboardType="phone-pad"
+              editable={!cargando}
+              placeholder="Ej: 311 222 3344"
+              testID="setup-prestador-telefono"
             />
           </View>
 
@@ -299,46 +358,61 @@ export default function SetupInicial({ onComplete }: Props) {
         </View>
 
         <View style={styles.card}>
-          <CampoTexto
-            etiqueta="Cédula"
-            placeholder="6 a 12 dígitos"
+          <FormField
+            label="Cédula"
+            required
             value={operarioForm.cedula}
             onChangeText={(v) => setCampoOperario('cedula', v.replace(/\D/g, ''))}
             error={erroresOperario.cedula}
             keyboardType="numeric"
             maxLength={12}
+            editable={!cargando}
+            placeholder="6 a 12 dígitos"
+            testID="setup-operario-cedula"
           />
-          <CampoTexto
-            etiqueta="Nombre completo"
-            placeholder="Nombre completo del operario"
+          <FormField
+            label="Nombre completo"
+            required
             value={operarioForm.nombre}
             onChangeText={(v) => setCampoOperario('nombre', v)}
             error={erroresOperario.nombre}
+            editable={!cargando}
+            placeholder="Nombre completo del operario"
+            testID="setup-operario-nombre"
           />
-          <CampoTexto
-            etiqueta="Email (opcional)"
-            placeholder="contacto@ejemplo.com"
+          <FormField
+            label="Email (opcional)"
             value={operarioForm.email}
             onChangeText={(v) => setCampoOperario('email', v)}
             error={erroresOperario.email}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!cargando}
+            placeholder="contacto@ejemplo.com"
+            testID="setup-operario-email"
           />
-          <CampoTexto
-            etiqueta="Contraseña"
-            placeholder="Mínimo 8 caracteres"
+          <FormField
+            label="Contraseña"
+            required
             value={operarioForm.password}
             onChangeText={(v) => setCampoOperario('password', v)}
             error={erroresOperario.password}
             secureTextEntry
+            editable={!cargando}
+            placeholder="Mínimo 8 caracteres"
+            helperText="La contraseña se guarda hasheada con SHA-256"
+            testID="setup-operario-password"
           />
-          <CampoTexto
-            etiqueta="Confirmar contraseña"
-            placeholder="Repetir contraseña"
+          <FormField
+            label="Confirmar contraseña"
+            required
             value={operarioForm.confirmar_password}
             onChangeText={(v) => setCampoOperario('confirmar_password', v)}
             error={erroresOperario.confirmar_password}
             secureTextEntry
+            editable={!cargando}
+            placeholder="Repetir contraseña"
+            testID="setup-operario-confirmar"
           />
 
           {/* Checkbox de consentimiento (Ley 1581/2012) */}
@@ -349,6 +423,9 @@ export default function SetupInicial({ onComplete }: Props) {
               styles.consentimientoFila,
               pressed && styles.pressed,
             ]}
+            accessibilityRole="switch"
+            accessibilityLabel="Consentimiento para el tratamiento de datos personales"
+            accessibilityState={{ checked: operarioForm.consentimiento }}
           >
             <Switch
               value={operarioForm.consentimiento}
@@ -378,6 +455,8 @@ export default function SetupInicial({ onComplete }: Props) {
               onPress={handleAtras}
               style={({ pressed }) => [styles.botonSecundario, pressed && styles.botonPresionado]}
               disabled={cargando}
+              accessibilityRole="button"
+              accessibilityLabel="Volver al paso 1"
             >
               <MaterialIcons name="arrow-back" size={20} color={COLORS.primary} />
               <Text style={styles.textoBotonSecundario}>Atrás</Text>
@@ -397,78 +476,6 @@ export default function SetupInicial({ onComplete }: Props) {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-// ── Subcomponentes ──────────────────────────────────────────────────────────
-
-interface CampoTextoProps {
-  readonly etiqueta: string;
-  readonly placeholder: string;
-  readonly value: string;
-  readonly onChangeText: (v: string) => void;
-  readonly error?: string;
-  readonly keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
-  readonly autoCapitalize?: 'none' | 'sentences';
-  readonly maxLength?: number;
-  readonly secureTextEntry?: boolean;
-}
-
-function CampoTexto({
-  etiqueta,
-  placeholder,
-  value,
-  onChangeText,
-  error,
-  keyboardType = 'default',
-  autoCapitalize = 'sentences',
-  maxLength,
-  secureTextEntry = false,
-}: CampoTextoProps) {
-  return (
-    <View style={styles.campoContenedor}>
-      <Text style={styles.etiqueta}>{etiqueta}</Text>
-      <TextInput
-        style={[styles.input, error !== undefined && styles.inputError]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.outline}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        maxLength={maxLength}
-        secureTextEntry={secureTextEntry}
-      />
-      {error !== undefined && <Text style={styles.errorText}>{error}</Text>}
-    </View>
-  );
-}
-
-interface CampoNumeroProps {
-  readonly etiqueta: string;
-  readonly value: number;
-  readonly onChangeNumber: (v: number) => void;
-  readonly error?: string;
-}
-
-function CampoNumero({ etiqueta, value, onChangeNumber, error }: CampoNumeroProps) {
-  return (
-    <View style={styles.campoContenedor}>
-      <Text style={styles.etiqueta}>{etiqueta}</Text>
-      <TextInput
-        style={[styles.input, error !== undefined && styles.inputError]}
-        value={String(value)}
-        onChangeText={(v) => {
-          const n = Number.parseInt(v, 10);
-          onChangeNumber(Number.isFinite(n) && n >= 0 ? n : 0);
-        }}
-        placeholder="0"
-        placeholderTextColor={COLORS.outline}
-        keyboardType="numeric"
-      />
-      {error !== undefined && <Text style={styles.errorText}>{error}</Text>}
-    </View>
   );
 }
 
@@ -519,24 +526,10 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     marginBottom: SPACING.xs,
   },
-  input: {
-    height: 48,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    paddingHorizontal: SPACING.md,
-    ...TYPOGRAPHY.bodyMd,
-    color: COLORS.onSurface,
-  },
-  inputError: {
-    borderColor: COLORS.error,
-    borderWidth: 2,
-  },
-  errorText: {
-    ...TYPOGRAPHY.labelSm,
+  requerido: {
+    ...TYPOGRAPHY.labelMd,
     color: COLORS.error,
-    marginTop: SPACING.xs,
+    fontWeight: '700',
   },
   chipsRow: {
     flexDirection: 'row',
@@ -544,7 +537,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     flex: 1,
-    height: 44,
+    height: 44, // WCAG 2.5.5
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -563,6 +556,11 @@ const styles = StyleSheet.create({
   },
   chipTextSel: {
     fontWeight: '700',
+  },
+  errorText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
   },
   filaDosColumnas: {
     flexDirection: 'row',
