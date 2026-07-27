@@ -90,4 +90,9 @@ export const migrations: readonly Migration[] = Object.freeze([
     nombre: '016_setup_inicial_multi_tenant',
     sql: leerSQL('016_setup_inicial_multi_tenant.sql'),
   },
+  {
+    version: 19,
+    nombre: '019_parametros_tarifa_completo',
+    sql: leerSQL('019_parametros_tarifa_completo.sql'),
+  },
 ]);

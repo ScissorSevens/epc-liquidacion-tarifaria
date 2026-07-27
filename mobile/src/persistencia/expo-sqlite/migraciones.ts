@@ -354,6 +354,40 @@ CREATE INDEX idx_suscriptor_email ON suscriptor (email);
 CREATE INDEX idx_suscriptor_telefono ON suscriptor (telefono);
 `;
 
+// Migration 019: ParametrosTarifa completo (Res CRA 825/2017).
+//
+// Extendiende en 4 dimensiones:
+//   1. ipuf_indice: Índice de Precios al Usuario Final (decimal).
+//   2. cargo_fijo_resultante + cargo_consumo_resultante: pre-calculados
+//      al guardar y PERSISTIDOS. NO se recalculan en cada factura.
+//   3. componentes_aplicables: JSON array de IDs de componentes activos.
+//   4. minimo_vital: tabla RELACIONADA 1:1 con prestador, con su PROPIA
+//      vigencia. Decoupling clave: el minimo vital puede cambiar dentro
+//      de un periodo tarifario.
+const MIGRACION_019_PARAMETROS_TARIFA_COMPLETO = `
+ALTER TABLE parametros_tarifa ADD COLUMN ipuf_indice REAL NOT NULL DEFAULT 1.0
+  CHECK (ipuf_indice >= 0);
+ALTER TABLE parametros_tarifa ADD COLUMN cargo_fijo_resultante REAL NOT NULL DEFAULT 0
+  CHECK (cargo_fijo_resultante >= 0);
+ALTER TABLE parametros_tarifa ADD COLUMN cargo_consumo_resultante REAL NOT NULL DEFAULT 0
+  CHECK (cargo_consumo_resultante >= 0);
+ALTER TABLE parametros_tarifa ADD COLUMN componentes_aplicables TEXT NOT NULL DEFAULT '[]';
+
+CREATE TABLE minimo_vital (
+  id_minimo_vital INTEGER PRIMARY KEY AUTOINCREMENT,
+  id_prestador    INTEGER NOT NULL REFERENCES prestador(id_prestador) ON DELETE CASCADE,
+  metros_cubicos  INTEGER NULL CHECK (metros_cubicos IS NULL OR metros_cubicos >= 0),
+  estratos_aplica TEXT    NOT NULL DEFAULT '[]',
+  vigente_desde   TEXT    NOT NULL,
+  vigente_hasta   TEXT    NOT NULL,
+  created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')),
+  UNIQUE (id_prestador, vigente_desde)
+);
+
+CREATE INDEX idx_minimo_vital_prestador_vigencia
+  ON minimo_vital (id_prestador, vigente_desde, vigente_hasta);
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -373,6 +407,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 16, nombre: '016_setup_inicial_multi_tenant', sql: MIGRACION_016_SETUP_INICIAL_MULTI_TENANT },
   { version: 17, nombre: '017_operario_password_hash', sql: MIGRACION_017_OPERARIO_PASSWORD_HASH },
   { version: 18, nombre: '018_suscriptor_email_telefono', sql: MIGRACION_018_SUSCRIPTOR_EMAIL_TELEFONO },
+  { version: 19, nombre: '019_parametros_tarifa_completo', sql: MIGRACION_019_PARAMETROS_TARIFA_COMPLETO },
 ];
 
 

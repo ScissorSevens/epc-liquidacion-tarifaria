@@ -9,6 +9,7 @@ import type {
   ParametrosTarifa,
   ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
+import type { MinimoVital } from '../../../dominio/parametros-tarifa/minimo-vital';
 
 export interface ParametrosTarifaRepositoryExpoSqlite extends ParametrosTarifaRepository {
   cerrar(): Promise<void>;
@@ -30,12 +31,57 @@ interface ParametrosRow {
   readonly suscriptores_promedio: number;
   readonly aplica_minimo_vital: number;
   readonly m3_gratis_minimo_vital: number;
+  readonly ipuf_indice: number;
+  readonly cargo_fijo_resultante: number;
+  readonly cargo_consumo_resultante: number;
+  readonly componentes_aplicables: string;
   readonly vigente_desde: string;
   readonly vigente_hasta: string;
   readonly created_at: string;
 }
 
-function fromRow(row: ParametrosRow): ParametrosTarifa {
+interface MinimoVitalRow {
+  readonly id_minimo_vital: number;
+  readonly id_prestador: number;
+  readonly metros_cubicos: number | null;
+  readonly estratos_aplica: string;
+  readonly vigente_desde: string;
+  readonly vigente_hasta: string;
+  readonly created_at: string;
+}
+
+function parseComponentesAplicables(sql: string): readonly string[] {
+  try {
+    const parsed = JSON.parse(sql) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === 'string');
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function fromMinimoVitalRow(row: MinimoVitalRow): MinimoVital {
+  let estratos: readonly number[] = [];
+  try {
+    const parsed = JSON.parse(row.estratos_aplica) as unknown;
+    if (Array.isArray(parsed)) {
+      estratos = parsed.filter((x): x is number => typeof x === 'number');
+    }
+  } catch {
+    estratos = [];
+  }
+  return {
+    id_minimo_vital: row.id_minimo_vital,
+    id_prestador: row.id_prestador,
+    metros_cubicos: row.metros_cubicos,
+    estratos_aplica: estratos,
+    vigente_desde: row.vigente_desde,
+    vigente_hasta: row.vigente_hasta,
+    created_at: row.created_at,
+  };
+}
+
+function fromRow(row: ParametrosRow, minimoVital: MinimoVital | null): ParametrosTarifa {
   return {
     id_parametros: row.id_parametros,
     id_prestador: row.id_prestador,
@@ -52,6 +98,11 @@ function fromRow(row: ParametrosRow): ParametrosTarifa {
     suscriptores_promedio: row.suscriptores_promedio,
     aplica_minimo_vital: row.aplica_minimo_vital === 1,
     m3_gratis_minimo_vital: row.m3_gratis_minimo_vital,
+    ipuf_indice: row.ipuf_indice,
+    cargo_fijo_resultante: row.cargo_fijo_resultante,
+    cargo_consumo_resultante: row.cargo_consumo_resultante,
+    componentes_aplicables: parseComponentesAplicables(row.componentes_aplicables),
+    minimo_vital: minimoVital,
     vigente_desde: row.vigente_desde,
     vigente_hasta: row.vigente_hasta,
     created_at: row.created_at,
@@ -61,18 +112,38 @@ function fromRow(row: ParametrosRow): ParametrosTarifa {
 export function crearParametrosTarifaRepositoryExpoSqlite(
   db: SQLite.SQLiteDatabase,
 ): ParametrosTarifaRepositoryExpoSqlite {
+  async function loadMinimoVitalVigente(
+    id_prestador: number,
+    fecha: string,
+  ): Promise<MinimoVital | null> {
+    const row = await db.getFirstAsync<MinimoVitalRow>(
+      `SELECT * FROM minimo_vital
+       WHERE id_prestador = ?
+         AND vigente_desde <= ?
+         AND vigente_hasta >= ?
+       ORDER BY vigente_desde DESC
+       LIMIT 1`,
+      id_prestador, fecha, fecha,
+    );
+    return row ? fromMinimoVitalRow(row) : null;
+  }
+
   return {
     async crear(data: CrearParametrosTarifaInput): Promise<ParametrosTarifa> {
       const result = await db.runAsync(
         `INSERT INTO parametros_tarifa (
           id_prestador, id_acuerdo, periodo, cma, cmo, cmi, cmt, cmviaa, aplica_cmviaa,
           agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
-          aplica_minimo_vital, m3_gratis_minimo_vital, vigente_desde, vigente_hasta
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
+          cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
+          vigente_desde, vigente_hasta
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
         data.aplica_minimo_vital ? 1 : 0, data.m3_gratis_minimo_vital,
+        data.ipuf_indice, data.cargo_fijo_resultante, data.cargo_consumo_resultante,
+        JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
       );
       const id = Number(result.lastInsertRowId);
@@ -80,14 +151,19 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         `SELECT * FROM parametros_tarifa WHERE id_parametros = ?`, id,
       );
       if (!row) throw new Error('crear: parametros no fueron persistidos');
-      return fromRow(row);
+      return fromRow(row, null);
     },
 
     async obtenerPorId(id_parametros: number): Promise<ParametrosTarifa | null> {
       const row = await db.getFirstAsync<ParametrosRow>(
         `SELECT * FROM parametros_tarifa WHERE id_parametros = ?`, id_parametros,
       );
-      return row ? fromRow(row) : null;
+      if (!row) return null;
+      const minimoVital = await loadMinimoVitalVigente(
+        row.id_prestador,
+        new Date().toISOString(),
+      );
+      return fromRow(row, minimoVital);
     },
 
     async listar(filtros: FiltrosListarParametros): Promise<readonly ParametrosTarifa[]> {
@@ -95,7 +171,13 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         `SELECT * FROM parametros_tarifa WHERE id_prestador = ? ORDER BY periodo DESC, vigente_desde DESC`,
         filtros.id_prestador,
       );
-      return rows.map(fromRow);
+      const fecha = new Date().toISOString();
+      const out: ParametrosTarifa[] = [];
+      for (const row of rows) {
+        const minimoVital = await loadMinimoVitalVigente(row.id_prestador, fecha);
+        out.push(fromRow(row, minimoVital));
+      }
+      return out;
     },
 
     async buscarVigente(id_prestador: number, fecha: string): Promise<ParametrosTarifa | null> {
@@ -108,7 +190,9 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
          LIMIT 1`,
         id_prestador, fecha, fecha,
       );
-      return row ? fromRow(row) : null;
+      if (!row) return null;
+      const minimoVital = await loadMinimoVitalVigente(id_prestador, fecha);
+      return fromRow(row, minimoVital);
     },
 
     async buscarPorPeriodo(id_prestador: number, periodo: number): Promise<ParametrosTarifa | null> {
@@ -116,7 +200,12 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         `SELECT * FROM parametros_tarifa WHERE id_prestador = ? AND periodo = ? ORDER BY vigente_desde DESC LIMIT 1`,
         id_prestador, periodo,
       );
-      return row ? fromRow(row) : null;
+      if (!row) return null;
+      const minimoVital = await loadMinimoVitalVigente(
+        row.id_prestador,
+        new Date().toISOString(),
+      );
+      return fromRow(row, minimoVital);
     },
 
     async cerrar(): Promise<void> {
