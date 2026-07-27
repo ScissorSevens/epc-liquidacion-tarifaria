@@ -23,7 +23,11 @@ import { FormField } from '../../componentes/FormField';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
-import type { ParametrosTarifa } from '../../../dominio/parametros-tarifa/types';
+import {
+  COMPONENTES_TARIFARIOS,
+  calcularCargos,
+  type ParametrosTarifa,
+} from '../../../dominio/parametros-tarifa';
 
 interface ParametrosTarifaRepo {
   readonly guardar: (p: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>) => Promise<ParametrosTarifa>;
@@ -150,7 +154,18 @@ export default function ParametrosTarifaForm({
     }
     setGuardando(true);
     try {
-      await repo.guardar({
+      const componentesActivos = (() => {
+        const todos: string[] = [...COMPONENTES_TARIFARIOS];
+        if (!aplicaCmviaa) {
+          return todos.filter((c) => c !== 'CMVIAA');
+        }
+        return todos;
+      })();
+      // Pre-calculamos cargo_fijo_resultante + cargo_consumo_resultante con
+      // los valores del formulario (SIN id_parametros/created_at — la
+      // factoría pura los ignora). Ver `calcularCargos` en
+      // dominio/parametros-tarifa/calcular.ts.
+      const borradorCargos: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'> = {
         id_prestador,
         id_acuerdo,
         periodo: entero(periodo),
@@ -165,8 +180,19 @@ export default function ParametrosTarifaForm({
         suscriptores_promedio: entero(suscriptoresPromedio),
         aplica_minimo_vital: aplicaMinimoVital,
         m3_gratis_minimo_vital: entero(m3Gratis),
+        ipuf_indice: 1.0,
+        componentes_aplicables: componentesActivos,
+        minimo_vital: null,
         vigente_desde: vigenteDesde,
         vigente_hasta: vigenteHasta,
+        cargo_fijo_resultante: 0,
+        cargo_consumo_resultante: 0,
+      };
+      const cargos = calcularCargos(borradorCargos as ParametrosTarifa);
+      await repo.guardar({
+        ...borradorCargos,
+        cargo_fijo_resultante: cargos.cargo_fijo,
+        cargo_consumo_resultante: cargos.cargo_consumo,
       });
       Alert.alert('Éxito', 'Parámetros tarifarios guardados');
     } catch (e) {

@@ -36,7 +36,7 @@
 import type { Prestador, CrearPrestadorInput } from '../../dominio/prestadores/types';
 import { crearPrestador } from '../../dominio/prestadores/validador-prestador';
 import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal/types';
-import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
+import { COMPONENTES_TARIFARIOS, calcularCargos, type ParametrosTarifa } from '../../dominio/parametros-tarifa';
 import type { Operario, OperarioBorrador } from '../../dominio/operarios/types';
 import { crearOperario } from '../../dominio/operarios/operarios';
 import type { Sesion } from './constantes';
@@ -212,7 +212,12 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
     // 3. Crear parametros tarifa vinculados al acuerdo.
     const suscriptoresPromedio =
       borradorPrestador.num_suscriptores_urbanos + borradorPrestador.num_suscriptores_rurales;
-    const parametros = await deps.parametrosRepo.crear({
+    // Pre-calculamos cargo_fijo_resultante + cargo_consumo_resultante aqui
+    // (factory del dominio: ver `calcularCargos`) — la Res 825/2017 compliance
+    // exige que estos valores se persistan al guardar y NO se recalculen
+    // en cada factura. Decoupling clave: si la metodologia cambia, las
+    // facturas historicas NO se invalidan.
+    const parametrosBorradorInmutable: Omit<ParametrosTarifa, 'id_parametros' | 'created_at' | 'cargo_fijo_resultante' | 'cargo_consumo_resultante'> = {
       id_prestador: prestador.id_prestador,
       id_acuerdo: acuerdo.id_acuerdo,
       periodo: ahora.getFullYear(),
@@ -227,9 +232,23 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       suscriptores_promedio: suscriptoresPromedio,
       aplica_minimo_vital: PARAMETROS_DEFAULTS.aplica_minimo_vital,
       m3_gratis_minimo_vital: PARAMETROS_DEFAULTS.m3_gratis_minimo_vital,
+      ipuf_indice: 1.0,
+      componentes_aplicables: [...COMPONENTES_TARIFARIOS],
+      minimo_vital: null,
       vigente_desde: fecha_vigencia_desde,
       vigente_hasta: fecha_vigencia_hasta,
-    });
+    };
+    const cargos = calcularCargos({
+      ...parametrosBorradorInmutable,
+      cargo_fijo_resultante: 0,
+      cargo_consumo_resultante: 0,
+    } as ParametrosTarifa);
+    const parametrosBorrador: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'> = {
+      ...parametrosBorradorInmutable,
+      cargo_fijo_resultante: cargos.cargo_fijo,
+      cargo_consumo_resultante: cargos.cargo_consumo,
+    };
+    const parametros = await deps.parametrosRepo.crear(parametrosBorrador);
 
     // 4. Crear el primer operario vinculado al prestador Y al
     //    dispositivo actual. Sin `dispositivo_id`, Configuracion.tsx

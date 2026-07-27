@@ -10,7 +10,24 @@
  * Multi-tenant: 1 prestador tiene N Parametros (uno por periodo), pero
  * solo 1 vigente en cualquier momento. El periodo tarifario es 5 años
  * según Res 825/2017.
+ *
+ * Extensiones del modelo (Res CRA 825/2017 compliance completo):
+ *   - `ipuf_indice`: Índice de Precios al Usuario Final. Default 1.0
+ *     (= sin ajuste). Multiplicador periódico para actualizar precios
+ *     sin re-emitir toda la metodología tarifaria.
+ *   - `cargo_fijo_resultante` + `cargo_consumo_resultante`: valores
+ *     pre-calculados (ver `/calcular.ts`) y PERSISTIDOS al guardar.
+ *     NO se recalculan en cada factura: si la metodología cambia, las
+ *     facturas históricas NO se invalidan (decoupling critico).
+ *   - `componentes_aplicables`: subset de componentes que están
+ *     ACTIVOS para este prestador. Default = todos. Permite que
+ *     segmento 2 rural NO aplique CMVIAA o CMT (caso real).
+ *   - `minimo_vital`: tabla relacionada 1:1 con prestador. Tiene su
+ *     PROPIA vigencia (independiente del periodo tarifario). null =
+ *     prestador sin mínimo vital configurado.
  */
+
+import type { MinimoVital } from './minimo-vital';
 
 export interface ParametrosTarifa {
   readonly id_parametros: number;
@@ -53,10 +70,57 @@ export interface ParametrosTarifa {
   /**
    * Flag: mínimo vital activo para este prestador. Default false
    * (825/2017 no obliga, ver Q9 spec).
+   *
+   * NOTA: este flag se conserva por backward-compat con data legacy.
+   * La fuente de verdad del mínimo vital es la tabla relacionada
+   * `minimo_vital` (ver `minimo_vital: MinimoVital | null`). Si
+   * `minimo_vital !== null`, hay mínimo vital configurado.
    */
   readonly aplica_minimo_vital: boolean;
   /** m³ gratis por mínimo vital. Default 0 (desactiva aunque flag=true). */
   readonly m3_gratis_minimo_vital: number;
+  /**
+   * Índice de Precios al Usuario Final. Multiplicador periódico para
+   * actualizar precios sin re-emitir la metodología tarifaria. Default
+   * 1.0 (sin ajuste). Numero decimal: 1.05 = 5% de incremento.
+   *
+   * NO se usa en el calculo del cargo_resultante (esa es la fórmula
+   * normativa cruda); se aplica DESPUES, al momento de emitir la
+   * factura, sobre el cargo persistido.
+   */
+  readonly ipuf_indice: number;
+  /**
+   * Cargo fijo resultado (COP / suscriptor / mes). PRE-CALCULADO al
+   * guardar (= CMA / N si CMA está en `componentes_aplicables`) y
+   * PERSISTIDO. NO se recalcula en cada factura.
+   *
+   * Si bien el motor tarifario podría recalcularlo, persistirlo
+   * desacopla las facturas del cambio de metodología (key insight del
+   * user: "future methodology changes don't break historic facturas").
+   */
+  readonly cargo_fijo_resultante: number;
+  /**
+   * Cargo por consumo resultado (COP / m³). PRE-CALCULADO al guardar
+   * (= CMO + CMI + CMT + CMVIAA si los componentes están activos) y
+   * PERSISTIDO. NO se recalcula en cada factura.
+   */
+  readonly cargo_consumo_resultante: number;
+  /**
+   * Componentes del modelo tarifario que están ACTIVOS para este
+   * prestador. Subset de `COMPONENTES_TARIFARIOS`. Default = todos.
+   * Si un componente NO está, su valor NO contribuye al cargo
+   * resultante (ej: segmento 2 rural sin CMVIAA).
+   */
+  readonly componentes_aplicables: readonly string[];
+  /**
+   * Mínimo vital del prestador. Tabla relacionada 1:1 con prestador
+   * (un prestador tiene UN mínimo vital vigente a la vez). null =
+   * prestador sin mínimo vital configurado.
+   *
+   * Su propia vigencia (vigente_desde → vigente_hasta) es
+   * INDEPENDIENTE del periodo tarifario de los ParametrosTarifa.
+   */
+  readonly minimo_vital: MinimoVital | null;
   readonly vigente_desde: string;
   readonly vigente_hasta: string;
   readonly created_at: string;
@@ -102,6 +166,7 @@ export const MENSAJES_ERROR_PARAMETROS = {
   IPUF_NEGATIVO: 'ipuf_m3_suscriptor_mes no puede ser negativo',
   SUSCRIPTORES_REQUERIDO: 'suscriptores_promedio debe ser > 0',
   M3_GRATIS_NEGATIVO: 'm3_gratis_minimo_vital no puede ser negativo',
+  IPUF_INDICE_NEGATIVO: 'ipuf_indice no puede ser negativo',
   FECHA_DESDE_REQUERIDA: 'vigente_desde requerida',
   FECHA_HASTA_REQUERIDA: 'vigente_hasta requerida',
   DUPLICADO_MISMO_PERIODO: 'ya existen Parametros vigentes para ese prestador/periodo',
