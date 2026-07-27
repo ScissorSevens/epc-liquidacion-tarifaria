@@ -42,6 +42,12 @@ public class SuscriptorPayload
     [JsonPropertyName("cedula")]
     public string? Cedula { get; set; }
 
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("telefono")]
+    public string? Telefono { get; set; }
+
     /// <summary>Municipio del suscriptor (opcional, hasta 100 chars). Nuevo campo extendido.</summary>
     [JsonPropertyName("municipio")]
     public string? Municipio { get; set; }

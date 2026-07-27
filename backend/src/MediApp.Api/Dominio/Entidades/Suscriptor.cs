@@ -62,6 +62,14 @@ public class Suscriptor
     [MaxLength(20)]
     public string? Cedula { get; set; }
 
+    /// <summary>Email de contacto opcional.</summary>
+    [MaxLength(254)]
+    public string? Email { get; set; }
+
+    /// <summary>Telefono de contacto opcional, entre 7 y 20 digitos.</summary>
+    [MaxLength(20)]
+    public string? Telefono { get; set; }
+
     /// <summary>Municipio del suscriptor (nullable — retrocompatibilidad con registros previos).</summary>
     [MaxLength(100)]
     public string? Municipio { get; set; }

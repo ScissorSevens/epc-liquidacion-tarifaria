@@ -18,6 +18,8 @@ public static class SuscriptorMapper
         IdCliente = p.IdCliente,
         // Campos extendidos: asignacion directa (null si no vino, retrocompatible)
         Cedula = p.Cedula,
+        Email = p.Email,
+        Telefono = p.Telefono,
         Municipio = p.Municipio,
         Sector = p.Sector,
         AplicaSubsidio = p.AplicaSubsidio,
@@ -37,6 +39,8 @@ public static class SuscriptorMapper
         // IdCliente NO se cambia: es la identidad logica.
         // Campos extendidos: condicional para no borrar valores existentes con null payload
         if (p.Cedula is not null) entidad.Cedula = p.Cedula;
+        if (p.Email is not null) entidad.Email = p.Email;
+        if (p.Telefono is not null) entidad.Telefono = p.Telefono;
         if (p.Municipio is not null) entidad.Municipio = p.Municipio;
         if (p.Sector is not null) entidad.Sector = p.Sector;
         if (p.AplicaSubsidio is not null) entidad.AplicaSubsidio = p.AplicaSubsidio;
