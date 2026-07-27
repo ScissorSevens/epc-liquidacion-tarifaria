@@ -5,12 +5,13 @@
  * y búsqueda. Permite crear, editar y suspender prestadores.
  */
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
+import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
 import type { ConfigStackParamList } from '../../navegacion/types';
@@ -150,23 +151,26 @@ export default function GestionPrestadores({
                 </Text>
               </View>
               <View style={estilos.acciones}>
-                <Pressable
-                  style={estilos.boton}
+                <BotonPrimario
+                  texto="Acuerdo"
+                  icono="gavel"
+                  tono="azul"
+                  tamano="compacto"
                   onPress={() => abrirAcuerdo(item.id_prestador)}
-                >
-                  <MaterialIcons name="gavel" size={16} color={COLORS.onPrimary} />
-                  <Text style={estilos.botonLabel}>Acuerdo</Text>
-                </Pressable>
-                <Pressable
-                  style={estilos.boton}
+                />
+                <BotonPrimario
+                  texto="Parámetros"
+                  icono="calculate"
+                  tono="azul"
+                  tamano="compacto"
                   onPress={() => abrirParametros(item.id_prestador)}
-                >
-                  <MaterialIcons name="calculate" size={16} color={COLORS.onPrimary} />
-                  <Text style={estilos.botonLabel}>Parámetros</Text>
-                </Pressable>
+                />
                 {item.estado === 'activo' && (
-                  <Pressable
-                    style={[estilos.boton, estilos.botonPeligro]}
+                  <BotonPrimario
+                    texto="Suspender"
+                    icono="block"
+                    tono="rojo"
+                    tamano="compacto"
                     onPress={() => {
                       if (repo === null) return;
                       void repo.suspender(item.id_prestador).then(() =>
@@ -177,12 +181,7 @@ export default function GestionPrestadores({
                         ),
                       );
                     }}
-                  >
-                    <MaterialIcons name="block" size={16} color={COLORS.onErrorContainer} />
-                    <Text style={[estilos.botonLabel, estilos.botonLabelPeligro]}>
-                      Suspender
-                    </Text>
-                  </Pressable>
+                  />
                 )}
               </View>
             </View>
@@ -240,16 +239,6 @@ const estilos = StyleSheet.create({
     gap: SPACING.xs,
     marginTop: SPACING.xs,
   },
-  boton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs + 2,
-    borderRadius: RADIUS.sm,
-    gap: SPACING.xs,
-  },
-  botonPeligro: { backgroundColor: COLORS.errorContainer },
-  botonLabel: { ...TYPOGRAPHY.labelMd, color: COLORS.onPrimary },
-  botonLabelPeligro: { color: COLORS.onErrorContainer },
+  // Los 3 botones (Acuerdo / Parámetros / Suspender) se renderizan
+  // via <BotonPrimario tamano="compacto"> extraído.
 });
