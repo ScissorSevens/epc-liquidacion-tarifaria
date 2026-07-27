@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -18,6 +18,10 @@ import { CATEGORIAS_USO, ETIQUETAS_CATEGORIA_USO, type CategoriaUso } from '@dom
 import { editarYEncolarSuscriptor } from '../adapters/editar-y-encolar-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { FormField } from '../componentes/FormField';
+import {
+  scrollToFirstError,
+  useFormFieldRefs,
+} from '../componentes/scroll-to-first-error';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -92,6 +96,8 @@ type Props = LecturasStackScreenProps<'EditarSuscriptor'>;
 export default function EditarSuscriptor({ navigation, route }: Props) {
   const { suscriptor } = route.params;
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const { getRef } = useFormFieldRefs<keyof FormEditarState>();
 
   const [form, setForm] = useState<FormEditarState>(() => initForm(suscriptor));
   const [enviando, setEnviando] = useState(false);
@@ -108,8 +114,36 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
   }
 
+  /**
+   * Validacion sincronica con scroll-to-first-error. Devuelve el mapa
+   * de errores para que el handler de submit pueda mostrar snack.
+   */
+  function validarSync(): { errores: Record<string, string> } {
+    const errores: Record<string, string> = {};
+    if (form.nombre_apellidos.trim().length < 3) {
+      errores['nombre_apellidos'] = 'Nombre obligatorio (mín 3 caracteres)';
+    }
+    if (form.municipio.trim().length === 0) {
+      errores['municipio'] = 'Municipio obligatorio';
+    }
+    if (form.direccion.trim().length < 3) {
+      errores['direccion'] = 'Dirección obligatoria (mín 3 caracteres)';
+    }
+    if (form.estrato === '') {
+      errores['estrato'] = 'Estrato obligatorio';
+    }
+    if (Object.keys(errores).length > 0) {
+      scrollToFirstError(scrollRef, errores, getRef);
+    }
+    return { errores };
+  }
+
   async function onGuardar() {
-    if (!esValido || enviando) return;
+    const { errores: nuevosErrores } = validarSync();
+    if (Object.keys(nuevosErrores).length > 0 || enviando) {
+      setSnack({ visible: true, mensaje: 'Revisá los campos marcados' });
+      return;
+    }
     setEnviando(true);
     try {
       const { suscriptorRepo, colaRepo, idGenerator, hasher } = await getBootstrap();
@@ -152,6 +186,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -178,6 +213,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             </View>
 
             <FormField
+              ref={getRef('nombre_apellidos')}
               label="Nombre y apellidos"
               required
               value={form.nombre_apellidos}
@@ -295,6 +331,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             </View>
 
             <FormField
+              ref={getRef('municipio')}
               label="Municipio"
               required
               value={form.municipio}
@@ -306,6 +343,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             />
 
             <FormField
+              ref={getRef('direccion')}
               label="Dirección"
               required
               value={form.direccion}
@@ -317,6 +355,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             />
 
             <FormField
+              ref={getRef('sector')}
               label="Sector (opcional)"
               value={form.sector}
               onChangeText={(v) => setCampo('sector', v)}

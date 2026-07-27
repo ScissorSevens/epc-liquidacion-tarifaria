@@ -366,8 +366,16 @@ describe('FormField — principios impeccable', () => {
 
   // ── Sanidad ──────────────────────────────────────────────────────────────
   describe('sanidad', () => {
-    it('exporta FormField como componente nominal', () => {
-      expect(typeof FormField).toBe('function');
+    it('exporta FormField como forwardRef (componente con ref forwarding)', () => {
+      // forwardRef retorna un objeto con $$typeof: REACT_FORWARD_REF_TYPE,
+      // no una función. Verificamos que el objeto tenga la marca de
+      // forwardRef (compatible con React 18+).
+      // Alternativa: typeof FormField === 'object' && $$typeof.
+      expect(FormField).toBeDefined();
+      expect(typeof FormField).toBe('object');
+      // $$typeof debe ser el symbol de forwardRef (REACT_FORWARD_REF_TYPE)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((FormField as any).$$typeof?.toString()).toMatch(/forward_ref|Symbol\(react\.forward_ref\)/);
     });
 
     it('el archivo del componente importa StyleSheet (sanity)', () => {

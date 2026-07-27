@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FechaPicker from '../components/FechaPicker';
 import {
@@ -25,6 +25,10 @@ import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encol
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { FormField } from '../componentes/FormField';
+import {
+  scrollToFirstError,
+  useFormFieldRefs,
+} from '../componentes/scroll-to-first-error';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { ConfigStackScreenProps } from '../navegacion/types';
@@ -191,6 +195,8 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
  */
 export default function AltaSuscriptor({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const { getRef } = useFormFieldRefs<CampoForm>();
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
   const [errores, setErrores] = useState<Errores>({});
   const [enviando, setEnviando] = useState(false);
@@ -232,12 +238,30 @@ export default function AltaSuscriptor({ navigation }: Props) {
     return Object.keys(next).length === 0;
   }
 
+  /**
+   * Wrapper que valida y, si hay errores, scrollea al primero. Asi el
+   * operario ve el problema sin scrollear manualmente.
+   */
+  function validarYScroll(): boolean {
+    const next: Errores = {};
+    (Object.keys(form) as CampoForm[]).forEach((c) => {
+      const msg = validarCampo(c, form[c] as string);
+      if (msg !== undefined) next[c] = msg;
+    });
+    setErrores(next);
+    if (Object.keys(next).length > 0) {
+      // Scroll al primer campo con error (UX: el operario no busca).
+      scrollToFirstError(scrollRef, next, getRef);
+    }
+    return Object.keys(next).length === 0;
+  }
+
   function mostrarSnack(mensaje: string, tipo: SnackTipo) {
     setSnack({ visible: true, mensaje, tipo });
   }
 
   async function onSubmit() {
-    if (!validarTodo()) {
+    if (!validarYScroll()) {
       mostrarSnack('Revisá los campos marcados', 'error');
       return;
     }
@@ -328,6 +352,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -350,6 +375,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             </View>
 
             <FormField
+              ref={getRef('nombre_apellidos')}
               label="Nombre y apellidos"
               required
               value={form.nombre_apellidos}
@@ -364,6 +390,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             />
 
             <FormField
+              ref={getRef('cedula')}
               label="Cédula"
               required
               value={form.cedula}
@@ -379,6 +406,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             />
 
             <FormField
+              ref={getRef('direccion')}
               label="Dirección"
               required
               value={form.direccion}
@@ -494,6 +522,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             </View>
 
             <FormField
+              ref={getRef('municipio')}
               label="Municipio"
               required
               value={form.municipio}
@@ -507,6 +536,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             />
 
             <FormField
+              ref={getRef('sector')}
               label="Sector (opcional)"
               value={form.sector}
               onChangeText={(v) => setCampo('sector', v)}
@@ -519,6 +549,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             />
 
             <FormField
+              ref={getRef('calle')}
               label="Calle (opcional)"
               value={form.calle}
               onChangeText={(v) => setCampo('calle', v)}
@@ -539,6 +570,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             </View>
 
             <FormField
+              ref={getRef('matricula_inmobiliaria')}
               label="Matrícula inmobiliaria (opcional)"
               value={form.matricula_inmobiliaria}
               onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
@@ -550,6 +582,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             />
 
             <FormField
+              ref={getRef('numero_catastral')}
               label="Número catastral (opcional)"
               value={form.numero_catastral}
               onChangeText={(v) => setCampo('numero_catastral', v)}
@@ -596,6 +629,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
             </View>
 
             <FormField
+              ref={getRef('observaciones_medidor')}
               label="Observaciones del medidor (opcional)"
               value={form.observaciones_medidor}
               onChangeText={(v) => setCampo('observaciones_medidor', v)}

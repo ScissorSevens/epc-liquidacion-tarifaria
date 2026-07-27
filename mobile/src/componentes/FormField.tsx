@@ -1,4 +1,5 @@
-import { useId } from 'react';
+import { forwardRef, useId } from 'react';
+import type { ComponentProps } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,7 +9,6 @@ import {
   type TextInputProps,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import type { ComponentProps } from 'react';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
@@ -93,7 +93,7 @@ export interface FormFieldProps {
   readonly onFocus?: () => void;
 }
 
-export function FormField({
+export const FormField = forwardRef<View, FormFieldProps>(function FormField({
   label,
   required = false,
   value,
@@ -115,7 +115,7 @@ export function FormField({
   editable = true,
   onBlur,
   onFocus,
-}: FormFieldProps) {
+}, ref) {
   const autoId = useId();
   const labelId = `ff-label-${autoId}`;
   const hintId = helperText !== undefined ? `ff-helper-${autoId}` : undefined;
@@ -150,7 +150,7 @@ export function FormField({
   const mostrarHelper = !conError && helperText !== undefined;
 
   return (
-    <View style={estilos.contenedor}>
+    <View ref={ref} style={estilos.contenedor} testID={testID !== undefined ? `${testID}-field` : undefined}>
       {/* Label visible + asterisco si required */}
       <Text
         style={estilos.label}
@@ -249,7 +249,7 @@ export function FormField({
       )}
     </View>
   );
-}
+});
 
 const estilos = StyleSheet.create({
   contenedor: {
