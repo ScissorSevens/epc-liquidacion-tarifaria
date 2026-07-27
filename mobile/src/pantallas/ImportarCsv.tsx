@@ -22,6 +22,7 @@ import type {
 } from '@dominio/importacion/types';
 import { persistirYEncolarImportacion } from '../adapters/persistir-y-encolar-importacion';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
@@ -370,13 +371,12 @@ function RenderIdle({
           <MaterialIcons name="info" size={16} color={COLORS.secondary} />
           <Text style={styles.cardHintTexto}>9 columnas separadas por coma · UTF-8</Text>
         </View>
-        <Pressable
+        <BotonPrimario
+          texto="Seleccionar archivo CSV"
+          icono="upload-file"
+          tono="azul"
           onPress={onSeleccionar}
-          style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-        >
-          <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>Seleccionar archivo CSV</Text>
-        </Pressable>
+        />
         <Pressable
           onPress={onVerFormato}
           style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
@@ -466,19 +466,15 @@ function RenderPreview({
         >
           <Text style={styles.btnSecondaryText}>Cancelar</Text>
         </Pressable>
-        <Pressable
-          onPress={onConfirmar}
-          disabled={archivo.filas.length === 0}
-          style={({ pressed }) => [
-            styles.btnPrimary,
-            styles.flex1,
-            archivo.filas.length === 0 && styles.btnDisabled,
-            pressed && styles.pressedDark,
-          ]}
-        >
-          <MaterialIcons name="cloud-upload" size={18} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>Importar suscriptores</Text>
-        </Pressable>
+        <View style={styles.flex1}>
+          <BotonPrimario
+            texto="Importar suscriptores"
+            icono="cloud-upload"
+            tono="azul"
+            onPress={onConfirmar}
+            disabled={archivo.filas.length === 0}
+          />
+        </View>
       </View>
     </View>
   );
@@ -550,13 +546,14 @@ function RenderResultado({
         >
           <Text style={styles.btnSecondaryText}>Importar otro</Text>
         </Pressable>
-        <Pressable
-          onPress={onVolverInicio}
-          style={({ pressed }) => [styles.btnPrimary, styles.flex1, pressed && styles.pressedDark]}
-        >
-          <MaterialIcons name="home" size={18} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>Ir al inicio</Text>
-        </Pressable>
+        <View style={styles.flex1}>
+          <BotonPrimario
+            texto="Ir al inicio"
+            icono="home"
+            tono="azul"
+            onPress={onVolverInicio}
+          />
+        </View>
       </View>
     </View>
   );
@@ -615,13 +612,12 @@ function RenderError({
     <View style={styles.errorCard}>
       <Text style={styles.errorTitulo}>No se pudo procesar el archivo</Text>
       <Text style={styles.errorBody}>{mensaje}</Text>
-      <Pressable
+      <BotonPrimario
+        texto="Reintentar"
+        icono="refresh"
+        tono="azul"
         onPress={onReintentar}
-        style={({ pressed }) => [styles.btnPrimary, { marginTop: SPACING.md }, pressed && styles.pressedDark]}
-      >
-        <MaterialIcons name="refresh" size={18} color={COLORS.onPrimary} />
-        <Text style={styles.btnPrimaryText}>Reintentar</Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -691,22 +687,7 @@ const styles = StyleSheet.create({
   separador: { height: 1, backgroundColor: COLORS.outlineVariant, marginVertical: SPACING.md },
 
   // Botones
-  btnPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.primaryContainer,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    minHeight: 52,
-    marginTop: SPACING.sm,
-  },
-  btnPrimaryText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
-  },
+  // El botón primario se renderiza via <BotonPrimario> extraído.
   btnSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
