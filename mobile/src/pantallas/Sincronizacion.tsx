@@ -13,6 +13,7 @@ import type { ResultadoSync } from '../composition/bootstrap';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
+import { TarjetaMetrica } from '../componentes/TarjetaMetrica';
 import { TopBar } from '../componentes/TopBar';
 import type { SyncStackScreenProps } from '../navegacion/types';
 import {
@@ -264,24 +265,27 @@ export default function Sincronizacion(_props: Props) {
 
         {/* Stats grid 3-col */}
         <View style={styles.statsGrid}>
-          {/* Exitosos */}
-          <View style={styles.statCard}>
-            <MaterialIcons name="check-circle" size={22} color={COLORS.brandVerde} testID="icono-exitosos" />
-            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>Exitosos</Text>
-            <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.exitosos}</Text>
-          </View>
-          {/* Fallidos */}
-          <View style={styles.statCard}>
-            <MaterialIcons name="error" size={22} color={COLORS.error} testID="icono-fallidos" />
-            <Text style={[TYPOGRAPHY.labelLg, styles.statLabelError]}>Fallidos</Text>
-            <Text style={[TYPOGRAPHY.headlineSm, styles.statValorError]}>{contadores.fallidos}</Text>
-          </View>
-          {/* Pendientes */}
-          <View style={styles.statCard}>
-            <MaterialIcons name="pending" size={22} color={COLORS.onSurfaceVariant} testID="icono-pendientes" />
-            <Text style={[TYPOGRAPHY.labelLg, styles.statLabel]}>Pendiente</Text>
-            <Text style={[TYPOGRAPHY.headlineSm, styles.statValor]}>{contadores.pendientes}</Text>
-          </View>
+          <TarjetaMetrica
+            icono="check-circle"
+            etiqueta="Exitosos"
+            valor={contadores.exitosos}
+            variante="exito"
+            testID="stat-exitosos"
+          />
+          <TarjetaMetrica
+            icono="error"
+            etiqueta="Fallidos"
+            valor={contadores.fallidos}
+            variante="error"
+            testID="stat-fallidos"
+          />
+          <TarjetaMetrica
+            icono="pending"
+            etiqueta="Pendiente"
+            valor={contadores.pendientes}
+            variante="normal"
+            testID="stat-pendientes"
+          />
         </View>
 
         {/* Tarjeta estado conexión */}
@@ -487,35 +491,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     width: '100%',
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-  },
-  statLabel: {
-    color: COLORS.onSurfaceVariant,
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  statLabelError: {
-    color: COLORS.error,
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  statValor: {
-    color: COLORS.primary,
-    textAlign: 'center',
-  },
-  statValorError: {
-    color: COLORS.error,
-    textAlign: 'center',
   },
 
   // ── Conexión ──────────────────────────────────────────────────────────────

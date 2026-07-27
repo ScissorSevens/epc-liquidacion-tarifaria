@@ -6,7 +6,9 @@
 //   - Avatar del operario usa brandAzulOscuro como fondo (identidad EPC)
 //     + onPrimary blanco para el texto de las iniciales (contraste AAA).
 //   - Botón "Cerrar sesión" (acción destructiva) usa brandRojo institucional
-//     tanto en el texto como en el borde, NO el `error` genérico.
+//     como FONDO del CTA destructivo (no como texto+borde outlined).
+//     Migrado al componente BotonPrimario (tono='rojo') — destructive
+//     CTAs son filled para maxima visibilidad.
 //
 // Mocks:
 //   - expo-splash-screen (silent preventAutoHide).
@@ -144,24 +146,22 @@ describe('MiPerfil — paleta institucional EPC', () => {
     expect(estiloTexto.color).toBe('#fff');
   });
 
-  it('MP-3 el botón "Cerrar sesión" usa brandRojo (#D5212A) como color de texto', () => {
+  it('MP-3 el botón "Cerrar sesión" usa brandRojo (#D5212A) como fondo (CTA destructivo filled)', () => {
     const { getByText, getByTestId } = renderMiPerfil();
     const boton = getByTestId('boton-cerrar-sesion');
-    // Buscamos el Text "Cerrar sesión" dentro del botón para inspeccionar su color.
+    // BotonPrimario con tono='rojo' aplica brandRojo como backgroundColor
+    // y onPrimary (blanco) como color del texto. Esto da contraste 5.2:1
+    // (>= 4.5:1 WCAG AA) sobre el fondo brandRojo. Mayor visibilidad que
+    // el outlined previo (border + texto brandRojo sobre blanco).
+    const estilo = StyleSheet.flatten(boton.props.style) as {
+      backgroundColor?: string;
+    };
+    expect(estilo.backgroundColor).toBe('#D5212A');
+    // El texto del boton es blanco (onPrimary) para el contraste AA.
     const textoBoton = getByText('Cerrar sesión');
     const estiloTexto = StyleSheet.flatten(textoBoton.props.style) as {
       color?: string;
     };
-    expect(estiloTexto.color).toBe('#D5212A');
-    expect(boton).toBeTruthy();
-  });
-
-  it('MP-4 el botón "Cerrar sesión" usa brandRojo (#D5212A) como color de borde', () => {
-    const { getByTestId } = renderMiPerfil();
-    const boton = getByTestId('boton-cerrar-sesion');
-    // En @testing-library/react-native v13, props.style ya viene evaluado:
-    // NO es la función ({pressed}) => [...] sino el array resuelto.
-    const estilo = StyleSheet.flatten(boton.props.style) as { borderColor?: string };
-    expect(estilo.borderColor).toBe('#D5212A');
+    expect(estiloTexto.color).toBe('#fff');
   });
 });

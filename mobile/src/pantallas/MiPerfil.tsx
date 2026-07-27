@@ -2,7 +2,9 @@ import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useState } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
+import { TarjetaMetrica } from '../componentes/TarjetaMetrica';
 import { TopBar } from '../componentes/TopBar';
 import { limpiarSesion } from '../composition/constantes';
 import {
@@ -58,16 +60,20 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         {/* Actividad Reciente */}
         <Text style={estilos.seccionTitulo}>Actividad reciente</Text>
         <View style={estilos.gridFila}>
-          <View style={[estilos.gridCard, estilos.gridCardMitad]}>
-            <MaterialIcons name="edit-note" size={24} color={COLORS.secondary} />
-            <Text style={estilos.gridEtiqueta}>Lecturas</Text>
-            <Text style={estilos.gridValor}>{PERFIL.lecturas}</Text>
-          </View>
-          <View style={[estilos.gridCard, estilos.gridCardMitad]}>
-            <MaterialIcons name="sync" size={24} color={COLORS.secondary} />
-            <Text style={estilos.gridEtiqueta}>Última sincronización</Text>
-            <Text style={estilos.gridValor}>{PERFIL.ultimaSincro}</Text>
-          </View>
+          <TarjetaMetrica
+            icono="edit-note"
+            etiqueta="Lecturas"
+            valor={PERFIL.lecturas}
+            variante="normal"
+            testID="tarjeta-lecturas"
+          />
+          <TarjetaMetrica
+            icono="sync"
+            etiqueta="Última sincronización"
+            valor={PERFIL.ultimaSincro}
+            variante="normal"
+            testID="tarjeta-ultima-sincro"
+          />
         </View>
 
         {/* Información Personal */}
@@ -96,17 +102,16 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         </View>
 
 {/* Cerrar sesión */}
-        <Pressable
-          style={({ pressed }) => [estilos.botonCerrar, pressed && estilos.botonPresionado]}
+        <BotonPrimario
+          texto="Cerrar sesión"
+          tono="rojo"
+          icono="logout"
           onPress={async () => {
             await limpiarSesion();
             onLogoutRequested();
           }}
           testID="boton-cerrar-sesion"
-        >
-          <MaterialIcons name="logout" size={20} color={COLORS.brandRojo} />
-          <Text style={estilos.botonCerrarTexto}>Cerrar sesión</Text>
-        </Pressable>
+        />
 
         <FooterApp />
       </ScrollView>
@@ -187,24 +192,6 @@ const estilos = StyleSheet.create({
     gap: SPACING.md,
     marginHorizontal: SPACING.margin,
   },
-  gridCard: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.xl,
-    ...BORDERS.thin,
-    padding: SPACING.md,
-  },
-  gridCardMitad: {
-    flex: 1,
-  },
-  gridEtiqueta: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.onSurfaceVariant,
-    marginTop: SPACING.xs,
-  },
-  gridValor: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
   listaCard: {
     marginHorizontal: SPACING.margin,
     backgroundColor: COLORS.surfaceContainerLowest,
@@ -263,26 +250,6 @@ const estilos = StyleSheet.create({
     backgroundColor: COLORS.surfaceContainerLowest,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-  },
-  botonCerrar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm + 4,
-    marginHorizontal: SPACING.margin,
-    marginTop: SPACING.xl,
-    height: 56,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.brandRojo,
-    backgroundColor: COLORS.surfaceContainerLowest,
-  },
-  botonPresionado: {
-    opacity: 0.8,
-  },
-  botonCerrarTexto: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.brandRojo,
   },
   toast: {
     position: 'absolute',

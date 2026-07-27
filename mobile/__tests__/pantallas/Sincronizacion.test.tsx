@@ -5,7 +5,12 @@
 //
 //   - Iconos de success (check-circle de "Exitosos"): brandVerde (#76B718).
 //   - Iconos de error (icon de "Fallidos"): error (rojo institucional).
-//   - Iconos neutrales (pending de "Pendiente"): onSurfaceVariant (gris).
+//   - Iconos neutrales (pending de "Pendiente"): brandAzulOscuro
+//     (#093C5D) — institucional sobre gris neutro; decision de craft
+//     upgrade respecto al gris onSurfaceVariant previo.
+//
+// Los 3 stat cards ahora usan el componente reutilizable
+// TarjetaMetrica (ver __tests__/componentes/TarjetaMetrica.test.tsx).
 //
 // Mockea:
 //   - expo-splash-screen.
@@ -141,21 +146,23 @@ function renderSync() {
 describe('Sincronizacion — paleta institucional EPC', () => {
   it('SY-1 el icono "check-circle" de Exitosos usa brandVerde (#76B718)', () => {
     const { getByTestId } = renderSync();
-    // El icono MaterialIcons tiene testID="icono-exitosos".
-    const icono = getByTestId('icono-exitosos');
+    // TarjetaMetrica setea testID={`${testID}-icon`}.
+    const icono = getByTestId('stat-exitosos-icon');
     expect(icono.props.color).toBe('#76B718');
   });
 
   it('SY-2 el icono "error" de Fallidos mantiene COLORS.error (#D5212A = brandRojo)', () => {
     const { getByTestId } = renderSync();
-    const icono = getByTestId('icono-fallidos');
+    const icono = getByTestId('stat-fallidos-icon');
     expect(icono.props.color).toBe('#D5212A');
   });
 
-  it('SY-3 el icono "pending" de Pendiente mantiene COLORS.onSurfaceVariant (gris neutral)', () => {
+  it('SY-3 el icono "pending" de Pendiente usa COLORS.brandAzulOscuro (upgrade de gris neutro a institucional)', () => {
     const { getByTestId } = renderSync();
-    const icono = getByTestId('icono-pendientes');
-    // El gris neutral institucional sigue siendo COLORS.onSurfaceVariant.
-    expect(icono.props.color).toBe('#44474D');
+    // Craft upgrade: variantes "normal" usan brandAzulOscuro en lugar del
+    // gris onSurfaceVariant previo. Brand color con proposito semantico,
+    // no reflex de neutral gris.
+    const icono = getByTestId('stat-pendientes-icon');
+    expect(icono.props.color).toBe('#093C5D');
   });
 });
