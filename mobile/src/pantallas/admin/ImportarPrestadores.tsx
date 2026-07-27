@@ -4,12 +4,22 @@
  * Carga 300 prestadores del programa "Agua la Vereda" desde un spreadsheet
  * (CSV con columnas: codigo, nombre, NIT, municipio, departamento, segmento,
  * num_suscriptores_urbanos, num_suscriptores_rurales).
+ *
+ * Commit 6 — FormField migration:
+ *   - El textarea CSV migrado a FormField con multiline=true.
+ *   - Sin required (no es required propiamente: el usuario puede pegar
+ *     un CSV vacio y el repo mostrara 0 inserts).
+ *   - Helper text explica el formato esperado.
+ *   - Botón "Importar" sigue via BotonPrimario (ya consolidado en commit
+ *     previo `3aa110d`).
  */
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { BotonPrimario } from '../../componentes/BotonPrimario';
+import { FormField } from '../../componentes/FormField';
 import { getBootstrap } from '../../composition/get-bootstrap';
 import type { PrestadorRepositoryExpoSqlite } from '../../persistencia/expo-sqlite/prestador-repository-expo-sqlite';
 
@@ -82,16 +92,17 @@ export default function ImportarPrestadores({ repo: repoProp }: Props) {
         cada fila y reportará errores sin abortar la importación.
       </Text>
 
-      <View style={estilos.seccion}>
-        <Text style={estilos.label}>CSV (formato: codigo, nombre, NIT, municipio, departamento, segmento, num_suscriptores_urbanos, num_suscriptores_rurales)</Text>
-        <TextInput
-          style={estilos.textarea}
-          multiline
-          value={csv}
-          onChangeText={setCsv}
-          textAlignVertical="top"
-        />
-      </View>
+      <FormField
+        label="CSV"
+        value={csv}
+        onChangeText={setCsv}
+        multiline
+        numberOfLines={10}
+        editable={!importando}
+        helperText="Formato: codigo, nombre, NIT, municipio, departamento, segmento, num_suscriptores_urbanos, num_suscriptores_rurales"
+        accessibilityHint="Pegue el contenido CSV con los prestadores a importar"
+        testID="importar-csv"
+      />
 
       <BotonPrimario
         texto="Importar"
@@ -105,8 +116,18 @@ export default function ImportarPrestadores({ repo: repoProp }: Props) {
       {ultimoResultado && (
         <View style={estilos.resultado}>
           <Text style={estilos.resultadoHeader}>Último resultado</Text>
-          <Text style={estilos.resultadoLinea}>✓ Insertados: {ultimoResultado.insertados}</Text>
-          <Text style={estilos.resultadoLinea}>✗ Errores: {ultimoResultado.errores.length}</Text>
+          <View style={estilos.resultadoLineaFila}>
+            <MaterialIcons name="check-circle" size={16} color={COLORS.brandVerde} />
+            <Text style={estilos.resultadoLinea}>
+              Insertados: {ultimoResultado.insertados}
+            </Text>
+          </View>
+          <View style={estilos.resultadoLineaFila}>
+            <MaterialIcons name="error-outline" size={16} color={COLORS.error} />
+            <Text style={estilos.resultadoLinea}>
+              Errores: {ultimoResultado.errores.length}
+            </Text>
+          </View>
           {ultimoResultado.errores.length > 0 && (
             <View style={estilos.listaErrores}>
               {ultimoResultado.errores.slice(0, 20).map((e, i) => (
@@ -130,19 +151,6 @@ const estilos = StyleSheet.create({
   content: { padding: SPACING.md, gap: SPACING.md },
   titulo: { ...TYPOGRAPHY.headlineLg, color: COLORS.onSurface },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
-  seccion: { gap: SPACING.xs },
-  label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
-  textarea: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.onSurface,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
-    minHeight: 240,
-    fontFamily: 'monospace',
-  },
   // El botón "Importar" se renderiza via <BotonPrimario> extraído.
   resultado: {
     marginTop: SPACING.md,
@@ -153,6 +161,12 @@ const estilos = StyleSheet.create({
     borderColor: COLORS.outlineVariant,
   },
   resultadoHeader: { ...TYPOGRAPHY.headlineSm, color: COLORS.onSurface, marginBottom: SPACING.xs },
+  resultadoLineaFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginVertical: 2,
+  },
   resultadoLinea: { ...TYPOGRAPHY.bodyMd, color: COLORS.onSurface },
   listaErrores: { marginTop: SPACING.xs, gap: 2 },
   errorLinea: { ...TYPOGRAPHY.bodySm, color: COLORS.error, fontFamily: 'monospace' },

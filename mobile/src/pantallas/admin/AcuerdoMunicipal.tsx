@@ -7,11 +7,20 @@
  * El form valida que los topes NO superen los topes nacionales:
  *   E1 ≤ 60%, E2 ≤ 50%, E3 ≤ 40% (subsidios)
  *   E5 ≤ 50%, E6 ≤ 60%, comercial/industrial ≥ 0 (contribuciones)
+ *
+ * Commit 6 — FormField migration:
+ *   - 9 inputs numericos migrados a FormField (subsidios E1-E3,
+ *     contribuciones E5-E6, comercial/industrial, fechas vigencia).
+ *   - Validación derivada del callsite via prop error.
+ *   - Toques de craft: required asterisk en REQ, accesibilidad, touch target.
+ *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { BotonPrimario } from '../../componentes/BotonPrimario';
+import { FormField } from '../../componentes/FormField';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
@@ -96,6 +105,8 @@ export default function AcuerdoMunicipalForm({
   const [vigenteDesde, setVigenteDesde] = useState(acuerdoActual?.fecha_vigencia_desde ?? new Date().toISOString().slice(0, 10));
   const [vigenteHasta, setVigenteHasta] = useState(acuerdoActual?.fecha_vigencia_hasta ?? `${new Date().getFullYear() + 4}-12-31`);
   const [guardando, setGuardando] = useState(false);
+  // Errores inline por campo (clave = nombre del factor).
+  const [errores, setErrores] = useState<Record<string, string | undefined>>({});
 
   /**
    * Sincroniza los inputs con el acuerdoActual UNA vez al recibirlo desde el
@@ -119,23 +130,36 @@ export default function AcuerdoMunicipalForm({
     setSincronizado(true);
   }, [acuerdoActual, sincronizado]);
 
-  const validar = (): string | null => {
-    const checks: Array<[string, number, number, number]> = [
-      ['E1', parseFloat(factorE1), -1, TOPES_NACIONALES.subs_e1],
-      ['E2', parseFloat(factorE2), -1, TOPES_NACIONALES.subs_e2],
-      ['E3', parseFloat(factorE3), -1, TOPES_NACIONALES.subs_e3],
-      ['E5', parseFloat(factorE5), 0, TOPES_NACIONALES.contr_e5],
-      ['E6', parseFloat(factorE6), 0, TOPES_NACIONALES.contr_e6],
-      ['Comercial', parseFloat(factorComercial), 0, 1],
-      ['Industrial', parseFloat(factorIndustrial), 0, 1],
+  const validar = (): boolean => {
+    const checks: Array<[string, string, number, number]> = [
+      ['E1', factorE1, -1, TOPES_NACIONALES.subs_e1],
+      ['E2', factorE2, -1, TOPES_NACIONALES.subs_e2],
+      ['E3', factorE3, -1, TOPES_NACIONALES.subs_e3],
+      ['E5', factorE5, 0, TOPES_NACIONALES.contr_e5],
+      ['E6', factorE6, 0, TOPES_NACIONALES.contr_e6],
+      ['Comercial', factorComercial, 0, 1],
+      ['Industrial', factorIndustrial, 0, 1],
     ];
-    for (const [estrato, valor, min, max] of checks) {
-      if (isNaN(valor)) return `${estrato}: valor no numérico`;
-      if (valor < min) return `${estrato}: factor no puede ser < ${min}`;
-      if (valor > max) return `${estrato}: factor ${valor} supera tope legal ${max} (Ley 142/1994 art. 99.6)`;
+    const nuevosErrores: Record<string, string> = {};
+    for (const [estrato, valorStr, min, max] of checks) {
+      const valor = parseFloat(valorStr);
+      if (Number.isNaN(valor)) {
+        nuevosErrores[estrato] = `${estrato}: valor no numérico`;
+        continue;
+      }
+      if (valor < min) {
+        nuevosErrores[estrato] = `${estrato}: factor no puede ser < ${min}`;
+        continue;
+      }
+      if (valor > max) {
+        nuevosErrores[estrato] = `${estrato}: factor ${valor} supera tope legal ${max} (Ley 142/1994 art. 99.6)`;
+      }
     }
-    if (vigenteDesde > vigenteHasta) return 'Vigencia: fecha desde posterior a fecha hasta';
-    return null;
+    if (vigenteDesde > vigenteHasta) {
+      nuevosErrores['vigencia'] = 'Vigencia: fecha desde posterior a fecha hasta';
+    }
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
   };
 
   const guardar = async () => {
@@ -143,9 +167,8 @@ export default function AcuerdoMunicipalForm({
       Alert.alert('Error', 'El repositorio aún no está listo. Esperá un instante.');
       return;
     }
-    const err = validar();
-    if (err) {
-      Alert.alert('Validación', err);
+    if (!validar()) {
+      Alert.alert('Validación', 'Revisá los campos marcados');
       return;
     }
     setGuardando(true);
@@ -183,63 +206,125 @@ export default function AcuerdoMunicipalForm({
       </Text>
 
       <Text style={estilos.seccion}>Subsidios por estrato (negativos)</Text>
-      {(['E1', 'E2', 'E3'] as const).map((estrato, idx) => {
-        const [v, s] = [parseFloat([factorE1, factorE2, factorE3][idx]), [setFactorE1, setFactorE2, setFactorE3][idx]];
-        const tope = [TOPES_NACIONALES.subs_e1, TOPES_NACIONALES.subs_e2, TOPES_NACIONALES.subs_e3][idx];
-        return (
-          <View key={estrato} style={estilos.campo}>
-            <Text style={estilos.label}>Estrato {estrato} (≤ {Math.abs(tope) * 100}%)</Text>
-            <TextInput
-              style={[estilos.input, v < tope && estilos.inputError]}
-              keyboardType="numeric"
-              value={[factorE1, factorE2, factorE3][idx]}
-              onChangeText={s}
-            />
-          </View>
-        );
-      })}
+      <View style={estilos.campo}>
+        <FormField
+          label="Estrato E1 (≤ 60% de subsidio)"
+          value={factorE1}
+          onChangeText={setFactorE1}
+          error={errores['E1']}
+          keyboardType="numeric"
+          editable={!guardando}
+          accessibilityHint="Factor de subsidio para estrato 1, valor negativo entre -1 y -0.60"
+          testID="acuerdo-e1"
+        />
+      </View>
+      <View style={estilos.campo}>
+        <FormField
+          label="Estrato E2 (≤ 50% de subsidio)"
+          value={factorE2}
+          onChangeText={setFactorE2}
+          error={errores['E2']}
+          keyboardType="numeric"
+          editable={!guardando}
+          accessibilityHint="Factor de subsidio para estrato 2, valor negativo entre -1 y -0.50"
+          testID="acuerdo-e2"
+        />
+      </View>
+      <View style={estilos.campo}>
+        <FormField
+          label="Estrato E3 (≤ 40% de subsidio)"
+          value={factorE3}
+          onChangeText={setFactorE3}
+          error={errores['E3']}
+          keyboardType="numeric"
+          editable={!guardando}
+          accessibilityHint="Factor de subsidio para estrato 3, valor negativo entre -1 y -0.40"
+          testID="acuerdo-e3"
+        />
+      </View>
 
       <Text style={estilos.seccion}>Contribuciones por estrato (positivas)</Text>
-      {(['E5', 'E6'] as const).map((estrato, idx) => {
-        const [v, s] = [parseFloat([factorE5, factorE6][idx]), [setFactorE5, setFactorE6][idx]];
-        const tope = [TOPES_NACIONALES.contr_e5, TOPES_NACIONALES.contr_e6][idx];
-        return (
-          <View key={estrato} style={estilos.campo}>
-            <Text style={estilos.label}>Estrato {estrato} (≤ {tope * 100}%)</Text>
-            <TextInput
-              style={[estilos.input, v > tope && estilos.inputError]}
-              keyboardType="numeric"
-              value={[factorE5, factorE6][idx]}
-              onChangeText={s}
-            />
-          </View>
-        );
-      })}
+      <View style={estilos.campo}>
+        <FormField
+          label="Estrato E5 (≤ 50% de contribución)"
+          value={factorE5}
+          onChangeText={setFactorE5}
+          error={errores['E5']}
+          keyboardType="numeric"
+          editable={!guardando}
+          accessibilityHint="Factor de contribución para estrato 5, valor positivo entre 0 y 0.50"
+          testID="acuerdo-e5"
+        />
+      </View>
+      <View style={estilos.campo}>
+        <FormField
+          label="Estrato E6 (≤ 60% de contribución)"
+          value={factorE6}
+          onChangeText={setFactorE6}
+          error={errores['E6']}
+          keyboardType="numeric"
+          editable={!guardando}
+          accessibilityHint="Factor de contribución para estrato 6, valor positivo entre 0 y 0.60"
+          testID="acuerdo-e6"
+        />
+      </View>
 
       <Text style={estilos.seccion}>Contribuciones por categoría de uso</Text>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Comercial (0 a 100%)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={factorComercial} onChangeText={setFactorComercial} />
+        <FormField
+          label="Comercial (0 a 100%)"
+          value={factorComercial}
+          onChangeText={setFactorComercial}
+          error={errores['Comercial']}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="acuerdo-comercial"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Industrial (0 a 100%)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={factorIndustrial} onChangeText={setFactorIndustrial} />
+        <FormField
+          label="Industrial (0 a 100%)"
+          value={factorIndustrial}
+          onChangeText={setFactorIndustrial}
+          error={errores['Industrial']}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="acuerdo-industrial"
+        />
       </View>
 
       <Text style={estilos.seccion}>Vigencia</Text>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Desde (YYYY-MM-DD)</Text>
-        <TextInput style={estilos.input} value={vigenteDesde} onChangeText={setVigenteDesde} />
+        <FormField
+          label="Desde (YYYY-MM-DD)"
+          value={vigenteDesde}
+          onChangeText={setVigenteDesde}
+          error={errores['vigencia']}
+          editable={!guardando}
+          accessibilityHint="Fecha de inicio de vigencia, formato AAAA-MM-DD"
+          testID="acuerdo-vigente-desde"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Hasta (YYYY-MM-DD)</Text>
-        <TextInput style={estilos.input} value={vigenteHasta} onChangeText={setVigenteHasta} />
+        <FormField
+          label="Hasta (YYYY-MM-DD)"
+          value={vigenteHasta}
+          onChangeText={setVigenteHasta}
+          editable={!guardando}
+          accessibilityHint="Fecha de fin de vigencia, formato AAAA-MM-DD"
+          testID="acuerdo-vigente-hasta"
+        />
       </View>
 
-      <Pressable style={[estilos.boton, guardando && estilos.botonDisabled]} onPress={guardar} disabled={guardando}>
-        <MaterialIcons name="save" size={20} color={COLORS.onPrimary} />
-        <Text style={estilos.botonLabel}>{guardando ? 'Guardando...' : 'Guardar Acuerdo'}</Text>
-      </Pressable>
+      <BotonPrimario
+        texto="Guardar Acuerdo"
+        textoCargando="Guardando…"
+        icono="save"
+        tono="azul"
+        onPress={guardar}
+        cargando={guardando}
+        testID="acuerdo-guardar"
+      />
     </ScrollView>
   );
 }
@@ -251,6 +336,8 @@ const estilos = StyleSheet.create({
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
   seccion: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, marginTop: SPACING.md },
   campo: { gap: SPACING.xs },
+  // Mantenemos 'label' y 'input' por si se agrega algun campo no-FormField
+  // en el futuro. Los FormField tienen su propio style interno.
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
   input: {
     ...TYPOGRAPHY.bodyMd,
@@ -261,17 +348,4 @@ const estilos = StyleSheet.create({
     borderRadius: RADIUS.sm,
     padding: SPACING.sm,
   },
-  inputError: { borderColor: COLORS.error, borderWidth: 2 },
-  boton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    gap: SPACING.xs,
-    marginTop: SPACING.lg,
-  },
-  botonDisabled: { opacity: 0.5 },
-  botonLabel: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary },
 });

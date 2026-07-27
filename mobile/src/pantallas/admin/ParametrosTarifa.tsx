@@ -7,11 +7,19 @@
  *
  * Multi-tenant: cada prestador tiene sus ParametrosTarifa (1 vigente
  * por periodo). El motor usa estos insumos + AcuerdoMunicipal.
+ *
+ * Commit 6 — FormField migration:
+ *   - 14 inputs numericos migrados a FormField (periodo, costos medios,
+ *     agua, suscriptores, fechas vigencia, mínimo vital).
+ *   - Validación derivada del callsite via prop error.
+ *   - Toggles preservados inline (no son text inputs).
+ *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { BotonPrimario } from '../../componentes/BotonPrimario';
+import { FormField } from '../../componentes/FormField';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
@@ -178,78 +186,167 @@ export default function ParametrosTarifaForm({
 
       <Text style={estilos.seccion}>Periodo y vigencia</Text>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Periodo (año tarifario, 5 años)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={periodo} onChangeText={setPeriodo} />
+        <FormField
+          label="Periodo (año tarifario, 5 años)"
+          required
+          value={periodo}
+          onChangeText={setPeriodo}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-periodo"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Vigente desde (YYYY-MM-DD)</Text>
-        <TextInput style={estilos.input} value={vigenteDesde} onChangeText={setVigenteDesde} />
+        <FormField
+          label="Vigente desde (YYYY-MM-DD)"
+          value={vigenteDesde}
+          onChangeText={setVigenteDesde}
+          editable={!guardando}
+          accessibilityHint="Fecha de inicio de vigencia del periodo tarifario"
+          testID="param-vigente-desde"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Vigente hasta (YYYY-MM-DD)</Text>
-        <TextInput style={estilos.input} value={vigenteHasta} onChangeText={setVigenteHasta} />
+        <FormField
+          label="Vigente hasta (YYYY-MM-DD)"
+          value={vigenteHasta}
+          onChangeText={setVigenteHasta}
+          editable={!guardando}
+          accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
+          testID="param-vigente-hasta"
+        />
       </View>
 
       <Text style={estilos.seccion}>Costos medios (estudio de costos del prestador)</Text>
       <Text style={estilos.nota}>Estos son los insumos de la fórmula normativa. El motor NO acepta inputs planos.</Text>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>CMA · Costo Medio Administración ($/año, art. 9)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={cma} onChangeText={setCma} />
+        <FormField
+          label="CMA · Costo Medio Administración ($/año, art. 9)"
+          value={cma}
+          onChangeText={setCma}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-cma"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>CMO · Costo Medio Operación ($/m³)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={cmo} onChangeText={setCmo} />
+        <FormField
+          label="CMO · Costo Medio Operación ($/m³)"
+          value={cmo}
+          onChangeText={setCmo}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-cmo"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>CMI · Costo Medio Inversión ($/m³)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={cmi} onChangeText={setCmi} />
+        <FormField
+          label="CMI · Costo Medio Inversión ($/m³)"
+          value={cmi}
+          onChangeText={setCmi}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-cmi"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>CMT · Costo Medio Tasas Ambientales ($/m³)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={cmt} onChangeText={setCmt} />
+        <FormField
+          label="CMT · Costo Medio Tasas Ambientales ($/m³)"
+          value={cmt}
+          onChangeText={setCmt}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-cmt"
+        />
       </View>
 
       <View style={estilos.campoFila}>
         <Text style={estilos.label}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
-        <Switch value={aplicaCmviaa} onValueChange={setAplicaCmviaa} />
+        <Switch
+          value={aplicaCmviaa}
+          onValueChange={setAplicaCmviaa}
+          disabled={guardando}
+          accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
+        />
       </View>
       {aplicaCmviaa && (
         <View style={estilos.campo}>
-          <Text style={estilos.label}>CMVIAA · Costo Medio Variable Inv. Ambientales Adicionales ($/m³)</Text>
-          <TextInput style={estilos.input} keyboardType="numeric" value={cmviaa} onChangeText={setCmviaa} />
+          <FormField
+            label="CMVIAA · Costo Medio Variable Inv. Ambientales Adicionales ($/m³)"
+            value={cmviaa}
+            onChangeText={setCmviaa}
+            keyboardType="numeric"
+            editable={!guardando}
+            testID="param-cmviaa"
+          />
         </View>
       )}
 
       <Text style={estilos.seccion}>Agua y suscriptores (insumo ASP = AS - IPUF×12×N)</Text>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Agua Suministrada año base (m³/año)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={aguaSuministrada} onChangeText={setAguaSuministrada} />
+        <FormField
+          label="Agua Suministrada año base (m³/año)"
+          value={aguaSuministrada}
+          onChangeText={setAguaSuministrada}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-agua"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>IPUF (m³/suscriptor/mes, art. 5, estándar 6)</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={ipuf} onChangeText={setIpuf} />
+        <FormField
+          label="IPUF (m³/suscriptor/mes, art. 5, estándar 6)"
+          value={ipuf}
+          onChangeText={setIpuf}
+          keyboardType="numeric"
+          editable={!guardando}
+          helperText="Estándar CRA: 6 m³/suscriptor/mes"
+          testID="param-ipuf"
+        />
       </View>
       <View style={estilos.campo}>
-        <Text style={estilos.label}>Suscriptores promedio (N) — divisor de CF = CMA/N</Text>
-        <TextInput style={estilos.input} keyboardType="numeric" value={suscriptoresPromedio} onChangeText={setSuscriptoresPromedio} />
+        <FormField
+          label="Suscriptores promedio (N) — divisor de CF = CMA/N"
+          value={suscriptoresPromedio}
+          onChangeText={setSuscriptoresPromedio}
+          keyboardType="numeric"
+          editable={!guardando}
+          testID="param-suscriptores"
+        />
       </View>
 
       <Text style={estilos.seccion}>Mínimo vital (Decreto 776/2025 — opcional)</Text>
       <View style={estilos.campoFila}>
         <Text style={estilos.label}>Activar mínimo vital</Text>
-        <Switch value={aplicaMinimoVital} onValueChange={setAplicaMinimoVital} />
+        <Switch
+          value={aplicaMinimoVital}
+          onValueChange={setAplicaMinimoVital}
+          disabled={guardando}
+          accessibilityLabel="Aplicar mínimo vital"
+        />
       </View>
       {aplicaMinimoVital && (
         <View style={estilos.campo}>
-          <Text style={estilos.label}>M³ gratis al inicio del periodo</Text>
-          <TextInput style={estilos.input} keyboardType="numeric" value={m3Gratis} onChangeText={setM3Gratis} />
+          <FormField
+            label="M³ gratis al inicio del periodo"
+            value={m3Gratis}
+            onChangeText={setM3Gratis}
+            keyboardType="numeric"
+            editable={!guardando}
+            testID="param-m3gratis"
+          />
         </View>
       )}
 
-      <Pressable style={[estilos.boton, guardando && estilos.botonDisabled]} onPress={guardar} disabled={guardando}>
-        <MaterialIcons name="save" size={20} color={COLORS.onPrimary} />
-        <Text style={estilos.botonLabel}>{guardando ? 'Guardando...' : 'Guardar Parámetros'}</Text>
-      </Pressable>
+      <BotonPrimario
+        texto="Guardar Parámetros"
+        textoCargando="Guardando…"
+        icono="save"
+        tono="azul"
+        onPress={guardar}
+        cargando={guardando}
+        testID="param-guardar"
+      />
     </ScrollView>
   );
 }
@@ -268,6 +365,8 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
   },
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
+  // Mantenemos 'input' por si se agrega algun campo no-FormField en el
+  // futuro. Los FormField tienen su propio style interno.
   input: {
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurface,
@@ -277,16 +376,4 @@ const estilos = StyleSheet.create({
     borderRadius: RADIUS.sm,
     padding: SPACING.sm,
   },
-  boton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    gap: SPACING.xs,
-    marginTop: SPACING.lg,
-  },
-  botonDisabled: { opacity: 0.5 },
-  botonLabel: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary },
 });
