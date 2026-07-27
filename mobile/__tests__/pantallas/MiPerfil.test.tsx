@@ -102,6 +102,7 @@ import MiPerfil from '../../src/pantallas/MiPerfil';
 import type { ConfigStackScreenProps } from '../../src/navegacion/types';
 import type { Sesion } from '../../src/composition/constantes';
 import type { Prestador } from '../../dominio/prestadores/types';
+import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
 
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<
   typeof AsyncStorage.getItem
@@ -138,6 +139,31 @@ function crearPrestadorFixture(): Prestador {
     estado: 'activo',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+/** Parámetros tarifarios vigentes del prestador activo (Res CRA 825/2017). */
+function crearParametrosFixture(overrides: Partial<ParametrosTarifa> = {}): ParametrosTarifa {
+  return {
+    id_parametros: 200,
+    id_prestador: 42,
+    id_acuerdo: 100,
+    periodo: 2026,
+    cma: 12_345_678,
+    cmo: 450,
+    cmi: 120,
+    cmt: 80,
+    cmviaa: 25,
+    aplica_cmviaa: true,
+    agua_suministrada_m3_anio: 50_000,
+    ipuf_m3_suscriptor_mes: 6,
+    suscriptores_promedio: 350,
+    aplica_minimo_vital: true,
+    m3_gratis_minimo_vital: 6,
+    vigente_desde: '2025-01-01',
+    vigente_hasta: '2029-12-31',
+    created_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -392,6 +418,208 @@ describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () =>
       expect(valorEl).toBeTruthy();
       expect(
         (valorEl.props.children as string | string[]) ?? '',
+      ).toBe('—');
+    });
+  });
+});
+
+describe('MiPerfil — parámetros tarifarios del prestador (TAREA 11 commit 2)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  /**
+   * Helper: mockea useWorkspace con parámetros tarifarios vigentes.
+   */
+  function mockearParametros(p: ParametrosTarifa): void {
+    const { useWorkspace } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 42,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: p,
+        cargando: false,
+      }),
+    );
+  }
+
+  /**
+   * T-MP-PARAM-1 — Renderiza el título de la sección "Parámetros
+   * tarifarios" cuando hay parámetros vigentes.
+   */
+  it('T-MP-PARAM-1 renderiza título de sección "Parámetros tarifarios"', async () => {
+    mockearParametros(crearParametrosFixture());
+
+    const { getByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByText('Parámetros tarifarios')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-MP-PARAM-2 — Muestra el CMA (Costo Medio de Administración)
+   * formateado. Es el campo más sensible del motor tarifario (CF = CMA/N
+   * art. 9 Res CRA 825/2017).
+   */
+  it('T-MP-PARAM-2 muestra CMA formateado desde parametros_vigentes.cma', async () => {
+    mockearParametros(crearParametrosFixture({ cma: 12_345_678 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      // El valor debe estar presente y NO ser el placeholder "—".
+      const valorEl = getByTestId('fila-param-cma-valor');
+      expect(valorEl).toBeTruthy();
+      const texto = (valorEl.props.children as string) ?? '';
+      expect(texto).not.toBe('—');
+      // El formato debe incluir el separador de miles (independiente del
+      // locale: punto o coma). El dato 12_345_678 contiene el separador
+      // tras parsearlo.
+      const digitos = texto.replace(/[^\d]/g, '');
+      expect(digitos).toBe('12345678');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-3 — Muestra CMO (Costo Medio de Operación por m³).
+   */
+  it('T-MP-PARAM-3 muestra CMO desde parametros_vigentes.cmo', async () => {
+    mockearParametros(crearParametrosFixture({ cmo: 450 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-cmo-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('450');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-4 — Muestra CMI (Costo Medio de Inversión por m³).
+   */
+  it('T-MP-PARAM-4 muestra CMI desde parametros_vigentes.cmi', async () => {
+    mockearParametros(crearParametrosFixture({ cmi: 120 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-cmi-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('120');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-5 — Muestra CMT (Costo Medio de Tasas Ambientales).
+   */
+  it('T-MP-PARAM-5 muestra CMT desde parametros_vigentes.cmt', async () => {
+    mockearParametros(crearParametrosFixture({ cmt: 80 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-cmt-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('80');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-6 — Muestra CMVIAA (Costo Medio Variable de Inversiones
+   * Ambientales Adicionales) cuando aplica_cmviaa=true.
+   */
+  it('T-MP-PARAM-6 muestra CMVIAA cuando aplica_cmviaa=true', async () => {
+    mockearParametros(
+      crearParametrosFixture({ aplica_cmviaa: true, cmviaa: 25 }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-cmviaa-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('25');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-7 — Muestra el mínimo vital (m³) desde m3_gratis_minimo_vital.
+   */
+  it('T-MP-PARAM-7 muestra Mínimo vital desde m3_gratis_minimo_vital', async () => {
+    mockearParametros(crearParametrosFixture({ m3_gratis_minimo_vital: 6 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-minimo-vital-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('6');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-8 — Muestra la vigencia (vigente_desde → vigente_hasta).
+   */
+  it('T-MP-PARAM-8 muestra vigencia desde vigente_desde y vigente_hasta', async () => {
+    mockearParametros(
+      crearParametrosFixture({
+        vigente_desde: '2025-01-01',
+        vigente_hasta: '2029-12-31',
+      }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const desdeEl = getByTestId('fila-param-vigente-desde-valor');
+      const hastaEl = getByTestId('fila-param-vigente-hasta-valor');
+      expect(desdeEl).toBeTruthy();
+      expect(hastaEl).toBeTruthy();
+      expect((desdeEl.props.children as string) ?? '').toBe('2025-01-01');
+      expect((hastaEl.props.children as string) ?? '').toBe('2029-12-31');
+    });
+  });
+
+  /**
+   * T-MP-PARAM-9 — Sin parametros_vigentes (store sin poblar), toda la
+   * sección cae al placeholder "—".
+   */
+  it('T-MP-PARAM-9 sin parámetros en store, todas las filas muestran "—"', async () => {
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      // Solo verificamos que el título está y los valores son "—".
+      expect(getByTestId('fila-param-cma-valor')).toBeTruthy();
+      expect(
+        (getByTestId('fila-param-cma-valor').props.children as string) ?? '',
+      ).toBe('—');
+      expect(
+        (getByTestId('fila-param-vigente-hasta-valor').props.children as string) ?? '',
       ).toBe('—');
     });
   });

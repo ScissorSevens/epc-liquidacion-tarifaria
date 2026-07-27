@@ -54,6 +54,17 @@ function obtenerIniciales(nombre: string | undefined): string {
     .join('');
 }
 
+/**
+ * Formatea un número con separador de miles estilo CO (punto).
+ *
+ * Locale-agnóstico (no usa `Intl.NumberFormat` porque su disponibilidad
+ * con locale `es-CO` varía entre Hermes y Node — preferimos un split por
+ * regex que produce el mismo string en ambos runtimes).
+ */
+function formatearNumero(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
   const [sesion, setSesion] = useState<Sesion | null>(null);
@@ -187,6 +198,66 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             etiqueta="Código"
             valor={prestadorCodigo === '' ? PLACEHOLDER : prestadorCodigo}
             testID="fila-prestador-codigo"
+          />
+        </View>
+
+        {/* Parámetros tarifarios — Res CRA 825/2017 + 907/2019 */}
+        <Text style={estilos.seccionTitulo}>Parámetros tarifarios</Text>
+        <View style={estilos.listaCard}>
+          <FilaInfo
+            etiqueta="CMA · Costo Medio de Administración ($/año)"
+            valor={parametros !== null ? formatearNumero(parametros.cma) : PLACEHOLDER}
+            testID="fila-param-cma"
+            borde
+          />
+          <FilaInfo
+            etiqueta="CMO · Costo Medio de Operación ($/m³)"
+            valor={parametros !== null ? formatearNumero(parametros.cmo) : PLACEHOLDER}
+            testID="fila-param-cmo"
+            borde
+          />
+          <FilaInfo
+            etiqueta="CMI · Costo Medio de Inversión ($/m³)"
+            valor={parametros !== null ? formatearNumero(parametros.cmi) : PLACEHOLDER}
+            testID="fila-param-cmi"
+            borde
+          />
+          <FilaInfo
+            etiqueta="CMT · Costo Medio de Tasas Ambientales ($/m³)"
+            valor={parametros !== null ? formatearNumero(parametros.cmt) : PLACEHOLDER}
+            testID="fila-param-cmt"
+            borde
+          />
+          <FilaInfo
+            etiqueta="CMVIAA · Inversiones Ambientales Adic. ($/m³)"
+            valor={
+              parametros !== null && parametros.aplica_cmviaa
+                ? formatearNumero(parametros.cmviaa)
+                : PLACEHOLDER
+            }
+            testID="fila-param-cmviaa"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Mínimo vital (m³)"
+            valor={
+              parametros !== null && parametros.aplica_minimo_vital
+                ? `${formatearNumero(parametros.m3_gratis_minimo_vital)} m³`
+                : PLACEHOLDER
+            }
+            testID="fila-param-minimo-vital"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Vigente desde"
+            valor={parametros !== null ? parametros.vigente_desde : PLACEHOLDER}
+            testID="fila-param-vigente-desde"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Vigente hasta"
+            valor={parametros !== null ? parametros.vigente_hasta : PLACEHOLDER}
+            testID="fila-param-vigente-hasta"
           />
         </View>
 
