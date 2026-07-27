@@ -224,6 +224,51 @@ describe('crearSuscriptor — municipio', () => {
   });
 });
 
+describe('crearSuscriptor — email y telefono opcionales', () => {
+  it('preserva email y telefono válidos cuando se proveen', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      email: 'cliente.nombre+agua@example.com',
+      telefono: '3001234567',
+    });
+
+    expect(resultado.email).toBe('cliente.nombre+agua@example.com');
+    expect(resultado.telefono).toBe('3001234567');
+  });
+
+  it('mantiene email y telefono undefined cuando no se proveen', () => {
+    const resultado = crearSuscriptor(inputValido);
+
+    expect(resultado.email).toBeUndefined();
+    expect(resultado.telefono).toBeUndefined();
+  });
+
+  it.each(['cliente', 'cliente@dominio', '@dominio.com'])(
+    'rechaza email inválido: %s',
+    (email) => {
+      expect(() => crearSuscriptor({ ...inputValido, email })).toThrow(
+        MENSAJES_ERROR_SUSCRIPTOR.EMAIL_INVALIDO,
+      );
+    },
+  );
+
+  it.each(['123456', '123456789012345678901', '300-1234567', '+573001234567'])(
+    'rechaza telefono inválido: %s',
+    (telefono) => {
+      expect(() => crearSuscriptor({ ...inputValido, telefono })).toThrow(
+        MENSAJES_ERROR_SUSCRIPTOR.TELEFONO_INVALIDO,
+      );
+    },
+  );
+
+  it.each(['1234567', '12345678901234567890'])(
+    'acepta telefono en los límites válidos: %s',
+    (telefono) => {
+      expect(crearSuscriptor({ ...inputValido, telefono }).telefono).toBe(telefono);
+    },
+  );
+});
+
 describe('crearSuscriptor — sector y calle (opcionales)', () => {
   it('rechaza sector de 101 caracteres', () => {
     expect(() =>

@@ -9,6 +9,8 @@ import { MENSAJES_ERROR_SUSCRIPTOR } from './types';
 
 const REGEX_CODIGO = /^\d{1,10}$/;
 const REGEX_CEDULA = /^\d{6,12}$/;
+const REGEX_EMAIL = /^[\w.+-]+@[\w-]+\.[\w.-]+$/;
+const REGEX_TELEFONO = /^\d{7,20}$/;
 const ESTADOS_VALIDOS: ReadonlySet<EstadoSuscriptor> = new Set([
   'activo',
   'inactivo',
@@ -73,6 +75,12 @@ function validarEntrada(input: CrearSuscriptorInput): void {
   if (input.calle !== undefined && input.calle.length > 100) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA);
   }
+  if (input.email !== undefined && !REGEX_EMAIL.test(input.email)) {
+    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.EMAIL_INVALIDO);
+  }
+  if (input.telefono !== undefined && !REGEX_TELEFONO.test(input.telefono)) {
+    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.TELEFONO_INVALIDO);
+  }
 }
 
 /**
@@ -89,6 +97,8 @@ export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador
     codigo: input.codigo,
     nombre_apellidos: input.nombre_apellidos,
     cedula: input.cedula.trim(),
+    email: input.email,
+    telefono: input.telefono,
     municipio: input.municipio.trim(),
     ...(input.sector !== undefined && { sector: input.sector }),
     ...(input.calle !== undefined && { calle: input.calle }),
