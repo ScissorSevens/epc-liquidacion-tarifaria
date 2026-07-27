@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { MENSAJES_ERROR_SUSCRIPTOR } from '@dominio/suscriptores';
 import type { ActualizarSuscriptorInput, EstadoSuscriptor, Suscriptor } from '@dominio/suscriptores/types';
 import { CATEGORIAS_USO, ETIQUETAS_CATEGORIA_USO, type CategoriaUso } from '@dominio/categorias-uso';
 import { editarYEncolarSuscriptor } from '../adapters/editar-y-encolar-suscriptor';
@@ -38,6 +39,8 @@ type EstratoStr = '' | '1' | '2' | '3' | '4' | '5' | '6';
 
 interface FormEditarState {
   nombre_apellidos: string;
+  email: string;
+  telefono: string;
   municipio: string;
   sector: string;
   direccion: string;
@@ -63,6 +66,8 @@ const BOTTOM_HEIGHT = 80;
 function initForm(sus: Suscriptor): FormEditarState {
   return {
     nombre_apellidos: sus.nombre_apellidos,
+    email: sus.email ?? '',
+    telefono: sus.telefono ?? '',
     municipio: sus.municipio,
     sector: sus.sector ?? '',
     direccion: sus.direccion,
@@ -108,6 +113,8 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
     form.nombre_apellidos.trim().length >= 3 &&
     form.municipio.trim().length > 0 &&
     form.direccion.trim().length >= 3 &&
+    (form.email.length === 0 || /^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(form.email)) &&
+    (form.telefono.length === 0 || /^\d{7,20}$/.test(form.telefono)) &&
     form.estrato !== '';
 
   function setCampo<K extends keyof FormEditarState>(campo: K, valor: FormEditarState[K]) {
@@ -129,6 +136,12 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
     if (form.direccion.trim().length < 3) {
       errores['direccion'] = 'Dirección obligatoria (mín 3 caracteres)';
     }
+    if (form.email.length > 0 && !/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(form.email)) {
+      errores['email'] = MENSAJES_ERROR_SUSCRIPTOR.EMAIL_INVALIDO;
+    }
+    if (form.telefono.length > 0 && !/^\d{7,20}$/.test(form.telefono)) {
+      errores['telefono'] = MENSAJES_ERROR_SUSCRIPTOR.TELEFONO_INVALIDO;
+    }
     if (form.estrato === '') {
       errores['estrato'] = 'Estrato obligatorio';
     }
@@ -149,6 +162,8 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
       const { suscriptorRepo, colaRepo, idGenerator, hasher } = await getBootstrap();
       const cambios: ActualizarSuscriptorInput = {
         nombre_apellidos: form.nombre_apellidos.trim(),
+        email: form.email.trim() || undefined,
+        telefono: form.telefono.trim() || undefined,
         municipio: form.municipio.trim(),
         sector: form.sector.trim() || undefined,
         direccion: form.direccion.trim(),
@@ -222,6 +237,30 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
               editable={!enviando}
               placeholder="Ej: Juan Pérez"
               testID="editar-nombre"
+            />
+
+            <FormField
+              ref={getRef('email')}
+              label="Email (opcional)"
+              value={form.email}
+              onChangeText={(v) => setCampo('email', v)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={!enviando}
+              placeholder="cliente@ejemplo.com"
+              testID="editar-email"
+            />
+
+            <FormField
+              ref={getRef('telefono')}
+              label="Teléfono (opcional)"
+              value={form.telefono}
+              onChangeText={(v) => setCampo('telefono', v)}
+              keyboardType="phone-pad"
+              maxLength={20}
+              editable={!enviando}
+              placeholder="7 a 20 dígitos"
+              testID="editar-telefono"
             />
 
             {/* Estrato */}

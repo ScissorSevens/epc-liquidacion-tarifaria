@@ -100,6 +100,8 @@ const SUSCRIPTOR_BASE = {
   codigo: 'S007',
   nombre_apellidos: 'Ana García',
   cedula: '12345678',
+  email: 'ana@example.com',
+  telefono: '3001234567',
   direccion: 'Calle 7',
   municipio: 'Caqueza',
   estrato: 2,
@@ -243,6 +245,19 @@ describe('DetalleSuscriptor — BotonPrimario migration', () => {
     await waitFor(() => {
       expect(screen.getByText('Reintentar')).toBeTruthy();
     });
+  });
+
+  it('T-DET-CONTACTO-1: muestra email y telefono del suscriptor', async () => {
+    configurarBootstrap();
+    renderConProviders(
+      <DetalleSuscriptor
+        navigation={nav as any}
+        route={{ key: 'k', name: 'DetalleSuscriptor', params: { id_suscriptor: 7 } } as any}
+      />,
+    );
+
+    expect(await screen.findByText('ana@example.com')).toBeTruthy();
+    expect(screen.getByText('3001234567')).toBeTruthy();
   });
 
   // T-DET-EMPTY-1: con 0 medidores, "Capturar lectura" NO aparece (verifica

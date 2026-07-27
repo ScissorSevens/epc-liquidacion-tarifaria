@@ -55,6 +55,8 @@ type EstratoStr = '' | '1' | '2' | '3' | '4' | '5' | '6';
 interface FormState {
   nombre_apellidos: string;
   cedula: string;
+  email: string;
+  telefono: string;
   municipio: string;
   sector: string;
   calle: string;
@@ -81,6 +83,8 @@ interface SnackState {
 const ESTADO_INICIAL: FormState = {
   nombre_apellidos: '',
   cedula: '',
+  email: '',
+  telefono: '',
   municipio: '',
   sector: '',
   calle: '',
@@ -116,6 +120,18 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
       if (!/^\d{6,12}$/.test(t)) return MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA;
       return undefined;
     }
+
+    case 'email':
+      if (v.length > 0 && !/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(v)) {
+        return MENSAJES_ERROR_SUSCRIPTOR.EMAIL_INVALIDO;
+      }
+      return undefined;
+
+    case 'telefono':
+      if (v.length > 0 && !/^\d{7,20}$/.test(v)) {
+        return MENSAJES_ERROR_SUSCRIPTOR.TELEFONO_INVALIDO;
+      }
+      return undefined;
 
     case 'municipio': {
       const t = v.trim();
@@ -278,6 +294,8 @@ export default function AltaSuscriptor({ navigation }: Props) {
         codigo: codigoGenerado,
         nombre_apellidos: form.nombre_apellidos.trim(),
         cedula: form.cedula.trim(),
+        email: form.email.trim() || undefined,
+        telefono: form.telefono.trim() || undefined,
         municipio: form.municipio.trim(),
         sector: form.sector.trim() || undefined,
         calle: form.calle.trim() || undefined,
@@ -403,6 +421,34 @@ export default function AltaSuscriptor({ navigation }: Props) {
               placeholder="6 a 12 dígitos"
               accessibilityHint="Ingrese la cédula del suscriptor, 6 a 12 dígitos numéricos"
               testID="alta-cedula"
+            />
+
+            <FormField
+              ref={getRef('email')}
+              label="Email (opcional)"
+              value={form.email}
+              onChangeText={(v) => setCampo('email', v)}
+              onBlur={() => onBlur('email')}
+              error={errores.email}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={!enviando}
+              placeholder="cliente@ejemplo.com"
+              testID="alta-email"
+            />
+
+            <FormField
+              ref={getRef('telefono')}
+              label="Teléfono (opcional)"
+              value={form.telefono}
+              onChangeText={(v) => setCampo('telefono', v)}
+              onBlur={() => onBlur('telefono')}
+              error={errores.telefono}
+              keyboardType="phone-pad"
+              maxLength={20}
+              editable={!enviando}
+              placeholder="7 a 20 dígitos"
+              testID="alta-telefono"
             />
 
             <FormField
