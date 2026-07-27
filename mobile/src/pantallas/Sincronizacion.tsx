@@ -11,6 +11,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { ResultadoSync } from '../composition/bootstrap';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { SyncStackScreenProps } from '../navegacion/types';
@@ -308,20 +309,15 @@ export default function Sincronizacion(_props: Props) {
         {/* Botones */}
         <View style={styles.botones}>
           {/* Sincronizar ahora — full width */}
-          <Pressable
+          <BotonPrimario
+            texto="Sincronizar ahora"
+            textoCargando="Sincronizando…"
+            icono="sync"
             onPress={sincronizar}
             disabled={cargando !== null}
-            style={({ pressed }) => [
-              styles.btnPrimario,
-              pressed && styles.btnPressed,
-              cargando !== null && styles.btnDisabled,
-            ]}
-          >
-            <MaterialIcons name="sync" size={22} color={COLORS.onPrimary} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>
-              {sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}
-            </Text>
-          </Pressable>
+            cargando={sincronizando}
+            testID="sincronizar-btn"
+          />
 
           {/* Grid 2-col */}
           <View style={styles.btnGrid}>
@@ -596,24 +592,6 @@ const styles = StyleSheet.create({
   botones: {
     width: '100%',
     gap: SPACING.sm,
-  },
-  btnPrimario: {
-    width: '100%',
-    height: 56,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-  },
-  btnPrimarioText: {
-    color: COLORS.onPrimary,
   },
   btnGrid: {
     flexDirection: 'row',

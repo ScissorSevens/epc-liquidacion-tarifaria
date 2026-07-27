@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { guardarSesion, type Sesion } from '../composition/constantes';
 import {
@@ -242,14 +243,14 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
             </View>
           </View>
 
-          {/* Botón Ingresar */}
-          <Pressable
-            style={({ pressed }) => [estilos.botonIngresar, pressed && estilos.botonPresionado]}
+          {/* Botón Ingresar — CTA destacado institucional (amarillo). */}
+          <BotonPrimario
+            texto="Ingresar"
             onPress={handleIngresar}
-          >
-            <Text style={estilos.textoBoton}>Ingresar</Text>
-            <MaterialIcons name="login" size={20} color={COLORS.brandAzulOscuro} />
-          </Pressable>
+            tono="amarillo"
+            icono="login"
+            testID="login-btn"
+          />
 
           {/* CTA secundario — recuperacion de credenciales.
               Color brandAzulDigital (azul digital institucional): el amarillo
@@ -386,16 +387,6 @@ const estilos = StyleSheet.create({
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.sm + 4,
   },
-  botonIngresar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.brandAmarillo,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    marginTop: SPACING.md,
-  },
   botonPresionado: {
     opacity: 0.85,
   },
@@ -411,10 +402,6 @@ const estilos = StyleSheet.create({
     color: COLORS.brandAzulDigital,
     fontWeight: '600',
     textDecorationLine: 'underline',
-  },
-  textoBoton: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.brandAzulOscuro,
   },
   divisor: {
     height: 1,
