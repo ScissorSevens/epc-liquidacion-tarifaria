@@ -39,6 +39,8 @@ interface SuscriptorRow {
   readonly codigo: string;
   readonly nombre_apellidos: string;
   readonly cedula: string;
+  readonly email: string | null;
+  readonly telefono: string | null;
   readonly municipio: string;
   readonly sector: string | null;
   readonly calle: string | null;
@@ -67,6 +69,8 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     categoria_uso: row.categoria_uso,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
+    ...(row.email !== null && { email: row.email }),
+    ...(row.telefono !== null && { telefono: row.telefono }),
     ...(row.sector !== null && { sector: row.sector }),
     ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
@@ -83,8 +87,8 @@ const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
     matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio,
-    cedula, municipio, sector
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    cedula, email, telefono, municipio, sector, calle
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
@@ -104,6 +108,8 @@ const SQL_UPDATE_SUBSIDIO = `UPDATE suscriptor SET aplica_subsidio = ? WHERE id_
 const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof SuscriptorRow> = [
   'nombre_apellidos',
   'cedula',
+  'email',
+  'telefono',
   'municipio',
   'sector',
   'calle',
@@ -165,8 +171,11 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.estado,
           data.aplica_subsidio ? 1 : 0,
           data.cedula,
+          data.email ?? null,
+          data.telefono ?? null,
           data.municipio,
           data.sector ?? null,
+          data.calle ?? null,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });

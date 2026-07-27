@@ -17,6 +17,8 @@ interface SuscriptorRowFixture {
   readonly codigo: string;
   readonly nombre_apellidos: string;
   readonly cedula: string;
+  readonly email: string | null;
+  readonly telefono: string | null;
   readonly municipio: string;
   readonly sector: string | null;
   readonly calle: string | null;
@@ -37,6 +39,8 @@ function buildRow(overrides: Partial<SuscriptorRowFixture> = {}): SuscriptorRowF
     codigo: '0007',
     nombre_apellidos: 'Ana Original',
     cedula: '51800012',
+    email: null,
+    telefono: null,
     municipio: 'Cáqueza',
     sector: 'Centro',
     calle: 'Cra 1',
@@ -59,6 +63,8 @@ function expectedSuscriptor(row: SuscriptorRowFixture): Suscriptor {
     codigo: row.codigo,
     nombre_apellidos: row.nombre_apellidos,
     cedula: row.cedula,
+    email: row.email ?? undefined,
+    telefono: row.telefono ?? undefined,
     municipio: row.municipio,
     sector: row.sector ?? undefined,
     calle: row.calle ?? undefined,
@@ -207,5 +213,31 @@ describe('crearSuscriptorRepositoryExpoSqlite.actualizar()', () => {
 
     expect(runAsync).not.toHaveBeenCalled();
     expect(actualizado).toEqual(expectedSuscriptor(original));
+  });
+
+  it('T-UPD-8: actualiza email y telefono explícitamente', async () => {
+    const original = buildRow();
+    const { db } = buildDb(original);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    const actualizado = await repo.actualizar(original.id_suscriptor, {
+      email: 'ana@example.com',
+      telefono: '3101234567',
+    });
+
+    expect(actualizado.email).toBe('ana@example.com');
+    expect(actualizado.telefono).toBe('3101234567');
+  });
+
+  it('T-UPD-9: omite contactos almacenados como NULL', async () => {
+    const original = buildRow({ email: null, telefono: null });
+    const { db } = buildDb(original);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    const encontrado = await repo.buscarPorId(original.id_suscriptor);
+
+    expect(encontrado).toEqual(expectedSuscriptor(original));
+    expect(encontrado).not.toHaveProperty('email');
+    expect(encontrado).not.toHaveProperty('telefono');
   });
 });
