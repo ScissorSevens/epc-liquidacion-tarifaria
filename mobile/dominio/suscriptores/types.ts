@@ -20,6 +20,8 @@ export interface Suscriptor {
   readonly codigo: string;
   readonly nombre_apellidos: string;
   readonly cedula: string;
+  readonly email?: string;
+  readonly telefono?: string;
   readonly municipio: string;
   readonly sector?: string;
   readonly calle?: string;
@@ -60,6 +62,8 @@ export type ActualizarSuscriptorInput = Partial<
     | 'numero_catastral'
     | 'estado'
     | 'cedula'
+    | 'email'
+    | 'telefono'
     | 'municipio'
     | 'sector'
     | 'calle'

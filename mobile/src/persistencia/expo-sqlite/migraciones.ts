@@ -347,6 +347,13 @@ const MIGRACION_017_OPERARIO_PASSWORD_HASH = `
 ALTER TABLE operarios ADD COLUMN password_hash TEXT NOT NULL DEFAULT '';
 `;
 
+const MIGRACION_018_SUSCRIPTOR_EMAIL_TELEFONO = `
+ALTER TABLE suscriptor ADD COLUMN email TEXT;
+ALTER TABLE suscriptor ADD COLUMN telefono TEXT;
+CREATE INDEX idx_suscriptor_email ON suscriptor (email);
+CREATE INDEX idx_suscriptor_telefono ON suscriptor (telefono);
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -365,6 +372,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 15, nombre: '015_operario', sql: MIGRACION_015_OPERARIO },
   { version: 16, nombre: '016_setup_inicial_multi_tenant', sql: MIGRACION_016_SETUP_INICIAL_MULTI_TENANT },
   { version: 17, nombre: '017_operario_password_hash', sql: MIGRACION_017_OPERARIO_PASSWORD_HASH },
+  { version: 18, nombre: '018_suscriptor_email_telefono', sql: MIGRACION_018_SUSCRIPTOR_EMAIL_TELEFONO },
 ];
 
 
