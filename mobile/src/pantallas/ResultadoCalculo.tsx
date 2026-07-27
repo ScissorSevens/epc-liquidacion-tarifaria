@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -220,16 +221,15 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Acciones */}
         <View style={styles.actionsCol}>
-          <Pressable
+          <BotonPrimario
+            texto="Ver historial"
+            icono="history"
+            tono="azul"
             onPress={() => navigation.navigate('Historial', {
               id_suscriptor,
               nombre: nombre_suscriptor,
             })}
-            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-          >
-            <MaterialIcons name="history" size={20} color={COLORS.onPrimary} />
-            <Text style={styles.btnPrimaryText}>Ver historial</Text>
-          </Pressable>
+          />
           <Pressable
             onPress={() =>
               navigation.replace('CapturarLectura', {
@@ -506,25 +506,6 @@ const styles = StyleSheet.create({
   actionsCol: {
     gap: SPACING.sm,
     marginTop: SPACING.lg,
-  },
-  btnPrimary: {
-    width: '100%',
-    height: 56,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.default,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-  },
-  btnPrimaryText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
   },
   btnSecondary: {
     width: '100%',
