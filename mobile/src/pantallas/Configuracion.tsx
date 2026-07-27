@@ -54,10 +54,36 @@ type EstadoPerfil =
   | { tipo: 'error'; mensaje: string };
 
 /**
+ * Formatea un número con separador de miles estilo CO (punto).
+ *
+ * Replica intencionalmente la función de `MiPerfil.tsx` para mantener
+ * consistencia visual entre la entrada de parámetros tarifarios del
+ * tab Perfil (esta pantalla) y la sección completa de MiPerfil.
+ */
+function formatearNumero(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
  * Pantalla de perfil — datos del operario + acciones de gestión.
+ *
+ * BUG FIX (T-MP-PARAM-FIX-*): la sección de parámetros tarifarios
+ * faltaba en esta pantalla. El user llegaba al tab "Perfil" (que
+ * monta `Configuracion`, NO `MiPerfil`) y no veía la sección que el
+ * commit 530dc10 había agregado en `MiPerfil.tsx`. Ahora esta pantalla
+ * expone una entrada "Parámetros tarifarios" que muestra un resumen
+ * del estado (CMA formateado + vigencia, o "Sin configurar") y al
+ * presionarla navega a `MiPerfil`, donde está la sección completa con
+ * el modal de edición.
  */
 export default function Configuracion({ navigation, onLogoutRequested }: Props) {
   const [perfil, setPerfil] = useState<EstadoPerfil>({ tipo: 'cargando' });
+
+  // Lectura del store para mostrar el resumen de parámetros tarifarios.
+  // No usamos el setter acá — la edición ocurre en MiPerfil (modal).
+  const parametrosVigentes = useWorkspace(
+    (s) => s.parametros_vigentes,
+  );
 
   const cargarPerfil = useCallback(async () => {
     setPerfil({ tipo: 'cargando' });
@@ -228,6 +254,46 @@ export default function Configuracion({ navigation, onLogoutRequested }: Props) 
                   {perfil.operario.estado}
                 </Text>
               </View>
+            </View>
+
+            {/* Parámetros tarifarios — entrada al editor (MiPerfil).
+                Muestra un resumen del estado: si no hay parámetros
+                vigentes, "Sin configurar"; si los hay, el CMA formateado
+                con separador de miles. El tap navega a MiPerfil, donde
+                está la sección completa con el modal de edición. */}
+            <Text style={[TYPOGRAPHY.labelMd, styles.seccionLabel]}>
+              Parámetros tarifarios
+            </Text>
+            <View style={styles.tarjeta}>
+              <Pressable
+                testID="item-parametros-tarifarios"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  parametrosVigentes !== null
+                    ? 'Editar parámetros tarifarios'
+                    : 'Configurar parámetros tarifarios'
+                }
+                style={({ pressed }) => [
+                  styles.itemMenu,
+                  pressed && styles.itemMenuPressed,
+                ]}
+                onPress={() => navigation.navigate('MiPerfil')}
+              >
+                <MaterialIcons name="tune" size={24} color={COLORS.primary} />
+                <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuTexto]}>
+                  Parámetros tarifarios
+                </Text>
+                {parametrosVigentes !== null ? (
+                  <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuValor]}>
+                    {formatearNumero(parametrosVigentes.cma)}
+                  </Text>
+                ) : (
+                  <Text style={[TYPOGRAPHY.bodyMd, styles.itemMenuValor]}>
+                    Sin configurar
+                  </Text>
+                )}
+                <MaterialIcons name="chevron-right" size={24} color={COLORS.outline} />
+              </Pressable>
             </View>
 
             {/* Gestión */}
