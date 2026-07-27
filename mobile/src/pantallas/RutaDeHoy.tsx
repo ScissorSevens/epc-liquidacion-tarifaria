@@ -21,6 +21,7 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import { useWorkspace } from '../composicion/useWorkspace';
@@ -187,9 +188,12 @@ export default function RutaDeHoy({ navigation }: Props) {
         <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>
           Error al cargar: {error}
         </Text>
-        <Pressable onPress={() => void cargar()} style={styles.btnRetry}>
-          <Text style={[TYPOGRAPHY.labelLg, styles.btnRetryText]}>Reintentar</Text>
-        </Pressable>
+        <BotonPrimario
+          texto="Reintentar"
+          tono="azul"
+          tamano="compacto"
+          onPress={() => void cargar()}
+        />
       </View>
     );
   }
@@ -307,20 +311,13 @@ export default function RutaDeHoy({ navigation }: Props) {
               Necesitamos un prestador activo para mostrar la ruta de hoy y
               los suscriptores asignados.
             </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.identidadVaciaCTA,
-                pressed && styles.identidadVaciaCTAPressed,
-              ]}
+            <BotonPrimario
+              texto="Configurar prestador"
+              icono="arrow-forward"
+              tono="azul"
+              tamano="compacto"
               onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
-              accessibilityRole="button"
-              accessibilityLabel="Configurar prestador"
-            >
-              <MaterialIcons name="arrow-forward" size={18} color={COLORS.onPrimary} />
-              <Text style={styles.identidadVaciaCTATexto}>
-                Configurar prestador
-              </Text>
-            </Pressable>
+            />
           </View>
         )}
 
@@ -639,25 +636,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurfaceVariant,
   },
-  identidadVaciaCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: SPACING.xs,
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm + 2, // 10
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.full,
-    marginTop: SPACING.xs,
-    minHeight: 44, // touch target accesible
-  },
-  identidadVaciaCTAPressed: {
-    opacity: 0.85,
-  },
-  identidadVaciaCTATexto: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
-  },
 
   // ── Progreso ──────────────────────────────────────────────────────────────
   // Sin border+shadow combo: solo border 1 con outlineVariant. Sin
@@ -790,15 +768,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Error / Retry ─────────────────────────────────────────────────────────
-  btnRetry: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
-  },
-  btnRetryText: {
-    color: COLORS.onPrimary,
-  },
+  // El botón "Reintentar" se renderiza via <BotonPrimario> extraído.
 
   // ── Modal selector de medidor ─────────────────────────────────────────────
   modalOverlay: {
