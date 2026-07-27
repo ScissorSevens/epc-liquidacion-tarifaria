@@ -174,6 +174,11 @@ function crearParametrosFixture(overrides: Partial<ParametrosTarifa> = {}): Para
     suscriptores_promedio: 350,
     aplica_minimo_vital: true,
     m3_gratis_minimo_vital: 6,
+    ipuf_indice: 1.0,
+    cargo_fijo_resultante: 12_345_678 / 350,
+    cargo_consumo_resultante: 450 + 120 + 80 + 25,
+    componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+    minimo_vital: null,
     vigente_desde: '2025-01-01',
     vigente_hasta: '2029-12-31',
     created_at: '2026-01-01T00:00:00.000Z',
@@ -979,6 +984,300 @@ describe('MiPerfil — editar parámetros tarifarios vía modal (TAREA 11 commit
       };
       const alto = estilo.height ?? estilo.minHeight ?? 0;
       expect(alto).toBeGreaterThanOrEqual(44);
+    });
+  });
+});
+
+describe('MiPerfil — ParametrosTarifa completo (Res 825/2017): IPUF, cargos, componentes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  function mockearParametros(p: ParametrosTarifa): void {
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 42,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: p,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+  }
+
+  /**
+   * T-MP-IPUF-1 — La pantalla muestra `ipuf_indice` formateado cuando
+   * hay parámetros vigentes. El IPUF (Índice de Precios al Usuario
+   * Final) es un multiplicador decimal: 1.0 = sin ajuste, 1.05 = +5%.
+   */
+  it('T-MP-IPUF-1 muestra IPUF desde parametros_vigentes.ipuf_indice', async () => {
+    mockearParametros(crearParametrosFixture({ ipuf_indice: 1.05 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-ipuf-valor');
+      expect(valorEl).toBeTruthy();
+      const texto = (valorEl.props.children as string) ?? '';
+      // 1.05 → "1.05" o "1,05" según locale; validamos el numero.
+      const num = parseFloat(texto.replace(',', '.'));
+      expect(num).toBeCloseTo(1.05, 2);
+    });
+  });
+
+  /**
+   * T-MP-CARGO-FIJO-1 — El cargo fijo resultante se muestra con su
+   * valor pre-calculado y persistido. El operario NO debe editarlo
+   * (es derivado de CMA/N).
+   */
+  it('T-MP-CARGO-FIJO-1 muestra cargo_fijo_resultante desde parametros', async () => {
+    mockearParametros(crearParametrosFixture({ cargo_fijo_resultante: 12_345 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-cargo-fijo-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('12345');
+    });
+  });
+
+  /**
+   * T-MP-CARGO-CONSUMO-1 — El cargo por consumo resultante (COP / m³)
+   * se muestra con su valor pre-calculado.
+   */
+  it('T-MP-CARGO-CONSUMO-1 muestra cargo_consumo_resultante desde parametros', async () => {
+    mockearParametros(crearParametrosFixture({ cargo_consumo_resultante: 875 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const valorEl = getByTestId('fila-param-cargo-consumo-valor');
+      expect(valorEl).toBeTruthy();
+      const digitos = ((valorEl.props.children as string) ?? '').replace(/[^\d]/g, '');
+      expect(digitos).toBe('875');
+    });
+  });
+
+  /**
+   * T-MP-COMPONENTES-1 — El modal de edición muestra un switch por
+   * cada componente. Toggle debe reflejar si está en el array
+   * `componentes_aplicables` del store.
+   */
+  it('T-MP-COMPONENTES-1 switches de componentes reflejando componentes_aplicables', async () => {
+    mockearParametros(
+      crearParametrosFixture({
+        componentes_aplicables: ['CMA', 'CMO', 'CMI'],  // CMT y CMVIAA off
+      }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      const switchCma = getByTestId('switch-componente-CMA');
+      const switchCmt = getByTestId('switch-componente-CMT');
+      expect(switchCma).toBeTruthy();
+      expect(switchCmt).toBeTruthy();
+      expect(switchCma.props.value).toBe(true);
+      expect(switchCmt.props.value).toBe(false);
+    });
+  });
+
+  /**
+   * T-MP-COMPONENTES-2 — Toggling un componente que está en el array
+   * lo quita. El cargo_fijo_resultante debe recalcularse en vivo
+   * (la UI muestra el preview, el guardado lo persiste).
+   */
+  it('T-MP-COMPONENTES-2 toggle de componente recalcula cargo_fijo_resultante en vivo', async () => {
+    mockearParametros(
+      crearParametrosFixture({
+        cma: 12_000_000,
+        suscriptores_promedio: 1000,
+        componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+      }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    // Apertura del modal.
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByTestId('switch-componente-CMA')).toBeTruthy();
+    });
+
+    // CFO inicial = 12_000_000 / 1000 = 12_000 (visible).
+    const cargoInicialEl = getByTestId('param-preview-cargo-fijo-valor');
+    const cargoInicial = (cargoInicialEl.props.children as string) ?? '';
+    expect(cargoInicial.replace(/[^\d]/g, '')).toBe('12000');
+
+    // Toggle CMA off → cargo_fijo debe ir a 0.
+    fireEvent(getByTestId('switch-componente-CMA'), 'valueChange', false);
+
+    const cargoSinCmaEl = getByTestId('param-preview-cargo-fijo-valor');
+    const cargoSinCma = (cargoSinCmaEl.props.children as string) ?? '';
+    expect(cargoSinCma.replace(/[^\d]/g, '')).toBe('0');
+  });
+
+  /**
+   * T-MP-IPUF-2 — El modal de edición expone un input numérico para
+   * `ipuf_indice`. El default sin parametros previos es 1.0.
+   */
+  it('T-MP-IPUF-2 modal expone input numérico para IPUF', async () => {
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      const input = getByTestId('param-ipuf-indice');
+      expect(input).toBeTruthy();
+      // Default sin parametros previos: 1.0.
+      expect((input.props.value as string)).toBe('1');
+    });
+  });
+
+  /**
+   * T-MP-CARGO-PREVIEW-1 — El modal muestra un preview de los cargos
+   * resultantes (calculados en vivo, no editables). Formato COP con
+   * separador de miles.
+   */
+  it('T-MP-CARGO-PREVIEW-1 modal muestra preview de cargo_fijo_resultante', async () => {
+    mockearParametros(
+      crearParametrosFixture({
+        cma: 12_000_000,
+        suscriptores_promedio: 1000,
+        componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+      }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      const preview = getByTestId('param-preview-cargo-fijo-valor');
+      expect(preview).toBeTruthy();
+      const texto = (preview.props.children as string) ?? '';
+      expect(texto.replace(/[^\d]/g, '')).toBe('12000');
+    });
+  });
+
+  /**
+   * T-MP-CARGO-PREVIEW-2 — El modal muestra preview de cargo_consumo_resultante.
+   */
+  it('T-MP-CARGO-PREVIEW-2 modal muestra preview de cargo_consumo_resultante', async () => {
+    mockearParametros(
+      crearParametrosFixture({
+        cmo: 500,
+        cmi: 200,
+        cmt: 100,
+        cmviaa: 25,
+        aplica_cmviaa: true,
+        componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+      }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      const preview = getByTestId('param-preview-cargo-consumo-valor');
+      expect(preview).toBeTruthy();
+      const texto = (preview.props.children as string) ?? '';
+      // 500 + 200 + 100 + 25 = 825.
+      expect(texto.replace(/[^\d]/g, '')).toBe('825');
+    });
+  });
+
+  /**
+   * T-MP-GUARDAR-CARGOS-1 — Al guardar, los cargos pre-calculados se
+   * persisten en el store via `setParametrosVigentes`. El modal
+   * muestra los valores PRE-CALCULADOS con la formula del dominio
+   * (CMA/N, CMO+CMI+CMT+CMVIAA).
+   */
+  it('T-MP-GUARDAR-CARGOS-1 guardar persiste cargos pre-calculados', async () => {
+    const { __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    __acciones.setParametrosVigentes.mockClear();
+
+    mockearParametros(
+      crearParametrosFixture({
+        cma: 12_000_000,
+        suscriptores_promedio: 1000,
+        cmo: 500,
+        cmi: 200,
+        cmt: 100,
+        cmviaa: 25,
+        aplica_cmviaa: true,
+        componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+      }),
+    );
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByTestId('param-guardar')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('param-guardar'));
+
+    await waitFor(() => {
+      expect(__acciones.setParametrosVigentes).toHaveBeenCalledTimes(1);
+      const arg = __acciones.setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
+      // Cargos pre-calculados con la formula del dominio.
+      expect(arg.cargo_fijo_resultante).toBe(12_000);
+      expect(arg.cargo_consumo_resultante).toBe(825);
     });
   });
 });

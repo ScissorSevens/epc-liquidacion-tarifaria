@@ -22,6 +22,7 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
   Pressable,
@@ -43,7 +44,12 @@ import {
   BORDERS,
 } from '../theme/skeletal-tokens';
 import type { ConfigStackScreenProps } from '../navegacion/types';
-import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
+import {
+  COMPONENTES_TARIFARIOS,
+  calcularCargos,
+  type ComponenteTarifa,
+  type ParametrosTarifa,
+} from '../../dominio/parametros-tarifa';
 
 type Props = ConfigStackScreenProps<'MiPerfil'> & {
   readonly onLogoutRequested: () => void;
@@ -92,10 +98,13 @@ interface FormParametros {
   readonly cmviaa: string;
   readonly agua: string;
   readonly ipuf: string;
+  readonly ipufIndice: string;
   readonly suscriptores: string;
   readonly m3gratis: string;
   readonly vigenteDesde: string;
   readonly vigenteHasta: string;
+  /** Componentes activos (subset de COMPONENTES_TARIFARIOS). */
+  readonly componentesActivos: readonly ComponenteTarifa[];
 }
 
 function formParametrosDesde(p: ParametrosTarifa): FormParametros {
@@ -108,12 +117,19 @@ function formParametrosDesde(p: ParametrosTarifa): FormParametros {
     cmviaa: String(p.cmviaa),
     agua: String(p.agua_suministrada_m3_anio),
     ipuf: String(p.ipuf_m3_suscriptor_mes),
+    ipufIndice: String(p.ipuf_indice),
     suscriptores: String(p.suscriptores_promedio),
     m3gratis: String(p.m3_gratis_minimo_vital),
     // Slice para quedarnos con YYYY-MM-DD aunque el stored value sea
     // un ISO completo (algunos seeds usan ISO 8601 con hora).
     vigenteDesde: p.vigente_desde.slice(0, 10),
     vigenteHasta: p.vigente_hasta.slice(0, 10),
+    // Filtramos componentes activos que sean válidos (un miembro de
+    // COMPONENTES_TARIFARIOS). Componentes legacy/forward-compat
+    // quedan omitidos de la UI (no son switchables).
+    componentesActivos: p.componentes_aplicables.filter((c): c is ComponenteTarifa =>
+      COMPONENTES_TARIFARIOS.includes(c as ComponenteTarifa),
+    ),
   };
 }
 
@@ -154,7 +170,7 @@ function parametrosDefaults(id_prestador: number): ParametrosTarifa {
   const hoy = new Date();
   const hasta = new Date(hoy);
   hasta.setFullYear(hasta.getFullYear() + 5);
-  return {
+  const base: ParametrosTarifa = {
     id_parametros: 0,
     id_prestador,
     id_acuerdo: 0,
@@ -170,9 +186,23 @@ function parametrosDefaults(id_prestador: number): ParametrosTarifa {
     suscriptores_promedio: 1,
     aplica_minimo_vital: false,
     m3_gratis_minimo_vital: 6,
+    ipuf_indice: 1.0,
+    cargo_fijo_resultante: 0,
+    cargo_consumo_resultante: 0,
+    componentes_aplicables: [...COMPONENTES_TARIFARIOS],
+    minimo_vital: null,
     vigente_desde: hoy.toISOString().slice(0, 10),
     vigente_hasta: hasta.toISOString().slice(0, 10),
     created_at: hoy.toISOString(),
+  };
+  // Pre-calculamos los cargos con la misma fórmula que se va a persistir.
+  // Así el modal muestra el cargo updated incluso antes de guardar.
+  const cargos = calcularCargos(base);
+  // Devolvemos una copia con los cargos calculados (la base queda intacta).
+  return {
+    ...base,
+    cargo_fijo_resultante: cargos.cargo_fijo,
+    cargo_consumo_resultante: cargos.cargo_consumo,
   };
 }
 
@@ -245,7 +275,9 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
     // operario solo edita los valores del form.
     const base: ParametrosTarifa =
       parametros ?? parametrosDefaults(idPrestadorActivo);
-    const nuevosParametros: ParametrosTarifa = {
+    const suscriptoresPromedio = aEntero(form.suscriptores);
+    const aplicaCmviaa = base.aplica_cmviaa;
+    const nuevosParametrosSinCargos: Omit<ParametrosTarifa, 'cargo_fijo_resultante' | 'cargo_consumo_resultante'> = {
       ...base,
       periodo: aEntero(form.periodo),
       cma: aNumero(form.cma),
@@ -255,11 +287,29 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
       cmviaa: aNumero(form.cmviaa),
       agua_suministrada_m3_anio: aNumero(form.agua),
       ipuf_m3_suscriptor_mes: aNumero(form.ipuf),
-      suscriptores_promedio: aEntero(form.suscriptores),
+      ipuf_indice: aNumero(form.ipufIndice),
+      suscriptores_promedio: suscriptoresPromedio,
       m3_gratis_minimo_vital: aEntero(form.m3gratis),
+      componentes_aplicables: form.componentesActivos,
       vigente_desde: form.vigenteDesde,
       vigente_hasta: form.vigenteHasta,
     };
+    // Pre-calculamos cargo_fijo_resultante + cargo_consumo_resultante
+    // con la factoría pura del dominio. Res 825/2017 compliance: estos
+    // valores se persisten al guardar y NO se recalculan en cada factura.
+    const cargos = calcularCargos({
+      ...nuevosParametrosSinCargos,
+      cargo_fijo_resultante: 0,
+      cargo_consumo_resultante: 0,
+    } as ParametrosTarifa);
+    const nuevosParametros: ParametrosTarifa = {
+      ...nuevosParametrosSinCargos,
+      cargo_fijo_resultante: cargos.cargo_fijo,
+      cargo_consumo_resultante: cargos.cargo_consumo,
+    };
+    // Garantizamos no usar la variable en desuso.
+    void suscriptoresPromedio;
+    void aplicaCmviaa;
     setParametrosVigentes(nuevosParametros);
     setModalVisible(false);
     setForm(null);
@@ -272,6 +322,20 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   ): void {
     if (form === null) return;
     setForm({ ...form, [key]: valor });
+  }
+
+  /**
+   * Toggle de un componente tarifario (CMA / CMO / CMI / CMT / CMVIAA).
+   * Si está activo lo quita del array; si no está, lo agrega.
+   */
+  function toggleComponente(componente: ComponenteTarifa): void {
+    if (form === null) return;
+    const activos = form.componentesActivos;
+    const estaActivo = activos.includes(componente);
+    const nuevos = estaActivo
+      ? activos.filter((c) => c !== componente)
+      : [...activos, componente];
+    setForm({ ...form, componentesActivos: nuevos });
   }
 
   // ── Valores derivados ─────────────────────────────────────────────────────
@@ -294,6 +358,40 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   const prestadorNombre = prestador?.nombre ?? PLACEHOLDER;
   const prestadorMunicipio = prestador?.municipio ?? '';
   const prestadorCodigo = prestador?.codigo ?? '';
+
+  /**
+   * Preview de los cargos resultantes a partir del estado actual del
+   * formulario. Se recalcula en cada render (no se persiste; solo
+   * para mostrar al operario qué se va a guardar). Si el form es
+   * null (modal cerrado), devolvemos zeros defensivos.
+   */
+  const previewCargos = form !== null
+    ? calcularCargos({
+        id_parametros: 0,
+        id_prestador: idPrestadorActivo,
+        id_acuerdo: 0,
+        periodo: aEntero(form.periodo),
+        cma: aNumero(form.cma),
+        cmo: aNumero(form.cmo),
+        cmi: aNumero(form.cmi),
+        cmt: aNumero(form.cmt),
+        cmviaa: aNumero(form.cmviaa),
+        aplica_cmviaa: parametros?.aplica_cmviaa ?? false,
+        agua_suministrada_m3_anio: aNumero(form.agua),
+        ipuf_m3_suscriptor_mes: aNumero(form.ipuf),
+        suscriptores_promedio: aEntero(form.suscriptores),
+        aplica_minimo_vital: parametros?.aplica_minimo_vital ?? false,
+        m3_gratis_minimo_vital: aEntero(form.m3gratis),
+        ipuf_indice: aNumero(form.ipufIndice),
+        componentes_aplicables: form.componentesActivos,
+        minimo_vital: null,
+        cargo_fijo_resultante: 0,
+        cargo_consumo_resultante: 0,
+        vigente_desde: form.vigenteDesde,
+        vigente_hasta: form.vigenteHasta,
+        created_at: new Date().toISOString(),
+      })
+    : { cargo_fijo: 0, cargo_consumo: 0 };
 
   return (
     <View style={estilos.raiz}>
@@ -448,6 +546,28 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             borde
           />
           <FilaInfo
+            etiqueta="IPUF · Índice de Precios al Usuario Final"
+            valor={
+              parametros !== null
+                ? parametros.ipuf_indice.toFixed(2)
+                : '1.00'
+            }
+            testID="fila-param-ipuf"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Componentes activos"
+            valor={
+              parametros !== null
+                ? parametros.componentes_aplicables.length === 0
+                  ? PLACEHOLDER
+                  : parametros.componentes_aplicables.join(', ')
+                : PLACEHOLDER
+            }
+            testID="fila-param-componentes"
+            borde
+          />
+          <FilaInfo
             etiqueta="Mínimo vital (m³)"
             valor={
               parametros !== null && parametros.aplica_minimo_vital
@@ -455,6 +575,30 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
                 : PLACEHOLDER
             }
             testID="fila-param-minimo-vital"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Cargo Fijo resultante ($/suscriptor/mes)"
+            valor={
+              parametros !== null
+                ? formatearNumero(
+                    Math.round(parametros.cargo_fijo_resultante),
+                  )
+                : PLACEHOLDER
+            }
+            testID="fila-param-cargo-fijo"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Cargo Consumo resultante ($/m³)"
+            valor={
+              parametros !== null
+                ? formatearNumero(
+                    Math.round(parametros.cargo_consumo_resultante),
+                  )
+                : PLACEHOLDER
+            }
+            testID="fila-param-cargo-consumo"
             borde
           />
           <FilaInfo
@@ -593,6 +737,60 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
                     testID="param-cmviaa"
                   />
 
+                  <Text style={estilos.modalSeccion}>Componentes activos</Text>
+                  <Text style={estilos.modalHelper}>
+                    Marcá los componentes que aplican a este prestador. El
+                    cargo fijo y el cargo por consumo se recalculan en vivo.
+                  </Text>
+                  {COMPONENTES_TARIFARIOS.map((componente) => {
+                    const activo = form.componentesActivos.includes(componente);
+                    const etiquetas: Record<ComponenteTarifa, string> = {
+                      CMA: 'CMA · Costo Medio Administración',
+                      CMO: 'CMO · Costo Medio Operación',
+                      CMI: 'CMI · Costo Medio Inversión',
+                      CMT: 'CMT · Costo Medio Tasas Ambientales',
+                      CMVIAA: 'CMVIAA · Inv. Ambientales Adicionales',
+                    };
+                    return (
+                      <View
+                        key={componente}
+                        style={estilos.switchFila}
+                        testID={`fila-switch-${componente}`}
+                      >
+                        <Text style={estilos.switchEtiqueta}>
+                          {etiquetas[componente]}
+                        </Text>
+                        <Switch
+                          testID={`switch-componente-${componente}`}
+                          value={activo}
+                          onValueChange={() => toggleComponente(componente)}
+                          accessibilityLabel={`Activar ${etiquetas[componente]}`}
+                        />
+                      </View>
+                    );
+                  })}
+
+                  <Text style={estilos.modalSeccion}>Cargos resultantes (preview)</Text>
+                  <Text style={estilos.modalHelper}>
+                    Estos valores se persisten al guardar y NO se recalculan
+                    en cada factura (Res 825/2017 compliance).
+                  </Text>
+                  <FilaInfo
+                    etiqueta="Cargo Fijo ($/suscriptor/mes)"
+                    valor={formatearNumero(
+                      Math.round(previewCargos.cargo_fijo),
+                    )}
+                    testID="param-preview-cargo-fijo"
+                    borde
+                  />
+                  <FilaInfo
+                    etiqueta="Cargo Consumo ($/m³)"
+                    valor={formatearNumero(
+                      Math.round(previewCargos.cargo_consumo),
+                    )}
+                    testID="param-preview-cargo-consumo"
+                  />
+
                   <Text style={estilos.modalSeccion}>Agua y suscriptores</Text>
                   <FormField
                     label="Agua Suministrada (m³/año)"
@@ -607,6 +805,14 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
                     onChangeText={(v) => setCampo('ipuf', v)}
                     keyboardType="numeric"
                     testID="param-ipuf"
+                  />
+                  <FormField
+                    label="IPUF · Índice de Precios al Usuario Final (decimal)"
+                    value={form.ipufIndice}
+                    onChangeText={(v) => setCampo('ipufIndice', v)}
+                    keyboardType="decimal-pad"
+                    helperText="Multiplicador para ajuste periódico. 1.0 = sin ajuste, 1.05 = +5%."
+                    testID="param-ipuf-indice"
                   />
                   <FormField
                     label="Suscriptores promedio (N)"
@@ -873,6 +1079,26 @@ const estilos = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     marginTop: SPACING.md,
     marginBottom: SPACING.xs,
+  },
+  modalHelper: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: SPACING.sm,
+  },
+  switchFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 48, // WCAG 2.5.5: >= 44px touch target.
+    paddingHorizontal: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+  },
+  switchEtiqueta: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
+    flexShrink: 1,
+    paddingRight: SPACING.md,
   },
   modalFooter: {
     flexDirection: 'row',
