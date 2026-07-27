@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -18,6 +17,7 @@ import type { ActualizarSuscriptorInput, EstadoSuscriptor, Suscriptor } from '@d
 import { CATEGORIAS_USO, ETIQUETAS_CATEGORIA_USO, type CategoriaUso } from '@dominio/categorias-uso';
 import { editarYEncolarSuscriptor } from '../adapters/editar-y-encolar-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { FormField } from '../componentes/FormField';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -82,6 +82,12 @@ type Props = LecturasStackScreenProps<'EditarSuscriptor'>;
  * - `estrato` y `estado` usan chips Pressable (patron AltaSuscriptor).
  * - GUARDAR deshabilitado si campos obligatorios estan vacios o hay envio en curso.
  * - Offline-first: escribe en SQLite → encola para sync posterior.
+ *
+ * Migracion a FormField (Commit 3 — impeccable craft):
+ *   - 7 inputs de texto migrados al componente FormField.
+ *   - Read-only cedula mantenida inline (no es FormField; es display).
+ *   - Chips de estrato/estado/categoria_uso + toggle subsidio preservados.
+ *   - Touch target >= 44px enforced via FormField (minHeight 48).
  */
 export default function EditarSuscriptor({ navigation, route }: Props) {
   const { suscriptor } = route.params;
@@ -162,29 +168,31 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             {/* Cédula — solo lectura */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Cédula</Text>
-              <View style={styles.readonlyField}>
+              <View
+                style={styles.readonlyField}
+                accessibilityLabel={`Cédula ${suscriptor.cedula}, no editable`}
+              >
                 <Text style={styles.readonlyText}>{suscriptor.cedula}</Text>
               </View>
               <Text style={styles.helperText}>El número de cédula no es editable</Text>
             </View>
 
-            {/* Nombre y apellidos */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Nombre y apellidos</Text>
-              <TextInput
-                style={styles.input}
-                value={form.nombre_apellidos}
-                onChangeText={(v) => setCampo('nombre_apellidos', v)}
-                placeholder="Ej: Juan Pérez"
-                maxLength={150}
-                editable={!enviando}
-                placeholderTextColor={COLORS.onSurfaceVariant}
-              />
-            </View>
+            <FormField
+              label="Nombre y apellidos"
+              required
+              value={form.nombre_apellidos}
+              onChangeText={(v) => setCampo('nombre_apellidos', v)}
+              maxLength={150}
+              editable={!enviando}
+              placeholder="Ej: Juan Pérez"
+              testID="editar-nombre"
+            />
 
             {/* Estrato */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Estrato</Text>
+              <Text style={styles.fieldLabel}>
+                Estrato <Text style={styles.requerido}>*</Text>
+              </Text>
               <View style={styles.chipsRow}>
                 {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
                   <Pressable
@@ -195,6 +203,9 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                       form.estrato === e && styles.chipSel,
                       pressed && styles.pressed,
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Estrato ${e}`}
+                    accessibilityState={{ selected: form.estrato === e }}
                   >
                     <Text style={[styles.chipText, form.estrato === e && styles.chipTextSel]}>
                       {e}
@@ -217,6 +228,9 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                       form.categoria_uso === cat && styles.chipSel,
                       pressed && styles.pressed,
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Categoría ${ETIQUETAS_CATEGORIA_USO[cat]}`}
+                    accessibilityState={{ selected: form.categoria_uso === cat }}
                   >
                     <Text
                       style={[
@@ -247,9 +261,12 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                       form.estado === est && styles.chipSel,
                       pressed && styles.pressed,
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Estado ${est}`}
+                    accessibilityState={{ selected: form.estado === est }}
                   >
                     <Text style={[styles.chipText, form.estado === est && styles.chipTextSel]}>
-                      {est.toUpperCase()}
+                      {est}
                     </Text>
                   </Pressable>
                 ))}
@@ -265,6 +282,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
                 trackColor={{ false: COLORS.surfaceVariant, true: COLORS.secondaryContainer }}
                 thumbColor={COLORS.surfaceContainerLowest}
                 disabled={enviando}
+                accessibilityLabel="Aplica subsidio"
               />
             </View>
           </View>
@@ -276,49 +294,37 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
               <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Ubicación</Text>
             </View>
 
-            {/* Municipio */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Municipio</Text>
-              <TextInput
-                style={styles.input}
-                value={form.municipio}
-                onChangeText={(v) => setCampo('municipio', v)}
-                placeholder="Ej: Bogotá"
-                maxLength={100}
-                editable={!enviando}
-                placeholderTextColor={COLORS.onSurfaceVariant}
-              />
-            </View>
+            <FormField
+              label="Municipio"
+              required
+              value={form.municipio}
+              onChangeText={(v) => setCampo('municipio', v)}
+              maxLength={100}
+              editable={!enviando}
+              placeholder="Ej: Bogotá"
+              testID="editar-municipio"
+            />
 
-            {/* Dirección */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Dirección</Text>
-              <TextInput
-                style={styles.input}
-                value={form.direccion}
-                onChangeText={(v) => setCampo('direccion', v)}
-                placeholder="Calle, Carrera, Vereda o Sector"
-                maxLength={200}
-                editable={!enviando}
-                placeholderTextColor={COLORS.onSurfaceVariant}
-              />
-            </View>
+            <FormField
+              label="Dirección"
+              required
+              value={form.direccion}
+              onChangeText={(v) => setCampo('direccion', v)}
+              maxLength={200}
+              editable={!enviando}
+              placeholder="Calle, Carrera, Vereda o Sector"
+              testID="editar-direccion"
+            />
 
-            {/* Sector */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>
-                Sector <Text style={styles.opcional}>(opcional)</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={form.sector}
-                onChangeText={(v) => setCampo('sector', v)}
-                placeholder="Ej: Centro, Zona Industrial"
-                maxLength={100}
-                editable={!enviando}
-                placeholderTextColor={COLORS.onSurfaceVariant}
-              />
-            </View>
+            <FormField
+              label="Sector (opcional)"
+              value={form.sector}
+              onChangeText={(v) => setCampo('sector', v)}
+              maxLength={100}
+              editable={!enviando}
+              placeholder="Ej: Centro, Zona Industrial"
+              testID="editar-sector"
+            />
           </View>
 
           {/* ── Sección 3: Datos Legales ── */}
@@ -328,35 +334,23 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
               <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Datos Legales</Text>
             </View>
 
-            {/* Matrícula inmobiliaria */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>
-                Matrícula inmobiliaria <Text style={styles.opcional}>(opcional)</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={form.matricula_inmobiliaria}
-                onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
-                maxLength={50}
-                editable={!enviando}
-                placeholderTextColor={COLORS.onSurfaceVariant}
-              />
-            </View>
+            <FormField
+              label="Matrícula inmobiliaria (opcional)"
+              value={form.matricula_inmobiliaria}
+              onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
+              maxLength={50}
+              editable={!enviando}
+              testID="editar-matricula"
+            />
 
-            {/* Número catastral */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>
-                Número catastral <Text style={styles.opcional}>(opcional)</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={form.numero_catastral}
-                onChangeText={(v) => setCampo('numero_catastral', v)}
-                maxLength={50}
-                editable={!enviando}
-                placeholderTextColor={COLORS.onSurfaceVariant}
-              />
-            </View>
+            <FormField
+              label="Número catastral (opcional)"
+              value={form.numero_catastral}
+              onChangeText={(v) => setCampo('numero_catastral', v)}
+              maxLength={50}
+              editable={!enviando}
+              testID="editar-catastral"
+            />
           </View>
 
           <FooterApp />
@@ -368,6 +362,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
         <Pressable
           onPress={() => setSnack((s) => ({ ...s, visible: false }))}
           style={styles.snackBox}
+          accessibilityRole="alert"
         >
           <Text style={styles.snackText}>{snack.mensaje}</Text>
           <Text style={styles.snackClose}>×</Text>
@@ -380,6 +375,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
           onPress={() => navigation.goBack()}
           disabled={enviando}
           style={({ pressed }) => [styles.btnCancelar, pressed && styles.pressed]}
+          accessibilityRole="button"
         >
           <Text style={styles.btnCancelarText}>Cancelar</Text>
         </Pressable>
@@ -391,9 +387,16 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
             (!esValido || enviando) && styles.btnDisabled,
             pressed && styles.pressed,
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !esValido || enviando, busy: enviando }}
         >
           {enviando ? (
-            <ActivityIndicator color={COLORS.onPrimary} size="small" />
+            <>
+              <ActivityIndicator color={COLORS.onPrimary} size="small" />
+              <Text style={[styles.btnGuardarText, styles.btnGuardarTextLoading]}>
+                Guardando…
+              </Text>
+            </>
           ) : (
             <Text style={styles.btnGuardarText}>Guardar cambios</Text>
           )}
@@ -440,7 +443,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
 
-  // ── Campos ─────────────────────────────────────────────────────────────────
+  // ── Campos (widgets inline que NO son FormField) ──────────────────────────
   fieldGroup: {
     gap: 6,
   },
@@ -448,24 +451,18 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
   },
-  input: {
-    height: 48,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.md,
-    ...TYPOGRAPHY.bodyMd,
-    color: COLORS.primary,
+  requerido: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.error,
+    fontWeight: '700',
   },
-
   // Campo read-only (cédula)
   readonlyField: {
-    height: 48,
+    minHeight: 48,
     backgroundColor: COLORS.surfaceVariant,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     justifyContent: 'center',
   },
@@ -478,11 +475,6 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     fontStyle: 'italic',
   },
-  opcional: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.onSurfaceVariant,
-    fontStyle: 'italic',
-  },
 
   // ── Chips estrato ──────────────────────────────────────────────────────────
   chipsRow: {
@@ -491,12 +483,12 @@ const styles = StyleSheet.create({
   },
   chip: {
     flex: 1,
-    height: 40,
+    height: 44, // WCAG 2.5.5
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceContainerLowest,
   },
   chipSel: {
@@ -519,12 +511,12 @@ const styles = StyleSheet.create({
   },
   chipEstado: {
     flex: 1,
-    height: 40,
+    height: 44, // WCAG 2.5.5
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceContainerLowest,
     paddingHorizontal: SPACING.xs,
   },
@@ -537,12 +529,12 @@ const styles = StyleSheet.create({
   },
   chipCategoria: {
     paddingHorizontal: SPACING.md,
-    height: 36,
+    height: 44, // WCAG 2.5.5
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceContainerLowest,
   },
   chipTextSm: {
@@ -576,7 +568,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.md,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     gap: SPACING.sm,
     backgroundColor: COLORS.error,
     elevation: 6,
@@ -619,7 +611,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     backgroundColor: 'transparent',
   },
   btnCancelarText: {
@@ -631,8 +623,10 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
     backgroundColor: COLORS.primaryContainer,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     elevation: 4,
     shadowColor: COLORS.primaryContainer,
     shadowOffset: { width: 0, height: 3 },
@@ -642,6 +636,9 @@ const styles = StyleSheet.create({
   btnGuardarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
+  },
+  btnGuardarTextLoading: {
+    marginLeft: SPACING.sm,
   },
   btnDisabled: {
     backgroundColor: COLORS.onSurfaceVariant,
