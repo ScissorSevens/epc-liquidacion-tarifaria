@@ -29,6 +29,7 @@ import {
 } from '../composition/bootstrap-completo';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { guardarSesion } from '../composition/constantes';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { useWorkspace } from '../composicion/useWorkspace';
 import { logger } from '../composicion/logger';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
@@ -272,14 +273,13 @@ export default function SetupInicial({ onComplete }: Props) {
             </View>
           )}
 
-          <Pressable
+          <BotonPrimario
+            texto="Siguiente"
+            icono="arrow-forward"
+            tono="amarillo"
             onPress={handleSiguiente}
-            style={({ pressed }) => [styles.botonPrimario, pressed && styles.botonPresionado]}
             testID="siguiente-btn"
-          >
-            <Text style={styles.textoBotonDestacado}>Siguiente</Text>
-            <MaterialIcons name="arrow-forward" size={20} color={COLORS.brandAzulOscuro} />
-          </Pressable>
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -373,34 +373,27 @@ export default function SetupInicial({ onComplete }: Props) {
         )}
 
         <View style={styles.filaBotones}>
-          <Pressable
-            onPress={handleAtras}
-            style={({ pressed }) => [styles.botonSecundario, pressed && styles.botonPresionado]}
-            disabled={cargando}
-          >
-            <MaterialIcons name="arrow-back" size={20} color={COLORS.primary} />
-            <Text style={styles.textoBotonSecundario}>Atrás</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => void handleFinalizar()}
-            style={({ pressed }) => [
-              styles.botonPrimario,
-              styles.botonPrimarioFlexible,
-              cargando && styles.botonDeshabilitado,
-              pressed && styles.botonPresionado,
-            ]}
-            disabled={cargando}
-            testID="finalizar-btn"
-          >
-            {cargando ? (
-              <ActivityIndicator color={COLORS.brandAzulOscuro} size="small" />
-            ) : (
-              <>
-                <Text style={styles.textoBotonDestacado}>Finalizar</Text>
-                <MaterialIcons name="check" size={20} color={COLORS.brandAzulOscuro} />
-              </>
-            )}
-          </Pressable>
+          <View style={styles.botonSecundarioWrap}>
+            <Pressable
+              onPress={handleAtras}
+              style={({ pressed }) => [styles.botonSecundario, pressed && styles.botonPresionado]}
+              disabled={cargando}
+            >
+              <MaterialIcons name="arrow-back" size={20} color={COLORS.primary} />
+              <Text style={styles.textoBotonSecundario}>Atrás</Text>
+            </Pressable>
+          </View>
+          <View style={styles.botonPrimarioWrap}>
+            <BotonPrimario
+              texto="Finalizar"
+              textoCargando="Finalizando…"
+              icono="check"
+              tono="amarillo"
+              onPress={() => void handleFinalizar()}
+              cargando={cargando}
+              testID="finalizar-btn"
+            />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -582,20 +575,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.md,
   },
-  botonPrimario: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    height: 48,
-    backgroundColor: COLORS.brandAmarillo,
-    borderRadius: RADIUS.md,
+  botonSecundarioWrap: {
+    flex: 1,
   },
-  botonPrimarioFlexible: {
+  botonPrimarioWrap: {
     flex: 2,
   },
   botonSecundario: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -606,19 +592,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.outlineVariant,
   },
-  textoBotonDestacado: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.brandAzulOscuro,
-  },
   textoBotonSecundario: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
   },
   botonPresionado: {
     opacity: 0.85,
-  },
-  botonDeshabilitado: {
-    opacity: 0.5,
   },
   errorBanner: {
     backgroundColor: COLORS.errorContainer,
