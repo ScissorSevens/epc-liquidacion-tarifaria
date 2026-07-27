@@ -243,7 +243,9 @@ describe('ImportarCsv — BotonPrimario migration', () => {
   it('T-IMP-CSV-HEADER: el header esperado tiene 9 columnas con cédula y municipio', () => {
     expect(HEADER_ESPERADO_TXT).toContain('cedula');
     expect(HEADER_ESPERADO_TXT).toContain('municipio');
+    expect(HEADER_ESPERADO_TXT).toContain('email');
+    expect(HEADER_ESPERADO_TXT).toContain('telefono');
     const cols = HEADER_ESPERADO_TXT.split(',');
-    expect(cols).toHaveLength(9);
+    expect(cols).toHaveLength(11);
   });
 });

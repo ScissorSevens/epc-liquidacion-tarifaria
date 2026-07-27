@@ -48,7 +48,7 @@ describe('ImportarCsv — contrato de header con parser (COR-09)', () => {
     const csv =
       HEADER_ESPERADO_TXT +
       '\n' +
-      'Juan Perez,12345678,Bogotá,Calle 1,3,,,2024-01-15,';
+      'Juan Perez,12345678,,,Bogotá,Calle 1,3,,,2024-01-15,';
     const r = parsearCSVForTest(csv);
     expect(r.errores).toEqual([]);
     expect(r.filas).toHaveLength(1);

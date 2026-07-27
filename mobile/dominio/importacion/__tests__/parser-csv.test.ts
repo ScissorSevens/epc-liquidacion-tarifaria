@@ -224,5 +224,29 @@ describe('parsearCSV', () => {
       // Y NO debe haber error de parseo: la validación es de dominio,
       // no sintáctica.
     });
+
+    it('T-CSV-5 extrae email y telefono opcionales cuando se proveen', () => {
+      const csv =
+        'nombre_apellidos,cedula,email,telefono,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor' +
+        '\nJuan Perez,12345678,juan@example.com,3001234567,Bogotá,Calle 1,3,,,2024-01-15,';
+      const r = parsearCSV(csv);
+
+      expect(r.errores).toEqual([]);
+      expect(r.filas[0]).toMatchObject({
+        email: 'juan@example.com',
+        telefono: '3001234567',
+      });
+    });
+
+    it('T-CSV-6 omite email y telefono cuando las celdas están vacías', () => {
+      const csv =
+        'nombre_apellidos,cedula,email,telefono,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor' +
+        '\nJuan Perez,12345678,,,Bogotá,Calle 1,3,,,2024-01-15,';
+      const r = parsearCSV(csv);
+
+      expect(r.errores).toEqual([]);
+      expect(r.filas[0]).not.toHaveProperty('email');
+      expect(r.filas[0]).not.toHaveProperty('telefono');
+    });
   });
 });

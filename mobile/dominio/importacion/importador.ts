@@ -71,6 +71,8 @@ export async function importarSuscriptoresYMedidores(
           codigo,
           nombre_apellidos: fila.nombre_apellidos,
           cedula: fila.cedula ?? '',
+          ...(fila.email !== undefined && { email: fila.email }),
+          ...(fila.telefono !== undefined && { telefono: fila.telefono }),
           municipio: fila.municipio ?? '',
           ...(fila.sector !== undefined && { sector: fila.sector }),
           ...(fila.calle !== undefined && { calle: fila.calle }),

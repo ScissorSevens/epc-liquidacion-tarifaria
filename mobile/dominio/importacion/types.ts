@@ -22,6 +22,8 @@ export interface FilaCSV {
   readonly codigo?: string;           // opcional: se auto-genera si viene vacío
   readonly nombre_apellidos: string;
   readonly cedula?: string;           // opcional: se completará manualmente si no viene en CSV
+  readonly email?: string;
+  readonly telefono?: string;
   readonly municipio?: string;        // opcional: se completará manualmente si no viene en CSV
   readonly sector?: string;
   readonly calle?: string;

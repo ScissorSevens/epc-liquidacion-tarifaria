@@ -50,6 +50,20 @@ import type { ErrorParseo, FilaCSV, ResultadoParseo } from './types';
 const HEADER_NUEVO = [
   'nombre_apellidos',
   'cedula',
+  'email',
+  'telefono',
+  'municipio',
+  'direccion',
+  'estrato',
+  'matricula_inmobiliaria',
+  'numero_catastral',
+  'fecha_instalacion',
+  'observaciones_medidor',
+] as const;
+
+const HEADER_NUEVO_SIN_CONTACTO = [
+  'nombre_apellidos',
+  'cedula',
   'municipio',
   'direccion',
   'estrato',
@@ -137,9 +151,15 @@ export function parsearCSV(texto: string): ResultadoParseo {
 
   const headerCampos = parsearLineaCSV(lineas[0]!).map((c) => c.trim());
 
-  const esNuevo =
+  const esNuevoContacto =
     headerCampos.length === HEADER_NUEVO.length &&
     HEADER_NUEVO.every((esperado, i) => headerCampos[i] === esperado);
+
+  const esNuevoSinContacto =
+    headerCampos.length === HEADER_NUEVO_SIN_CONTACTO.length &&
+    HEADER_NUEVO_SIN_CONTACTO.every((esperado, i) => headerCampos[i] === esperado);
+
+  const esNuevo = esNuevoContacto || esNuevoSinContacto;
 
   const esLegacy =
     headerCampos.length === HEADER_LEGACY.length &&
@@ -163,7 +183,11 @@ export function parsearCSV(texto: string): ResultadoParseo {
     const numLinea = i + 1; // 1-indexed para el usuario
     const campos = parsearLineaCSV(cruda);
 
-    const expectedCols = esLegacy ? HEADER_LEGACY.length : HEADER_NUEVO.length;
+    const expectedCols = esLegacy
+      ? HEADER_LEGACY.length
+      : esNuevoContacto
+        ? HEADER_NUEVO.length
+        : HEADER_NUEVO_SIN_CONTACTO.length;
     if (campos.length !== expectedCols) {
       errores.push({
         linea: numLinea,
@@ -175,6 +199,8 @@ export function parsearCSV(texto: string): ResultadoParseo {
     let codigo: string | undefined;
     let nombre_apellidos: string;
     let cedula: string;
+    let email: string | undefined;
+    let telefono: string | undefined;
     let municipio: string;
     let direccion: string;
     let estratoCrudo: string;
@@ -201,6 +227,23 @@ export function parsearCSV(texto: string): ResultadoParseo {
       // El importador rellena con `''` antes de invocar crearSuscriptor.
       cedula = '' as string;
       municipio = '' as string;
+    } else if (esNuevoContacto) {
+      const trimmed = campos.map((c) => c.trim());
+      [
+        nombre_apellidos,
+        cedula,
+        email,
+        telefono,
+        municipio,
+        direccion,
+        estratoCrudo,
+        matricula,
+        catastral,
+        fecha_instalacion,
+        observaciones,
+      ] = trimmed as [string, string, string, string, string, string, string, string, string, string, string];
+      codigo = undefined;
+      numero_medidor = undefined;
     } else {
       const trimmed = campos.map((c) => c.trim());
       [
@@ -263,6 +306,8 @@ export function parsearCSV(texto: string): ResultadoParseo {
       // importador rellena con '' antes de `crearSuscriptor`.
       fila.cedula = cedula!;
       fila.municipio = municipio!;
+      if (email) fila.email = email;
+      if (telefono) fila.telefono = telefono;
     }
 
     filas.push(fila);
