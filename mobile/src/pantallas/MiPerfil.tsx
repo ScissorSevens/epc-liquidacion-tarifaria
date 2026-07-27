@@ -117,6 +117,65 @@ function formParametrosDesde(p: ParametrosTarifa): FormParametros {
   };
 }
 
+/**
+ * Defaults normativos para crear un ParametrosTarifa "desde cero"
+ * cuando el store no tiene parámetros vigentes aún (caso típico:
+ * prestador activo pero parámetros nunca asignados).
+ *
+ * Decisiones (Res CRA 825/2017 + 907/2019):
+ *   - Costos medios (CMA/CMO/CMI/CMT/CMVIAA) en 0. El operario los
+ *     tipea a mano (no podemos adivinarlos del store sin una fuente).
+ *   - IPUF en 6 m³/suscriptor/mes: constante normativa del art. 5
+ *     Res CRA 825/2017. Default seguro.
+ *   - Mínimo vital en 6 m³: default del sistema (la spec Q9 dice que
+ *     825/2017 no obliga, pero 6 m³ es el valor que la mayoría de
+ *     prestadores rurales EPC adoptan).
+ *   - Flags (aplica_cmviaa, aplica_minimo_vital) en false: defaults
+ *     seguros. El operario los activa a mano si los necesita.
+ *   - Vigente desde = hoy; hasta = hoy + 5 años (periodo tarifario
+ *     Res 825/2017).
+ *   - Periodo = año actual.
+ *   - suscriptores_promedio = 1 (mínimo >0 que el dominio acepta
+ *     en MENSAJES_ERROR_PARAMETROS.SUSCRIPTORES_REQUERIDO). Si el
+ *     operario no edita este campo, el motor tarifario va a dar
+ *     resultados absurdos con divisor=1 — pero eso es preferible
+ *     a fallar la creación.
+ *   - agua_suministrada_m3_anio = 0: no podemos inferir.
+ *   - id_parametros = 0 (lo asignará SQLite al persistir).
+ *   - id_acuerdo = 0 (no hay acuerdo vigente editable desde MiPerfil;
+ *     este campo se corrige cuando se persiste via el repo).
+ *   - created_at = ahora (placeholder; el repo lo sobreescribe al
+ *     persistir).
+ *
+ * El id_prestador se pasa por parámetro para que el nuevo objeto
+ * quede atado al prestador activo del store (no a un literal 0).
+ */
+function parametrosDefaults(id_prestador: number): ParametrosTarifa {
+  const hoy = new Date();
+  const hasta = new Date(hoy);
+  hasta.setFullYear(hasta.getFullYear() + 5);
+  return {
+    id_parametros: 0,
+    id_prestador,
+    id_acuerdo: 0,
+    periodo: hoy.getFullYear(),
+    cma: 0,
+    cmo: 0,
+    cmi: 0,
+    cmt: 0,
+    cmviaa: 0,
+    aplica_cmviaa: false,
+    agua_suministrada_m3_anio: 0,
+    ipuf_m3_suscriptor_mes: 6,
+    suscriptores_promedio: 1,
+    aplica_minimo_vital: false,
+    m3_gratis_minimo_vital: 6,
+    vigente_desde: hoy.toISOString().slice(0, 10),
+    vigente_hasta: hasta.toISOString().slice(0, 10),
+    created_at: hoy.toISOString(),
+  };
+}
+
 /** Coerciona un string a número. Vacío o inválido → 0. */
 function aNumero(s: string): number {
   const n = parseFloat(s);
@@ -139,6 +198,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   // parametros_vigentes y el setter. Cambios en prestadores_disponibles
   // / cargando / acuerdo_vigente NO causan re-render.
   const prestador = useWorkspace((s) => s.prestador);
+  const idPrestadorActivo = useWorkspace((s) => s.id_prestador_activo);
   const parametros = useWorkspace((s) => s.parametros_vigentes);
   const setParametrosVigentes = useWorkspace((s) => s.setParametrosVigentes);
 
@@ -162,8 +222,13 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
 
   // ── Handlers del modal ────────────────────────────────────────────────────
   function abrirModalEdicion(): void {
-    if (parametros === null) return;
-    setForm(formParametrosDesde(parametros));
+    // Si hay parámetros vigentes, prellenamos con esos. Si NO hay (caso
+    // "crear desde cero"), prellenamos con defaults normativos — ver
+    // `parametrosDefaults` arriba. El operario puede editar lo que
+    // difiera del default sin tener que tipear 12 campos vacíos.
+    const base: ParametrosTarifa =
+      parametros ?? parametrosDefaults(idPrestadorActivo);
+    setForm(formParametrosDesde(base));
     setModalVisible(true);
   }
 
@@ -173,9 +238,15 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   }
 
   function guardarEdicion(): void {
-    if (parametros === null || form === null) return;
+    if (form === null) return;
+    // Si hay parámetros previos, MERGEAMOS (preservamos id_parametros,
+    // id_prestador, id_acuerdo, created_at del store). Si NO hay,
+    // partimos de los defaults para esos campos administrativos — el
+    // operario solo edita los valores del form.
+    const base: ParametrosTarifa =
+      parametros ?? parametrosDefaults(idPrestadorActivo);
     const nuevosParametros: ParametrosTarifa = {
-      ...parametros,
+      ...base,
       periodo: aEntero(form.periodo),
       cma: aNumero(form.cma),
       cmo: aNumero(form.cmo),
@@ -314,18 +385,32 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         {/* Parámetros tarifarios — Res CRA 825/2017 + 907/2019 */}
         <View style={estilos.seccionHeader}>
           <Text style={estilos.seccionTitulo}>Parámetros tarifarios</Text>
-          {parametros !== null && (
-            <Pressable
-              style={estilos.botonEditar}
-              onPress={abrirModalEdicion}
-              testID="boton-editar-parametros"
-              accessibilityRole="button"
-              accessibilityLabel="Editar parámetros tarifarios"
-            >
-              <MaterialIcons name="edit" size={16} color={COLORS.primary} />
-              <Text style={estilos.botonEditarTexto}>Editar</Text>
-            </Pressable>
-          )}
+          {/* El botón Editar se muestra SIEMPRE — incluso si no hay
+              parámetros vigentes aún. Caso típico: el prestador activo
+              no tiene parámetros asignados (fresh install sin setup
+              completo). Antes este botón estaba gated por
+              `parametros !== null`, lo que dejaba al operario con una
+              sección llena de "—" sin forma de configurar nada (el
+              user reportó "no veo cómo configurar los parámetros
+              tarifarios"). Al presionar Editar sin parámetros previos,
+              el modal prellena defaults normativos (ver
+              `parametrosDefaults`). */}
+          <Pressable
+            style={estilos.botonEditar}
+            onPress={abrirModalEdicion}
+            testID="boton-editar-parametros"
+            accessibilityRole="button"
+            accessibilityLabel={
+              parametros !== null
+                ? 'Editar parámetros tarifarios'
+                : 'Configurar parámetros tarifarios'
+            }
+          >
+            <MaterialIcons name="edit" size={16} color={COLORS.primary} />
+            <Text style={estilos.botonEditarTexto}>
+              {parametros !== null ? 'Editar' : 'Configurar'}
+            </Text>
+          </Pressable>
         </View>
         <View style={estilos.listaCard}>
           <FilaInfo

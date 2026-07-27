@@ -698,14 +698,111 @@ describe('MiPerfil — editar parámetros tarifarios vía modal (TAREA 11 commit
 
   /**
    * T-MP-MODAL-2 — Sin parametros_vigentes en store, el botón "Editar"
-   * NO se muestra (no hay nada para editar).
+   * SÍ se muestra (el operario debe poder CREAR los parámetros desde
+   * MiPerfil aunque el store no los tenga poblados — caso típico:
+   * prestador activo pero sin parámetros tarifarios aún asignados).
+   *
+   * Bug arreglado en este commit: antes el botón estaba gated por
+   * `parametros !== null`, lo que dejaba al operario con una sección
+   * llena de "—" sin forma de configurar nada. El user reportó "no veo
+   * cómo configurar los parámetros tarifarios".
    */
-  it('T-MP-MODAL-2 sin parametros_vigentes, no muestra botón Editar', async () => {
+  it('T-MP-MODAL-2 sin parametros_vigentes, SÍ muestra botón Editar (para crear)', async () => {
     // mock default: parametros_vigentes = null
-    const { queryByTestId } = renderMiPerfil();
+    const { getByTestId } = renderMiPerfil();
 
     await waitFor(() => {
-      expect(queryByTestId('boton-editar-parametros')).toBeNull();
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-9 — Sin parametros_vigentes previos, al presionar Editar
+   * se abre el modal con valores por defecto razonables:
+   *   - Costos medios (CMA, CMO, CMI, CMT, CMVIAA) en 0.
+   *   - IPUF en 6 (constante normativa Res CRA 825/2017 art. 5).
+   *   - Mínimo vital en 6 m³ (default del sistema).
+   *   - Vigente desde = hoy, vigente hasta = +5 años (periodo tarifario).
+   *   - aplica_cmviaa=false, aplica_minimo_vital=false (defaults seguros).
+   *
+   * Esto le permite al operario partir de un estado conocido y editar
+   * solo lo que difiere del default, en vez de tener que tipear 12
+   * campos desde cero.
+   */
+  it('T-MP-MODAL-9 sin parametros_vigentes, modal prellena con defaults normativos', async () => {
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      // Costos medios en 0.
+      expect((getByTestId('param-cma').props.value as string)).toBe('0');
+      expect((getByTestId('param-cmo').props.value as string)).toBe('0');
+      expect((getByTestId('param-cmi').props.value as string)).toBe('0');
+      expect((getByTestId('param-cmt').props.value as string)).toBe('0');
+      expect((getByTestId('param-cmviaa').props.value as string)).toBe('0');
+      // IPUF = 6 (Res CRA 825/2017 art. 5).
+      expect((getByTestId('param-ipuf').props.value as string)).toBe('6');
+      // Mínimo vital = 6 m³ (default).
+      expect((getByTestId('param-m3gratis').props.value as string)).toBe('6');
+      // Vigente desde = hoy (YYYY-MM-DD).
+      const hoy = new Date().toISOString().slice(0, 10);
+      expect((getByTestId('param-vigente-desde').props.value as string)).toBe(hoy);
+    });
+  });
+
+  /**
+   * T-MP-MODAL-10 — Sin parametros_vigentes previos, al guardar el
+   * modal crea un ParametrosTarifa NUEVO (con id_parametros=0 /
+   * id_prestador del store) y lo inyecta en el store vía
+   * `setParametrosVigentes`. La fila del MiPerfil pasa a mostrar el
+   * valor editado (no "—").
+   *
+   * Esto cierra el ciclo: "ver sección con guiones" → "presionar
+   * Editar" → "llenar form" → "Guardar" → "sección muestra datos".
+   */
+  it('T-MP-MODAL-10 guardar sin parametros_vigentes crea nuevo ParametrosTarifa en store', async () => {
+    const { __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    __acciones.setParametrosVigentes.mockClear();
+
+    const { getByTestId, getByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByTestId('param-cma')).toBeTruthy();
+    });
+
+    // Editamos el CMA desde 0 (default) a 5_000_000.
+    fireEvent.changeText(getByTestId('param-cma'), '5000000');
+
+    // Guardamos.
+    fireEvent.press(getByTestId('param-guardar'));
+
+    await waitFor(() => {
+      expect(__acciones.setParametrosVigentes).toHaveBeenCalledTimes(1);
+      const arg = __acciones.setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
+      // El CMA editado se persiste.
+      expect(arg.cma).toBe(5_000_000);
+      // Los defaults se preservan.
+      expect(arg.cmo).toBe(0);
+      expect(arg.ipuf_m3_suscriptor_mes).toBe(6);
+      expect(arg.m3_gratis_minimo_vital).toBe(6);
+      // Flags por defecto.
+      expect(arg.aplica_cmviaa).toBe(false);
+      expect(arg.aplica_minimo_vital).toBe(false);
+      // El modal se cerró.
+      expect(() => getByText('Editar parámetros tarifarios')).toThrow();
     });
   });
 
