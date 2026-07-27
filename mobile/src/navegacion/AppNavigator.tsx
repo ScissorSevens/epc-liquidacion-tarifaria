@@ -17,7 +17,10 @@ import type { TabParamList } from './types';
 import ConfigStack from './stacks/ConfigStack';
 import InicioStack from './stacks/InicioStack';
 import LecturasStack from './stacks/LecturasStack';
-import SyncStack from './stacks/SyncStack';
+// Tab Sincro deshabilitado por ahora — la app debe ser autonoma.
+// La pantalla Sincronizacion.tsx queda en codigo para la Fase 6
+// (backend real). Ver SDD setup-inicial-backend-real.
+// import SyncStack from './stacks/SyncStack';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -26,6 +29,9 @@ type IconName = ComponentProps<typeof MaterialIcons>['name'];
 const TAB_ICONS: Record<keyof TabParamList, IconName> = {
   Inicio: 'home',
   Lecturas: 'edit-note',
+  // Sincronizacion: inactiva hasta Fase 6 (backend real). Mantener la
+  // entry aca para que `Record<keyof TabParamList, IconName>` siga
+  // satisfaciendo el type checker y reactivar el tab sea un un-comment.
   Sincronizacion: 'sync',
   Config: 'settings',
 };
@@ -217,7 +223,7 @@ export default function AppNavigator({ onLogoutRequested }: Props) {
         component={InicioStack}
         options={{
           // Accesibilidad WCAG 2.1 AA: label describe la accion ("Ir a
-          // Inicio"), role "tab" para que el screen reader agrupe los 4
+          // Inicio"), role "tab" para que el screen reader agrupe los 3
           // tabs, y accessibilityState.selected sigue el focused tab.
           tabBarIcon: ({ focused }) => (
             <TabIcon
@@ -247,7 +253,10 @@ export default function AppNavigator({ onLogoutRequested }: Props) {
           ),
         }}
       />
-      <Tab.Screen
+      {/* Tab Sincro deshabilitado por ahora — la app debe ser autonoma.
+          La pantalla Sincronizacion.tsx queda en codigo para la Fase 6
+          (backend real). Ver SDD setup-inicial-backend-real. */}
+      {/* <Tab.Screen
         name="Sincronizacion"
         component={SyncStack}
         options={{
@@ -262,7 +271,7 @@ export default function AppNavigator({ onLogoutRequested }: Props) {
             />
           ),
         }}
-      />
+      /> */}
       <Tab.Screen
         name="Config"
         options={{

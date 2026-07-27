@@ -14,11 +14,15 @@
 // Contrato:
 //   - Cada tab lleva accessibilityLabel que describe el destino de la
 //     accion ("Ir a Inicio", "Ir a Lecturas", etc.).
-//   - role = "tab" para que el screen reader agrupe los 4 tabs y el
+//   - role = "tab" para que el screen reader agrupe los tabs y el
 //     operario sepa que esta navegando "tabs" (no botones sueltos).
 //   - accessibilityState.selected refleja el tab activo en el momento.
-//   - Los 4 tabs del TabParamList (Inicio, Lecturas, Sincronizacion,
-//     Config) deben estar anunciados.
+//   - Los 3 tabs VISIBLES (Inicio, Lecturas, Config) deben estar
+//     anunciados. El tab "Sincronizacion" existe en el TabParamList
+//     pero NO se renderiza en el TabBar (la app es autonoma — ver
+//     Sincronizacion.tsx queda en codigo para la Fase 6 cuando se
+//     reactive el backend). Por lo tanto, su label "Ir a Sincro" no
+//     debe aparecer en el arbol accesible.
 //
 // Estrategia de mocks:
 //   - @react-navigation/bottom-tabs: createBottomTabNavigator devuelve
@@ -130,7 +134,7 @@ import AppNavigator from '../../src/navegacion/AppNavigator';
  * real), pero un test puede pisarlo para verificar el estado selected
  * de otro tab.
  */
-function setFocusedTab(nombre: 'Inicio' | 'Lecturas' | 'Sincronizacion' | 'Config'): void {
+function setFocusedTab(nombre: 'Inicio' | 'Lecturas' | 'Config'): void {
   const Tab = (
     jest.requireMock('@react-navigation/bottom-tabs') as {
       createBottomTabNavigator: () => unknown;
@@ -160,7 +164,6 @@ describe('AppNavigator — TabBar accessibility (WCAG 2.1 AA)', () => {
 
     expect(getByLabelText('Ir a Inicio')).toBeTruthy();
     expect(getByLabelText('Ir a Lecturas')).toBeTruthy();
-    expect(getByLabelText('Ir a Sincro')).toBeTruthy();
     expect(getByLabelText('Ir a Config')).toBeTruthy();
   });
 
@@ -178,7 +181,6 @@ describe('AppNavigator — TabBar accessibility (WCAG 2.1 AA)', () => {
 
     expect(getByRole('tab', { name: 'Ir a Inicio' })).toBeTruthy();
     expect(getByRole('tab', { name: 'Ir a Lecturas' })).toBeTruthy();
-    expect(getByRole('tab', { name: 'Ir a Sincro' })).toBeTruthy();
     expect(getByRole('tab', { name: 'Ir a Config' })).toBeTruthy();
   });
 
@@ -215,7 +217,6 @@ describe('AppNavigator — TabBar accessibility (WCAG 2.1 AA)', () => {
     );
 
     expect(getByLabelText('Ir a Lecturas').props.accessibilityState.selected).toBe(false);
-    expect(getByLabelText('Ir a Sincro').props.accessibilityState.selected).toBe(false);
     expect(getByLabelText('Ir a Config').props.accessibilityState.selected).toBe(false);
   });
 
@@ -251,5 +252,32 @@ describe('AppNavigator — TabBar accessibility (WCAG 2.1 AA)', () => {
     // El label accesible es exactamente el texto que el screen reader
     // leeria antes del role.
     expect(getByLabelText('Ir a Inicio')).toBeTruthy();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // T-A11Y-T-7: el tab "Sincro" NO esta en el arbol accesible.
+  //
+  // Caso: la app es autonoma. El usuario decidio deshabilitar la sync
+  // hasta la Fase 6 (backend real). Aun asi, Sincronizacion.tsx queda
+  // en codigo para futura reactivacion. El TabBar no debe exponer el
+  // tab para evitar que el operario vea una pantalla sin funcionalidad.
+  //
+  // Esto cubre DOS cosas a la vez:
+  //   1. Garantiza la accesibilidad (no hay un tab "fantasma" que el
+  //      screen reader anuncie como inaccesible / deshabilitado).
+  //   2. Documenta el contrato: cualquier intento de re-agregar el
+  //      Tab.Screen "Sincronizacion" debe romper este test, forzando
+  //      una decision consciente.
+  // ─────────────────────────────────────────────────────────────────────
+  it('T-A11Y-T-7 el tab "Sincro" NO esta en el arbol accesible', () => {
+    const { queryByLabelText, queryByRole } = render(
+      <AppNavigator onLogoutRequested={() => undefined} />,
+    );
+
+    // queryBy*: devuelven null cuando no hay match. NO getBy* — esos
+    // lanzan excepcion y un test que falla con excepcion es mas ruidoso
+    // que un test que falla con un expect(null).toBeNull().
+    expect(queryByLabelText('Ir a Sincro')).toBeNull();
+    expect(queryByRole('tab', { name: 'Ir a Sincro' })).toBeNull();
   });
 });
