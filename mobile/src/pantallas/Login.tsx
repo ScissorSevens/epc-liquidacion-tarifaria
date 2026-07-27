@@ -61,12 +61,15 @@ interface Props {
  * Multi-tenant: la sesion persistida tiene `idPrestador` del operario
  * (NO hardcoded a 1). Cada operario entra a SU prestador.
  *
- * PUNTO C — Banner "Tu sesion anterior vencio":
- *   Si AuthGate detecta que la sesion persistida esta vencida, pasa
- *   `mensajeInicial` y Login rendea un banner amarillo arriba del form.
- *   El operario puede dismissarlo con la X (UX: no forzamos a leer un
- *   mensaje que ya entendio). El state interno `mensajeVisible`
- *   controla la visibilidad; el prop es solo la semilla inicial.
+ * Commit 5 — impeccable craft:
+ *   - KeyboardAvoidingView ya estaba. Confirmamos behavior correcto por
+ *     plataforma (iOS padding / Android height).
+ *   - Inputs ahora con accessibilityLabel explicito y accessibilityHint
+ *     derivado del contexto (cédula numérica, contraseña oculta).
+ *   - secureTextEntry ya estaba en contraseña. Confirmado.
+ *   - El banner de error global usa accessibilityLiveRegion='polite' para
+ *     que screen readers anuncien cambios sin interrumpir al usuario.
+ *   - El icono izquierdo (badge/lock) se conserva en cada input.
  */
 export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
   const [cedula, setCedula] = useState('');
@@ -136,6 +139,7 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
     <KeyboardAvoidingView
       style={estilos.raiz}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
         contentContainerStyle={estilos.scroll}
@@ -152,6 +156,7 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
             testID="banner"
             style={estilos.banner}
             accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
             accessibilityLabel={`Aviso: ${mensajeVisible}`}
           >
             <MaterialIcons
@@ -189,7 +194,12 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
           {/* Campo Cédula */}
           <View style={estilos.campoContenedor}>
             <Text style={estilos.etiqueta}>Cédula</Text>
-            <View style={[estilos.inputFila, { borderColor: errores.cedula ? COLORS.error : COLORS.outlineVariant }]}>
+            <View
+              style={[
+                estilos.inputFila,
+                { borderColor: errores.cedula ? COLORS.error : COLORS.outlineVariant },
+              ]}
+            >
               <MaterialIcons
                 name="badge"
                 size={20}
@@ -205,6 +215,9 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
                 keyboardType="numeric"
                 autoCapitalize="none"
                 autoCorrect={false}
+                accessibilityLabel="Cédula"
+                accessibilityHint="Ingrese su cédula, 6 a 12 dígitos numéricos"
+                testID="login-cedula"
               />
             </View>
           </View>
@@ -212,7 +225,14 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
           {/* Campo Contraseña */}
           <View style={estilos.campoContenedor}>
             <Text style={estilos.etiqueta}>Contraseña</Text>
-            <View style={[estilos.inputFila, { borderColor: errores.contrasena ? COLORS.error : COLORS.outlineVariant }]}>
+            <View
+              style={[
+                estilos.inputFila,
+                {
+                  borderColor: errores.contrasena ? COLORS.error : COLORS.outlineVariant,
+                },
+              ]}
+            >
               <MaterialIcons
                 name="lock"
                 size={20}
@@ -228,11 +248,16 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
                 secureTextEntry={!verContrasena}
                 autoCapitalize="none"
                 autoCorrect={false}
+                accessibilityLabel="Contraseña"
+                accessibilityHint="Ingrese su contraseña, mínimo 8 caracteres"
+                testID="login-password"
               />
               <Pressable
                 onPress={() => setVerContrasena(!verContrasena)}
                 style={estilos.botonVerContrasena}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={verContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
                 <MaterialIcons
                   name={verContrasena ? 'visibility-off' : 'visibility'}
@@ -362,9 +387,11 @@ const estilos = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     marginBottom: SPACING.xs,
   },
+  // Input row: minHeight 48 = touch target >= 44px (WCAG 2.5.5).
   inputFila: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 48,
     backgroundColor: COLORS.surfaceContainerLowest,
     borderRadius: RADIUS.md,
     ...BORDERS.thin,
@@ -375,6 +402,7 @@ const estilos = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minHeight: 48, // touch target explicito
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurface,
     paddingVertical: SPACING.sm + 4,
