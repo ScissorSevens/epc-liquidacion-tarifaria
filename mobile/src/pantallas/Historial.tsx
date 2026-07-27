@@ -11,7 +11,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { Lectura } from '@dominio/captura-lecturas/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
+import { TarjetaMetrica } from '../componentes/TarjetaMetrica';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
@@ -126,12 +128,12 @@ export default function Historial({ navigation, route }: Props) {
         <View style={styles.centrado}>
           <MaterialIcons name="error-outline" size={40} color={COLORS.error} />
           <Text style={styles.errorTexto}>{error}</Text>
-          <Pressable
+          <BotonPrimario
+            texto="Reintentar"
+            tono="azul"
+            tamano="compacto"
             onPress={() => void cargar()}
-            style={({ pressed }) => [styles.btnReintentar, pressed && { opacity: 0.8 }]}
-          >
-            <Text style={styles.btnReintentarTexto}>Reintentar</Text>
-          </Pressable>
+          />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
@@ -140,21 +142,27 @@ export default function Historial({ navigation, route }: Props) {
           <View style={styles.kpiCard}>
             <Text style={styles.kpiTitulo}>Métricas generales</Text>
             <View style={styles.kpiFila}>
-              <View style={styles.kpiItem}>
-                <Text style={styles.kpiEtiqueta}>Promedio</Text>
-                <Text style={styles.kpiValor}>{promedioConsumo.toFixed(1)}</Text>
-                <Text style={styles.kpiUnidad}>m³</Text>
-              </View>
-              <View style={[styles.kpiItem, styles.kpiItemBordes]}>
-                <Text style={styles.kpiEtiqueta}>Pico</Text>
-                <Text style={styles.kpiValor}>{picoConsumo.toFixed(1)}</Text>
-                <Text style={styles.kpiUnidad}>m³</Text>
-              </View>
-              <View style={styles.kpiItem}>
-                <Text style={styles.kpiEtiqueta}>Total</Text>
-                <Text style={styles.kpiValor}>{totalConsumo.toFixed(0)}</Text>
-                <Text style={styles.kpiUnidad}>m³</Text>
-              </View>
+              <TarjetaMetrica
+                icono="analytics"
+                etiqueta="Promedio"
+                valor={`${promedioConsumo.toFixed(1)} m³`}
+                variante="normal"
+                testID="kpi-promedio"
+              />
+              <TarjetaMetrica
+                icono="trending-up"
+                etiqueta="Pico"
+                valor={`${picoConsumo.toFixed(1)} m³`}
+                variante="normal"
+                testID="kpi-pico"
+              />
+              <TarjetaMetrica
+                icono="water-drop"
+                etiqueta="Total"
+                valor={`${totalConsumo.toFixed(0)} m³`}
+                variante="normal"
+                testID="kpi-total"
+              />
             </View>
           </View>
 
@@ -231,13 +239,12 @@ export default function Historial({ navigation, route }: Props) {
           </View>
 
           {/* ── Botón volver ── */}
-          <Pressable
+          <BotonPrimario
+            texto="Volver"
+            icono="arrow-back"
+            tono="azul"
             onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.btnVolver, pressed && { opacity: 0.85 }]}
-          >
-            <MaterialIcons name="arrow-back" size={20} color={COLORS.onPrimary} />
-            <Text style={styles.btnVolverTexto}>Volver</Text>
-          </Pressable>
+          />
 
           <FooterApp />
         </ScrollView>
@@ -259,14 +266,7 @@ const styles = StyleSheet.create({
   },
   cargandoTexto: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
   errorTexto: { ...TYPOGRAPHY.bodyMd, color: COLORS.error, textAlign: 'center' },
-  btnReintentar: {
-    marginTop: SPACING.sm,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    backgroundColor: COLORS.primaryContainer,
-    borderRadius: RADIUS.lg,
-  },
-  btnReintentarTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onPrimary },
+  // El botón "Reintentar" se renderiza via <BotonPrimario> extraído.
 
   // Scroll
   scroll: {
@@ -289,20 +289,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
-  kpiFila: { flexDirection: 'row' },
-  kpiItem: { flex: 1, alignItems: 'center', gap: 2 },
-  kpiItemBordes: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  kpiEtiqueta: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.onSurfaceVariant,
-  },
-  kpiValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, fontWeight: '700' },
-  kpiUnidad: { fontSize: 10, color: COLORS.onSurfaceVariant, fontWeight: '500' },
+  kpiFila: { flexDirection: 'row', gap: SPACING.sm },
+  // Los 3 KPIs ahora se renderizan via <TarjetaMetrica> extraída.
 
   // Gráfico
   graficoCard: {
@@ -372,18 +360,5 @@ const styles = StyleSheet.create({
   filaValor: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
   filaLecturaRaw: { fontSize: 11, color: COLORS.onSurfaceVariant, fontWeight: '400' },
 
-  // Botón volver
-  btnVolver: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    height: 56,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.xl,
-  },
-  btnVolverTexto: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-  },
+  // El botón "Volver" se renderiza via <BotonPrimario> extraído.
 });
