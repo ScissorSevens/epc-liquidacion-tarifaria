@@ -23,6 +23,20 @@ interface WorkspaceState {
   readonly cargando: boolean;
   setPrestadores: (prestadores: readonly Prestador[]) => void;
   /**
+   * Actualiza `parametros_vigentes` en el store localmente. La
+   * persistencia real a SQLite queda fuera de scope de este setter —
+   * el repo `parametrosTarifaRepo` no expone `actualizar` (solo
+   * `crear`/`buscarVigente`/etc.; ver
+   * parametros-tarifa-repository-expo-sqlite.ts). Este setter permite
+   * que la UI del MiPerfil refleje la edición inmediatamente sin
+   * recargar todo el contexto via `cambiarPrestadorYCargarContexto`.
+   *
+   * Acepta `null` para limpiar el slot (caso edge: edición cancelada
+   * o reseteo manual). NO toca `prestador` ni `acuerdo_vigente` —
+   * solo el chunk tarifario del contexto.
+   */
+  setParametrosVigentes: (p: ParametrosTarifa | null) => void;
+  /**
    * Cambia el prestador activo y recarga el contexto tarifario (COR-08).
    *
    * Reemplaza al buggy `setIdPrestadorActivo()` previo que solo mutaba
@@ -90,6 +104,12 @@ export const useWorkspace = create<WorkspaceState>()(
       cargando: false,
 
       setPrestadores: (prestadores) => set({ prestadores_disponibles: prestadores }),
+
+      /**
+       * Ver bloque de docs en la interface arriba. Acepta null para
+       * limpieza; no toca prestador/acuerdo_vigente.
+       */
+      setParametrosVigentes: (p) => set({ parametros_vigentes: p }),
 
       /**
        * Ver bloque de docs en la interface arriba (COR-08).

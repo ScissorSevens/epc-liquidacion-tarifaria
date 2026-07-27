@@ -437,4 +437,86 @@ describe('useWorkspace (Fase 4.2.1)', () => {
       expect(useWorkspace.getState().parametros_vigentes).toBeNull();
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // T-WKS-7: setParametrosVigentes (TAREA 11 commit 3)
+  //
+  // El MiPerfil modal de edición de parámetros tarifarios actualiza
+  // el store localmente para reflejar el cambio en la UI sin tener
+  // que recargar el contexto via cambiarPrestadorYCargarContexto.
+  // La persistencia real a SQLite queda fuera de scope de este commit
+  // (el repo no expone `actualizar`; ver
+  // parametros-tarifa-repository-expo-sqlite.ts).
+  // ─────────────────────────────────────────────────────────────────
+  describe('setParametrosVigentes', () => {
+    /** Parámetros tarifarios de fixture (definido LOCAL al describe —
+     *  los fixtures del describe padre están scoped al bloque de
+     *  cambiarPrestadorYCargarContexto). */
+    const parametrosSeed: ParametrosTarifa = {
+      id_parametros: 200,
+      id_prestador: 7,
+      id_acuerdo: 100,
+      periodo: new Date().getUTCFullYear(),
+      cma: 12_345_678,
+      cmo: 450,
+      cmi: 120,
+      cmt: 80,
+      cmviaa: 0,
+      aplica_cmviaa: false,
+      agua_suministrada_m3_anio: 50_000,
+      ipuf_m3_suscriptor_mes: 6,
+      suscriptores_promedio: 350,
+      aplica_minimo_vital: true,
+      m3_gratis_minimo_vital: 6,
+      vigente_desde: '2025-01-01',
+      vigente_hasta: '2029-12-31',
+      created_at: '2026-01-01T00:00:00.000Z',
+    };
+
+    it('T-WKS-7.1 setea parametros_vigentes al objeto provisto', () => {
+      const nuevosParametros = {
+        ...parametrosSeed,
+        cma: 99_999_999,
+      };
+
+      useWorkspace.getState().setParametrosVigentes(nuevosParametros);
+
+      expect(useWorkspace.getState().parametros_vigentes).toEqual(
+        nuevosParametros,
+      );
+    });
+
+    it('T-WKS-7.2 acepta null (caso edge: edición cancelada / limpieza)', () => {
+      // Sembramos con parámetros "viejos" para verificar que setParametrosVigentes(null)
+      // los limpia.
+      useWorkspace.setState({
+        parametros_vigentes: parametrosSeed,
+      });
+
+      useWorkspace.getState().setParametrosVigentes(null);
+
+      expect(useWorkspace.getState().parametros_vigentes).toBeNull();
+    });
+
+    it('T-WKS-7.3 NO toca prestador / acuerdo_vigente (solo actualiza parámetros)', () => {
+      // Sembramos prestador y acuerdo_vigente para verificar que el
+      // setter NO los limpia accidentalmente.
+      const prestadorSeed = { id_prestador: 7, nombre: 'PRESTADOR SEED' };
+      const acuerdoSeed = { id_acuerdo: 100 };
+      useWorkspace.setState({
+        prestador: prestadorSeed as never,
+        acuerdo_vigente: acuerdoSeed as never,
+      });
+
+      useWorkspace
+        .getState()
+        .setParametrosVigentes({ ...parametrosSeed, cmo: 999 });
+
+      // prestador y acuerdo_vigente deben quedar intactos.
+      expect(useWorkspace.getState().prestador).toEqual(prestadorSeed);
+      expect(useWorkspace.getState().acuerdo_vigente).toEqual(acuerdoSeed);
+      // Solo parametros_vigentes cambió.
+      expect(useWorkspace.getState().parametros_vigentes?.cmo).toBe(999);
+    });
+  });
 });

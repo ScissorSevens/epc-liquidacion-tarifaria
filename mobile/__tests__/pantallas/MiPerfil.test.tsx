@@ -15,7 +15,7 @@
 //   - getBootstrap stub para evitar que composition/constantes.limpiarSesion
 //     explote si se llega a invocar.
 
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, fireEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { ComponentProps, ReactElement } from 'react';
@@ -72,18 +72,32 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
   },
 }));
 
-jest.mock('../../src/composicion/useWorkspace', () => ({
-  useWorkspace: jest.fn((sel: (s: unknown) => unknown) =>
-    sel({
-      id_prestador_activo: 0,
-      prestador: null,
-      prestadores_disponibles: [],
-      acuerdo_vigente: null,
-      parametros_vigentes: null,
-      cargando: false,
-    }),
-  ),
-}));
+jest.mock('../../src/composicion/useWorkspace', () => {
+  // Store mockeado con shape completo (data + actions). Las acciones son
+  // jest.fn() que los tests pueden inspeccionar via `useWorkspace.setState`
+  // o usando `jest.requireMock('../../src/composicion/useWorkspace')` para
+  // llegar al módulo y espiar las acciones globales. NOTA: las acciones
+  // viven en `useWorkspace.getState()` en el store real; acá las exponemos
+  // también en el objeto "estado" que devuelve el selector para que el
+  // componente MiPerfil las pueda tomar via `useWorkspace((s) => s.setX)`.
+  const acciones = {
+    setParametrosVigentes: jest.fn(),
+  };
+  return {
+    useWorkspace: jest.fn((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        ...acciones,
+      }),
+    ),
+    __acciones: acciones,
+  };
+});
 
 jest.mock('../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn().mockResolvedValue({}),
@@ -244,7 +258,7 @@ describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () =>
     // de cada test. Si no, `mockImplementation` aplicado en tests previos
     // persiste y filtra estado entre tests (ver T-MP-DATA-8 fallando
     // por arrastre del mock de T-MP-DATA-7).
-    const { useWorkspace } = jest.requireMock(
+    const { useWorkspace, __acciones } = jest.requireMock(
       '../../src/composicion/useWorkspace',
     );
     useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
@@ -255,6 +269,9 @@ describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () =>
         acuerdo_vigente: null,
         parametros_vigentes: null,
         cargando: false,
+        // Mantenemos las acciones mockeadas disponibles para que
+        // MiPerfil no rompa al tomar `s.setParametrosVigentes`.
+        setParametrosVigentes: __acciones.setParametrosVigentes,
       }),
     );
     // Default: AsyncStorage vacío → `cargarSesion()` resuelve null.
@@ -426,7 +443,7 @@ describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () =>
 describe('MiPerfil — parámetros tarifarios del prestador (TAREA 11 commit 2)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const { useWorkspace } = jest.requireMock(
+    const { useWorkspace, __acciones } = jest.requireMock(
       '../../src/composicion/useWorkspace',
     );
     useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
@@ -437,6 +454,7 @@ describe('MiPerfil — parámetros tarifarios del prestador (TAREA 11 commit 2)'
         acuerdo_vigente: null,
         parametros_vigentes: null,
         cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
       }),
     );
     mockedGetItem.mockResolvedValue(null);
@@ -446,7 +464,7 @@ describe('MiPerfil — parámetros tarifarios del prestador (TAREA 11 commit 2)'
    * Helper: mockea useWorkspace con parámetros tarifarios vigentes.
    */
   function mockearParametros(p: ParametrosTarifa): void {
-    const { useWorkspace } = jest.requireMock(
+    const { useWorkspace, __acciones } = jest.requireMock(
       '../../src/composicion/useWorkspace',
     );
     useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
@@ -457,6 +475,7 @@ describe('MiPerfil — parámetros tarifarios del prestador (TAREA 11 commit 2)'
         acuerdo_vigente: null,
         parametros_vigentes: p,
         cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
       }),
     );
   }
@@ -621,6 +640,248 @@ describe('MiPerfil — parámetros tarifarios del prestador (TAREA 11 commit 2)'
       expect(
         (getByTestId('fila-param-vigente-hasta-valor').props.children as string) ?? '',
       ).toBe('—');
+    });
+  });
+});
+
+describe('MiPerfil — editar parámetros tarifarios vía modal (TAREA 11 commit 3)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  function mockearParametros(p: ParametrosTarifa): void {
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 42,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: p,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+  }
+
+  /**
+   * T-MP-MODAL-1 — El botón "Editar" se muestra cuando hay parámetros
+   * tarifarios vigentes en el store (es decir, el operario puede
+   * editar lo que está viendo).
+   */
+  it('T-MP-MODAL-1 muestra botón Editar cuando hay parametros_vigentes', async () => {
+    mockearParametros(crearParametrosFixture());
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-2 — Sin parametros_vigentes en store, el botón "Editar"
+   * NO se muestra (no hay nada para editar).
+   */
+  it('T-MP-MODAL-2 sin parametros_vigentes, no muestra botón Editar', async () => {
+    // mock default: parametros_vigentes = null
+    const { queryByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(queryByTestId('boton-editar-parametros')).toBeNull();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-3 — Presionar "Editar" abre el modal: aparece el título
+   * del modal y los FormFields editables.
+   */
+  it('T-MP-MODAL-3 presionar Editar abre modal con FormField CMA', async () => {
+    mockearParametros(crearParametrosFixture({ cma: 12_345_678 }));
+
+    const { getByTestId, getByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByText('Editar parámetros tarifarios')).toBeTruthy();
+      // El FormField del CMA tiene testID='param-cma' y se propaga al
+      // TextInput como testID={testID} (ver FormField.tsx).
+      expect(getByTestId('param-cma')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-4 — El FormField del CMA se inicializa con el valor
+   * actual del store (no vacío).
+   */
+  it('T-MP-MODAL-4 FormField CMA inicializa con valor del store', async () => {
+    mockearParametros(crearParametrosFixture({ cma: 12_345_678 }));
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      const input = getByTestId('param-cma');
+      expect(input.props.value).toBe('12345678');
+    });
+  });
+
+  /**
+   * T-MP-MODAL-5 — Presionar "Guardar" actualiza el store vía
+   * `setParametrosVigentes` con los valores del form, y cierra el
+   * modal (el título desaparece).
+   */
+  it('T-MP-MODAL-5 Guardar actualiza el store y cierra el modal', async () => {
+    const parametrosIniciales = crearParametrosFixture({ cma: 12_345_678 });
+    mockearParametros(parametrosIniciales);
+
+    // Obtenemos el setter mockeado (misma referencia que consume MiPerfil
+    // via `useWorkspace((s) => s.setParametrosVigentes)`).
+    const { __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    __acciones.setParametrosVigentes.mockClear();
+
+    const { getByTestId, queryByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByTestId('param-cma')).toBeTruthy();
+    });
+
+    // Cambiamos el valor del CMA en el form.
+    fireEvent.changeText(getByTestId('param-cma'), '99999999');
+
+    // Presionamos Guardar.
+    fireEvent.press(getByTestId('param-guardar'));
+
+    await waitFor(() => {
+      // El setter fue invocado con el objeto mergeado.
+      expect(__acciones.setParametrosVigentes).toHaveBeenCalledTimes(1);
+      const arg = __acciones.setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
+      expect(arg.cma).toBe(99_999_999);
+      // El resto de campos se preservó.
+      expect(arg.cmo).toBe(parametrosIniciales.cmo);
+      expect(arg.id_parametros).toBe(parametrosIniciales.id_parametros);
+      // El modal se cerró.
+      expect(queryByText('Editar parámetros tarifarios')).toBeNull();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-6 — Presionar "Cancelar" cierra el modal SIN invocar
+   * `setParametrosVigentes` (el operario descartó la edición).
+   */
+  it('T-MP-MODAL-6 Cancelar cierra modal sin guardar', async () => {
+    mockearParametros(crearParametrosFixture());
+
+    const { __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    __acciones.setParametrosVigentes.mockClear();
+
+    const { getByTestId, queryByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByTestId('param-cancelar')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('param-cancelar'));
+
+    await waitFor(() => {
+      expect(__acciones.setParametrosVigentes).not.toHaveBeenCalled();
+      expect(queryByText('Editar parámetros tarifarios')).toBeNull();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-7 — El modal contiene FormFields para todos los
+   * parámetros editables (CMA, CMO, CMI, CMT, CMVIAA, agua,
+   * ipuf, suscriptores, mínimo vital, periodo, vigencia).
+   */
+  it('T-MP-MODAL-7 modal expone FormField para cada parametro editable', async () => {
+    mockearParametros(crearParametrosFixture());
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByTestId('boton-editar-parametros')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('boton-editar-parametros'));
+
+    await waitFor(() => {
+      expect(getByTestId('param-cma')).toBeTruthy();
+      expect(getByTestId('param-cmo')).toBeTruthy();
+      expect(getByTestId('param-cmi')).toBeTruthy();
+      expect(getByTestId('param-cmt')).toBeTruthy();
+      expect(getByTestId('param-cmviaa')).toBeTruthy();
+      expect(getByTestId('param-agua')).toBeTruthy();
+      expect(getByTestId('param-ipuf')).toBeTruthy();
+      expect(getByTestId('param-suscriptores')).toBeTruthy();
+      expect(getByTestId('param-m3gratis')).toBeTruthy();
+      expect(getByTestId('param-periodo')).toBeTruthy();
+      expect(getByTestId('param-vigente-desde')).toBeTruthy();
+      expect(getByTestId('param-vigente-hasta')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-MP-MODAL-8 — El botón "Editar" tiene touch target >= 44px
+   * (WCAG 2.5.5). Verificamos el minHeight del Pressable.
+   */
+  it('T-MP-MODAL-8 botón Editar tiene touch target ≥ 44px', async () => {
+    mockearParametros(crearParametrosFixture());
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const boton = getByTestId('boton-editar-parametros');
+      expect(boton).toBeTruthy();
+      const estilo = StyleSheet.flatten(boton.props.style) as {
+        minHeight?: number;
+        height?: number;
+      };
+      const alto = estilo.height ?? estilo.minHeight ?? 0;
+      expect(alto).toBeGreaterThanOrEqual(44);
     });
   });
 });
