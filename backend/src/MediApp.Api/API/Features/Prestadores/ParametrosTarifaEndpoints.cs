@@ -106,6 +106,11 @@ public static class ParametrosTarifaEndpoints
         p.SuscriptoresPromedio,
         p.AplicaMinimoVital,
         p.M3GratisMinimoVital,
+        // Res 825/2017 compliance.
+        p.IpufIndice,
+        p.CargoFijoResultante,
+        p.CargoConsumoResultante,
+        p.ComponentesAplicables,
         p.VigenteDesde,
         p.VigenteHasta,
         p.CreatedAt,

@@ -21,6 +21,10 @@ public static class ParametrosTarifaMapper
         SuscriptoresPromedio = p.SuscriptoresPromedio,
         AplicaMinimoVital = p.AplicaMinimoVital,
         M3GratisMinimoVital = p.M3GratisMinimoVital,
+        IpufIndice = p.IpufIndice,
+        CargoFijoResultante = p.CargoFijoResultante,
+        CargoConsumoResultante = p.CargoConsumoResultante,
+        ComponentesAplicables = p.ComponentesAplicables ?? Array.Empty<string>(),
         VigenteDesde = p.VigenteDesde,
         VigenteHasta = p.VigenteHasta,
     };
@@ -39,6 +43,10 @@ public static class ParametrosTarifaMapper
         entidad.SuscriptoresPromedio = p.SuscriptoresPromedio;
         entidad.AplicaMinimoVital = p.AplicaMinimoVital;
         entidad.M3GratisMinimoVital = p.M3GratisMinimoVital;
+        entidad.IpufIndice = p.IpufIndice;
+        entidad.CargoFijoResultante = p.CargoFijoResultante;
+        entidad.CargoConsumoResultante = p.CargoConsumoResultante;
+        entidad.ComponentesAplicables = p.ComponentesAplicables ?? Array.Empty<string>();
         entidad.VigenteDesde = p.VigenteDesde;
         entidad.VigenteHasta = p.VigenteHasta;
     }

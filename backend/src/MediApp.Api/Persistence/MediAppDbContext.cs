@@ -24,6 +24,9 @@ public class MediAppDbContext : DbContext
     public DbSet<Prestador> Prestadores => Set<Prestador>();
     public DbSet<AcuerdoMunicipal> AcuerdosMunicipales => Set<AcuerdoMunicipal>();
     public DbSet<ParametrosTarifa> ParametrosTarifa => Set<ParametrosTarifa>();
+    // Res 825/2017 compliance: minimo vital como entidad hermana
+    // (1:1 con prestador).
+    public DbSet<MinimoVital> MinimosVitales => Set<MinimoVital>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
