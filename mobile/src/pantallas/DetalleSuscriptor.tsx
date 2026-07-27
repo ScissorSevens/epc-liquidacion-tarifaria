@@ -14,6 +14,7 @@ import type { Medidor } from '@dominio/medidores/types';
 import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
@@ -348,12 +349,11 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
       ) : suscriptor === null ? (
         <View style={styles.center}>
           <Text style={styles.notFoundText}>Suscriptor no encontrado</Text>
-          <Pressable
+          <BotonPrimario
+            texto="Volver"
+            tono="azul"
             onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-          >
-            <Text style={styles.btnPrimaryText}>Volver</Text>
-          </Pressable>
+          />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
@@ -453,20 +453,16 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                         <Campo label="Observaciones" valor={m.observaciones} />
                       </>
                     )}
-                    <Pressable
+                    <BotonPrimario
+                      texto="Capturar lectura"
+                      tono="azul"
                       onPress={() =>
                         navigation.navigate('CapturarLectura', {
                           id_medidor: m.id_medidor,
                           id_suscriptor,
                         })
                       }
-                      style={({ pressed }) => [
-                        styles.btnCapturar,
-                        pressed && styles.pressedDark,
-                      ]}
-                    >
-                      <Text style={styles.btnCapturarText}>Capturar lectura</Text>
-                    </Pressable>
+                    />
                     {/* Botón historial completo */}
                     <Pressable
                       onPress={() =>
@@ -498,20 +494,23 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
       {/* ── Bottom bar fijo ── */}
       {!loading && (
         <View style={[styles.bottomBar, styles.bottomBarRow]}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.btnVolver, styles.btnHalf, pressed && styles.pressedLight]}
-          >
-            <Text style={styles.btnVolverText}>Volver</Text>
-          </Pressable>
-          {suscriptor !== null && (
+          <View style={styles.btnHalf}>
             <Pressable
-              onPress={() => navigation.navigate('EditarSuscriptor', { suscriptor })}
-              style={({ pressed }) => [styles.btnEditar, styles.btnHalf, pressed && styles.pressedDark]}
+              onPress={() => navigation.goBack()}
+              style={({ pressed }) => [styles.btnVolver, pressed && styles.pressedLight]}
             >
-              <MaterialIcons name="edit" size={16} color={COLORS.onPrimary} />
-              <Text style={styles.btnEditarText}>Editar suscriptor</Text>
+              <Text style={styles.btnVolverText}>Volver</Text>
             </Pressable>
+          </View>
+          {suscriptor !== null && (
+            <View style={styles.btnHalf}>
+              <BotonPrimario
+                texto="Editar suscriptor"
+                icono="edit"
+                tono="azul"
+                onPress={() => navigation.navigate('EditarSuscriptor', { suscriptor })}
+              />
+            </View>
           )}
         </View>
       )}
@@ -658,30 +657,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Botón capturar lectura (primario full-width) ── */
-  btnCapturar: {
-    marginTop: SPACING.md,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-  },
-  btnCapturarText: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-  },
-
-  /* ── Botón primario genérico ── */
-  btnPrimary: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    alignItems: 'center',
-  },
-  btnPrimaryText: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-  },
+  // "Capturar lectura" se renderiza via <BotonPrimario> extraído.
 
   /* ── Bottom bar ── */
   bottomBar: {
@@ -709,24 +685,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     paddingVertical: SPACING.md,
     alignItems: 'center',
+    minHeight: 48,
   },
   btnVolverText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primaryContainer,
   },
-  btnEditar: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-  },
-  btnEditarText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
-  },
+  // "Editar suscriptor" se renderiza via <BotonPrimario> extraído.
 
   /* ── Pressed states ── */
   pressedDark: {
