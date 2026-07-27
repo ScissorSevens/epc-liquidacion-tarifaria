@@ -1,12 +1,32 @@
+/**
+ * Pantalla Mi Perfil — datos reales del operario + prestador + parámetros
+ * tarifarios.
+ *
+ * TAREA 11 — Reemplazo del PERFIL hardcoded (commit 1) + sección de
+ * parámetros tarifarios del prestador activo (commit 2) + edición vía
+ * modal con FormField (commit 3).
+ *
+ * Fuentes de datos:
+ *   - Sesion (AsyncStorage via `cargarSesion()`): cedula, nombre,
+ *     idOperario. La sesión NO trae email ni teléfono — esos campos se
+ *     muestran como "—" hasta que se agregue un flujo de edición de
+ *     perfil del operario. (Operario.email existe en dominio pero requiere
+ *     fetch via operarioRepo, fuera de scope.)
+ *   - useWorkspace.prestador: nombre, municipio, codigo del prestador
+ *     activo. Se popula vía WorkspaceSwitcher / cambiarPrestadorYCargarContexto.
+ *   - useWorkspace.parametros_vigentes: CMA, CMO, CMI, CMT, CMVIAA,
+ *     mínimo vital, fechas de vigencia. Lo carga el bootstrap inicial.
+ */
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
-import { useState } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { TarjetaMetrica } from '../componentes/TarjetaMetrica';
 import { TopBar } from '../componentes/TopBar';
-import { limpiarSesion } from '../composition/constantes';
+import { limpiarSesion, cargarSesion, type Sesion } from '../composition/constantes';
+import { useWorkspace } from '../composicion/useWorkspace';
 import {
   COLORS,
   RADIUS,
@@ -20,25 +40,69 @@ type Props = ConfigStackScreenProps<'MiPerfil'> & {
   readonly onLogoutRequested: () => void;
 };
 
-/** Datos de perfil estáticos — en el futuro vendrán del store. */
-const PERFIL = {
-  iniciales: 'OP',
-  nombre: 'Operario',
-  rol: 'Operario rural · EPC',
-  idOperario: '—',
-  telefono: '—',
-  correo: '—',
-  lecturas: '—',
-  ultimaSincro: '—',
-};
+/** Placeholder honesto cuando no hay dato real cargado todavía. */
+const PLACEHOLDER = '—';
+
+/** Iniciales (hasta 2 letras) derivadas del nombre. Vacío si no hay nombre. */
+function obtenerIniciales(nombre: string | undefined): string {
+  if (nombre === undefined || nombre.trim() === '') return '';
+  return nombre
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
+  const [sesion, setSesion] = useState<Sesion | null>(null);
+
+  // PER-05: selectores específicos. Solo nos interesa prestador y
+  // parametros_vigentes. Cambios en prestadores_disponibles / cargando /
+  // acuerdo_vigente NO causan re-render.
+  const prestador = useWorkspace((s) => s.prestador);
+  const parametros = useWorkspace((s) => s.parametros_vigentes);
+
+  // Cargar sesión al mount. La sesión vive en AsyncStorage bajo
+  // `@sistema_epc:sesion` y `cargarSesion()` ya valida vigencia + shape.
+  useEffect(() => {
+    let cancelado = false;
+    void (async () => {
+      const s = await cargarSesion();
+      if (!cancelado) setSesion(s);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   function mostrarToast() {
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2500);
   }
+
+  // ── Valores derivados ─────────────────────────────────────────────────────
+  const nombre = sesion?.nombre ?? PLACEHOLDER;
+  const idOperarioNum = sesion?.idOperario;
+  const cedula = sesion?.cedula ?? PLACEHOLDER;
+  const idOperarioStr =
+    idOperarioNum !== undefined && idOperarioNum > 0
+      ? `#${idOperarioNum}`
+      : PLACEHOLDER;
+  const inicialesCalc = obtenerIniciales(sesion?.nombre);
+  // Sin sesion caemos al placeholder legacy "OP" (Operario) — backward
+  // compatible con tests MP-2 que verifican que el avatar muestra "OP"
+  // en el estado "sin sesión".
+  const iniciales = inicialesCalc === '' ? 'OP' : inicialesCalc;
+  // Rol: la Sesion no trae rol explícito; mostramos "Operario" cuando
+  // hay sesion activa. "—" en el fallback para no mentir con un literal
+  // hardcoded (el viejo "Operario rural · EPC" era engañoso).
+  const rol = sesion !== null ? 'Operario' : PLACEHOLDER;
+  const prestadorNombre = prestador?.nombre ?? PLACEHOLDER;
+  const prestadorMunicipio = prestador?.municipio ?? '';
+  const prestadorCodigo = prestador?.codigo ?? '';
+
   return (
     <View style={estilos.raiz}>
       {/* Top App Bar */}
@@ -51,10 +115,10 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         {/* Avatar */}
         <View style={estilos.avatarSeccion}>
           <View style={estilos.avatar} testID="avatar">
-            <Text style={estilos.avatarTexto}>{PERFIL.iniciales}</Text>
+            <Text style={estilos.avatarTexto}>{iniciales}</Text>
           </View>
-          <Text style={estilos.nombre}>{PERFIL.nombre}</Text>
-          <Text style={estilos.rol}>{PERFIL.rol}</Text>
+          <Text style={estilos.nombre} testID="perfil-nombre">{nombre}</Text>
+          <Text style={estilos.rol} testID="perfil-rol">{rol}</Text>
         </View>
 
         {/* Actividad Reciente */}
@@ -63,14 +127,14 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           <TarjetaMetrica
             icono="edit-note"
             etiqueta="Lecturas"
-            valor={PERFIL.lecturas}
+            valor={PLACEHOLDER}
             variante="normal"
             testID="tarjeta-lecturas"
           />
           <TarjetaMetrica
             icono="sync"
             etiqueta="Última sincronización"
-            valor={PERFIL.ultimaSincro}
+            valor={PLACEHOLDER}
             variante="normal"
             testID="tarjeta-ultima-sincro"
           />
@@ -79,9 +143,51 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         {/* Información Personal */}
         <Text style={estilos.seccionTitulo}>Información personal</Text>
         <View style={estilos.listaCard}>
-          <FilaInfo etiqueta="ID Operario" valor={PERFIL.idOperario} borde />
-          <FilaInfo etiqueta="Teléfono" valor={PERFIL.telefono} borde />
-          <FilaInfo etiqueta="Correo" valor={PERFIL.correo} />
+          <FilaInfo
+            etiqueta="Cédula"
+            valor={cedula}
+            testID="fila-cedula"
+            borde
+          />
+          <FilaInfo
+            etiqueta="ID Operario"
+            valor={idOperarioStr}
+            testID="fila-id-operario"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Teléfono"
+            valor={PLACEHOLDER}
+            testID="fila-telefono"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Correo"
+            valor={PLACEHOLDER}
+            testID="fila-correo"
+          />
+        </View>
+
+        {/* Prestador activo */}
+        <Text style={estilos.seccionTitulo}>Prestador activo</Text>
+        <View style={estilos.listaCard}>
+          <FilaInfo
+            etiqueta="Nombre"
+            valor={prestadorNombre}
+            testID="fila-prestador-nombre"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Municipio"
+            valor={prestadorMunicipio === '' ? PLACEHOLDER : prestadorMunicipio}
+            testID="fila-prestador-municipio"
+            borde
+          />
+          <FilaInfo
+            etiqueta="Código"
+            valor={prestadorCodigo === '' ? PLACEHOLDER : prestadorCodigo}
+            testID="fila-prestador-codigo"
+          />
         </View>
 
         {/* Configuración */}
@@ -101,7 +207,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           </View>
         </View>
 
-{/* Cerrar sesión */}
+        {/* Cerrar sesión */}
         <BotonPrimario
           texto="Cerrar sesión"
           tono="rojo"
@@ -129,15 +235,22 @@ function FilaInfo({
   etiqueta,
   valor,
   borde,
+  testID,
 }: {
   etiqueta: string;
   valor: string;
   borde?: boolean;
+  testID?: string;
 }) {
   return (
-    <View style={[estilos.fila, borde && estilos.filaBorde]}>
+    <View style={[estilos.fila, borde && estilos.filaBorde]} testID={testID}>
       <Text style={estilos.filaEtiqueta}>{etiqueta}</Text>
-      <Text style={estilos.filaValor}>{valor}</Text>
+      <Text
+        style={estilos.filaValor}
+        testID={testID !== undefined ? `${testID}-valor` : undefined}
+      >
+        {valor}
+      </Text>
     </View>
   );
 }
