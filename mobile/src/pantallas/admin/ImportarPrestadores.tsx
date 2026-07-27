@@ -6,10 +6,10 @@
  * num_suscriptores_urbanos, num_suscriptores_rurales).
  */
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
+import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { getBootstrap } from '../../composition/get-bootstrap';
 import type { PrestadorRepositoryExpoSqlite } from '../../persistencia/expo-sqlite/prestador-repository-expo-sqlite';
 
@@ -93,10 +93,14 @@ export default function ImportarPrestadores({ repo: repoProp }: Props) {
         />
       </View>
 
-      <Pressable style={[estilos.boton, importando && estilos.botonDisabled]} onPress={importar} disabled={importando}>
-        <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
-        <Text style={estilos.botonLabel}>{importando ? 'Importando...' : 'Importar'}</Text>
-      </Pressable>
+      <BotonPrimario
+        texto="Importar"
+        textoCargando="Importando…"
+        icono="upload-file"
+        tono="azul"
+        onPress={importar}
+        cargando={importando}
+      />
 
       {ultimoResultado && (
         <View style={estilos.resultado}>
@@ -139,17 +143,7 @@ const estilos = StyleSheet.create({
     minHeight: 240,
     fontFamily: 'monospace',
   },
-  boton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    gap: SPACING.xs,
-  },
-  botonDisabled: { opacity: 0.5 },
-  botonLabel: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary },
+  // El botón "Importar" se renderiza via <BotonPrimario> extraído.
   resultado: {
     marginTop: SPACING.md,
     padding: SPACING.md,
