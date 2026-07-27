@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FilaSuscriptor } from '../componentes/FilaSuscriptor';
 import { FooterApp } from '../componentes/FooterApp';
 import { TopBar } from '../componentes/TopBar';
@@ -179,12 +180,12 @@ export default function ListaSuscriptores({ navigation }: Props) {
             ) : error !== null ? (
               <>
                 <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.btnTomarLectura, pressed && styles.pressed]}
+                <BotonPrimario
+                  texto="Reintentar"
+                  tono="azul"
+                  tamano="compacto"
                   onPress={() => void cargar()}
-                >
-                  <Text style={[TYPOGRAPHY.labelLg, styles.btnTomarLecturaTexto]}>Reintentar</Text>
-                </Pressable>
+                />
               </>
             ) : suscriptores.length === 0 ? (
               <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>
@@ -343,20 +344,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Botones compartidos (usados también en el estado de error/retry) ────────
-  btnTomarLectura: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
-  },
-  btnTomarLecturaTexto: {
-    color: COLORS.onPrimary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  // El botón "Reintentar" se renderiza via <BotonPrimario> extraído.
 
   // ── Estados centro ─────────────────────────────────────────────────────────
   center: {
