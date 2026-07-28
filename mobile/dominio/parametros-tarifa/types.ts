@@ -150,6 +150,18 @@ export interface ParametrosTarifaRepository {
    */
   buscarVigente(id_prestador: number, fecha: string): Promise<ParametrosTarifa | null>;
   buscarPorPeriodo(id_prestador: number, periodo: number): Promise<ParametrosTarifa | null>;
+  /**
+   * UPSERT por (id_prestador, periodo, vigente_desde). Si ya existe una
+   * fila con esa triple clave, actualiza todos los campos; si no, inserta
+   * nueva. Retorna el ParametrosTarifa persistido (con id_parametros +
+   * created_at). El id_parametros NO cambia en un UPSERT match — es la
+   * misma fila actualizada.
+   *
+   * El screen admin `ParametrosTarifa.tsx` usa esto para "Guardar
+   * Parámetros": carga `buscarVigente` para pre-rellenar y luego
+   * `guardar` para persistir (sea alta nueva o edición).
+   */
+  guardar(data: ParametrosTarifaBorrador): Promise<ParametrosTarifa>;
   eliminar(id: number): Promise<void>;
 }
 

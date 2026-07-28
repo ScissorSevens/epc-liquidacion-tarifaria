@@ -284,6 +284,20 @@ export function crearParametrosTarifaRepositorySqlite(
       db.prepare('DELETE FROM parametros_tarifa WHERE id_parametros = ?').run(id);
     },
 
+    /**
+     * Stub de `guardar`. El commit feat(domain) agrega el metodo al
+     * interface compartido `ParametrosTarifaRepository`. La
+     * implementacion real como UPSERT se hara en un commit posterior
+     * (sigue la logica de `crear` + `buscarPorPeriodo` para minimizar
+     * diff). Mientras tanto, conserva la firma para que tsc --noEmit
+     * pase en el resto del repo.
+     */
+    async guardar(_data: CrearParametrosTarifaInput): Promise<ParametrosTarifa> {
+      throw new Error(
+        'guardar: pendiente de implementacion para ParametrosTarifaRepositorySqlite',
+      );
+    },
+
     cerrar(): void {
       db.close();
     },
