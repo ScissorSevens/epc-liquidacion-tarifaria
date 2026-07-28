@@ -222,15 +222,77 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
     },
 
     /**
-     * Stub de `guardar`. El commit feat(domain) agrega el metodo al
-     * interface compartido `ParametrosTarifaRepository`. La
-     * implementacion real como UPSERT se hara en el siguiente commit.
-     * Mientras tanto, conserva la firma para que tsc --noEmit pase.
+     * UPSERT por la triple clave (id_prestador, periodo, vigente_desde).
+     *
+     * Por que UPSERT (no `crear`):
+     *   El UNIQUE constraint `UNIQUE(id_prestador, periodo, vigente_desde)`
+     *   garantiza no duplicar Parametros vigentes. El UPSERT convierte
+     *   eso en una primitiva declarativa: si la fila existe, UPDATE; si
+     *   no, INSERT. Esto matchea exactamente el flujo de la pantalla
+     *   admin `ParametrosTarifa.tsx`:
+     *     1) `buscarVigente` para pre-rellenar el form.
+     *     2) `guardar` con todo el payload (sea alta nueva o edicion).
+     *
+     * El id_parametros NO cambia cuando hay match (mismo registro). Se
+     * preserva `created_at` original (no esta en el SET). Despues del
+     * UPSERT hacemos un SELECT por la triple clave para devolver el row
+     * completo mapeado via `fromRow`.
+     *
+     * Decisiones:
+     *   - `excluded.<col>` en el DO UPDATE SET evita ambiguedad entre el
+     *     valor pre-existente y el nuevo (sqlite docs: `excluded` es el
+     *     pseudo-row del INSERT que se intento).
+     *   - `id_parametros` y `created_at` NO estan en el SET: la primera
+     *     es PK autogenerada, la segunda la asigna SQLite con `strftime`
+     *     al INSERT inicial y solo se preserva.
+     *   - SELECT post-UPSERT va por la triple clave (no por
+     *     `id_parametros`) porque el UPSERT puede haber UPDATEADO una fila
+     *     existente — `lastInsertRowId` en ese caso devuelve el id del
+     *     registro actualizado, no uno nuevo, pero queremos asegurar el
+     *     contrato "dame la fila persistida por la triple clave".
      */
-    async guardar(_data: CrearParametrosTarifaInput): Promise<ParametrosTarifa> {
-      throw new Error(
-        'guardar: pendiente de implementacion en ParametrosTarifaRepositoryExpoSqlite',
+    async guardar(data: CrearParametrosTarifaInput): Promise<ParametrosTarifa> {
+      await db.runAsync(
+        `INSERT INTO parametros_tarifa (
+          id_prestador, id_acuerdo, periodo, cma, cmo, cmi, cmt, cmviaa, aplica_cmviaa,
+          agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
+          aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
+          cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
+          vigente_desde, vigente_hasta
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id_prestador, periodo, vigente_desde) DO UPDATE SET
+          id_acuerdo = excluded.id_acuerdo,
+          cma = excluded.cma,
+          cmo = excluded.cmo,
+          cmi = excluded.cmi,
+          cmt = excluded.cmt,
+          cmviaa = excluded.cmviaa,
+          aplica_cmviaa = excluded.aplica_cmviaa,
+          agua_suministrada_m3_anio = excluded.agua_suministrada_m3_anio,
+          ipuf_m3_suscriptor_mes = excluded.ipuf_m3_suscriptor_mes,
+          suscriptores_promedio = excluded.suscriptores_promedio,
+          aplica_minimo_vital = excluded.aplica_minimo_vital,
+          m3_gratis_minimo_vital = excluded.m3_gratis_minimo_vital,
+          ipuf_indice = excluded.ipuf_indice,
+          cargo_fijo_resultante = excluded.cargo_fijo_resultante,
+          cargo_consumo_resultante = excluded.cargo_consumo_resultante,
+          componentes_aplicables = excluded.componentes_aplicables,
+          vigente_hasta = excluded.vigente_hasta`,
+        data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
+        data.cmviaa, data.aplica_cmviaa ? 1 : 0,
+        data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
+        data.aplica_minimo_vital ? 1 : 0, data.m3_gratis_minimo_vital,
+        data.ipuf_indice, data.cargo_fijo_resultante, data.cargo_consumo_resultante,
+        JSON.stringify([...data.componentes_aplicables]),
+        data.vigente_desde, data.vigente_hasta,
       );
+      const row = await db.getFirstAsync<ParametrosRow>(
+        `SELECT * FROM parametros_tarifa
+         WHERE id_prestador = ? AND periodo = ? AND vigente_desde = ?`,
+        data.id_prestador, data.periodo, data.vigente_desde,
+      );
+      if (!row) throw new Error('guardar: parametros no fueron persistidos');
+      return fromRow(row, null);
     },
   };
 }
