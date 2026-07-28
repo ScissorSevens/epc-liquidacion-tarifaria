@@ -27,16 +27,9 @@ import {
   COMPONENTES_TARIFARIOS,
   calcularCargos,
   type ParametrosTarifa,
+  type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
-
-interface ParametrosTarifaRepo {
-  readonly guardar: (p: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>) => Promise<ParametrosTarifa>;
-  readonly buscarVigente: (id_prestador: number, fecha: string) => Promise<ParametrosTarifa | null>;
-}
-
-interface AcuerdoRepo {
-  readonly buscarVigente: (id_prestador: number, fecha: string) => Promise<{ id_acuerdo: number } | null>;
-}
+import type { AcuerdoMunicipalRepository } from '../../../dominio/acuerdo-municipal';
 
 interface Props {
   /** Si no se provee, se toma del workspace (`useWorkspace.id_prestador_activo`). */
@@ -45,10 +38,14 @@ interface Props {
   readonly id_acuerdo?: number;
   /** Si no se provee, se busca via `repo.buscarVigente()` con la fecha actual. */
   readonly parametrosActuales?: ParametrosTarifa | null;
-  /** Si no se provee, se resuelve via `getBootstrap()` (patrón del resto del código). */
-  readonly repo?: ParametrosTarifaRepo;
+  /**
+   * Si no se provee, se resuelve via `getBootstrap()` (patrón del resto
+   * del código). Contrato: implementa `ParametrosTarifaRepository` del
+   * dominio — el screen usa `buscarVigente` y `guardar`.
+   */
+  readonly repo?: ParametrosTarifaRepository;
   /** Si no se provee, se resuelve via `getBootstrap()` (requerido para derivar id_acuerdo). */
-  readonly acuerdoRepo?: AcuerdoRepo;
+  readonly acuerdoRepo?: AcuerdoMunicipalRepository;
 }
 
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
@@ -66,8 +63,8 @@ export default function ParametrosTarifaForm({
   // cargando o prestador NO causan re-render.
   const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const id_prestador = idProp ?? id_prestador_activo;
-  const [repo, setRepo] = useState<ParametrosTarifaRepo | null>(repoProp ?? null);
-  const [acuerdoRepo, setAcuerdoRepo] = useState<AcuerdoRepo | null>(acuerdoRepoProp ?? null);
+  const [repo, setRepo] = useState<ParametrosTarifaRepository | null>(repoProp ?? null);
+  const [acuerdoRepo, setAcuerdoRepo] = useState<AcuerdoMunicipalRepository | null>(acuerdoRepoProp ?? null);
   const [id_acuerdo, setIdAcuerdo] = useState<number>(idAcuerdoProp ?? 0);
   const [parametrosActuales, setParametrosActuales] = useState<ParametrosTarifa | null>(parametrosProp ?? null);
   const [cargando, setCargando] = useState(true);
@@ -79,8 +76,14 @@ export default function ParametrosTarifaForm({
     void (async () => {
       const bs = await getBootstrap();
       if (cancelado) return;
-      if (repo === null) setRepo(bs.parametrosTarifaRepo as unknown as ParametrosTarifaRepo);
-      if (acuerdoRepo === null) setAcuerdoRepo(bs.acuerdoMunicipalRepo as unknown as AcuerdoRepo);
+      // El bootstrap retorna el adapter expo-sqlite que implementa el
+      // contract `ParametrosTarifaRepository`. Sin cast: TS verifica
+      // adhesion estructural directamente. Antes esto era:
+      //   `bs.parametrosTarifaRepo as unknown as ParametrosTarifaRepo`
+      // (cast inseguro que tapaba el bug `repo.guardar is not a function`
+      //  — ver TAREA 11 sdd-apply).
+      if (repo === null) setRepo(bs.parametrosTarifaRepo);
+      if (acuerdoRepo === null) setAcuerdoRepo(bs.acuerdoMunicipalRepo);
     })();
     return () => { cancelado = true; };
   }, [repo, acuerdoRepo]);
