@@ -162,7 +162,13 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     }),
   });
   const medidorSnapshot = deepFreeze({
+    id_medidor: input.medidor.id_medidor,
     numero_medidor: input.medidor.numero_medidor,
+    estado: input.medidor.estado,
+    fecha_instalacion: input.medidor.fecha_instalacion,
+    ...(input.medidor.observaciones !== undefined && {
+      observaciones: input.medidor.observaciones,
+    }),
   });
   const periodoSnapshot = deepFreeze({
     id_periodo: input.periodo.id_periodo,

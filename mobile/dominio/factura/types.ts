@@ -88,8 +88,20 @@ export interface FacturaSnapshotPrestador {
   readonly representante_legal: string;
 }
 
+/**
+ * Snapshot del medidor al momento de emisión. Res CRA 1038/2026 §3
+ * exige identificar el instrumento de medición que origina la
+ * liquidación. Datos: id interno, número de medidor, estado al
+ * momento de la captura, fecha de instalación y observaciones.
+ *
+ * NO se expone `created_at` (timestamp de fila).
+ */
 export interface FacturaSnapshotMedidor {
+  readonly id_medidor: number;
   readonly numero_medidor: string;
+  readonly estado: 'activo' | 'inactivo' | 'reemplazado';
+  readonly fecha_instalacion: string;
+  readonly observaciones?: string;
 }
 
 export interface FacturaSnapshotPeriodo {

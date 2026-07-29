@@ -193,10 +193,15 @@ describe('emitirFactura — happy path', () => {
     expect(Object.isFrozen(factura.snapshot.suscriptor)).toBe(true);
   });
 
-  it('snapshotea medidor (numero_medidor) y lo congela', () => {
+  it('snapshotea medidor (id, numero, estado, fecha_instalacion) y lo congela', () => {
     const medidor: Medidor = { ...medidorBase(), numero_medidor: 'MED-9999' };
     const factura = emitirFactura({ ...inputBase(), medidor }, hasher);
-    expect(factura.snapshot.medidor).toEqual({ numero_medidor: 'MED-9999' });
+    expect(factura.snapshot.medidor).toEqual({
+      id_medidor: medidor.id_medidor,
+      numero_medidor: 'MED-9999',
+      estado: medidor.estado,
+      fecha_instalacion: medidor.fecha_instalacion,
+    });
     expect(Object.isFrozen(factura.snapshot.medidor)).toBe(true);
   });
 
