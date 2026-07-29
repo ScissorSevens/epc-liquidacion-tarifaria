@@ -42,6 +42,11 @@ interface FacturaRow {
   readonly motivo_anulacion: string | null;
   readonly fecha_anulacion: string | null;
   readonly reemplaza_a: string | null;
+  // Migration 020 — columnas dedicadas para busqueda operativa.
+  readonly codigo_verificacion: string | null;
+  readonly referencia_pago: string | null;
+  readonly qr_pago: string | null;
+  readonly version_tarifa_aplicada: string | null;
 }
 
 function toRow(factura: Factura): {
@@ -58,6 +63,10 @@ function toRow(factura: Factura): {
   motivo_anulacion: string | null;
   fecha_anulacion: string | null;
   reemplaza_a: string | null;
+  codigo_verificacion: string | null;
+  referencia_pago: string | null;
+  qr_pago: string | null;
+  version_tarifa_aplicada: string | null;
 } {
   return {
     id: factura.id,
@@ -73,19 +82,32 @@ function toRow(factura: Factura): {
     motivo_anulacion: factura.motivo_anulacion ?? null,
     fecha_anulacion: factura.fecha_anulacion ?? null,
     reemplaza_a: factura.reemplaza_a ?? null,
+    codigo_verificacion: factura.codigo_verificacion ?? null,
+    referencia_pago: factura.referencia_pago ?? null,
+    qr_pago: factura.qr_pago ?? null,
+    version_tarifa_aplicada: factura.version_tarifa_aplicada ?? null,
   };
 }
 
 function fromRow(row: FacturaRow): Factura {
   const snapshot = JSON.parse(row.snapshot) as FacturaSnapshot;
-  // Compatibilidad: filas v1 (pre-migration 020) no tienen
-  // codigo_verificacion / version_tarifa_aplicada en columnas. Los
-  // derivamos del hash y del snapshot.
-  const codigoVerificacion = calcularCodigoVerificacionPlaceholder(row.hash);
+  // Codigo de verificacion: leemos de la columna migration 020. Si la
+  // fila es legacy (pre-2027) y la columna es null, derivamos del hash.
+  const codigoVerificacion =
+    row.codigo_verificacion !== null && row.codigo_verificacion !== ''
+      ? row.codigo_verificacion
+      : calcularCodigoVerificacionPlaceholder(row.hash);
+  // Version tarifa: columna migration 020. Fallback legacy.
   const versionTarifaAplicada =
-    snapshot.liquidacion.resultado.metadata.version_motor ?? 'v1-legacy';
-  const referenciaPago: string | undefined = undefined;
-  const qrPago: string | undefined = undefined;
+    row.version_tarifa_aplicada !== null && row.version_tarifa_aplicada !== ''
+      ? row.version_tarifa_aplicada
+      : snapshot.liquidacion.resultado.metadata.version_motor ?? 'v1-legacy';
+  const referenciaPago: string | undefined =
+    row.referencia_pago !== null && row.referencia_pago !== ''
+      ? row.referencia_pago
+      : undefined;
+  const qrPago: string | undefined =
+    row.qr_pago !== null && row.qr_pago !== '' ? row.qr_pago : undefined;
   const factura: Factura = {
     id: row.id,
     numero_factura: row.numero_factura,
@@ -106,16 +128,27 @@ function fromRow(row: FacturaRow): Factura {
 }
 
 function calcularCodigoVerificacionPlaceholder(hash: string): string {
-  if (hash.length >= 16) return hash.slice(0, 16);
-  return hash.padStart(16, '0');
+  // Espejo del helper en pagos.ts: filtra chars no-hex (compat con
+  // hasher fake en tests), convierte primeros 16 hex chars a base36,
+  // padStart a 10. En prod el hash es SHA-256 hex de 64 chars.
+  const hexOnly = (hash + '0'.repeat(16))
+    .split('')
+    .filter((ch) => /[0-9a-fA-F]/.test(ch))
+    .join('')
+    .slice(0, 16)
+    .padEnd(16, '0');
+  const valor = parseInt(hexOnly, 16);
+  const base36 = valor.toString(36).toUpperCase();
+  return base36.slice(0, 10).padStart(10, '0');
 }
 
 const SQL_INSERT = `
   INSERT INTO factura (
     id, numero_factura, estado, fecha_emision, snapshot, hash,
     liquidacion_id, id_periodo, id_suscriptor, created_at,
-    motivo_anulacion, fecha_anulacion, reemplaza_a
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    motivo_anulacion, fecha_anulacion, reemplaza_a,
+    codigo_verificacion, referencia_pago, qr_pago, version_tarifa_aplicada
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM factura WHERE id = ?`;
@@ -203,6 +236,10 @@ export function crearFacturaRepositoryExpoSqlite(
           row.motivo_anulacion,
           row.fecha_anulacion,
           row.reemplaza_a,
+          row.codigo_verificacion,
+          row.referencia_pago,
+          row.qr_pago,
+          row.version_tarifa_aplicada,
         );
       } catch (e) {
         throw traducirError(e, { liquidacion_id: row.liquidacion_id });

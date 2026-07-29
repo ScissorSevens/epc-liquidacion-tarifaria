@@ -46,6 +46,11 @@ interface FacturaRow {
   readonly motivo_anulacion: string | null;
   readonly fecha_anulacion: string | null;
   readonly reemplaza_a: string | null;
+  // Migration 020 — columnas dedicadas para busqueda operativa.
+  readonly codigo_verificacion: string | null;
+  readonly referencia_pago: string | null;
+  readonly qr_pago: string | null;
+  readonly version_tarifa_aplicada: string | null;
 }
 
 function toRow(factura: Factura): {
@@ -62,6 +67,10 @@ function toRow(factura: Factura): {
   motivo_anulacion: string | null;
   fecha_anulacion: string | null;
   reemplaza_a: string | null;
+  codigo_verificacion: string | null;
+  referencia_pago: string | null;
+  qr_pago: string | null;
+  version_tarifa_aplicada: string | null;
 } {
   return {
     id: factura.id,
@@ -77,19 +86,34 @@ function toRow(factura: Factura): {
     motivo_anulacion: factura.motivo_anulacion ?? null,
     fecha_anulacion: factura.fecha_anulacion ?? null,
     reemplaza_a: factura.reemplaza_a ?? null,
+    codigo_verificacion: factura.codigo_verificacion ?? null,
+    referencia_pago: factura.referencia_pago ?? null,
+    qr_pago: factura.qr_pago ?? null,
+    version_tarifa_aplicada: factura.version_tarifa_aplicada ?? null,
   };
 }
 
 function fromRow(row: FacturaRow): Factura {
   const snapshot = JSON.parse(row.snapshot) as FacturaSnapshot;
-  // Compatibilidad: filas v1 (pre-migration 020) no tienen codigo_verificacion
-  // y version_tarifa_aplicada en columnas. Como estan en el snapshot JSON,
-  // los extraemos de alli con fallback a los campos top-level.
-  const codigoVerificacion = calcularCodigoVerificacionPlaceholder(row.hash);
+  // Codigo de verificacion: leemos de la columna migration 020. Si la
+  // fila es legacy (pre-2027) y la columna es null, derivamos del hash.
+  const codigoVerificacion =
+    row.codigo_verificacion !== null && row.codigo_verificacion !== ''
+      ? row.codigo_verificacion
+      : calcularCodigoVerificacionPlaceholder(row.hash);
+  // Version tarifa: columna migration 020. Fallback legacy.
   const versionTarifaAplicada =
-    snapshot.liquidacion.resultado.metadata.version_motor ?? 'v1-legacy';
-  const referenciaPago: string | undefined = undefined; // columna migration 020
-  const qrPago: string | undefined = undefined; // columna migration 020
+    row.version_tarifa_aplicada !== null && row.version_tarifa_aplicada !== ''
+      ? row.version_tarifa_aplicada
+      : snapshot.liquidacion.resultado.metadata.version_motor ?? 'v1-legacy';
+  // referencia_pago y qr_pago: columnas migration 020. Si son null
+  // (fila legacy), NO las exponemos (consistente con shape original).
+  const referenciaPago: string | undefined =
+    row.referencia_pago !== null && row.referencia_pago !== ''
+      ? row.referencia_pago
+      : undefined;
+  const qrPago: string | undefined =
+    row.qr_pago !== null && row.qr_pago !== '' ? row.qr_pago : undefined;
   const factura: Factura = {
     id: row.id,
     numero_factura: row.numero_factura,
@@ -128,11 +152,13 @@ const SQL_INSERT = `
   INSERT INTO factura (
     id, numero_factura, estado, fecha_emision, snapshot, hash,
     liquidacion_id, id_periodo, id_suscriptor, created_at,
-    motivo_anulacion, fecha_anulacion, reemplaza_a
+    motivo_anulacion, fecha_anulacion, reemplaza_a,
+    codigo_verificacion, referencia_pago, qr_pago, version_tarifa_aplicada
   ) VALUES (
     @id, @numero_factura, @estado, @fecha_emision, @snapshot, @hash,
     @liquidacion_id, @id_periodo, @id_suscriptor, @created_at,
-    @motivo_anulacion, @fecha_anulacion, @reemplaza_a
+    @motivo_anulacion, @fecha_anulacion, @reemplaza_a,
+    @codigo_verificacion, @referencia_pago, @qr_pago, @version_tarifa_aplicada
   )
 `;
 
