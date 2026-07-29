@@ -351,21 +351,67 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
     expect(factura.snapshot.otros_valores.length).toBe(todosLosConceptos.length);
   });
 
-  it('lanza error si el total (post calculo) es negativo', () => {
-    // Forzamos un escenario donde el saldo_anterior + otros_valores
-    // hacia abajo del total de la liquidacion. Logica del motor: el
-    // total es matriz del calculo. Si saldo_anterior < 0 o si
-    // otros_valores impactarian negativo, error.
-    // Probamos: totalBase = 20000, saldoAnterior = 30000, otros = []
-    // → total = 20000 + 0 + 30000 = 50000 (no negativo)
-    // Para forzar negativo, motor deberia restar: no es nuestro caso.
-    // Por lo tanto, este test verifica la validacion de TIPO: si el
-    // calculo del total produce < 0, lanzar.
-    // Caso real: error si saldo_anterior > 0 pero al restar otro
-    // valor negativo del catalogo... no aplica, validar otro escenario:
-    // saldo_anterior = 0, otros: vacio ✓
-    // documento el caso: pasar saldo_anterior = -1 (test anterior cubre).
-    expect(true).toBe(true);
+  it('lanza error si el total (post calculo) es negativo (TOTAL_NEGATIVO_NO_PERMITIDO)', () => {
+    // Forzamos un escenario donde el snapshot tiene saldo_anterior
+    // negativo (bypass via JSON round-trip / DB corrupta). Aunque
+    // emitirFactura bloquea esto, calcularTotalFactura es la ultima
+    // linea de defensa para facturas ya persistidas con snapshot
+    // malicioso. Aqui simulamos creando la Factura manualmente con
+    // saldo_anterior negativo en el snapshot.
+    const resultado: ResultadoCalculo = {
+      ...resultadoBase(),
+      total: 100,
+    };
+    const liqBase = {
+      id: '22222222-2222-2222-2222-222222222222',
+      suscriptorId: '1',
+      fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
+      resultado,
+      estado: 'ACTIVA' as const,
+    };
+    const liquidacion: Liquidacion = { ...liqBase, hash: calcularHash(liqBase, hasher) };
+    const factura: Factura = emitirFactura(
+      inputBase({ liquidacion, saldoAnterior: 0, otrosValores: [] }),
+      hasher,
+    );
+    // Simulamos un snapshot corrupto donde saldo_anterior es -500
+    // (esto podria pasar por mutacion de DB post-emision).
+    const facturaCorrupta: Factura = {
+      ...factura,
+      snapshot: {
+        ...factura.snapshot,
+        saldo_anterior: -500,
+      },
+    };
+    // 100 + 0 + (-500) = -400 < 0 → lanzar
+    expect(() => calcularTotalFactura(facturaCorrupta)).toThrow(
+      MENSAJES_ERROR_FACTURA.TOTAL_NEGATIVO_NO_PERMITIDO,
+    );
+  });
+
+  it('happy path: retorna total positivo con todos los componentes normales', () => {
+    const resultado: ResultadoCalculo = {
+      ...resultadoBase(),
+      total: 10000,
+    };
+    const liqBase = {
+      id: '33333333-3333-3333-3333-333333333333',
+      suscriptorId: '1',
+      fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
+      resultado,
+      estado: 'ACTIVA' as const,
+    };
+    const liquidacion: Liquidacion = { ...liqBase, hash: calcularHash(liqBase, hasher) };
+    const factura = emitirFactura(
+      inputBase({
+        liquidacion,
+        saldoAnterior: 5000,
+        otrosValores: [crearOtroValor('RECONEXION', 3000)],
+      }),
+      hasher,
+    );
+    // 10000 + 5000 + 3000 = 18000
+    expect(calcularTotalFactura(factura)).toBe(18000);
   });
 });
 

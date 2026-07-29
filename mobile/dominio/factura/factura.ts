@@ -460,11 +460,12 @@ export function corregirFactura(input: {
  *
  * Función pura. NO muta la factura. NO lee el repo.
  *
- * La validación `total < 0` está cubierta por el guard de saldo_anterior
- * (no se permite negativo) en emitirFactura. Esta función es una vista
- * que siempre suma: si el usuario lograra pasar un snapshot con
- * saldo_anterior negativo (vía JSON round-trip malicioso), el resultado
- * puede ser < 0 y eso es señal de corrupción — debe lanzar.
+ * Validación: si el total calculado es < 0, lanza
+ * `Error(MENSAJES_ERROR_FACTURA.TOTAL_NEGATIVO_NO_PERMITIDO)`. Esto
+ * cubre el caso de factura con snapshot corrupto (round-trip JSON,
+ * mutación externa) donde saldo_anterior o un OtroValor atravesó el
+ * guard de `emitirFactura`. Una factura con total negativo es señal
+ * de corrupción — se rechaza antes de devolver el cálculo.
  */
 export function calcularTotalFactura(factura: Factura): number {
   const liquidacionTotal = factura.snapshot.liquidacion.resultado.total;
@@ -475,6 +476,9 @@ export function calcularTotalFactura(factura: Factura): number {
   const total = liquidacionTotal + otrosValoresSum + factura.snapshot.saldo_anterior;
   if (!Number.isFinite(total)) {
     throw new Error('calcularTotalFactura: total no es finito');
+  }
+  if (total < 0) {
+    throw new Error(MENSAJES_ERROR_FACTURA.TOTAL_NEGATIVO_NO_PERMITIDO);
   }
   return total;
 }
