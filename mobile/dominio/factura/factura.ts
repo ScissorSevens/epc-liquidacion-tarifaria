@@ -11,6 +11,7 @@ import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
 import type { Prestador } from '../prestadores/types';
 import {
+  extraerSnapshotLectura,
   MENSAJES_ERROR_FACTURA,
   type EmitirFacturaInput,
   type EstadoFactura,
@@ -93,6 +94,7 @@ export function calcularHashFactura(
       periodo: snapshot.periodo,
       operario: snapshot.operario,
       prestador: snapshot.prestador,
+      lectura: snapshot.lectura,
       liquidacion: snapshot.liquidacion,
       consumosHistoricos: snapshot.consumosHistoricos,
       metadata: snapshot.metadata,
@@ -136,6 +138,10 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
   const prestador = input.prestador;
   if (prestador === null || prestador === undefined) {
     throw new Error('emitirFactura: input.prestador es requerido');
+  }
+  const lectura = input.lectura;
+  if (lectura === null || lectura === undefined) {
+    throw new Error('emitirFactura: input.lectura es requerida');
   }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
@@ -189,6 +195,7 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     dispositivo_id: input.operario.dispositivo_id ?? '',
   });
   const prestadorSnapshot = extraerSnapshotPrestador(prestador);
+  const lecturaSnapshot = extraerSnapshotLectura(lectura);
   const liquidacionSnapshot = deepFreeze({
     id: input.liquidacion.id,
     hash: input.liquidacion.hash,
@@ -208,6 +215,7 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     periodo: periodoSnapshot,
     operario: operarioSnapshot,
     prestador: prestadorSnapshot,
+    lectura: lecturaSnapshot,
     liquidacion: liquidacionSnapshot,
     consumosHistoricos: consumosHistoricosSnapshot,
     metadata,

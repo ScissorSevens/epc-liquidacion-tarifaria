@@ -21,6 +21,7 @@ export type {
   FacturaSnapshotPeriodo,
   FacturaSnapshotOperario,
   FacturaSnapshotPrestador,
+  FacturaSnapshotLectura,
   FacturaSnapshotLiquidacion,
   FacturaMetadata,
   HashVersion,
@@ -29,6 +30,7 @@ export type {
   FacturaRepository,
   ConsecutivoFacturaProvider,
 } from './types';
+export { extraerSnapshotLectura } from './types';
 export { MENSAJES_ERROR_FACTURA } from './types';
 export { crearBootstrapFacturaSqlite } from './bootstrap';
 export type {

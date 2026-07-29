@@ -20,6 +20,7 @@ import type { Medidor } from '../../medidores/types';
 import type { Periodo } from '../../periodos/types';
 import type { Operario } from '../../operarios/types';
 import type { Prestador } from '../../prestadores/types';
+import type { Lectura } from '../../captura-lecturas/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
 import type { Hasher } from '../../shared/ports';
 
@@ -110,6 +111,20 @@ function prestadorBase(): Prestador {
   };
 }
 
+function lecturaBase(): Lectura {
+  return {
+    id_medidor: 10,
+    id_periodo: '202601',
+    id_operario: 7,
+    lectura_actual: 1234,
+    lectura_anterior: 1200,
+    estado_validacion: 'validado',
+    timestamp_captura: '2026-02-01T08:30:00.000Z',
+    estado_sync: 'pendiente',
+    id_prestador: 1,
+  };
+}
+
 function resultadoCalculoBase(): ResultadoCalculo {
   return {
     id_prestador: 0, estrato: 4 as const, categoria_uso: 'residencial' as const, consumo_m3: 10, consumo_efectivo_m3: 10, bloques: [],
@@ -136,6 +151,7 @@ function inputBase(): EmitirFacturaInput {
     periodo: periodoBase(),
     operario: operarioBase(),
     prestador: prestadorBase(),
+    lectura: lecturaBase(),
     liquidacion: liquidacionBase(),
     consumosHistoricos: [],
     fechaEmision: '2026-02-01',

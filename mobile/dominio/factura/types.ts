@@ -13,6 +13,7 @@ import type { Suscriptor } from '../suscriptores/types';
 import type { Medidor } from '../medidores/types';
 import type { Periodo } from '../periodos/types';
 import type { Operario } from '../operarios/types';
+import type { EvidenciaFoto, Lectura } from '../captura-lecturas/types';
 
 export type EstadoFactura = 'BORRADOR' | 'EMITIDA' | 'PAGADA' | 'ANULADA';
 
@@ -142,6 +143,47 @@ export interface FacturaSnapshotLiquidacion {
 }
 
 /**
+ * Snapshot de la lectura que origina la liquidación. Res CRA 1038/2026
+ * §3 y §10 exigen publicar la lectura del medidor que da origen a la
+ * factura. Datos proyectados de la entidad `Lectura`:
+ *
+ * - lectura_actual / lectura_anterior: valores del medidor (m³).
+ * - evidencia: foto_path + foto_hash (cuando el operario tomó foto).
+ * - timestamp_captura: ISO 8601 del momento de captura.
+ * - observaciones: notas del operario.
+ *
+ * NO se proyecta: id_lectura (interno), id_medidor (ya en snapshot.medidor),
+ * id_periodo (ya en snapshot.periodo), id_operario (ya en snapshot.operario),
+ * estado_validacion (workflow), estado_sync (workflow), timestamp_sync
+ * (workflow), id_prestador (ya en snapshot.prestador).
+ */
+export interface FacturaSnapshotLectura {
+  readonly lectura_actual: number;
+  readonly lectura_anterior: number;
+  readonly evidencia?: EvidenciaFoto;
+  readonly timestamp_captura: string;
+  readonly observaciones?: string;
+}
+
+/**
+ * Helper de proyeccion Lectura → FacturaSnapshotLectura. Reusa
+ * `EvidenciaFoto` del módulo de captura.
+ */
+export function extraerSnapshotLectura(lectura: Lectura): FacturaSnapshotLectura {
+  if (lectura === null || lectura === undefined) {
+    throw new Error('extraerSnapshotLectura: lectura es requerida');
+  }
+  const snap: FacturaSnapshotLectura = {
+    lectura_actual: lectura.lectura_actual,
+    lectura_anterior: lectura.lectura_anterior,
+    timestamp_captura: lectura.timestamp_captura,
+    ...(lectura.evidencia !== undefined && { evidencia: { ...lectura.evidencia } }),
+    ...(lectura.observaciones !== undefined && { observaciones: lectura.observaciones }),
+  };
+  return Object.freeze(snap);
+}
+
+/**
  * Identifica la versión del serializador del snapshot. Cuando se
  * agregan campos al `FacturaSnapshot` (design D — versionado hash), el
  * cálculo del hash v2 los incluye. Facturas históricas v1 siguen
@@ -164,7 +206,7 @@ export interface FacturaMetadata {
  * aislado en su sub-objeto.
  *
  * v2 (FacturaCompliance-Fase1, Res CRA 1038/2026): agrega `prestador`
- * con datos del prestador al momento de emisión.
+ * y `lectura` con datos completos al momento de emisión.
  */
 export interface FacturaSnapshot {
   readonly suscriptor: FacturaSnapshotSuscriptor;
@@ -172,6 +214,7 @@ export interface FacturaSnapshot {
   readonly periodo: FacturaSnapshotPeriodo;
   readonly operario: FacturaSnapshotOperario;
   readonly prestador: FacturaSnapshotPrestador;
+  readonly lectura: FacturaSnapshotLectura;
   readonly liquidacion: FacturaSnapshotLiquidacion;
   readonly consumosHistoricos: readonly ConsumoHistorico[]; // 0..6
   readonly metadata: FacturaMetadata;
@@ -197,6 +240,7 @@ export interface EmitirFacturaInput {
   readonly periodo: Periodo;
   readonly operario: Operario;
   readonly prestador: Prestador;
+  readonly lectura: Lectura;
   readonly liquidacion: Liquidacion;
   readonly consumosHistoricos: readonly ConsumoHistorico[];
   readonly fechaEmision: string; // ISO 8601 (YYYY-MM-DD)

@@ -1,21 +1,17 @@
 /**
- * Tests del snapshot del suscriptor en la factura.
+ * Tests del snapshot de la lectura en la factura.
  *
- * Cubre:
- *  - Expansion de FacturaSnapshotSuscriptor con cedula, email, telefono,
- *    municipio, sector, calle.
- *  - Inmutabilidad del snapshot.
- *  - Reproducibilidad del hash: cambios en cualquier campo del suscriptor
- *    cambian el hash.
- *  - Sanitization: suscriptor inactivo o sin estado no aparecen como
- *    "activo" en el snapshot.
+ * Expansion v2: lectura_actual, lectura_anterior, foto (path + hash),
+ * timestamp_captura, observaciones.
  *
- * TDD phase: tests RED que motivan la expansion del snapshot.
+ * TDD: tests RED que motivan la inclusion de la lectura completa en el
+ * snapshot. Res CRA 1038/2026 §3 exige publicar la lectura que origina
+ * la facturacion.
  */
 'use strict';
 
 import { emitirFactura } from '../factura';
-import type { EmitirFacturaInput, FacturaSnapshotSuscriptor } from '../types';
+import type { EmitirFacturaInput, FacturaSnapshotLectura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
 import type { Suscriptor } from '../../suscriptores/types';
@@ -55,29 +51,6 @@ function prestadorBase(): Prestador {
 }
 
 function suscriptorBase(): Suscriptor {
-  return {
-    id_suscriptor: 1,
-    codigo: '00001',
-    nombre_apellidos: 'María López',
-    cedula: '123456789',
-    email: 'maria@example.com',
-    telefono: '3001234567',
-    municipio: 'Bogotá',
-    sector: 'Centro',
-    calle: 'Calle 5',
-    direccion: 'Calle 5 #2-10',
-    estrato: 2,
-    matricula_inmobiliaria: 'MAT-001',
-    numero_catastral: 'CAT-001',
-    aplica_subsidio: false,
-    id_prestador: 0,
-    categoria_uso: 'residencial',
-    estado: 'activo',
-    created_at: '2026-01-01T00:00:00.000Z',
-  };
-}
-
-function suscriptorSinCamposOpcionales(): Suscriptor {
   return {
     id_suscriptor: 1,
     codigo: '00001',
@@ -180,7 +153,12 @@ function lecturaBase(): Lectura {
     id_operario: 7,
     lectura_actual: 1234,
     lectura_anterior: 1200,
+    evidencia: {
+      foto_path: 'file:///photo.jpg',
+      foto_hash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+    },
     estado_validacion: 'validado',
+    observaciones: 'Sin novedad',
     timestamp_captura: '2026-02-01T08:30:00.000Z',
     estado_sync: 'pendiente',
     id_prestador: 1,
@@ -203,143 +181,125 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
   };
 }
 
-describe('FacturaSnapshotSuscriptor — expansion v2', () => {
-  it('incluye todos los campos del Suscriptor en el snapshot', () => {
+describe('FacturaSnapshotLectura — expansion v2', () => {
+  it('incluye lecturas, evidencia, timestamp y observaciones', () => {
     const factura = emitirFactura(inputBase(), hasher);
-    expect(factura.snapshot.suscriptor).toEqual({
-      codigo: '00001',
-      nombre_apellidos: 'María López',
-      cedula: '123456789',
-      email: 'maria@example.com',
-      telefono: '3001234567',
-      municipio: 'Bogotá',
-      sector: 'Centro',
-      calle: 'Calle 5',
-      direccion: 'Calle 5 #2-10',
-      estrato: 2,
-      matricula_inmobiliaria: 'MAT-001',
-      numero_catastral: 'CAT-001',
-      id_prestador: 0,
-      categoria_uso: 'residencial',
+    expect(factura.snapshot.lectura).toEqual({
+      lectura_actual: 1234,
+      lectura_anterior: 1200,
+      evidencia: {
+        foto_path: 'file:///photo.jpg',
+        foto_hash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      },
+      timestamp_captura: '2026-02-01T08:30:00.000Z',
+      observaciones: 'Sin novedad',
     });
   });
 
-  it('campos opcionales (email, telefono, sector, calle, matricula, catastral) son undefined cuando no se proveen', () => {
-    const factura = emitirFactura(inputBase({ suscriptor: suscriptorSinCamposOpcionales() }), hasher);
-    const snap = factura.snapshot.suscriptor;
-    expect(snap.email).toBeUndefined();
-    expect(snap.telefono).toBeUndefined();
-    expect(snap.sector).toBeUndefined();
-    expect(snap.calle).toBeUndefined();
-    expect(snap.matricula_inmobiliaria).toBeUndefined();
-    expect(snap.numero_catastral).toBeUndefined();
+  it('evidencia opcional se omite cuando no se provee', () => {
+    const lecturaSinFoto: Lectura = {
+      id_medidor: 10,
+      id_periodo: '202601',
+      id_operario: 7,
+      lectura_actual: 1234,
+      lectura_anterior: 1200,
+      estado_validacion: 'pendiente',
+      timestamp_captura: '2026-02-01T08:30:00.000Z',
+      estado_sync: 'pendiente',
+    };
+    const factura = emitirFactura(inputBase({ lectura: lecturaSinFoto }), hasher);
+    expect(factura.snapshot.lectura.evidencia).toBeUndefined();
   });
 
-  it('snapshot.suscriptor esta deepFrozen', () => {
+  it('observaciones opcional se omite cuando no se provee', () => {
+    const lecturaSinObs: Lectura = {
+      ...lecturaBase(),
+      observaciones: undefined,
+    };
+    const factura = emitirFactura(inputBase({ lectura: lecturaSinObs }), hasher);
+    expect(factura.snapshot.lectura.observaciones).toBeUndefined();
+  });
+
+  it('snapshot.lectura esta deepFrozen', () => {
     const factura = emitirFactura(inputBase(), hasher);
-    expect(Object.isFrozen(factura.snapshot.suscriptor)).toBe(true);
+    expect(Object.isFrozen(factura.snapshot.lectura)).toBe(true);
     expect(() => {
-      (factura.snapshot.suscriptor as { cedula: string }).cedula = 'X';
+      (factura.snapshot.lectura as { lectura_actual: number }).lectura_actual = 9999;
     }).toThrow(TypeError);
   });
 
-  it('cambiar la cedula del suscriptor cambia el hash', () => {
+  it('cambiar lectura_actual cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), cedula: '999999999' } }),
+      inputBase({ lectura: { ...lecturaBase(), lectura_actual: 1300 } }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
   });
 
-  it('cambiar el email del suscriptor cambia el hash', () => {
+  it('cambiar lectura_anterior cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), email: 'otro@example.com' } }),
+      inputBase({ lectura: { ...lecturaBase(), lectura_anterior: 1100 } }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
   });
 
-  it('cambiar el telefono del suscriptor cambia el hash', () => {
+  it('cambiar timestamp_captura cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), telefono: '3119999999' } }),
+      inputBase({ lectura: { ...lecturaBase(), timestamp_captura: '2026-02-02T08:30:00.000Z' } }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
   });
 
-  it('cambiar el municipio del suscriptor cambia el hash', () => {
+  it('cambiar foto_path de la evidencia cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), municipio: 'Medellín' } }),
+      inputBase({
+        lectura: {
+          ...lecturaBase(),
+          evidencia: { foto_path: 'file:///otra.jpg', foto_hash: 'h' },
+        },
+      }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
   });
 
-  it('cambiar el sector del suscriptor cambia el hash', () => {
+  it('cambiar observaciones cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), sector: 'Norte' } }),
+      inputBase({ lectura: { ...lecturaBase(), observaciones: 'Con novedad' } }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
   });
 
-  it('cambiar el calle del suscriptor cambia el hash', () => {
-    const a = emitirFactura(inputBase(), hasher);
-    const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), calle: 'Calle 99' } }),
-      hasher,
-    );
-    expect(a.hash).not.toBe(b.hash);
-  });
-
-  it('cambiar matricula_inmobiliaria del suscriptor cambia el hash', () => {
-    const a = emitirFactura(inputBase(), hasher);
-    const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), matricula_inmobiliaria: 'MAT-002' } }),
-      hasher,
-    );
-    expect(a.hash).not.toBe(b.hash);
-  });
-
-  it('cambiar numero_catastral del suscriptor cambia el hash', () => {
-    const a = emitirFactura(inputBase(), hasher);
-    const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), numero_catastral: 'CAT-002' } }),
-      hasher,
-    );
-    expect(a.hash).not.toBe(b.hash);
-  });
-
-  it('mismo suscriptor completo produce mismo hash (determinismo)', () => {
+  it('misma lectura produce mismo hash (determinismo)', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(inputBase(), hasher);
     expect(a.hash).toBe(b.hash);
   });
 
-  it('FacturaSnapshotSuscriptor tiene 12+ campos (shape v2 con todos los opcionales presentes)', () => {
-    const factura = emitirFactura(inputBase(), hasher);
-    const keys = Object.keys(factura.snapshot.suscriptor).sort();
-    // Suscriptor base del test incluye matricula_inmobiliaria y numero_catastral.
-    expect(keys).toEqual([
-      'calle',
-      'categoria_uso',
-      'cedula',
-      'codigo',
-      'direccion',
-      'email',
-      'estrato',
-      'id_prestador',
-      'matricula_inmobiliaria',
-      'municipio',
-      'nombre_apellidos',
-      'numero_catastral',
-      'sector',
-      'telefono',
+  it('emisión requiere input.lectura (TS: required field)', () => {
+    const inputSinLectura = inputBase();
+    const inputRoto = { ...inputSinLectura, lectura: undefined as unknown as Lectura };
+    expect(() => emitirFactura(inputRoto, hasher)).toThrow(/lectura/i);
+  });
+
+  it('FacturaSnapshotLectura shape v2 (5 campos + evidencia opcional)', () => {
+    const snap: FacturaSnapshotLectura = {
+      lectura_actual: 1,
+      lectura_anterior: 0,
+      timestamp_captura: 'X',
+    };
+    expect(Object.keys(snap).sort()).toEqual([
+      'lectura_actual',
+      'lectura_anterior',
+      'timestamp_captura',
     ]);
   });
 });
