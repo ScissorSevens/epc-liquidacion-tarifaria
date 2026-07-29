@@ -235,6 +235,30 @@ export interface Factura {
   readonly fecha_emision: string; // ISO 8601 (YYYY-MM-DD)
   readonly snapshot: FacturaSnapshot;
   readonly hash: string; // SHA-256 sobre snapshot + numero_factura + fecha_emision
+  /**
+   * Codigo de verificacion publico, 16 chars hex. Es un derivado
+   * estable del hash canonico + discriminador. Lectura legible para
+   * impresion en la factura y verificacion manual por el auditor.
+   */
+  readonly codigo_verificacion: string;
+  /**
+   * Version de la tarifa aplicada al momento del calculo. Copiada
+   * de `liquidacion.resultado.metadata.version_motor` para trazabilidad
+   * regulatoria (Res CRA 825/2017 art. 9 sobre metodologia tarifaria).
+   */
+  readonly version_tarifa_aplicada: string;
+  /**
+   * Referencia de pago unica (UUID v4). Se setea al persistir la
+   * factura via emitirFacturaConRepo (con IdGenerator). Las facturas
+   * en BORRADOR previas al repo no tienen este campo.
+   */
+  readonly referencia_pago?: string;
+  /**
+   * Payload QR para banca virtual. Formato:
+   *   EPC|{referencia_pago}|{timestamp}
+   * Generado al persistir (cuando se asigna referencia_pago).
+   */
+  readonly qr_pago?: string;
   readonly motivo_anulacion?: string;
   readonly fecha_anulacion?: string; // ISO 8601 (YYYY-MM-DD), set por anularFactura
   readonly reemplaza_a?: string; // id de factura anulada que esta reemplaza

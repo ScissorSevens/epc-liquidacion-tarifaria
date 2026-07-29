@@ -12,6 +12,11 @@ export {
   anularFacturaConRepo,
   corregirFacturaConRepo,
 } from './factura-con-repo';
+export {
+  calcularCodigoVerificacion,
+  generarReferenciaPago,
+  generarQrPago,
+} from './pagos';
 export type {
   EstadoFactura,
   NumeroFactura,

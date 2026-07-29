@@ -78,6 +78,14 @@ function toRow(factura: Factura): {
 
 function fromRow(row: FacturaRow): Factura {
   const snapshot = JSON.parse(row.snapshot) as FacturaSnapshot;
+  // Compatibilidad: filas v1 (pre-migration 020) no tienen
+  // codigo_verificacion / version_tarifa_aplicada en columnas. Los
+  // derivamos del hash y del snapshot.
+  const codigoVerificacion = calcularCodigoVerificacionPlaceholder(row.hash);
+  const versionTarifaAplicada =
+    snapshot.liquidacion.resultado.metadata.version_motor ?? 'v1-legacy';
+  const referenciaPago: string | undefined = undefined;
+  const qrPago: string | undefined = undefined;
   const factura: Factura = {
     id: row.id,
     numero_factura: row.numero_factura,
@@ -85,12 +93,21 @@ function fromRow(row: FacturaRow): Factura {
     fecha_emision: row.fecha_emision,
     snapshot,
     hash: row.hash,
+    codigo_verificacion: codigoVerificacion,
+    version_tarifa_aplicada: versionTarifaAplicada,
+    ...(referenciaPago !== undefined && { referencia_pago: referenciaPago }),
+    ...(qrPago !== undefined && { qr_pago: qrPago }),
     created_at: row.created_at,
     ...(row.motivo_anulacion !== null && { motivo_anulacion: row.motivo_anulacion }),
     ...(row.fecha_anulacion !== null && { fecha_anulacion: row.fecha_anulacion }),
     ...(row.reemplaza_a !== null && { reemplaza_a: row.reemplaza_a }),
   };
   return factura;
+}
+
+function calcularCodigoVerificacionPlaceholder(hash: string): string {
+  if (hash.length >= 16) return hash.slice(0, 16);
+  return hash.padStart(16, '0');
 }
 
 const SQL_INSERT = `

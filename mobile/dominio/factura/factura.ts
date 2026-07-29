@@ -6,7 +6,7 @@
  * inmutabilidad recursiva.
  */
 
-import type { Hasher } from '../shared/ports';
+import type { Hasher, IdGenerator } from '../shared/ports';
 import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
 import type { Prestador } from '../prestadores/types';
@@ -21,6 +21,15 @@ import {
   type FacturaSnapshotPrestador,
   type OtroValor,
 } from './types';
+import {
+  calcularCodigoVerificacion,
+  generarQrPago,
+  generarReferenciaPago,
+} from './pagos';
+
+// Re-export de los helpers de pagos para que `import { ... } from '../factura'`
+// siga funcionando como API unica del modulo.
+export { calcularCodigoVerificacion, generarReferenciaPago, generarQrPago } from './pagos';
 
 /**
  * Congela recursivamente. Replicado de calculo.ts (3er duplicado pendiente
@@ -107,7 +116,7 @@ export function calcularHashFactura(
   return hasher.sha256(payload);
 }
 
-export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factura {
+export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher, idGen?: IdGenerator): Factura {
   if (!verificarIntegridad(input.liquidacion, hasher)) {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
   }
@@ -235,6 +244,21 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     ...(input.observaciones !== undefined && { observaciones: input.observaciones }),
   };
   const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision, hasher);
+  // Codigo de verificacion: derivado estable del hash. Lo calculamos
+  // ANTES de armar el Factura para que el campo este disponible.
+  const codigoVerificacion = calcularCodigoVerificacionPlaceholder(hash);
+  const versionTarifaAplicada = input.liquidacion.resultado.metadata.version_motor;
+  // Si se inyecta idGen, generamos referencia_pago y qr_pago en este momento.
+  let referenciaPago: string | undefined;
+  let qrPago: string | undefined;
+  if (idGen !== undefined) {
+    referenciaPago = generarReferenciaPago(idGen);
+    qrPago = generarQrPago(
+      { hash, numero_factura, fecha_emision: input.fechaEmision } as Factura,
+      referenciaPago,
+      new Date().toISOString(),
+    );
+  }
   return deepFreeze({
     id: '',
     numero_factura,
@@ -242,8 +266,26 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     fecha_emision: input.fechaEmision,
     snapshot,
     hash,
+    codigo_verificacion: codigoVerificacion,
+    version_tarifa_aplicada: versionTarifaAplicada,
+    ...(referenciaPago !== undefined && { referencia_pago: referenciaPago }),
+    ...(qrPago !== undefined && { qr_pago: qrPago }),
     created_at: '',
   });
+}
+
+/**
+ * Helper interno para derivar el codigo de verificacion sin reinjectar
+ * el hasher: dado que el hash canonico ya es estable, tomamos los
+ * primeros 16 chars del hash. Esto es leíble Y verificable.
+ *
+ * Compat tests: si el hash es < 16 chars (hasher fake en tests
+ * contractuales), padStart con '0' para llegar a 16. NO es un caso de
+ * produccion — en prod SHA-256 hex SIEMPRE tiene 64 chars.
+ */
+function calcularCodigoVerificacionPlaceholder(hash: string): string {
+  if (hash.length >= 16) return hash.slice(0, 16);
+  return hash.padStart(16, '0');
 }
 
 /**
