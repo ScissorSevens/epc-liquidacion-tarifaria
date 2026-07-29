@@ -1,4 +1,4 @@
-import { forwardRef, useId } from 'react';
+import { forwardRef, memo, useId } from 'react';
 import type { ComponentProps } from 'react';
 import {
   StyleSheet,
@@ -93,7 +93,7 @@ export interface FormFieldProps {
   readonly onFocus?: () => void;
 }
 
-export const FormField = forwardRef<View, FormFieldProps>(function FormField({
+export const FormField = memo(forwardRef<View, FormFieldProps>(function FormField({
   label,
   required = false,
   value,
@@ -249,7 +249,7 @@ export const FormField = forwardRef<View, FormFieldProps>(function FormField({
       )}
     </View>
   );
-});
+}));
 
 const estilos = StyleSheet.create({
   contenedor: {

@@ -27,9 +27,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import React from 'react';
+import React, { Profiler } from 'react';
 import { StyleSheet } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { FormField } from '../../src/componentes/FormField';
 
@@ -366,16 +366,23 @@ describe('FormField — principios impeccable', () => {
 
   // ── Sanidad ──────────────────────────────────────────────────────────────
   describe('sanidad', () => {
-    it('exporta FormField como forwardRef (componente con ref forwarding)', () => {
-      // forwardRef retorna un objeto con $$typeof: REACT_FORWARD_REF_TYPE,
-      // no una función. Verificamos que el objeto tenga la marca de
-      // forwardRef (compatible con React 18+).
-      // Alternativa: typeof FormField === 'object' && $$typeof.
+    it('exporta FormField preservando forwardRef (con o sin React.memo wrapping)', () => {
+      // El export debe preservar la marca de forwardRef en su grafo.
+      // Con React.memo: $$typeof === Symbol(react.memo) y .type.$$typeof
+      // === Symbol(react.forward_ref). Sin memo: $$typeof directamente
+      // forwardRef. Aceptamos ambas configuraciones para tolerar el wrap.
       expect(FormField).toBeDefined();
       expect(typeof FormField).toBe('object');
-      // $$typeof debe ser el symbol de forwardRef (REACT_FORWARD_REF_TYPE)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((FormField as any).$$typeof?.toString()).toMatch(/forward_ref|Symbol\(react\.forward_ref\)/);
+      const outer = (FormField as any).$$typeof;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inner = (FormField as any).type?.$$typeof;
+      const outerStr = outer?.toString() ?? '';
+      const innerStr = inner?.toString() ?? '';
+      const hasForwardRef =
+        outerStr.includes('react.forward_ref') ||
+        innerStr.includes('react.forward_ref');
+      expect(hasForwardRef).toBe(true);
     });
 
     it('el archivo del componente importa StyleSheet (sanity)', () => {
@@ -391,6 +398,103 @@ describe('FormField — principios impeccable', () => {
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '');
       expect(sinComentarios).toContain("from '../theme/skeletal-tokens'");
+    });
+  });
+
+  // ── T-MM-1: memoización — FormField NO re-renderiza con props estables ──
+  // Garantía: FormField envuelto en React.memo. Si las props son
+  // referencialmente iguales, el componente debe saltearse el render.
+  // Esta memoización es condición necesaria para evitar re-renders en
+  // cascada cuando el padre cambia estado por razones ajenas al campo
+  // (ej. alternar un Switch).
+  //
+  // Verificación: usamos React.Profiler. Con memo, el Profiler sigue
+  // disparando onRender para el commit de la actualización del PADRE,
+  // pero `actualDuration` (3er argumento) es 0 ⇒ React saltó el render
+  // del FormField gracias a React.memo. Sin memo, el duration sería > 0.
+  describe('T-MM-1: memoización — FormField no re-renderiza con props estables', () => {
+    it('actualDuration de update es 0 cuando el padre se re-renderiza con props referencialmente iguales', () => {
+      const spy = jest.fn();
+      const onChangeText = jest.fn();
+      function Padre({ ignorado }: { ignorado: number }) {
+        return (
+          <Profiler id="ff-memo" onRender={spy}>
+            <FormField
+              label="Cédula"
+              value="51800012"
+              onChangeText={onChangeText}
+              testID="ff-memo-1"
+            />
+          </Profiler>
+        );
+      }
+      const { rerender } = render(<Padre ignorado={0} />);
+      // El mount siempre muestra actualDuration > 0 (render real).
+      const mountCall = spy.mock.calls.find((c) => c[1] === 'mount');
+      expect(mountCall).toBeDefined();
+      expect((mountCall as unknown[])[2]).toBeGreaterThan(0);
+      // Cambiamos prop del PADRE. Con memo, FormField NO re-renderiza
+      // ⇒ actualDuration del commit siguiente = 0.
+      rerender(<Padre ignorado={1} />);
+      rerender(<Padre ignorado={2} />);
+      const updates = spy.mock.calls.filter((c) => c[1] === 'update');
+      expect(updates).toHaveLength(2);
+      // actualDuration = 0 ⇒ el árbol memoizado no se renderizó.
+      updates.forEach((call) => {
+        expect((call as unknown[])[2]).toBe(0);
+      });
+    });
+  });
+
+  // ── T-MM-2: memoización — FormField re-renderiza cuando value cambia ────
+  // Validación negativa: la memoización NO debe over-blockear. Si el
+  // padre pasa un `value` distinto, el FormField debe re-renderizar para
+  // reflejar el cambio controlado.
+  describe('T-MM-2: memoización — FormField re-renderiza cuando el value cambia', () => {
+    it('re-renderiza una vez cuando el padre cambia el value del FormField', () => {
+      const spy = jest.fn();
+      const onChangeText = jest.fn();
+      function Padre({ valor }: { valor: string }) {
+        return (
+          <Profiler id="ff-memo-2" onRender={spy}>
+            <FormField
+              label="Cédula"
+              value={valor}
+              onChangeText={onChangeText}
+              testID="ff-memo-2"
+            />
+          </Profiler>
+        );
+      }
+      const { rerender } = render(<Padre valor="123" />);
+      const baseline = spy.mock.calls.length;
+      rerender(<Padre valor="456" />);
+      const finalCount = spy.mock.calls.length;
+      // Tras cambiar value, Profiler's onRender debe dispararse al
+      // menos una vez (mount + update + commit). Con cualquier
+      // configuración (memo o no), value change ⇒ re-render.
+      expect(finalCount).toBeGreaterThan(baseline);
+      // El input debe reflejar el nuevo value.
+      expect(screen.getByTestId('ff-memo-2').props.value).toBe('456');
+    });
+  });
+
+  // ── T-MM-3: memoización — sanity de input controlado tras cycle ────────
+  // Verifica que onChangeText del FormField memoizado sigue propagando
+  // los cambios al padre (sin deadlock por memo).
+  describe('T-MM-3: memoización — callback propagacion no se interrumpe', () => {
+    it('onChangeText sigue invocando el callback del padre tras wrapping memo', () => {
+      const onChangeText = jest.fn();
+      render(
+        <FormField
+          label="Cédula"
+          value="123"
+          onChangeText={onChangeText}
+          testID="ff-memo-3"
+        />,
+      );
+      fireEvent.changeText(screen.getByTestId('ff-memo-3'), '999');
+      expect(onChangeText).toHaveBeenCalledWith('999');
     });
   });
 });
