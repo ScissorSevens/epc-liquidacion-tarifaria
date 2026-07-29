@@ -8,6 +8,7 @@
 
 import type { Hasher, IdGenerator } from '../shared/ports';
 import { calcularCodigoVerificacionPlaceholder } from '../shared/codigos';
+import type { ConceptoOtroValorRepository } from '../concepto-otro-valor/types';
 import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
 import type { Prestador } from '../prestadores/types';
@@ -219,11 +220,45 @@ export function verificarIntegridadFactura(factura: Factura, hasher: Hasher): bo
   return factura.hash === esperado;
 }
 
+// Overloads: emitirFactura devuelve Factura sincronico cuando NO se
+// inyecta catalogoRepo (compat callers legacy); devuelve Promise<Factura>
+// cuando se inyecta (path async validando contra DB).
+export function emitirFactura(
+  input: EmitirFacturaInput,
+  hasher: Hasher,
+  idGen?: IdGenerator,
+  clock?: Clock,
+): Factura;
+export function emitirFactura(
+  input: EmitirFacturaInput,
+  hasher: Hasher,
+  idGen: IdGenerator | undefined,
+  clock: Clock | undefined,
+  catalogoRepo: ConceptoOtroValorRepository,
+): Promise<Factura>;
 export function emitirFactura(
   input: EmitirFacturaInput,
   hasher: Hasher,
   idGen?: IdGenerator,
   clock: Clock = relojSistema,
+  catalogoRepo?: ConceptoOtroValorRepository,
+): Factura | Promise<Factura> {
+  if (catalogoRepo !== undefined) {
+    return emitirFacturaAsync(input, hasher, idGen, clock, catalogoRepo);
+  }
+  return emitirFacturaSync(input, hasher, idGen, clock);
+}
+
+/**
+ * Path sync (legacy): emite Factura usando `OtrosValoresCatalogo` constante
+ * como fuente de verdad para validacion de catalogo. Backward-compatible
+ * con todos los callers que invocan emitirFactura(input, hasher, ...).
+ */
+function emitirFacturaSync(
+  input: EmitirFacturaInput,
+  hasher: Hasher,
+  idGen: IdGenerator | undefined,
+  clock: Clock,
 ): Factura {
   if (!verificarIntegridad(input.liquidacion, hasher)) {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
@@ -268,11 +303,8 @@ export function emitirFactura(
   if (saldoAnterior < 0) {
     throw new Error('emitirFactura: saldo_anterior no puede ser negativo');
   }
-  // Validacion de frontera contra el catalogo regulatorio. Aunque
-  // `crearOtroValor` ya valida el concepto, `emitirFactura` es la
-  // frontera publica: NO se puede colar un OtroValor con un concepto
-  // fuera del catalogo por casts, JSON round-trip, ni mutacion de
-  // snapshot (es caso real de fraude / corrupcion de DB).
+  // Validacion de frontera contra el catalogo regulatorio (legacy).
+  // Validacion contra el `catalogoRepo` se hace en `emitirFacturaAsync`.
   for (const ov of otrosValores) {
     if (OtrosValoresCatalogo[ov.concepto] === undefined) {
       throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
@@ -408,6 +440,44 @@ export function emitirFactura(
     ...(referenciaPago !== undefined && { referencia_pago: referenciaPago }),
     ...(qrPago !== undefined && { qr_pago: qrPago }),
   });
+}
+
+/**
+ * Path async (Task 6 introducido, Task 7 endurecido): emite Factura usando
+ * `catalogoRepo` para validacion. Si el repo retorna vacio, cae a la
+ * constante legacy con warning (defensa contra instalaciones con migration
+ * 021 no aplicada o DB corrupta).
+ *
+ * La validacion contra el repo es post-deepeFreeze en `OtrosValoresCatalogo`
+ * legacy — primero chequeamos el repo, y solo si falla, fallback al constante.
+ *
+ * Implementacion actual (Task 6): valida que el codigo exista en el repo
+ * (sin importar `activo`). Task 7 endurece: rechaza conceptos `activo=false`.
+ */
+async function emitirFacturaAsync(
+  input: EmitirFacturaInput,
+  hasher: Hasher,
+  idGen: IdGenerator | undefined,
+  clock: Clock,
+  catalogoRepo: ConceptoOtroValorRepository,
+): Promise<Factura> {
+  const otrosValores: readonly OtroValor[] = input.otrosValores ?? [];
+  const conceptos = await catalogoRepo.listar();
+  if (conceptos.length > 0) {
+    // Repo poblado → es la fuente de verdad.
+    for (const ov of otrosValores) {
+      const encontrado = conceptos.find((c) => c.codigo === ov.concepto.toUpperCase());
+      if (!encontrado) {
+        throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
+      }
+    }
+  } else if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+    console.warn(
+      '[factura-compliance-hardening] catalogoRepo vacio; fallback a OtrosValoresCatalogo legacy',
+    );
+  }
+  // Resto del flujo (incluida validacion legacy si repo vacio): delega a sync.
+  return emitirFacturaSync(input, hasher, idGen, clock);
 }
 
 /**

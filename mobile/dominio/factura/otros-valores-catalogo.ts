@@ -12,13 +12,19 @@
  * arrastra automaticamente, sin glosa del operario.
  *
  * Hardcoded vs tabla DB: la regulación tiene 7 conceptos estables
- * (lista cerrada). Una tabla dinámica sería over-engineering para
- * Fase 1. Cuando la norma agregue conceptos nuevos, se actualiza
- * este archivo + tests.
+ * (lista cerrada). A partir de `factura-compliance-hardening` el catalogo
+ * migro a la tabla SQLite `concepto_otro_valor` (versionada y auditables).
+ * Esta constante queda como DEPRECATED FALLBACK para instalaciones con
+ * migration 021 no aplicada (o si el repository retorna vacio).
  *
  * NO se exponen: descripcion / codigo_formulario en el objeto OtroValor
  * persistido (esos viven en el catalogo). El array persistido solo
  * guarda concepto + valor + glosa opcional.
+ *
+ * @deprecated Usa `ConceptoOtroValorRepository` (de `@dominio/concepto-otro-valor`)
+ *             como fuente de verdad. Este constante permanece una version como
+ *             fallback defensivo si el repository no esta disponible (sin
+ *             bootstrap o con tabla vacia).
  */
 
 export type ConceptoOtroValor =
