@@ -310,6 +310,28 @@ CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
 `;
 
 /**
+ * Migration 020: Res CRA 1038/2026 compliance — agrega columnas para
+ * busqueda operativa de codigo de verificacion, referencia de pago, QR
+ * y version de tarifa aplicada. Espejo verbatim de
+ * mobile/dominio/persistencia/sqlite/migrations/020_factura_compliance_1038.sql.
+ *
+ * Idempotencia: la migration 020 NO es idempotente en SQLite 3.35
+ * (no soporta 'ADD COLUMN IF NOT EXISTS'). El runner la aplica una
+ * sola vez por device via __migraciones_aplicadas. Para DBs muy viejas
+ * con la tabla ya modificada, se necesita un skip explicito.
+ */
+const MIGRACION_020_FACTURA_COMPLIANCE_1038 = `
+ALTER TABLE factura ADD COLUMN codigo_verificacion TEXT;
+ALTER TABLE factura ADD COLUMN referencia_pago TEXT;
+ALTER TABLE factura ADD COLUMN qr_pago TEXT;
+ALTER TABLE factura ADD COLUMN version_tarifa_aplicada TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_factura_referencia_pago_unique
+  ON factura (referencia_pago)
+  WHERE referencia_pago IS NOT NULL;
+`;
+
+/**
  * TICKET-EPIC-LOGIN-001 — PUNTO A: Login real local contra SQLite.
  *
  * El repo de operarios (`operario-repository-expo-sqlite.ts`) y las
@@ -408,6 +430,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 17, nombre: '017_operario_password_hash', sql: MIGRACION_017_OPERARIO_PASSWORD_HASH },
   { version: 18, nombre: '018_suscriptor_email_telefono', sql: MIGRACION_018_SUSCRIPTOR_EMAIL_TELEFONO },
   { version: 19, nombre: '019_parametros_tarifa_completo', sql: MIGRACION_019_PARAMETROS_TARIFA_COMPLETO },
+  { version: 20, nombre: '020_factura_compliance_1038', sql: MIGRACION_020_FACTURA_COMPLIANCE_1038 },
 ];
 
 
