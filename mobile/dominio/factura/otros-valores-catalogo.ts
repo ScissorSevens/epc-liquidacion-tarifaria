@@ -27,6 +27,8 @@
  *             bootstrap o con tabla vacia).
  */
 
+import { nullIfEmptyOrWhitespace } from '../shared/strings';
+
 export type ConceptoOtroValor =
   | 'SALDO_ANTERIOR'
   | 'INTERESES_AUTORIZADOS'
@@ -114,15 +116,16 @@ export function crearOtroValor(
   if (catalogo === undefined) {
     throw new Error(`crearOtroValor: concepto '${concepto}' no es válido en el catálogo`);
   }
-  if (catalogo.requiere_glosa && (glosa === undefined || glosa.trim() === '')) {
+  if (catalogo.requiere_glosa && nullIfEmptyOrWhitespace(glosa) === null) {
     throw new Error(
       `crearOtroValor: concepto '${concepto}' requiere glosa (${catalogo.descripcion})`,
     );
   }
+  const glosaNormalizada = nullIfEmptyOrWhitespace(glosa);
   const ov: OtroValor = {
     concepto,
     valor,
-    ...(glosa !== undefined && glosa.trim() !== '' && { glosa: glosa.trim() }),
+    ...(glosaNormalizada !== null && { glosa: glosaNormalizada }),
   };
   return Object.freeze(ov);
 }

@@ -8,6 +8,7 @@
 
 import type { Hasher, IdGenerator } from '../shared/ports';
 import { calcularCodigoVerificacionPlaceholder } from '../shared/codigos';
+import { nullIfEmpty } from '../shared/strings';
 import type { ConceptoOtroValorRepository } from '../concepto-otro-valor/types';
 import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
@@ -78,15 +79,8 @@ export function extraerSnapshotPrestador(prestador: Prestador): FacturaSnapshotP
   if (prestador === null || prestador === undefined) {
     throw new Error('extraerSnapshotPrestador: prestador es requerido');
   }
-  const representanteLegal =
-    prestador.representante_legal === undefined || prestador.representante_legal === ''
-      ? null
-      : prestador.representante_legal;
-  const representanteLegalCedula =
-    prestador.representante_legal_cedula === undefined ||
-    prestador.representante_legal_cedula === ''
-      ? null
-      : prestador.representante_legal_cedula;
+  const representanteLegal = nullIfEmpty(prestador.representante_legal);
+  const representanteLegalCedula = nullIfEmpty(prestador.representante_legal_cedula);
   return deepFreeze({
     id_prestador: prestador.id_prestador,
     codigo: prestador.codigo,
@@ -368,35 +362,16 @@ function emitirFacturaSync(
     codigo: input.suscriptor.codigo,
     nombre_apellidos: input.suscriptor.nombre_apellidos,
     cedula: input.suscriptor.cedula,
-    email:
-      input.suscriptor.email === undefined || input.suscriptor.email === ''
-        ? null
-        : input.suscriptor.email,
-    telefono:
-      input.suscriptor.telefono === undefined || input.suscriptor.telefono === ''
-        ? null
-        : input.suscriptor.telefono,
+    email: nullIfEmpty(input.suscriptor.email),
+    telefono: nullIfEmpty(input.suscriptor.telefono),
     municipio: input.suscriptor.municipio,
-    sector:
-      input.suscriptor.sector === undefined || input.suscriptor.sector === ''
-        ? null
-        : input.suscriptor.sector,
-    calle:
-      input.suscriptor.calle === undefined || input.suscriptor.calle === ''
-        ? null
-        : input.suscriptor.calle,
+    sector: nullIfEmpty(input.suscriptor.sector),
+    calle: nullIfEmpty(input.suscriptor.calle),
     direccion: input.suscriptor.direccion,
     estrato: input.suscriptor.estrato,
     estado: input.suscriptor.estado,
-    matricula_inmobiliaria:
-      input.suscriptor.matricula_inmobiliaria === undefined ||
-      input.suscriptor.matricula_inmobiliaria === ''
-        ? null
-        : input.suscriptor.matricula_inmobiliaria,
-    numero_catastral:
-      input.suscriptor.numero_catastral === undefined || input.suscriptor.numero_catastral === ''
-        ? null
-        : input.suscriptor.numero_catastral,
+    matricula_inmobiliaria: nullIfEmpty(input.suscriptor.matricula_inmobiliaria),
+    numero_catastral: nullIfEmpty(input.suscriptor.numero_catastral),
     id_prestador: input.suscriptor.id_prestador,
     categoria_uso: input.suscriptor.categoria_uso,
   });

@@ -14,6 +14,7 @@ import type { Medidor } from '../medidores/types';
 import type { Periodo } from '../periodos/types';
 import type { Operario } from '../operarios/types';
 import type { EvidenciaFoto, Lectura } from '../captura-lecturas/types';
+import { nullIfEmpty } from '../shared/strings';
 import type { ConceptoOtroValor, OtroValor } from './otros-valores-catalogo';
 
 export type { ConceptoOtroValor, OtroValor } from './otros-valores-catalogo';
@@ -202,22 +203,16 @@ export function extraerSnapshotLectura(lectura: Lectura): FacturaSnapshotLectura
     throw new Error('extraerSnapshotLectura: lectura es requerida');
   }
   const estadoValidacion = lectura.estado_validacion;
+  const evidencia = lectura.evidencia;
   const evidenciaFotoPath =
-    lectura.evidencia === undefined || lectura.evidencia === null
+    evidencia === undefined || evidencia === null
       ? null
-      : lectura.evidencia.foto_path === undefined || lectura.evidencia.foto_path === ''
-        ? null
-        : lectura.evidencia.foto_path;
+      : nullIfEmpty(evidencia.foto_path);
   const evidenciaFotoHash =
-    lectura.evidencia === undefined || lectura.evidencia === null
+    evidencia === undefined || evidencia === null
       ? null
-      : lectura.evidencia.foto_hash === undefined || lectura.evidencia.foto_hash === ''
-        ? null
-        : lectura.evidencia.foto_hash;
-  const observaciones =
-    lectura.observaciones === undefined || lectura.observaciones === ''
-      ? null
-      : lectura.observaciones;
+      : nullIfEmpty(evidencia.foto_hash);
+  const observaciones = nullIfEmpty(lectura.observaciones);
   const snap: FacturaSnapshotLectura = {
     lectura_actual: lectura.lectura_actual,
     lectura_anterior: lectura.lectura_anterior,
