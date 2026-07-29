@@ -26,6 +26,7 @@ import {
   generarQrPago,
   generarReferenciaPago,
 } from './pagos';
+import { OtrosValoresCatalogo } from './otros-valores-catalogo';
 
 // Re-export de los helpers de pagos para que `import { ... } from '../factura'`
 // siga funcionando como API unica del modulo.
@@ -177,6 +178,16 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher, idGen?:
   const saldoAnterior: number = input.saldoAnterior ?? 0;
   if (saldoAnterior < 0) {
     throw new Error('emitirFactura: saldo_anterior no puede ser negativo');
+  }
+  // Validacion de frontera contra el catalogo regulatorio. Aunque
+  // `crearOtroValor` ya valida el concepto, `emitirFactura` es la
+  // frontera publica: NO se puede colar un OtroValor con un concepto
+  // fuera del catalogo por casts, JSON round-trip, ni mutacion de
+  // snapshot (es caso real de fraude / corrupcion de DB).
+  for (const ov of otrosValores) {
+    if (OtrosValoresCatalogo[ov.concepto] === undefined) {
+      throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
+    }
   }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',

@@ -388,12 +388,16 @@ export const MENSAJES_ERROR_FACTURA = {
   FACTURA_NO_ENCONTRADA: 'factura no encontrada en el repositorio',
   CONSUMO_HISTORICO_INVALIDO:
     'consumos_historicos no puede tener más de 6 elementos',
+  CONCEPTO_NO_AUTORIZADO:
+    'concepto de otro valor no autorizado por el catálogo regulatorio',
   FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL:
     'factura solo puede anularse desde estado EMITIDA',
   CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE:
     'liquidacionAnulada.id no coincide con la liquidacion de la facturaOriginal',
   TRANSICION_ILEGAL:
     'transición de estado no permitida para esta factura',
+  TOTAL_NEGATIVO_NO_PERMITIDO:
+    'el total de la factura no puede ser negativo',
   RESTRICCION_UNICIDAD:
     'violación de unicidad en el repositorio de facturas',
 } as const;

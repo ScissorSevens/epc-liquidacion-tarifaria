@@ -326,6 +326,31 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
     ).toThrow(/saldo_anterior.*negativo/i);
   });
 
+  it('lanza error si algun concepto de otrosValores NO esta en el catalogo (CONCEPTO_NO_AUTORIZADO)', () => {
+    // Inyecta un OtroValor con concepto fuera del catalogo — bypass de
+    // `crearOtroValor` (que validaria) simulando un caso de frontera
+    // (cast, JSON round-trip, DB corrupta, mutacion).
+    const ovInvalido = {
+      concepto: 'INVENTADO' as unknown as 'RECONEXION',
+      valor: 1000,
+    };
+    expect(() =>
+      emitirFactura(inputBase({ otrosValores: [ovInvalido] }), hasher),
+    ).toThrow(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
+  });
+
+  it('acepta otrosValores con todos los conceptos del catalogo', () => {
+    const todosLosConceptos = Object.keys(OtrosValoresCatalogo) as Array<
+      'RECONEXION' | 'INTERESES_AUTORIZADOS' | 'FINANCIACION' | 'MATERIALES_ACOMETIDA' | 'AJUSTES_DEVOLUCIONES' | 'OTROS_AUTORIZADOS' | 'SALDO_ANTERIOR'
+    >;
+    const ovValidos = todosLosConceptos.map((concepto, i) => ({
+      concepto,
+      valor: 1000 + i,
+    }));
+    const factura = emitirFactura(inputBase({ otrosValores: ovValidos }), hasher);
+    expect(factura.snapshot.otros_valores.length).toBe(todosLosConceptos.length);
+  });
+
   it('lanza error si el total (post calculo) es negativo', () => {
     // Forzamos un escenario donde el saldo_anterior + otros_valores
     // hacia abajo del total de la liquidacion. Logica del motor: el
