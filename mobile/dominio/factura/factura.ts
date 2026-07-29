@@ -464,10 +464,15 @@ async function emitirFacturaAsync(
   const otrosValores: readonly OtroValor[] = input.otrosValores ?? [];
   const conceptos = await catalogoRepo.listar();
   if (conceptos.length > 0) {
-    // Repo poblado → es la fuente de verdad.
+    // Repo poblado → es la fuente de verdad. Validamos que cada codigo
+    // exista Y este activo (regla regulatoria Res CRA 1038/2026).
     for (const ov of otrosValores) {
       const encontrado = conceptos.find((c) => c.codigo === ov.concepto.toUpperCase());
       if (!encontrado) {
+        throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
+      }
+      if (!encontrado.activo) {
+        // Concepto fue desactivado por la regulacion posterior: rechazar.
         throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
       }
     }
