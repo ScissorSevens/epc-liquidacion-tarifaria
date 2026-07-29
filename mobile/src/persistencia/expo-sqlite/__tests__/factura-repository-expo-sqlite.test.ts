@@ -288,4 +288,263 @@ describe('factura-repository-expo-sqlite (contract)', () => {
       ).rejects.toThrow(/unicidad|RESTRICCION_UNICIDAD/i);
     });
   });
+
+  // ────────────────────────────────────────────────────────────────────
+  // Bloque E — Cobertura extendida (parametrizada) introducida en
+  // `factura-compliance-polish`: listar, buscarPorPeriodo,
+  // buscarPorSuscriptor, transiciones ilegales, motivo_anulacion,
+  // multiples facturas en la misma DB.
+  // ────────────────────────────────────────────────────────────────────
+
+  describe('listar() con/sin facturas', () => {
+    it('listar() con DB vacia retorna []', async () => {
+      const mock = crearMockExpoSqliteDb();
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      await expect(repo.listar()).resolves.toEqual([]);
+    });
+
+    it('listar() con 1 sola factura retorna el array de 1', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([buildFacturaRow({ id: 'F-001' })]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const lista = await repo.listar();
+      expect(lista).toHaveLength(1);
+      expect(lista[0]!.id).toBe('F-001');
+    });
+
+    it('listar() con N=5 facturas preserva el orden de insercion', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({ id: 'F-001' }),
+        buildFacturaRow({ id: 'F-002' }),
+        buildFacturaRow({ id: 'F-003' }),
+        buildFacturaRow({ id: 'F-004' }),
+        buildFacturaRow({ id: 'F-005' }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const lista = await repo.listar();
+      expect(lista.map((f) => f.id)).toEqual(['F-001', 'F-002', 'F-003', 'F-004', 'F-005']);
+    });
+  });
+
+  describe('buscarPorPeriodo', () => {
+    it('retorna las facturas cuyo id_periodo matchea', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({ id: 'F-001', id_periodo: '202607' }),
+        buildFacturaRow({ id: 'F-002', id_periodo: '202607' }),
+        buildFacturaRow({ id: 'F-003', id_periodo: '202608' }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const periodo = await repo.buscarPorPeriodo('202607');
+      expect(periodo).toHaveLength(2);
+      expect(periodo.map((f) => f.id).sort()).toEqual(['F-001', 'F-002']);
+    });
+
+    it('retorna [] si ningun factura matchea el periodo', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([buildFacturaRow({ id: 'F-001', id_periodo: '202607' })]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const periodo = await repo.buscarPorPeriodo('209912');
+      expect(periodo).toEqual([]);
+    });
+
+    it('multiples periodos retornan conjuntos disjuntos', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({ id: 'F-001', id_periodo: '202607' }),
+        buildFacturaRow({ id: 'F-002', id_periodo: '202608' }),
+        buildFacturaRow({ id: 'F-003', id_periodo: '202609' }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const p607 = await repo.buscarPorPeriodo('202607');
+      const p608 = await repo.buscarPorPeriodo('202608');
+      const p609 = await repo.buscarPorPeriodo('202609');
+      expect(p607.map((f) => f.id)).toEqual(['F-001']);
+      expect(p608.map((f) => f.id)).toEqual(['F-002']);
+      expect(p609.map((f) => f.id)).toEqual(['F-003']);
+    });
+  });
+
+  describe('buscarPorSuscriptor', () => {
+    it('retorna las facturas del suscriptor', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({ id: 'F-001', id_suscriptor: 7 }),
+        buildFacturaRow({ id: 'F-002', id_suscriptor: 7 }),
+        buildFacturaRow({ id: 'F-003', id_suscriptor: 8 }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const facturas = await repo.buscarPorSuscriptor(7);
+      expect(facturas).toHaveLength(2);
+      expect(facturas.map((f) => f.id).sort()).toEqual(['F-001', 'F-002']);
+    });
+
+    it('retorna [] si el suscriptor no tiene facturas', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([buildFacturaRow({ id: 'F-001', id_suscriptor: 7 })]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const facturas = await repo.buscarPorSuscriptor(999);
+      expect(facturas).toEqual([]);
+    });
+  });
+
+  describe('actualizar() con transiciones de estado', () => {
+    it('BORRADOR → PAGADA directo lanza TRANSICION_ILEGAL (no legal)', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({
+          id: 'F-001',
+          estado: 'BORRADOR',
+          motivo_anulacion: null,
+          fecha_anulacion: null,
+        }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      await expect(
+        repo.actualizar('F-001', { estado: 'PAGADA' }),
+      ).rejects.toThrow(/TRANSICION_ILEGAL|transici[oó]n.*no permit/i);
+    });
+
+    it('BORRADOR → EMITIDA es legal (happy path)', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({
+          id: 'F-001',
+          estado: 'BORRADOR',
+          motivo_anulacion: null,
+          fecha_anulacion: null,
+        }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const actualizada = await repo.actualizar('F-001', { estado: 'EMITIDA' });
+      expect(actualizada.estado).toBe('EMITIDA');
+    });
+
+    it('PAGADA → ANULADA es ilegal (PAGADA es terminal)', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({
+          id: 'F-001',
+          estado: 'PAGADA',
+          motivo_anulacion: null,
+          fecha_anulacion: null,
+        }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      await expect(
+        repo.actualizar('F-001', { estado: 'ANULADA', motivo_anulacion: 'X' }),
+      ).rejects.toThrow(/TRANSICION_ILEGAL|transici[oó]n.*no permit/i);
+    });
+
+    it('mismo estado (no-op) es legal sin error', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({
+          id: 'F-001',
+          estado: 'EMITIDA',
+          motivo_anulacion: null,
+          fecha_anulacion: null,
+        }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      // Actualizar sin cambiar el estado: el adapter detecta que
+      // `cambios.estado === existente.estado` y no invoca la
+      // validacion de transicion legal.
+      const actualizada = await repo.actualizar('F-001', { estado: 'EMITIDA' });
+      expect(actualizada.estado).toBe('EMITIDA');
+    });
+  });
+
+  describe('actualizar() con motivo_anulacion', () => {
+    it('setear motivo_anulacion sin estado ANULADA lo persiste en la fila', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({
+          id: 'F-001',
+          estado: 'EMITIDA',
+          motivo_anulacion: null,
+          fecha_anulacion: null,
+        }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const actualizada = await repo.actualizar('F-001', {
+        estado: 'EMITIDA',
+        motivo_anulacion: 'observacion auditoria',
+      });
+      expect(actualizada.motivo_anulacion).toBe('observacion auditoria');
+    });
+
+    it('anular + motivo_anulacion -> fila persistida con ambos', async () => {
+      const mock = crearMockExpoSqliteDb();
+      mock.seed([
+        buildFacturaRow({
+          id: 'F-001',
+          estado: 'EMITIDA',
+          motivo_anulacion: null,
+          fecha_anulacion: null,
+        }),
+      ]);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const actualizada = await repo.actualizar('F-001', {
+        estado: 'ANULADA',
+        motivo_anulacion: 'Error de digitacion',
+        fecha_anulacion: '2026-07-29T15:00:00.000Z',
+      });
+      expect(actualizada.estado).toBe('ANULADA');
+      expect(actualizada.motivo_anulacion).toBe('Error de digitacion');
+      expect(actualizada.fecha_anulacion).toBe('2026-07-29T15:00:00.000Z');
+    });
+  });
+
+  describe('multiples facturas en la misma DB', () => {
+    it('N=10 facturas con distintos metadatos: listar retorna todas', async () => {
+      const mock = crearMockExpoSqliteDb();
+      const seedRows = Array.from({ length: 10 }, (_, i) =>
+        buildFacturaRow({
+          id: `F-${String(i + 1).padStart(3, '0')}`,
+          numero_factura: `F-2026-${String(i + 1).padStart(3, '0')}`,
+          liquidacion_id: `L-${i + 1}`,
+          id_suscriptor: (i % 3) + 1,
+          id_periodo: ['202607', '202608', '202609'][i % 3]!,
+        }),
+      );
+      mock.seed(seedRows);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const lista = await repo.listar();
+      expect(lista).toHaveLength(10);
+      expect(new Set(lista.map((f) => f.id)).size).toBe(10);
+    });
+
+    it('multiples facturas del mismo suscriptor: buscarPorSuscriptor las trae todas', async () => {
+      const mock = crearMockExpoSqliteDb();
+      // Inyectamos id_periodo en el snapshot del JSON para que
+      // `f.snapshot.periodo.id_periodo` matchee el `id_periodo` de la fila.
+      // (El `buildFacturaRow` default usa '202607' en el snapshot.periodo.)
+      const seedRows = [
+        buildFacturaRow({ id: 'F-001', id_suscriptor: 7, id_periodo: '202607' }),
+        buildFacturaRow({ id: 'F-002', id_suscriptor: 7, id_periodo: '202608' }),
+        buildFacturaRow({ id: 'F-003', id_suscriptor: 7, id_periodo: '202609' }),
+        buildFacturaRow({ id: 'F-004', id_suscriptor: 8, id_periodo: '202607' }),
+      ].map((r) => ({
+        ...r,
+        snapshot: JSON.stringify({
+          ...JSON.parse(r.snapshot),
+          periodo: { ...JSON.parse(r.snapshot).periodo, id_periodo: r.id_periodo },
+        }),
+      })) as ReturnType<typeof buildFacturaRow>[];
+      mock.seed(seedRows);
+      const repo = crearFacturaRepositoryExpoSqlite(mock.db);
+      const suscriptor7 = await repo.buscarPorSuscriptor(7);
+      expect(suscriptor7).toHaveLength(3);
+      expect(suscriptor7.map((f) => f.snapshot.periodo.id_periodo).sort()).toEqual([
+        '202607',
+        '202608',
+        '202609',
+      ]);
+      const suscriptor8 = await repo.buscarPorSuscriptor(8);
+      expect(suscriptor8).toHaveLength(1);
+      expect(suscriptor8[0]!.id).toBe('F-004');
+    });
+  });
 });
