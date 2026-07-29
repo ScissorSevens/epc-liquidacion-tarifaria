@@ -51,6 +51,10 @@ import {
   crearOperarioRepositoryExpoSqlite,
   type OperarioRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
+import {
+  crearConceptoOtroValorRepositoryExpoSqlite,
+  type ConceptoOtroValorRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/concepto-otro-valor-repository-expo-sqlite';
 import type { Prestador } from '../../dominio/prestadores';
 import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal';
 import type { ParametrosTarifa } from '../../dominio/parametros-tarifa';
@@ -107,6 +111,10 @@ export interface BootstrapApp {
   // expone en el BootstrapApp para que el setup wizard cree el primer
   // operario via bootstrapCompleto() sin tener que re-construir el repo.
   readonly operarioRepo: OperarioRepositoryExpoSqlite;
+  // Catalogo regulatorio de otros_valores (Res CRA 1038/2026) — fuente
+  // de verdad para la UI `OtrosValoresFactura`. Inyectado via
+  // `getBootstrap().conceptoOtroValorRepo.listar(true)` desde la pantalla.
+  readonly conceptoOtroValorRepo: ConceptoOtroValorRepositoryExpoSqlite;
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
   readonly clienteHttp: ClienteSincronizacion;
@@ -153,6 +161,7 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const parametrosTarifaRepo = crearParametrosTarifaRepositoryExpoSqlite(db);
   const operarioRepo = crearOperarioRepositoryExpoSqlite(db);
   await operarioRepo.inicializar();
+  const conceptoOtroValorRepo = crearConceptoOtroValorRepositoryExpoSqlite(db);
 
   // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
   // de crypto.getRandomValues importado al tope del archivo). Cualquier
@@ -224,6 +233,7 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
     acuerdoMunicipalRepo,
     parametrosTarifaRepo,
     operarioRepo,
+    conceptoOtroValorRepo,
     hasher,
     idGenerator,
     clienteHttp,

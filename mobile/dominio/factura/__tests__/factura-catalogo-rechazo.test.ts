@@ -48,11 +48,11 @@ const RECONEXION_INACTIVO: ConceptoOtroValor = {
   activo: false,
 };
 
-function emitirSyncOVacio(input: EmitirFacturaInput) {
+function emitirSyncOVacio(input: EmitirFacturaInput, hasher: { sha256: (s: string) => string }) {
   // Helper para disparar el path sync (legacy constante). Devuelve el error
   // como value para que el caller decida.
   try {
-    emitirFactura(input);
+    emitirFactura(input, hasher);
     return null;
   } catch (e) {
     return e;

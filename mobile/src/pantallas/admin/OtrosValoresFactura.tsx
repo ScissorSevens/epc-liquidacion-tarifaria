@@ -6,22 +6,36 @@
  * ANTES de emitir la factura. Esta pantalla es el editor admin que
  * prepara esos datos — la persistencia la hace el caller via `onGuardar`.
  *
+ * Cambio introducido en `factura-compliance-hardening` Task 8: el catalogo
+ * de conceptos se carga desde `ConceptoOtroValorRepository` (tabla SQLite
+ * `concepto_otro_valor`, version regulatoria `1038-2026-v1`) en vez de la
+ * constante hardcoded `OtrosValoresCatalogo`. Esto permite:
+ *  - Cambio de norma → nueva migration 022 con la lista actualizada, sin
+ *    redeploy.
+ *  - Conceptos se pueden desactivar (`activo=false`) por regulatoria,
+ *    permaneciendo visibles solo al auditor (legacy: solo activos visibles).
+ *  - Auditoria: cada concepto lleva `version` y `created_at`.
+ *
  * UI:
  *  - Lista actual de otros_valores (readonly inline; el admin edita el
  *    valor numerico o elimina el item).
- *  - Selector de catalogo con los 7 conceptos hardcoded.
+ *  - Selector de catalogo con los N conceptos seed vigentes.
  *  - Input para saldo_anterior (default 0).
  *  - Botones guardar / cancelar.
+ *  - Estado de carga (`ActivityIndicator`) mientras `repo.listar()` esta
+ *    en flight.
+ *  - Estado de error accionable si `repo.listar()` lanza.
  *
- * Touch targets ≥ 44px (WCAG 2.5.5).
+ * Touch targets ≥ 44px (WCAG 2.5.5) en todos los controles.
  *
  * Esta pantalla es CONTROLLED: no toca persistencia. Espera que el
  * caller provea `onGuardar` con los datos finales. Asi es testeable y
  * reusable (ej: como pantalla admin por prestador, o embebida en un
  * wizard de edicion).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,11 +45,8 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import {
-  OtrosValoresCatalogo,
-  type ConceptoOtroValor,
-  type OtroValor,
-} from '@dominio/factura/otros-valores-catalogo';
+import { getBootstrap } from '../../composition/get-bootstrap';
+import type { ConceptoOtroValor } from '@dominio/concepto-otro-valor';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 
 interface Props {
@@ -48,7 +59,26 @@ interface Props {
   readonly onCancelar: () => void;
 }
 
+/**
+ * Shape local del OtroValor (Codigo + Valor + Glosa) — match con el
+ * @dominio/factura/otros-valores-catalogo.OtroValor legacy. El caller
+ * (orquestador `emitirFactura`) acepta este shape directamente.
+ */
+interface OtroValor {
+  readonly concepto: string;
+  readonly valor: number;
+  readonly glosa?: string;
+}
+
 const TOUCH_TARGET = 56; // ≥ 44px (WCAG 2.5.5)
+
+type EstadoCatalogo =
+  | { readonly tipo: 'cargando' }
+  | {
+      readonly tipo: 'listo';
+      readonly catalogo: readonly ConceptoOtroValor[];
+    }
+  | { readonly tipo: 'error'; readonly mensaje: string };
 
 export default function OtrosValoresFactura({
   otrosValoresIniciales,
@@ -62,26 +92,47 @@ export default function OtrosValoresFactura({
   const [saldoAnterior, setSaldoAnterior] = useState<string>(
     saldoAnteriorInicial === 0 ? '0' : String(saldoAnteriorInicial),
   );
+  const [estado, setEstado] = useState<EstadoCatalogo>({ tipo: 'cargando' });
 
-  function agregarConcepto(concepto: ConceptoOtroValor): void {
-    // Verificar que no exista ya.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const bootstrap = await getBootstrap();
+        const conceptos = await bootstrap.conceptoOtroValorRepo.listar(true);
+        // Solo activos (`activo=true`) — la UI los renderiza como opciones
+        // elegibles. Conceptos `activo=false` quedan ocultos (auditable via DB).
+        if (!cancelado) {
+          setEstado({ tipo: 'listo', catalogo: conceptos });
+        }
+      } catch (e) {
+        if (!cancelado) {
+          const mensaje = e instanceof Error ? e.message : String(e);
+          setEstado({ tipo: 'error', mensaje });
+        }
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  function agregarConcepto(concepto: string): void {
     if (otrosValores.some((ov) => ov.concepto === concepto)) return;
-    const catalogo = OtrosValoresCatalogo[concepto];
-    if (catalogo.requiere_glosa) {
-      // Para conceptos que requieren glosa, abrimos un dialog inline
-      // básico. Para Fase 1 simplificamos: el admin edita la glosa
-      // luego en el item.
+    if (estado.tipo !== 'listo') return;
+    const meta = estado.catalogo.find((c) => c.codigo === concepto);
+    if (meta?.requiereGlosa) {
       setOtrosValores((prev) => [...prev, { concepto, valor: 0, glosa: '' }]);
     } else {
       setOtrosValores((prev) => [...prev, { concepto, valor: 0 }]);
     }
   }
 
-  function eliminarConcepto(concepto: ConceptoOtroValor): void {
+  function eliminarConcepto(concepto: string): void {
     setOtrosValores((prev) => prev.filter((ov) => ov.concepto !== concepto));
   }
 
-  function editarValor(concepto: ConceptoOtroValor, texto: string): void {
+  function editarValor(concepto: string, texto: string): void {
     const valor = parseFloat(texto);
     setOtrosValores((prev) =>
       prev.map((ov) =>
@@ -92,7 +143,7 @@ export default function OtrosValoresFactura({
     );
   }
 
-  function editarGlosa(concepto: ConceptoOtroValor, texto: string): void {
+  function editarGlosa(concepto: string, texto: string): void {
     setOtrosValores((prev) =>
       prev.map((ov) => (ov.concepto === concepto ? { ...ov, glosa: texto } : ov)),
     );
@@ -104,6 +155,11 @@ export default function OtrosValoresFactura({
       otrosValores,
       saldoAnterior: Number.isFinite(saldo) && saldo >= 0 ? saldo : 0,
     });
+  }
+
+  function reintentar(): void {
+    setEstado({ tipo: 'cargando' });
+    void estado;
   }
 
   return (
@@ -139,9 +195,11 @@ export default function OtrosValoresFactura({
                   <MaterialIcons name="close" size={18} color={COLORS.error} />
                 </Pressable>
               </View>
-              <Text style={styles.itemDesc}>
-                {OtrosValoresCatalogo[ov.concepto].descripcion}
-              </Text>
+              {estado.tipo === 'listo' && (
+                <Text style={styles.itemDesc}>
+                  {estado.catalogo.find((c) => c.codigo === ov.concepto)?.descripcion ?? ov.concepto}
+                </Text>
+              )}
               <View style={styles.itemRow}>
                 <Text style={styles.itemLabel}>Valor (COP)</Text>
                 <TextInput
@@ -152,17 +210,18 @@ export default function OtrosValoresFactura({
                   style={styles.inputValor}
                 />
               </View>
-              {OtrosValoresCatalogo[ov.concepto].requiere_glosa && (
-                <View style={styles.itemRow}>
-                  <Text style={styles.itemLabel}>Glosa</Text>
-                  <TextInput
-                    testID={`glosa-${ov.concepto}`}
-                    value={ov.glosa ?? ''}
-                    onChangeText={(t) => editarGlosa(ov.concepto, t)}
-                    style={styles.inputGlosa}
-                  />
-                </View>
-              )}
+              {estado.tipo === 'listo' &&
+                estado.catalogo.find((c) => c.codigo === ov.concepto)?.requiereGlosa && (
+                  <View style={styles.itemRow}>
+                    <Text style={styles.itemLabel}>Glosa</Text>
+                    <TextInput
+                      testID={`glosa-${ov.concepto}`}
+                      value={ov.glosa ?? ''}
+                      onChangeText={(t) => editarGlosa(ov.concepto, t)}
+                      style={styles.inputGlosa}
+                    />
+                  </View>
+                )}
             </View>
           ))
         )}
@@ -171,24 +230,43 @@ export default function OtrosValoresFactura({
       {/* Selector de catalogo */}
       <View style={styles.section}>
         <Text style={styles.sectionTitulo}>Agregar concepto del catálogo</Text>
-        <View style={styles.catalogoGrid}>
-          {(Object.keys(OtrosValoresCatalogo) as ConceptoOtroValor[]).map((concepto) => (
+        {estado.tipo === 'cargando' && (
+          <View style={styles.loadingContainer} testID="catalogo-loading">
+            <ActivityIndicator color={COLORS.primary} />
+            <Text style={styles.sub}>Cargando catálogo regulatorio...</Text>
+          </View>
+        )}
+        {estado.tipo === 'error' && (
+          <View style={styles.errorContainer} testID="catalogo-error">
+            <Text style={styles.errorMensaje}>{estado.mensaje}</Text>
             <Pressable
-              key={concepto}
-              testID={`catalogo-${concepto}`}
-              onPress={() => agregarConcepto(concepto)}
-              disabled={otrosValores.some((ov) => ov.concepto === concepto)}
-              style={({ pressed }) => [
-                styles.chip,
-                pressed && styles.chipPressed,
-                otrosValores.some((ov) => ov.concepto === concepto) && styles.chipDisabled,
-              ]}
-              hitSlop={8}
+              onPress={reintentar}
+              style={({ pressed }) => [styles.btnReintentar, pressed && styles.btnReintentarPressed]}
             >
-              <Text style={styles.chipTexto}>{concepto}</Text>
+              <Text style={styles.btnReintentarTexto}>Reintentar</Text>
             </Pressable>
-          ))}
-        </View>
+          </View>
+        )}
+        {estado.tipo === 'listo' && (
+          <View style={styles.catalogoGrid}>
+            {estado.catalogo.map((c) => (
+              <Pressable
+                key={c.codigo}
+                testID={`catalogo-${c.codigo}`}
+                onPress={() => agregarConcepto(c.codigo)}
+                disabled={otrosValores.some((ov) => ov.concepto === c.codigo)}
+                style={({ pressed }) => [
+                  styles.chip,
+                  pressed && styles.chipPressed,
+                  otrosValores.some((ov) => ov.concepto === c.codigo) && styles.chipDisabled,
+                ]}
+                hitSlop={8}
+              >
+                <Text style={styles.chipTexto}>{c.codigo}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Saldo anterior */}
@@ -270,7 +348,7 @@ const styles = StyleSheet.create({
   itemLabel: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurface, flex: 1 },
   inputValor: {
     minWidth: 120,
-    height: 44,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: COLORS.outline,
     borderRadius: RADIUS.sm,
@@ -281,7 +359,7 @@ const styles = StyleSheet.create({
   },
   inputGlosa: {
     flex: 2,
-    height: 44,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: COLORS.outline,
     borderRadius: RADIUS.sm,
@@ -304,6 +382,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: SPACING.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -322,7 +401,7 @@ const styles = StyleSheet.create({
   },
   btnCancelar: {
     flex: 1,
-    height: TOUCH_TARGET,
+    minHeight: TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.md,
@@ -334,7 +413,7 @@ const styles = StyleSheet.create({
   btnCancelarTexto: { ...TYPOGRAPHY.labelLg, color: COLORS.primary },
   btnGuardar: {
     flex: 1,
-    height: TOUCH_TARGET,
+    minHeight: TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.md,
@@ -342,4 +421,17 @@ const styles = StyleSheet.create({
   },
   btnGuardarPressed: { opacity: 0.85 },
   btnGuardarTexto: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary, fontWeight: '700' },
+  loadingContainer: { gap: SPACING.xs, alignItems: 'center', paddingVertical: SPACING.md },
+  errorContainer: { gap: SPACING.xs, paddingVertical: SPACING.md },
+  errorMensaje: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
+  btnReintentar: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.errorContainer,
+    paddingHorizontal: SPACING.md,
+  },
+  btnReintentarPressed: { opacity: 0.7 },
+  btnReintentarTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onErrorContainer, fontWeight: '700' },
 });
