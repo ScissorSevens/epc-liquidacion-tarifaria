@@ -536,26 +536,6 @@ async function emitirFacturaAsync(
 }
 
 /**
- * Helper interno para derivar el codigo de verificacion sin reinjectar
- * el hasher: dado que el hash canonico ya es estable, tomamos 16 chars
- * hex del hash y los codificamos en base36, primeros 10 chars.
- *
- * Movido a `../shared/codigos` en `factura-compliance-hardening` para
- * consolidar el helper duplicado que vivia en 3 archivos. Re-exportado
- * via este import para preservar el binding local.
- *
- * Compat tests: si el hash es < 16 chars o tiene prefijos no-hex
- * (hasher fake en tests contractuales como 'hash-fake-'), filtramos
- * los chars no-hex y padStart con '0' para llegar a 16. NO es un caso
- * de produccion — en prod SHA-256 hex SIEMPRE tiene 64 chars.
- */
-// Re-export para que callers existentes en este archivo sigan funcionando.
-// La implementacion canonica vive en `dominio/shared/codigos.ts`.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _placeholderReexport = calcularCodigoVerificacionPlaceholder;
-
-
-/**
  * Anula una Factura EMITIDA. Función pura — devuelve copia congelada con
  * estado ANULADA, motivo y fecha de anulación. Mismo id y numero_factura.
  *
