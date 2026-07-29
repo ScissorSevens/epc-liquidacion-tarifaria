@@ -46,7 +46,10 @@ export async function emitirFacturaConRepo(
   hasher: Hasher,
   idGen: IdGenerator,
 ): Promise<Factura> {
-  const facturaPura = emitirFactura(input, hasher);
+  // Pasamos el idGen a la fase pura para que `emitirFactura` populada
+  // `referencia_pago` y `qr_pago`. La fase pura es deterministica y
+  // no toca persistencia.
+  const facturaPura = emitirFactura(input, hasher, idGen);
 
   // Validacion de unicidad: numero_factura por periodo (sigue en orquestador
   // hasta que se modele constraint SQL UNIQUE (id_periodo, numero_factura)
