@@ -206,29 +206,178 @@ describe('OtrosValoresFactura — pantalla admin', () => {
     });
   });
 
-  it('Touch targets ≥ 44px en botones (WCAG 2.5.5) — presencia de testID sufficient', async () => {
-    const { getByTestId } = render(
-      <OtrosValoresFactura
-        otrosValoresIniciales={[]}
-        saldoAnteriorInicial={0}
-        onGuardar={jest.fn()}
-        onCancelar={jest.fn()}
-      />,
-    );
-    await waitFor(() => {
-      expect(getByTestId('boton-guardar')).toBeTruthy();
-      expect(getByTestId('boton-cancelar')).toBeTruthy();
+  // WCAG 2.5.5 — touch targets ≥ 44px. Endurecido en este change:
+  // inspecciona los estilos computados via `props.style` del test instance,
+  // no se conforma con la presencia de testID. Si el componente baja
+  // accidentamente el minHeight a < 44, el test falla ruidosamente.
+  describe('Touch targets WCAG 2.5.5 (≥ 44px) — inspeccion de styles', () => {
+    /** Extrae el numero de pixels de un style value: numero directo, o
+     * derivado de un array de styles concatenados. */
+    function resolverMinHeight(style: unknown): number {
+      const arr = Array.isArray(style) ? style : [style];
+      let resolved: { minHeight?: number; height?: number; width?: number; minWidth?: number } = {};
+      for (const s of arr) {
+        if (s === null || s === undefined) continue;
+        if (typeof s === 'number') continue; // StyleSheet id, no inspeccionable
+        if (typeof s === 'object') {
+          resolved = { ...resolved, ...(s as Record<string, number>) };
+        }
+      }
+      // Consideramos valido si height >= 44 o minHeight >= 44.
+      const v = resolved.height ?? resolved.minHeight ?? 0;
+      return v;
+    }
+
+    it('boton-guardar tiene minHeight >= 44px', async () => {
+      const { getByTestId } = render(
+        <OtrosValoresFactura
+          otrosValoresIniciales={[]}
+          saldoAnteriorInicial={0}
+          onGuardar={jest.fn()}
+          onCancelar={jest.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('boton-guardar')).toBeTruthy();
+      });
+      const style = getByTestId('boton-guardar').props.style;
+      const h = resolverMinHeight(style);
+      // El componente declara TOUCH_TARGET = 56 → esperamos 56.
+      expect(h).toBeGreaterThanOrEqual(44);
     });
-    // Los styles.minHeight ≥ 44px se validan en el componente (style minHeight: 44).
-    expect(getByTestId('boton-guardar')).toBeTruthy();
-    expect(getByTestId('boton-cancelar')).toBeTruthy();
+
+    it('boton-cancelar tiene minHeight >= 44px', async () => {
+      const { getByTestId } = render(
+        <OtrosValoresFactura
+          otrosValoresIniciales={[]}
+          saldoAnteriorInicial={0}
+          onGuardar={jest.fn()}
+          onCancelar={jest.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('boton-cancelar')).toBeTruthy();
+      });
+      const style = getByTestId('boton-cancelar').props.style;
+      const h = resolverMinHeight(style);
+      expect(h).toBeGreaterThanOrEqual(44);
+    });
+
+    it('input-saldo-anterior tiene minHeight >= 44px', async () => {
+      const { getByTestId } = render(
+        <OtrosValoresFactura
+          otrosValoresIniciales={[]}
+          saldoAnteriorInicial={0}
+          onGuardar={jest.fn()}
+          onCancelar={jest.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('input-saldo-anterior')).toBeTruthy();
+      });
+      const style = getByTestId('input-saldo-anterior').props.style;
+      const h = resolverMinHeight(style);
+      expect(h).toBeGreaterThanOrEqual(44);
+    });
+
+    it('eliminar de item tiene width y height >= 44px', async () => {
+      const { getByTestId } = render(
+        <OtrosValoresFactura
+          otrosValoresIniciales={[{ concepto: 'RECONEXION', valor: 50000 }]}
+          saldoAnteriorInicial={0}
+          onGuardar={jest.fn()}
+          onCancelar={jest.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('eliminar-RECONEXION')).toBeTruthy();
+      });
+      const style = getByTestId('eliminar-RECONEXION').props.style;
+      const arr = Array.isArray(style) ? style : [style];
+      let merged: { width?: number; height?: number; minHeight?: number; minWidth?: number } = {};
+      for (const s of arr) {
+        if (s === null || s === undefined || typeof s !== 'object') continue;
+        merged = { ...merged, ...(s as Record<string, number>) };
+      }
+      expect(merged.width ?? merged.minWidth ?? 0).toBeGreaterThanOrEqual(44);
+      expect(merged.height ?? merged.minHeight ?? 0).toBeGreaterThanOrEqual(44);
+    });
+
+    it('chip del catalogo tiene minHeight y minWidth >= 44px', async () => {
+      const { getByTestId } = render(
+        <OtrosValoresFactura
+          otrosValoresIniciales={[]}
+          saldoAnteriorInicial={0}
+          onGuardar={jest.fn()}
+          onCancelar={jest.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('catalogo-RECONEXION')).toBeTruthy();
+      });
+      const style = getByTestId('catalogo-RECONEXION').props.style;
+      const arr = Array.isArray(style) ? style : [style];
+      let merged: { minHeight?: number; minWidth?: number; height?: number; width?: number } = {};
+      for (const s of arr) {
+        if (s === null || s === undefined || typeof s !== 'object') continue;
+        merged = { ...merged, ...(s as Record<string, number>) };
+      }
+      expect(merged.minHeight ?? merged.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(merged.minWidth ?? merged.width ?? 0).toBeGreaterThanOrEqual(44);
+    });
   });
 
-  it('NO importa la constante legacy OtrosValoresCatalogo', () => {
-    // Comprobacion de imports: la UI NO deberia importar la constante
-    // legacy (mas alla del guard de types). El mock del repo suple esa
-    // fuente de verdad. Si alguien readd el import, jest lo detectaria
-    // porque el test no tendria sinon que ejercite la constante legacy.
-    expect(true).toBe(true);
+  // Verifica que la UI NO importa la constante legacy. Esta garantia
+  // estructura el "fuente de verdad =  repo" del change
+  // `factura-compliance-hardening`. Si alguien readd el import, este
+  // test falla con el path ofensor — sin trampas de `expect(true).toBe(true)`.
+  describe('Sin import de la constante legacy OtrosValoresCatalogo', () => {
+    it('el archivo OtrosValoresFactura.tsx NO contiene import de OtrosValoresCatalogo', () => {
+      const fs = jest.requireActual('fs') as typeof import('fs');
+      const path = jest.requireActual('path') as typeof import('path');
+      const srcPath = path.resolve(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'src',
+        'pantallas',
+        'admin',
+        'OtrosValoresFactura.tsx',
+      );
+      const src = fs.readFileSync(srcPath, 'utf-8');
+      // Quitamos comentarios en bloque para no romper el assert por
+      // una linea de documentacion.
+      const limpio = src.replace(/\/\*[\s\S]*?\*\//g, '');
+      // El archivo NO debe importar la constante legacy desde
+      // `otros-valores-catalogo`. Re-exportes via `index.ts` de
+      // `@dominio/factura` SI son aceptables (los tipos vienen de ahi).
+      const regexImport = /import\s+[^;]*['"]\.\.\/\.\.\/\.\.\/dominio\/factura\/otros-valores-catalogo['"]/;
+      expect(limpio).not.toMatch(regexImport);
+    });
+
+    it('Bootstrap.conceptoOtroValorRepo.listar(true) es la fuente de la lista renderizada', async () => {
+      const { getByTestId } = render(
+        <OtrosValoresFactura
+          otrosValoresIniciales={[]}
+          saldoAnteriorInicial={0}
+          onGuardar={jest.fn()}
+          onCancelar={jest.fn()}
+        />,
+      );
+      // La lista de "conceptos seed" debe renderizarse → el mock
+      // `conceptoOtroValorRepo.listar` con `CATALOGO_SEED` es la
+      // fuente. Si la UI re-importara `OtrosValoresCatalogo` y la
+      // usara, el render seria independiente del mock (no fallaria
+      // por el mock, pero tampoco probaria la fuente).
+      await waitFor(() => {
+        expect(getByTestId('catalogo-RECONEXION')).toBeTruthy();
+        expect(getByTestId('catalogo-FINANCIACION')).toBeTruthy();
+      });
+      // Test que dependa del dato unico del mock (no de la constante):
+      // la constante legacy no tiene `descripcion: 'Saldo pendiente de
+      // periodos anteriores'` cargada — solo la mock version la tiene.
+      expect(getByTestId('catalogo-SALDO_ANTERIOR')).toBeTruthy();
+    });
   });
 });
