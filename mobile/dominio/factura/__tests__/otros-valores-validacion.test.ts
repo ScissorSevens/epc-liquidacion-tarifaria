@@ -3,8 +3,7 @@
  *
  * TDD strict: cubre la deduplicacion de logica entre
  * `emitirFacturaSync` y `emitirFacturaAsync`. Cubre:
- *  - `CatalogoLegacy` acepta los 7 codigos del constante
- *  - `CatalogoLegacy` rechaza codigos no catalogados
+ *  - `CatalogoLegacy` es un shim no-op (acepta todo, Task 5 phase-out)
  *  - `CatalogoMapa` consulta O(1) sobre el Map pre-cargado
  *  - `CatalogoMapa` rechaza inactivos
  *  - `validarOtrosValores` itera y lanza para codigos rechazados
@@ -37,24 +36,23 @@ const FINANCIACION_INACTIVO: ConceptoOtroValor = {
   requiereGlosa: true,
 };
 
-describe('CatalogoLegacy', () => {
-  it('existe retorna true para cada uno de los 7 conceptos del constante', () => {
+describe('CatalogoLegacy (phase-out — acepta todo)', () => {
+  // Tras el phase-out de `OtrosValoresCatalogo` (Task 5), el `CatalogoLegacy`
+  // es un shim no-op. `emitirFacturaSync` lo usa y adopta la semantica
+  // "trust the caller" — la validacion regulatoria real ocurre solo en el
+  // path async con `catalogoRepo` inyectado.
+
+  it('existe retorna true para cualquier codigo (shim no-op)', () => {
     const f = new CatalogoLegacy();
     expect(f.existe('RECONEXION')).toBe(true);
-    expect(f.existe('SALDO_ANTERIOR')).toBe(true);
-    expect(f.existe('OTROS_AUTORIZADOS')).toBe(true);
+    expect(f.existe('INVENTADO')).toBe(true);
+    expect(f.existe('')).toBe(true);
   });
 
-  it('existe retorna false para codigos fuera del constante', () => {
-    const f = new CatalogoLegacy();
-    expect(f.existe('INVENTADO')).toBe(false);
-    expect(f.existe('')).toBe(false);
-  });
-
-  it('activo retorna true para codigos existentes (no hay flag en constante legacy)', () => {
+  it('activo retorna true para cualquier codigo (shim no-op)', () => {
     const f = new CatalogoLegacy();
     expect(f.activo('RECONEXION')).toBe(true);
-    expect(f.activo('INVENTADO')).toBe(false);
+    expect(f.activo('INVENTADO')).toBe(true);
   });
 });
 
@@ -70,8 +68,6 @@ describe('CatalogoMapa', () => {
   });
 
   it('activo retorna true solo cuando existe Y activo=true', () => {
-    // Dos codigos distintos: uno activo, otro inactivo. El test verifica
-    // que `activo` los diferencia por separado.
     const f = CatalogoMapa.desdeLista([RECONEXION_ACTIVO, FINANCIACION_INACTIVO]);
     expect(f.activo('RECONEXION')).toBe(true);
     expect(f.activo('FINANCIACION')).toBe(false);
@@ -111,13 +107,10 @@ describe('CatalogoMapa', () => {
       createdAt: '2026-07-29T00:00:00.000Z',
     }));
     const f = CatalogoMapa.desdeLista(conceptosGrandes);
-    // Lookup de conceptos conocidos: presente + activo
     expect(f.existe('CONCEPTO_001')).toBe(true);
     expect(f.activo('CONCEPTO_001')).toBe(true);
-    // Inactivo (id divisible por 7): presente pero no activo
     expect(f.existe('CONCEPTO_007')).toBe(true);
     expect(f.activo('CONCEPTO_007')).toBe(false);
-    // Ausente
     expect(f.existe('CONCEPTO_999')).toBe(false);
   });
 });
@@ -128,23 +121,15 @@ describe('validarOtrosValores', () => {
     expect(() => validarOtrosValores([], f)).not.toThrow();
   });
 
-  it('no lanza si todos los codigos existen en CatalogoLegacy', () => {
-    const f = new CatalogoLegacy();
-    const ovs: OtroValor[] = [
-      { concepto: 'RECONEXION', valor: 1000 },
-      { concepto: 'SALDO_ANTERIOR', valor: 5000 },
-    ];
-    expect(() => validarOtrosValores(ovs, f)).not.toThrow();
-  });
-
-  it('lanza CONCEPTO_NO_AUTORIZADO si algun codigo no existe en CatalogoLegacy', () => {
+  it('no lanza con CatalogoLegacy (shim no-op acepta todo)', () => {
+    // Tras Task 5, CatalogoLegacy es shim — emitirFacturaSync
+    // delega a este helper y NO valida. La validacion ocurre
+    // exclusivamente en el path async con catalogoRepo.
     const f = new CatalogoLegacy();
     const ovs: OtroValor[] = [
       { concepto: 'INVENTADO' as OtroValor['concepto'], valor: 1000 },
     ];
-    expect(() => validarOtrosValores(ovs, f)).toThrow(
-      MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO,
-    );
+    expect(() => validarOtrosValores(ovs, f)).not.toThrow();
   });
 
   it('lanza CONCEPTO_NO_AUTORIZADO si CatalogoMapa reporta inactivo', () => {
@@ -157,13 +142,23 @@ describe('validarOtrosValores', () => {
     );
   });
 
+  it('lanza CONCEPTO_NO_AUTORIZADO si CatalogoMapa reporta ausente', () => {
+    const f = CatalogoMapa.desdeLista([RECONEXION_ACTIVO]);
+    const ovs: OtroValor[] = [
+      { concepto: 'INVENTADO' as OtroValor['concepto'], valor: 1000 },
+    ];
+    expect(() => validarOtrosValores(ovs, f)).toThrow(
+      MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO,
+    );
+  });
+
   it('normaliza codigos a UPPER-CASE antes de consultar', () => {
-    const f = new CatalogoLegacy();
+    const f = CatalogoMapa.desdeLista([RECONEXION_ACTIVO]);
     const ovs: OtroValor[] = [
       { concepto: 'reconexion' as OtroValor['concepto'], valor: 1000 },
     ];
-    // El constante tiene 'RECONEXION' (upper). El input trae 'reconexion'
-    // (lower). El helper normaliza → acepta.
+    // El Map tiene 'RECONEXION'. El input trae 'reconexion'.
+    // El helper normaliza → acepta.
     expect(() => validarOtrosValores(ovs, f)).not.toThrow();
   });
 

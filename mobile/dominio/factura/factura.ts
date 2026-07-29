@@ -300,9 +300,36 @@ export function emitirFactura(
 }
 
 /**
- * Path sync (legacy): emite Factura usando `OtrosValoresCatalogo` constante
- * como fuente de verdad para validacion de catalogo. Backward-compatible
- * con todos los callers que invocan emitirFactura(input, hasher, ...).
+ * Path sync (legacy): emite Factura SIN validar contra catalogo.
+ * Delega a `validarOtrosValores()` con `CatalogoLegacy`, que es un
+ * shim no-op (acepta todos los codigos) despues del phase-out de
+ * `OtrosValoresCatalogo` (Task 5 de `factura-compliance-cleanup`).
+ *
+ * ## Semantica "trust the caller"
+ *
+ * El path sync ya NO valida que los codigos de `otrosValores`
+ * existan en el catalogo regulatorio. La validacion es responsabilidad
+ * del caller — generalmente la UI (`OtrosValoresFactura.tsx`) filtra
+ * los conceptos disponibles antes de invocar `emitirFactura`. Si el
+ * caller quiere enforcement regulatorio, DEBE usar el path async
+ * pasando `catalogoRepo` (que invoca `emitirFacturaAsync` y delega
+ * a este sync al final).
+ *
+ * ## Por que
+ *
+ * Antes del phase-out, `emitirFacturaSync` validaba contra la
+ * constante hardcoded `OtrosValoresCatalogo` (7 conceptos). Esa
+ * constante quedo obsoleta cuando el catalogo migro a la tabla
+ * SQLite `concepto_otro_valor` (versionada, regulatoriamente
+ * auditable). Mantener la validacion contra la constante significaba
+ * duplicar la verdad: la constante hardcoded divergiria inevitablemente
+ * de la version regulatoria vigente.
+ *
+ * La unica fuente de verdad es ahora la tabla SQLite. El path sync
+ * se preserva para compatibilidad con tests puros y herramientas
+ * offline que no tienen bootstrap. Tests que simulan inputs
+ * "invalidos" (codigo desconocido) deben usar el path async con un
+ * repo poblado.
  */
 function emitirFacturaSync(
   input: EmitirFacturaInput,

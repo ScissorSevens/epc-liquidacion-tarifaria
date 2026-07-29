@@ -40,7 +40,6 @@
  */
 
 import type { ConceptoOtroValor } from '../concepto-otro-valor';
-import { OtrosValoresCatalogo } from './otros-valores-catalogo';
 import { MENSAJES_ERROR_FACTURA, type OtroValor } from './types';
 
 /**
@@ -60,21 +59,32 @@ export interface CatalogoFuente {
 }
 
 /**
- * Wrap a la constante legacy `OtrosValoresCatalogo`. Acepta todos los
- * 7 codigos del constante hardcoded. NO consulta `activo` — la
- * constante no tiene ese campo (es siempre "activo" por construccion).
+ * `CatalogoLegacy` (phase-out): acepta TODOS los codigos sin validar.
  *
- * Mantiene paridad 1:1 con el comportamiento previo de
- * `emitirFacturaSync` antes de este refactor.
+ * Tras el phase-out de `OtrosValoresCatalogo` (Task 5 de
+ * `factura-compliance-cleanup`), esta clase es un shim no-op: NO
+ * consulta ninguna constante ni hace lookup. Sirve como "fuente
+ * permisiva" para `emitirFacturaSync`, que adopta la semantica
+ * "trust the caller" — si el caller construyo el `OtroValor`
+ * via UI, asume que la seleccion fue correcta.
+ *
+ * La validacion regulatoria REAL ocurre exclusivamente en la ruta
+ * async (`emitirFacturaAsync` con `catalogoRepo` inyectado), que usa
+ * `CatalogoMapa` y rechaza codigos inexistentes o inactivos.
+ *
+ * Antes de Task 5, esta clase validaba contra la constante
+ * hardcoded `OtrosValoresCatalogo`. Esa constante ya no existe; el
+ * dominio regulatorio migro a la tabla SQLite `concepto_otro_valor`
+ * con `version = '1038-2026-v1'`.
  */
 export class CatalogoLegacy implements CatalogoFuente {
-  existe(codigo: string): boolean {
-    return codigo in OtrosValoresCatalogo;
+  existe(_codigo: string): boolean {
+    // Acepta todo: la responsabilidad de filtrar codigos es del caller
+    // (UI + emitFacturaAsync con catalogoRepo).
+    return true;
   }
-  activo(codigo: string): boolean {
-    // La constante legacy no tiene flag `activo`: si existe, se considera
-    // utilizable. Esto preserva el comportamiento legacy.
-    return this.existe(codigo);
+  activo(_codigo: string): boolean {
+    return true;
   }
 }
 

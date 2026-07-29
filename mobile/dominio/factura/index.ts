@@ -38,7 +38,9 @@ export type {
   ConceptoOtroValor,
   OtroValor,
 } from './types';
-export { extraerSnapshotLectura, crearOtroValor, OtrosValoresCatalogo } from './types';
+export { extraerSnapshotLectura } from './types';
+// `OtrosValoresCatalogo` y `crearOtroValor` removidos en
+// `factura-compliance-cleanup` Task 5.
 export { MENSAJES_ERROR_FACTURA } from './types';
 export { crearBootstrapFacturaSqlite } from './bootstrap';
 export type {

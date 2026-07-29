@@ -18,7 +18,11 @@ import { nullIfEmpty } from '../shared/strings';
 import type { ConceptoOtroValor, OtroValor } from './otros-valores-catalogo';
 
 export type { ConceptoOtroValor, OtroValor } from './otros-valores-catalogo';
-export { crearOtroValor, OtrosValoresCatalogo } from './otros-valores-catalogo';
+// `OtrosValoresCatalogo` y `crearOtroValor` fueron removidos en
+// `factura-compliance-cleanup` Task 5 (phase-out del constante legacy).
+// El catalogo regulatorio vive en la tabla SQLite `concepto_otro_valor`.
+// Para construir un `OtroValor` en tests/UI, instanciar el type directo:
+//   { concepto: 'RECONEXION', valor: 1000 }
 
 export type EstadoFactura = 'BORRADOR' | 'EMITIDA' | 'PAGADA' | 'ANULADA';
 

@@ -24,7 +24,8 @@ import { emitirFactura, calcularTotalFactura } from '../../dominio/factura/factu
 import { emitirFacturaConRepo } from '../../dominio/factura/factura-con-repo';
 import { calcularHash } from '../../dominio/calculo/calculo';
 import { crearFacturaRepositoryInMemory } from '../../dominio/factura/__tests__/factura-repository-in-memory';
-import { crearOtroValor } from '../../dominio/factura/otros-valores-catalogo';
+// `crearOtroValor` removido en `factura-compliance-cleanup` Task 5.
+// Tests ahora construyen `OtroValor` directamente.
 import type { EmitirFacturaInput, Factura } from '../../dominio/factura/types';
 import type { Liquidacion } from '../../dominio/calculo/types';
 import type { Suscriptor } from '../../dominio/suscriptores/types';
@@ -253,8 +254,8 @@ describe('wire bootstrap + liquidarLectura + emitirFactura', () => {
     const bootstrap = crearBootstrapFacturaSqlite({ dbPath });
     try {
       const otrosValores = [
-        crearOtroValor('RECONEXION', 50000),
-        crearOtroValor('INTERESES_AUTORIZADOS', 5000, 'Res 825 art.14'),
+        { concepto: 'RECONEXION' as const, valor: 50000 },
+        { concepto: 'INTERESES_AUTORIZADOS' as const, valor: 5000, glosa: 'Res 825 art.14' },
       ];
       const input = inputBase({ otrosValores, saldoAnterior: 15000 });
       const factura = await emitirFacturaConRepo(input, bootstrap.repository, hasher, idGen);
@@ -336,7 +337,7 @@ describe('wire bootstrap + liquidarLectura + emitirFactura', () => {
     const input = inputBase({
       prestador: prestadorBase(),
       lectura: lecturaBase(),
-      otrosValores: [crearOtroValor('RECONEXION', 50000)],
+      otrosValores: [{ concepto: 'RECONEXION' as const, valor: 50000 }],
       saldoAnterior: 15000,
     });
     const factura = await emitirFacturaConRepo(input, repo, hasher, idGen);

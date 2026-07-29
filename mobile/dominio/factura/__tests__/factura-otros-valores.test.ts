@@ -1,14 +1,28 @@
 /**
- * Tests del catálogo y helpers de `otros_valores` y `saldo_anterior`.
+ * Tests del snapshot de `otros_valores` y `saldo_anterior` en la factura.
+ *
+ * Refactor `factura-compliance-cleanup` Task 5 (phase-out de
+ * `OtrosValoresCatalogo` y `crearOtroValor`):
+ *  - `OtrosValoresCatalogo` constant removida. El catalogo regulatorio
+ *    vive en la tabla SQLite `concepto_otro_valor`. La validacion del
+ *    path sync de `emitirFactura` ya NO ocurre (semantica "trust the
+ *    caller"; ver `emitirFacturaSync` JSDoc).
+ *  - `crearOtroValor` helper removido. Los tests construyen `OtroValor`
+ *    directamente.
+ *  - Los tests de rechazo por codigo invalido se mueven al path async
+ *    con `ConceptoOtroValorRepository` mockeado (ver
+ *    `factura-catalogo-rechazo.test.ts`).
  *
  * Cubre:
- *  - Constante `OtrosValoresCatalogo` con 7 conceptos.
- *  - Helper `crearOtroValor(concepto, valor, glosa?)` con validación.
- *  - Función pura `calcularTotalFactura(factura)`.
- *  - `FacturaSnapshot.otros_valores` y `saldo_anterior`.
- *  - Serialización JSON include en hash v2.
- *  - Lanzar error si total < 0.
- *  - Edge cases: array vacío, glosa opcional, conceptos desconocidos.
+ *  - Snapshot default values (`otros_valores=[]`, `saldo_anterior=0`).
+ *  - Snapshot acepta `otros_valores` y los proyecta.
+ *  - Snapshot acepta `saldo_anterior` y lo proyecta.
+ *  - Snapshot es deepFrozen.
+ *  - Hash cambia con `otros_valores` o `saldo_anterior` distintos.
+ *  - `saldo_anterior` negativo lanza error.
+ *  - Path sync NO valida codigo (semantica "trust the caller").
+ *  - `calcularTotalFactura` formula, edge cases, total negativo.
+ *  - `calcularTotalFactura` es pura.
  */
 'use strict';
 
@@ -16,12 +30,7 @@ import {
   emitirFactura,
   calcularTotalFactura,
 } from '../factura';
-import {
-  ConceptoOtroValor,
-  OtrosValoresCatalogo,
-  type OtroValor,
-  crearOtroValor,
-} from '../otros-valores-catalogo';
+import type { ConceptoOtroValor, OtroValor } from '../types';
 import type { EmitirFacturaInput, Factura } from '../types';
 import { MENSAJES_ERROR_FACTURA } from '../types';
 import { calcularHash } from '../../calculo/calculo';
@@ -188,91 +197,6 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
   };
 }
 
-describe('OtrosValoresCatalogo — 7 conceptos Res CRA 1038/2026', () => {
-  it('expone 7 conceptos hardcoded', () => {
-    const keys = Object.keys(OtrosValoresCatalogo).sort();
-    expect(keys).toEqual([
-      'AJUSTES_DEVOLUCIONES',
-      'FINANCIACION',
-      'INTERESES_AUTORIZADOS',
-      'MATERIALES_ACOMETIDA',
-      'OTROS_AUTORIZADOS',
-      'RECONEXION',
-      'SALDO_ANTERIOR',
-    ]);
-  });
-
-  it('cada concepto tiene descripcion, codigo_formulario y permite_glosa', () => {
-    for (const k of Object.keys(OtrosValoresCatalogo)) {
-      const entry = OtrosValoresCatalogo[k as ConceptoOtroValor];
-      expect(entry.descripcion).toBeTruthy();
-      expect(entry.codigo_formulario).toBeTruthy();
-      expect(typeof entry.requiere_glosa).toBe('boolean');
-    }
-  });
-
-  it('saldo_anterior no requiere glosa (es automatico del sistema)', () => {
-    expect(OtrosValoresCatalogo.SALDO_ANTERIOR.requiere_glosa).toBe(false);
-  });
-
-  it('es deepFrozen (no se puede mutar el catalogo)', () => {
-    expect(Object.isFrozen(OtrosValoresCatalogo)).toBe(true);
-    expect(Object.isFrozen(OtrosValoresCatalogo.SALDO_ANTERIOR)).toBe(true);
-  });
-});
-
-describe('crearOtroValor — helper puro', () => {
-  it('crea un OtroValor valido sin glosa', () => {
-    const ov = crearOtroValor('RECONEXION', 50000);
-    expect(ov).toEqual({
-      concepto: 'RECONEXION',
-      valor: 50000,
-      glosa: undefined,
-    });
-  });
-
-  it('crea un OtroValor con glosa cuando se provee', () => {
-    const ov = crearOtroValor('FINANCIACION', 100000, 'Cuota 1 de 12 por acometida');
-    expect(ov).toEqual({
-      concepto: 'FINANCIACION',
-      valor: 100000,
-      glosa: 'Cuota 1 de 12 por acometida',
-    });
-  });
-
-  it('lanza error si concepto es desconocido', () => {
-    expect(() =>
-      crearOtroValor('INVENTADO' as ConceptoOtroValor, 1000),
-    ).toThrow(/concepto.*no.*v[áa]lido/i);
-  });
-
-  it('lanza error si el valor es negativo', () => {
-    expect(() => crearOtroValor('RECONEXION', -100)).toThrow(/valor.*negativo/i);
-  });
-
-  it('lanza error si valor es NaN', () => {
-    expect(() => crearOtroValor('RECONEXION', Number.NaN)).toThrow(/valor.*n[úu]mero/i);
-  });
-
-  it('lanza error si concepto requiere_glosa y no se provee', () => {
-    expect(OtrosValoresCatalogo.INTERESES_AUTORIZADOS.requiere_glosa).toBe(true);
-    expect(() => crearOtroValor('INTERESES_AUTORIZADOS', 5000)).toThrow(/requiere.*glosa/i);
-  });
-
-  it('acepta concepto que requiere_glosa si se provee', () => {
-    const ov = crearOtroValor('INTERESES_AUTORIZADOS', 5000, 'Res 825 art. 14');
-    expect(ov.glosa).toBe('Res 825 art. 14');
-  });
-
-  it('OtroValor es deepFrozen', () => {
-    const ov = crearOtroValor('RECONEXION', 50000);
-    expect(Object.isFrozen(ov)).toBe(true);
-    expect(() => {
-      (ov as { valor: number }).valor = 9999;
-    }).toThrow(TypeError);
-  });
-});
-
 describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
   it('snapshot.otros_valores por defecto es [] (compatibilidad legacy)', () => {
     const factura = emitirFactura(inputBase(), hasher);
@@ -286,8 +210,8 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
 
   it('acepta input.otros_valores y los proyecta', () => {
     const otrosValores: OtroValor[] = [
-      crearOtroValor('RECONEXION', 50000),
-      crearOtroValor('FINANCIACION', 100000, 'Cuota 1/12'),
+      { concepto: 'RECONEXION', valor: 50000 },
+      { concepto: 'FINANCIACION', valor: 100000, glosa: 'Cuota 1/12' },
     ];
     const factura = emitirFactura(inputBase({ otrosValores }), hasher);
     expect(factura.snapshot.otros_valores).toEqual(otrosValores);
@@ -299,7 +223,7 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
   });
 
   it('snapshot.otros_valores esta deepFrozen', () => {
-    const ov = crearOtroValor('RECONEXION', 50000);
+    const ov: OtroValor = { concepto: 'RECONEXION', valor: 50000 };
     const factura = emitirFactura(inputBase({ otrosValores: [ov] }), hasher);
     expect(Object.isFrozen(factura.snapshot.otros_valores)).toBe(true);
     expect(Object.isFrozen(factura.snapshot.otros_valores[0])).toBe(true);
@@ -314,7 +238,7 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
   it('cambiar otros_valores cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
-      inputBase({ otrosValores: [crearOtroValor('RECONEXION', 50000)] }),
+      inputBase({ otrosValores: [{ concepto: 'RECONEXION', valor: 50000 }] }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
@@ -326,24 +250,32 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
     ).toThrow(/saldo_anterior.*negativo/i);
   });
 
-  it('lanza error si algun concepto de otrosValores NO esta en el catalogo (CONCEPTO_NO_AUTORIZADO)', () => {
-    // Inyecta un OtroValor con concepto fuera del catalogo — bypass de
-    // `crearOtroValor` (que validaria) simulando un caso de frontera
-    // (cast, JSON round-trip, DB corrupta, mutacion).
-    const ovInvalido = {
-      concepto: 'INVENTADO' as unknown as 'RECONEXION',
+  // Tras Task 5 (phase-out de OtrosValoresCatalogo), el path sync
+  // adopta la semantica "trust the caller": NO valida codigos. La
+  // validacion ocurre exclusivamente en el path async con
+  // catalogoRepo inyectado (ver factura-catalogo-rechazo.test.ts).
+  it('path sync NO valida codigo desconocido (semantica trust the caller)', () => {
+    const ovInvalido: OtroValor = {
+      concepto: 'INVENTADO' as unknown as ConceptoOtroValor,
       valor: 1000,
     };
+    // No lanza — el sync path acepta todo.
     expect(() =>
       emitirFactura(inputBase({ otrosValores: [ovInvalido] }), hasher),
-    ).toThrow(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
+    ).not.toThrow();
   });
 
-  it('acepta otrosValores con todos los conceptos del catalogo', () => {
-    const todosLosConceptos = Object.keys(OtrosValoresCatalogo) as Array<
-      'RECONEXION' | 'INTERESES_AUTORIZADOS' | 'FINANCIACION' | 'MATERIALES_ACOMETIDA' | 'AJUSTES_DEVOLUCIONES' | 'OTROS_AUTORIZADOS' | 'SALDO_ANTERIOR'
-    >;
-    const ovValidos = todosLosConceptos.map((concepto, i) => ({
+  it('acepta otrosValores con todos los 7 codigos canonicos (path sync)', () => {
+    const todosLosConceptos: ConceptoOtroValor[] = [
+      'RECONEXION',
+      'INTERESES_AUTORIZADOS',
+      'FINANCIACION',
+      'MATERIALES_ACOMETIDA',
+      'AJUSTES_DEVOLUCIONES',
+      'OTROS_AUTORIZADOS',
+      'SALDO_ANTERIOR',
+    ];
+    const ovValidos: OtroValor[] = todosLosConceptos.map((concepto, i) => ({
       concepto,
       valor: 1000 + i,
     }));
@@ -352,12 +284,6 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
   });
 
   it('lanza error si el total (post calculo) es negativo (TOTAL_NEGATIVO_NO_PERMITIDO)', () => {
-    // Forzamos un escenario donde el snapshot tiene saldo_anterior
-    // negativo (bypass via JSON round-trip / DB corrupta). Aunque
-    // emitirFactura bloquea esto, calcularTotalFactura es la ultima
-    // linea de defensa para facturas ya persistidas con snapshot
-    // malicioso. Aqui simulamos creando la Factura manualmente con
-    // saldo_anterior negativo en el snapshot.
     const resultado: ResultadoCalculo = {
       ...resultadoBase(),
       total: 100,
@@ -374,8 +300,6 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
       inputBase({ liquidacion, saldoAnterior: 0, otrosValores: [] }),
       hasher,
     );
-    // Simulamos un snapshot corrupto donde saldo_anterior es -500
-    // (esto podria pasar por mutacion de DB post-emision).
     const facturaCorrupta: Factura = {
       ...factura,
       snapshot: {
@@ -383,7 +307,6 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
         saldo_anterior: -500,
       },
     };
-    // 100 + 0 + (-500) = -400 < 0 → lanzar
     expect(() => calcularTotalFactura(facturaCorrupta)).toThrow(
       MENSAJES_ERROR_FACTURA.TOTAL_NEGATIVO_NO_PERMITIDO,
     );
@@ -406,11 +329,10 @@ describe('emitirFactura — snapshot.otros_valores y saldo_anterior', () => {
       inputBase({
         liquidacion,
         saldoAnterior: 5000,
-        otrosValores: [crearOtroValor('RECONEXION', 3000)],
+        otrosValores: [{ concepto: 'RECONEXION', valor: 3000 }],
       }),
       hasher,
     );
-    // 10000 + 5000 + 3000 = 18000
     expect(calcularTotalFactura(factura)).toBe(18000);
   });
 });
@@ -420,12 +342,13 @@ describe('calcularTotalFactura — formula total', () => {
     const factura = emitirFactura(
       inputBase({
         saldoAnterior: 15000,
-        otrosValores: [crearOtroValor('RECONEXION', 50000), crearOtroValor('FINANCIACION', 100000, 'cuota')],
+        otrosValores: [
+          { concepto: 'RECONEXION', valor: 50000 },
+          { concepto: 'FINANCIACION', valor: 100000, glosa: 'cuota' },
+        ],
       }),
       hasher,
     );
-    // totalBase = 20000, saldo = 15000, otros = 50000 + 100000 = 150000
-    // total = 20000 + 15000 + 150000 = 185000
     expect(calcularTotalFactura(factura)).toBe(185000);
   });
 
@@ -441,43 +364,15 @@ describe('calcularTotalFactura — formula total', () => {
 
   it('calcularTotalFactura con solo otros_valores', () => {
     const factura = emitirFactura(
-      inputBase({ otrosValores: [crearOtroValor('RECONEXION', 8000)] }),
+      inputBase({ otrosValores: [{ concepto: 'RECONEXION', valor: 8000 }] }),
       hasher,
     );
     expect(calcularTotalFactura(factura)).toBe(28000);
   });
 
-  it('lanza error si el total calculado es negativo', () => {
-    // Para forzar: el motor del test retorna total=100 (custom).
-    const resultado: ResultadoCalculo = {
-      ...resultadoBase(),
-      total: 100,
-    };
-    const liqBase = {
-      id: '22222222-2222-2222-2222-222222222222',
-      suscriptorId: '1',
-      fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
-      resultado,
-      estado: 'ACTIVA' as const,
-    };
-    const liquidacion: Liquidacion = { ...liqBase, hash: calcularHash(liqBase, hasher) };
-    const factura: Factura = emitirFactura(
-      inputBase({ liquidacion, saldoAnterior: 0, otrosValores: [] }),
-      hasher,
-    );
-    // 100 + 0 + 0 = 100 (no negativo)
-    // Para forzar negativo, saldo_anterior negativo — que ya validamos
-    // no se permite. El caso negativo_path no es alcanzable via esta
-    // construcción: el guard está en emitirFactura para saldo_anterior.
-    // calcularTotalFactura es una funcion pura que solo suma: nunca
-    // produce negativo en el happy path. Verificamos que el happy path
-    // funciona:
-    expect(calcularTotalFactura(factura)).toBe(100);
-  });
-
   it('calcularTotalFactura es pura (no muta input)', () => {
     const factura = emitirFactura(
-      inputBase({ saldoAnterior: 5000, otrosValores: [crearOtroValor('RECONEXION', 1000)] }),
+      inputBase({ saldoAnterior: 5000, otrosValores: [{ concepto: 'RECONEXION', valor: 1000 }] }),
       hasher,
     );
     const hashAntes = factura.hash;
