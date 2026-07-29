@@ -106,7 +106,7 @@ export function extraerSnapshotPrestador(prestador: Prestador): FacturaSnapshotP
  * verificables con el snapshot extendido.
  *
  * Exportado para que callers verifiquen integridad post-corrección
- * (ej: `verificarIntegridad(factura)` o tests de coherencia).
+ * (ej: `verificarIntegridadFactura(factura, hasher)` o tests de coherencia).
  */
 export function calcularHashFactura(
   snapshot: FacturaSnapshot,
@@ -133,6 +133,87 @@ export function calcularHashFactura(
     },
   });
   return hasher.sha256(payload);
+}
+
+/**
+ * Calcula el hash canonico v1 (retrocompatible con facturas historicas).
+ *
+ * v1 NO incluye `prestador` (no existia el campo), ni `metadata`
+ * (no existia). Es la firma de las facturas emitidas antes del change
+ * `factura-compliance-fase1`. Esta funcion existe SOLO para que
+ * `verificarIntegridadFactura` pueda validar facturas v1 sin
+ * recalcularlas con v2 (invalidaria su firma).
+ */
+function calcularHashFacturaV1(
+  snapshotV1: {
+    readonly suscriptor: unknown;
+    readonly medidor: unknown;
+    readonly periodo: unknown;
+    readonly operario: unknown;
+    readonly lectura: unknown;
+    readonly liquidacion: unknown;
+    readonly consumosHistoricos: unknown;
+  },
+  numeroFactura: string,
+  fechaEmision: string,
+  hasher: Hasher,
+): string {
+  const payload = JSON.stringify({
+    numero_factura: numeroFactura,
+    fecha_emision: fechaEmision,
+    snapshot: snapshotV1,
+  });
+  return hasher.sha256(payload);
+}
+
+/**
+ * Verifica la integridad de una factura comparando su hash contra el
+ * hash canonico recalculado.
+ *
+ * Detecta la version por `snapshot.metadata.hash_version`:
+ *  - `v2`: payload extendido (incluye prestador, otros_valores, etc).
+ *  - `v1`: payload retrocompatible (sin prestador, sin metadata).
+ *
+ * Compatibilidad: facturas v1 existentes (sin prestador en el snapshot)
+ * se verifican correctamente con su firma original. NO se invalidan.
+ *
+ * Retorna `true` si el hash coincide (factura integra), `false` si
+ * fue alterada (cualquier campo cambio desde la emision).
+ *
+ * Exportado para que orquestadores y auditors verifiquen integridad
+ * post-correccion o post-sincronizacion con backend.
+ */
+export function verificarIntegridadFactura(factura: Factura, hasher: Hasher): boolean {
+  const version = factura.snapshot.metadata.hash_version;
+  if (version === 'v1') {
+    // Snapshot v1: extraemos solo las claves conocidas. Si el snapshot
+    // tiene `metadata` y `prestador`, los descartamos para verificar
+    // con el algoritmo v1 puro.
+    const snapV1 = {
+      suscriptor: factura.snapshot.suscriptor,
+      medidor: factura.snapshot.medidor,
+      periodo: factura.snapshot.periodo,
+      operario: factura.snapshot.operario,
+      lectura: factura.snapshot.lectura,
+      liquidacion: factura.snapshot.liquidacion,
+      consumosHistoricos: factura.snapshot.consumosHistoricos,
+    };
+    const esperado = calcularHashFacturaV1(
+      snapV1,
+      factura.numero_factura,
+      factura.fecha_emision,
+      hasher,
+    );
+    return factura.hash === esperado;
+  }
+  // v2 (default): payload extendido
+  const esperado = calcularHashFactura(
+    factura.snapshot,
+    factura.numero_factura,
+    factura.fecha_emision,
+    hasher,
+  );
+  return factura.hash === esperado;
 }
 
 export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher, idGen?: IdGenerator): Factura {
