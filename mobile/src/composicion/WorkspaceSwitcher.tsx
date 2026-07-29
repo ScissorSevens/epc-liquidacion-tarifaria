@@ -1,5 +1,5 @@
 /**
- * Componente selector de prestador activo.
+ * Componente selector de prestador en uso.
  *
  * Se muestra en el header de navegación. Solo visible si hay más de un
  * prestador disponible (operario multi-prestador).

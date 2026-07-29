@@ -76,7 +76,7 @@ export default function AcuerdoMunicipalForm({
     return () => { cancelado = true; };
   }, [repo]);
 
-  // Cargar acuerdo vigente para el prestador activo (una sola vez por id_prestador).
+  // Cargar acuerdo vigente para el prestador en uso (una sola vez por id_prestador).
   useEffect(() => {
     if (id_prestador <= 0 || repo === null) return;
     let cancelado = false;

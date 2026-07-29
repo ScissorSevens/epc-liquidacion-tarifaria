@@ -401,7 +401,7 @@ describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () =>
   });
 
   /**
-   * T-MP-DATA-7 — Sección "Prestador activo" muestra el nombre REAL
+   * T-MP-DATA-7 — Sección "Prestador actual" muestra el nombre REAL
    * del prestador desde `useWorkspace.prestador`. Si el store aún no
    * fue poblado (caso edge: MiPerfil abre antes que el WorkspaceSwitcher),
    * muestra "—" en vez de inventar un nombre.
@@ -432,7 +432,7 @@ describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () =>
 
   /**
    * T-MP-DATA-8 — Si useWorkspace.prestador es null (caso edge: store
-   * sin poblar), la sección "Prestador activo" muestra "—".
+   * sin poblar), la sección "Prestador actual" muestra "—".
    */
   it('T-MP-DATA-8 sin prestador en store, muestra placeholder "—"', async () => {
     // Mock default: prestador: null (no tocar)

@@ -32,7 +32,7 @@ type Props = InicioStackScreenProps<'RutaDeHoy'>;
  * Pantalla INICIO — muestra la ruta de lecturas del día.
  *
  * Identidad del prestador (Opción A + B):
- *   - TopBar recibe el nombre del prestador activo como subtitulo.
+ *   - TopBar recibe el nombre del prestador en uso como subtitulo.
  *   - Banner de identidad con NIT, segmento, total suscriptores y %
  *     capturado del mes — acerca al operario al prestador con el que
  *     trabaja (no una lista genérica de "suscriptores").
@@ -60,7 +60,7 @@ export default function RutaDeHoy({ navigation }: Props) {
   const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const prestador = useWorkspace((s) => s.prestador);
 
-  // ── Carga lazy del prestador activo (fix bug) ─────────────────────────────
+  // ── Carga lazy del prestador en uso (fix bug) ─────────────────────────────
   // En cold-boot, `useWorkspace.setSesionCompleta(sesion)` setea
   // `id_prestador_activo` pero NO el objeto `prestador` (queda null).
   // Si llegamos acá con `prestador === null` pero `id_prestador_activo !== 0`,
@@ -203,7 +203,7 @@ export default function RutaDeHoy({ navigation }: Props) {
 
   // ── Identidad del prestador (TopBar subtitulo + banner Nequi) ────────────
   // TopBar subtitulo: pasamos null si no hay prestador, así NO cae en el
-  // fallback histórico "Sin prestador activo" — el TopBar simplemente no
+  // fallback histórico "Sin prestador asignado" — el TopBar simplemente no
   // renderiza la segunda línea.
   const prestadorSubtitulo = prestador
     ? `${prestador.nombre} · ${prestador.municipio}`
@@ -216,7 +216,7 @@ export default function RutaDeHoy({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* TopAppBar — subtitulo: nombre del prestador activo. */}
+      {/* TopAppBar — subtitulo: nombre del prestador en uso. */}
       <TopBar
         titulo="Ruta de hoy"
         subtitulo={prestadorSubtitulo}
@@ -235,9 +235,9 @@ export default function RutaDeHoy({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Banner de identidad (estilo Nequi) o estado vacío con CTA.
-            Si NO hay prestador activo (id=0, repo=null, etc.), mostramos un
+            Si NO hay prestador en uso (id=0, repo=null, etc.), mostramos un
             card claro con CTA "Configurar prestador" en vez del fallback
-            histórico "Sin prestador activo". */}
+            histórico "Sin prestador asignado". */}
         {prestador ? (
           <View
             style={styles.identidadCard}
@@ -299,7 +299,7 @@ export default function RutaDeHoy({ navigation }: Props) {
           <View
             style={styles.identidadVaciaCard}
             accessibilityRole="alert"
-            accessibilityLabel="No hay prestador activo. Configurá uno para ver la ruta."
+            accessibilityLabel="No hay prestador asignado. Configurá uno para ver la ruta."
           >
             <View style={styles.identidadVaciaIconCircle}>
               <MaterialIcons name="storefront" size={26} color={COLORS.onSecondaryContainer} />
@@ -308,7 +308,7 @@ export default function RutaDeHoy({ navigation }: Props) {
               Configurá tu prestador
             </Text>
             <Text style={styles.identidadVaciaCopy}>
-              Necesitamos un prestador activo para mostrar la ruta de hoy y
+              Necesitamos un prestador en uso para mostrar la ruta de hoy y
               los suscriptores asignados.
             </Text>
             <BotonPrimario
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
 
-  // ── Estado vacío: sin prestador activo (CTA) ──────────────────────────────
+  // ── Estado vacío: sin prestador asignado (CTA) ──────────────────────────────
   // Mismo lenguaje visual (círculo decorativo + radio 20) que el banner de
   // identidad, pero con icono storefront y CTA primario.
   identidadVaciaCard: {

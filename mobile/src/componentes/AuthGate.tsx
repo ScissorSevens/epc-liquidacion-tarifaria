@@ -114,7 +114,7 @@ export function AuthGate() {
         //    "prestador configurado" — es solo compat. Filtramos:
         //    - si id=0 → legacy placeholder
         //    - si codigo='EPC-LEGACY' → legacy placeholder (defensa extra)
-        //    - si estado='suspendido' → no es un prestador activo para login
+        //    - si estado='suspendido' → no es un prestador válido para login
         const todosPrestadores = await bootstrap.repos.prestadorRepo.listar();
         if (cancelado) return;
 

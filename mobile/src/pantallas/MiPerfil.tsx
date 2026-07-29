@@ -458,8 +458,8 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           />
         </View>
 
-        {/* Prestador activo */}
-        <Text style={estilos.seccionTitulo}>Prestador activo</Text>
+        {/* Prestador actual */}
+        <Text style={estilos.seccionTitulo}>Prestador actual</Text>
         <View style={estilos.listaCard}>
           <FilaInfo
             etiqueta="Nombre"

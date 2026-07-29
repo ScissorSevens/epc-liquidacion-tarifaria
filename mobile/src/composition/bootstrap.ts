@@ -131,7 +131,7 @@ export interface BootstrapServices {
   readonly procesadorCola: () => Promise<ResultadoSync>;
   readonly smoke: ResultadoSmokeDominio;
   /**
-   * Resuelve el contexto multi-tenant del prestador activo:
+   * Resuelve el contexto multi-tenant del prestador en uso:
    * ParametrosTarifa + AcuerdoMunicipal vigentes. Usado por la UI
    * (CapturarLectura, ResultadoCalculo) y por la fase 6 (workspace).
    */

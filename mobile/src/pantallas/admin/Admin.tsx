@@ -82,7 +82,7 @@ export default function Admin({ navigation }: Props) {
   );
 
   /**
-   * Handler del WorkspaceSwitcher: cambia el prestador activo Y recarga
+   * Handler del WorkspaceSwitcher: cambia el prestador en uso Y recarga
    * el contexto tarifario (prestador, acuerdo_vigente, parametros_vigentes).
    *
    * COR-08 (reporte de calidad): el handler previo solo actualizaba

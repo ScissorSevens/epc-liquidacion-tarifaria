@@ -88,7 +88,7 @@ export default function ParametrosTarifaForm({
     return () => { cancelado = true; };
   }, [repo, acuerdoRepo]);
 
-  // Derivar id_acuerdo a partir del acuerdo vigente del prestador activo.
+  // Derivar id_acuerdo a partir del acuerdo vigente del prestador en uso.
   useEffect(() => {
     if (idAcuerdoProp !== undefined) return;
     if (acuerdoRepo === null || id_prestador <= 0) return;
@@ -102,7 +102,7 @@ export default function ParametrosTarifaForm({
     return () => { cancelado = true; };
   }, [acuerdoRepo, id_prestador, idAcuerdoProp]);
 
-  // Cargar parámetros tarifarios vigentes para el prestador activo.
+  // Cargar parámetros tarifarios vigentes para el prestador en uso.
   useEffect(() => {
     if (id_prestador <= 0 || repo === null) return;
     let cancelado = false;

@@ -333,8 +333,8 @@ describe('RutaDeHoy', () => {
     // El repo devuelve null (id huérfano o borrado).
     configurarBootstrap({ prestadorPorId: jest.fn().mockResolvedValue(null) });
     renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    // 1) NO debe quedar el fallback "Sin prestador activo" en ningún lado.
-    expect(screen.queryByText(/Sin prestador activo/i)).toBeNull();
+    // 1) NO debe quedar el fallback "Sin prestador (activo|asignado|en uso)" en ningún lado.
+    expect(screen.queryByText(/Sin prestador (activo|asignado|en uso)/i)).toBeNull();
     // 2) Debe haber un CTA claro de "Configurar prestador".
     //    Usamos string exact porque el boton se llama igual que el heading
     //    de la empty card ("Configurá tu prestador") NO matchea este text.
@@ -356,8 +356,8 @@ describe('RutaDeHoy', () => {
     const prestadorPorId = jest.fn().mockResolvedValue(null);
     configurarBootstrap({ prestadorPorId });
     renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
-    // Sin "Sin prestador activo" como subtítulo.
-    expect(screen.queryByText(/Sin prestador activo/i)).toBeNull();
+    // Sin "Sin prestador (activo|asignado|en uso)" como subtítulo.
+    expect(screen.queryByText(/Sin prestador (activo|asignado|en uso)/i)).toBeNull();
     // Con CTA claro (string exact).
     expect(await screen.findByText('Configurar prestador')).toBeTruthy();
     // Nunca llamamos al repo si id = 0 (cheapest branch).

@@ -2,7 +2,7 @@
  * Store Zustand para el workspace multi-tenant del operario.
  *
  * Permite al operario cambiar entre los prestadores rurales vinculados a EPC
- * (programa "Agua la Vereda"). El prestador activo persiste en AsyncStorage
+ * (programa "Agua la Vereda"). El prestador en uso persiste en AsyncStorage
  * para sobrevivir reinicios de la app.
  */
 import { create } from 'zustand';
@@ -37,7 +37,7 @@ interface WorkspaceState {
    */
   setParametrosVigentes: (p: ParametrosTarifa | null) => void;
   /**
-   * Cambia el prestador activo y recarga el contexto tarifario (COR-08).
+   * Cambia el prestador en uso y recarga el contexto tarifario (COR-08).
    *
    * Reemplaza al buggy `setIdPrestadorActivo()` previo que solo mutaba
    * `id_prestador_activo` pero dejaba `prestador`, `acuerdo_vigente` y
@@ -82,7 +82,7 @@ interface WorkspaceState {
    */
   setSesionCompleta: (sesion: Sesion) => Promise<void>;
   /**
-   * Resetea el workspace a estado "sin prestador activo" — usado en
+   * Resetea el workspace a estado "sin prestador asignado" — usado en
    * logout (futuro) y cuando se invalida la sesión defensivamente.
    *
    * NO toca `prestadores_disponibles`: ese campo es el catálogo de
