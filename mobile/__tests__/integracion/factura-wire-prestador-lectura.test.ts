@@ -219,9 +219,18 @@ describe('wire bootstrap + liquidarLectura + emitirFactura', () => {
       // referencia_pago, qr_pago.
       const facturaPura = emitirFactura(inputBase(), hasher, idGen);
       expect(facturaPura.codigo_verificacion).toBeDefined();
+      expect(facturaPura.codigo_verificacion).toHaveLength(10);
       expect(facturaPura.version_tarifa_aplicada).toBe('v825-2017-1.0');
-      expect(facturaPura.referencia_pago).toMatch(/^[0-9a-f-]{36}$/);
-      expect(facturaPura.qr_pago).toMatch(/^EPC\|/);
+      expect(facturaPura.referencia_pago).toMatch(/^.+-.+-.+-.{4}$/);
+      expect(facturaPura.qr_pago).toBeDefined();
+      // qr_pago es JSON parseable con 4 campos
+      const qrParsed = JSON.parse(facturaPura.qr_pago!) as Record<string, unknown>;
+      expect(Object.keys(qrParsed).sort()).toEqual([
+        'codigo_verificacion',
+        'fecha_emision',
+        'referencia_pago',
+        'valor_total',
+      ]);
       // Snapshot con prestador.
       expect(facturaPura.snapshot.prestador.id_prestador).toBe(1);
       expect(facturaPura.snapshot.prestador.nit).toBe('900123456-7');

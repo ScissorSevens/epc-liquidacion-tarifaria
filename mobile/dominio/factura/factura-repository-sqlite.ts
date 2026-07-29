@@ -110,8 +110,18 @@ function fromRow(row: FacturaRow): Factura {
 }
 
 function calcularCodigoVerificacionPlaceholder(hash: string): string {
-  if (hash.length >= 16) return hash.slice(0, 16);
-  return hash.padStart(16, '0');
+  // Espejo del helper en pagos.ts: filtra chars no-hex (compat con
+  // hasher fake en tests), convierte primeros 16 hex chars a base36,
+  // padStart a 10. En prod el hash es SHA-256 hex de 64 chars.
+  const hexOnly = (hash + '0'.repeat(16))
+    .split('')
+    .filter((ch) => /[0-9a-fA-F]/.test(ch))
+    .join('')
+    .slice(0, 16)
+    .padEnd(16, '0');
+  const valor = parseInt(hexOnly, 16);
+  const base36 = valor.toString(36).toUpperCase();
+  return base36.slice(0, 10).padStart(10, '0');
 }
 
 const SQL_INSERT = `

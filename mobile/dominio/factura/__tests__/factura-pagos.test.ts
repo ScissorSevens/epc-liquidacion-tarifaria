@@ -14,10 +14,13 @@
 
 import {
   emitirFactura,
+} from '../factura';
+import {
   calcularCodigoVerificacion,
   generarReferenciaPago,
   generarQrPago,
-} from '../factura';
+  esCodigoVerificacionValido,
+} from '../pagos';
 import type { EmitirFacturaInput, Factura } from '../types';
 import { calcularHash } from '../../calculo/calculo';
 import type { Liquidacion } from '../../calculo/types';
@@ -193,17 +196,20 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
 }
 
 describe('calcularCodigoVerificacion — helper puro', () => {
-  it('retorna string derivado del hash canónico', () => {
+  it('retorna string de 10 chars base36 derivado del hash canónico', () => {
     const factura = emitirFactura(inputBase(), hasher);
     const codigo = calcularCodigoVerificacion(factura);
-    // En produccion (SHA-256 hex = 64 chars) el codigo tiene 16 chars.
-    // En tests con hasher fake puede ser más corto. Validamos que es
-    // un prefijo del hash canonico.
-    expect(factura.hash.startsWith(codigo)).toBe(true);
-    expect(codigo.length).toBeGreaterThan(0);
+    expect(codigo).toHaveLength(10);
+    expect(esCodigoVerificacionValido(codigo)).toBe(true);
   });
 
-  it('misma factura produce mismo codigo (puro)', () => {
+  it('solo usa chars base36 (0-9, A-Z)', () => {
+    const factura = emitirFactura(inputBase(), hasher);
+    const codigo = calcularCodigoVerificacion(factura);
+    expect(codigo).toMatch(/^[0-9A-Z]{10}$/);
+  });
+
+  it('misma factura produce mismo codigo (puro y determinista)', () => {
     const factura = emitirFactura(inputBase(), hasher);
     const a = calcularCodigoVerificacion(factura);
     const b = calcularCodigoVerificacion(factura);
@@ -213,69 +219,136 @@ describe('calcularCodigoVerificacion — helper puro', () => {
   it('cambiar el hash de la factura cambia el codigo', () => {
     const factura = emitirFactura(inputBase(), hasher);
     const codigoOriginal = calcularCodigoVerificacion(factura);
-    const facturaModificada: Factura = { ...factura, hash: 'otro-hash-1234567890abcdef' };
+    const facturaModificada: Factura = { ...factura, hash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' };
     const codigoModificado = calcularCodigoVerificacion(facturaModificada);
     expect(codigoOriginal).not.toBe(codigoModificado);
   });
 
-  it('usa el hasher inyectado (no crypto real)', () => {
+  it('distinto prestador → distinto codigo', () => {
+    const prestador2: Prestador = { ...prestadorBase(), nombre: 'OTRO PRESTADOR' };
+    const a = emitirFactura(inputBase(), hasher);
+    const b = emitirFactura(inputBase({ prestador: prestador2 }), hasher);
+    expect(calcularCodigoVerificacion(a)).not.toBe(calcularCodigoVerificacion(b));
+  });
+
+  it('el codigo tiene siempre exactamente 10 chars (longitud normativa)', () => {
     const factura = emitirFactura(inputBase(), hasher);
     const codigo = calcularCodigoVerificacion(factura);
-    // determinista: usar mismo hasher produce mismo codigo
-    expect(codigo).toBe(calcularCodigoVerificacion(factura));
+    expect(codigo.length).toBe(10);
+    // Validar tambien con hash vacio (caso degenerado)
+    const codigoVacio = calcularCodigoVerificacion({ ...factura, hash: '' });
+    expect(codigoVacio.length).toBe(10);
   });
 });
 
-describe('generarReferenciaPago — helper puro', () => {
-  it('genera string formato UUID v4 (36 chars con guiones)', () => {
-    const ref = generarReferenciaPago(idGen);
-    expect(ref).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+describe('generarReferenciaPago — formato {prestador}-{periodo}-{consecutivo}-{checksum}', () => {
+  it('genera string con 4 segmentos separados por guion', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 42 }), hasher);
+    const ref = generarReferenciaPago(factura, 42, hasher);
+    expect(ref).toMatch(/^.+-.+-.+-.{4}$/);
   });
 
-  it('dos invocaciones generan referencias distintas', () => {
-    const a = generarReferenciaPago(idGen);
-    const b = generarReferenciaPago(idGen);
-    expect(a).not.toBe(b);
+  it('primer segmento es id_prestador (1 = EPC del test base)', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 7 }), hasher);
+    const ref = generarReferenciaPago(factura, 7, hasher);
+    expect(ref.split('-')[0]).toBe('1');
+  });
+
+  it('segundo segmento es id_periodo (202601 del periodo base)', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 1 }), hasher);
+    const ref = generarReferenciaPago(factura, 1, hasher);
+    expect(ref.split('-')[1]).toBe('202601');
+  });
+
+  it('tercer segmento es el consecutivo', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 99 }), hasher);
+    const ref = generarReferenciaPago(factura, 99, hasher);
+    expect(ref.split('-')[2]).toBe('99');
+  });
+
+  it('cuarto segmento es checksum 4 chars base36 derivado de SHA-256', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 1 }), hasher);
+    const ref = generarReferenciaPago(factura, 1, hasher);
+    const checksum = ref.split('-')[3];
+    expect(checksum).toMatch(/^[0-9A-Z]{4}$/);
+  });
+
+  it('mismo input produce misma referencia (determinista)', () => {
+    const a = emitirFactura(inputBase({ consecutivo: 1 }), hasher);
+    const b = emitirFactura(inputBase({ consecutivo: 1 }), hasher);
+    expect(generarReferenciaPago(a, 1, hasher)).toBe(generarReferenciaPago(b, 1, hasher));
+  });
+
+  it('distinto consecutivo → distinta referencia', () => {
+    const a = emitirFactura(inputBase({ consecutivo: 1 }), hasher);
+    const b = emitirFactura(inputBase({ consecutivo: 2 }), hasher);
+    expect(generarReferenciaPago(a, 1, hasher)).not.toBe(generarReferenciaPago(b, 2, hasher));
   });
 });
 
-describe('generarQrPago — helper puro', () => {
-  it('formato `${prefijo}|${referencia_pago}|${timestamp}`', () => {
-    const factura = emitirFactura(inputBase(), hasher);
-    const ref = generarReferenciaPago(idGen);
-    const timestamp = '2026-02-01T10:00:00.000Z';
-    const qr = generarQrPago(factura, ref, timestamp);
-    expect(qr).toBe(`EPC|${ref}|${timestamp}`);
+describe('generarQrPago — payload JSON con 4 campos', () => {
+  it('el resultado es JSON parseable', () => {
+    const factura = emitirFactura(inputBase(), hasher, idGen);
+    const qr = generarQrPago(factura);
+    expect(() => JSON.parse(qr)).not.toThrow();
   });
 
-  it('prefijo es "EPC" (codigo de la empresa)', () => {
-    const factura = emitirFactura(inputBase(), hasher);
-    const qr = generarQrPago(factura, 'ref-test', '2026-02-01T10:00:00.000Z');
-    expect(qr.split('|')[0]).toBe('EPC');
+  it('contiene exactamente 4 campos canónicos', () => {
+    const factura = emitirFactura(inputBase(), hasher, idGen);
+    const qr = generarQrPago(factura);
+    const parsed = JSON.parse(qr) as Record<string, unknown>;
+    expect(Object.keys(parsed).sort()).toEqual([
+      'codigo_verificacion',
+      'fecha_emision',
+      'referencia_pago',
+      'valor_total',
+    ]);
   });
 
-  it('incluye la referencia pasada como argumento', () => {
-    const factura = emitirFactura(inputBase(), hasher);
-    const qr = generarQrPago(factura, 'mi-referencia-123', '2026-02-01T10:00:00.000Z');
-    expect(qr).toContain('mi-referencia-123');
+  it('codigo_verificacion del QR coincide con el de la factura (10 base36)', () => {
+    const factura = emitirFactura(inputBase(), hasher, idGen);
+    const qr = generarQrPago(factura);
+    const parsed = JSON.parse(qr) as { codigo_verificacion: string };
+    expect(parsed.codigo_verificacion).toBe(factura.codigo_verificacion);
+    expect(parsed.codigo_verificacion.length).toBe(10);
+    expect(esCodigoVerificacionValido(parsed.codigo_verificacion)).toBe(true);
+  });
+
+  it('valor_total es numero (en pesos)', () => {
+    const factura = emitirFactura(inputBase(), hasher, idGen);
+    const qr = generarQrPago(factura);
+    const parsed = JSON.parse(qr) as { valor_total: unknown };
+    expect(typeof parsed.valor_total).toBe('number');
+    expect(parsed.valor_total).toBeGreaterThan(0);
+  });
+
+  it('fecha_emision es ISO 8601 (YYYY-MM-DD)', () => {
+    const factura = emitirFactura(inputBase(), hasher, idGen);
+    const qr = generarQrPago(factura);
+    const parsed = JSON.parse(qr) as { fecha_emision: string };
+    expect(parsed.fecha_emision).toBe('2026-02-01');
+  });
+
+  it('referencia_pago tiene formato {prestador}-{periodo}-{consecutivo}-{checksum}', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 1 }), hasher, idGen);
+    const qr = generarQrPago(factura);
+    const parsed = JSON.parse(qr) as { referencia_pago: string };
+    expect(parsed.referencia_pago).toMatch(/^.+-.+-.+-.{4}$/);
+  });
+
+  it('es determinista: misma factura → mismo QR', () => {
+    const factura = emitirFactura(inputBase(), hasher, idGen);
+    const a = generarQrPago(factura);
+    const b = generarQrPago(factura);
+    expect(a).toBe(b);
   });
 });
 
 describe('emitirFactura — campos top-level: codigo_verificacion, referencia_pago, qr_pago, version_tarifa_aplicada', () => {
-  it('emite factura con codigo_verificacion derivado del hash', () => {
+  it('emite factura con codigo_verificacion 10 chars base36', () => {
     const factura = emitirFactura(inputBase(), hasher);
-    // El codigo de verificacion es un derivado del hash canonico. En
-    // produccion (SHA-256 hex de 64 chars) tiene 16 chars. En tests
-    // con hasher fake puede ser más corto. Validamos que es un
-    // prefijo del hash: empieza con el mismo prefijo.
-    expect(factura.hash.startsWith(factura.codigo_verificacion)).toBe(true);
-    expect(factura.codigo_verificacion.length).toBeGreaterThan(0);
-  });
-
-  it('codigo_verificacion es deepFrozen (en la factura)', () => {
-    const factura = emitirFactura(inputBase(), hasher);
-    expect(Object.isFrozen(factura)).toBe(true);
-    // El string es primitivo, no necesita freeze, pero el objeto Factura sí.
+    expect(factura.codigo_verificacion).toHaveLength(10);
+    expect(esCodigoVerificacionValido(factura.codigo_verificacion)).toBe(true);
   });
 
   it('emite factura con version_tarifa_aplicada copiada del motor', () => {
@@ -283,10 +356,21 @@ describe('emitirFactura — campos top-level: codigo_verificacion, referencia_pa
     expect(factura.version_tarifa_aplicada).toBe('v825-2017-1.0');
   });
 
-  it('emite factura con referencia_pago y qr_pago', () => {
+  it('emite factura con referencia_pago formato {prestador}-{periodo}-{consecutivo}-{checksum}', () => {
+    const factura = emitirFactura(inputBase({ consecutivo: 1 }), hasher, idGen);
+    expect(factura.referencia_pago).toMatch(/^.+-.+-.+-.{4}$/);
+  });
+
+  it('emite factura con qr_pago que es JSON parseable con 4 campos', () => {
     const factura = emitirFactura(inputBase(), hasher, idGen);
-    expect(factura.referencia_pago).toMatch(/^[0-9a-f-]{36}$/);
-    expect(factura.qr_pago).toMatch(/^EPC\|[0-9a-f-]{36}\|\d{4}-\d{2}-\d{2}T/);
+    expect(factura.qr_pago).toBeDefined();
+    const parsed = JSON.parse(factura.qr_pago!) as Record<string, unknown>;
+    expect(Object.keys(parsed).sort()).toEqual([
+      'codigo_verificacion',
+      'fecha_emision',
+      'referencia_pago',
+      'valor_total',
+    ]);
   });
 
   it('el codigo_verificacion es determinista para misma factura', () => {
@@ -300,14 +384,6 @@ describe('emitirFactura — campos top-level: codigo_verificacion, referencia_pa
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(inputBase({ prestador: prestador2 }), hasher);
     expect(a.codigo_verificacion).not.toBe(b.codigo_verificacion);
-  });
-
-  it('referencia_pago se puede regenerar con idGen externo', () => {
-    const fixedRef = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-    const customIdGen: IdGenerator = { uuid: () => fixedRef };
-    const factura = emitirFactura(inputBase(), hasher, customIdGen);
-    expect(factura.referencia_pago).toBe(fixedRef);
-    expect(factura.qr_pago).toContain(fixedRef);
   });
 
   it('emitirFactura es backward-compatible: sin idGen, NO asigna referencia_pago ni qr_pago', () => {

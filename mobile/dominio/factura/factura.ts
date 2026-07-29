@@ -289,48 +289,58 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher, idGen?:
     ...(input.observaciones !== undefined && { observaciones: input.observaciones }),
   };
   const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision, hasher);
-  // Codigo de verificacion: derivado estable del hash. Lo calculamos
-  // ANTES de armar el Factura para que el campo este disponible.
+  // Codigo de verificacion: derivado estable del hash (10 chars base36).
+  // Lo calculamos ANTES de armar el Factura para que el campo este disponible.
   const codigoVerificacion = calcularCodigoVerificacionPlaceholder(hash);
   const versionTarifaAplicada = input.liquidacion.resultado.metadata.version_motor;
-  // Si se inyecta idGen, generamos referencia_pago y qr_pago en este momento.
-  let referenciaPago: string | undefined;
-  let qrPago: string | undefined;
-  if (idGen !== undefined) {
-    referenciaPago = generarReferenciaPago(idGen);
-    qrPago = generarQrPago(
-      { hash, numero_factura, fecha_emision: input.fechaEmision } as Factura,
-      referenciaPago,
-      new Date().toISOString(),
-    );
-  }
-  return deepFreeze({
+  // Armamos el Factura base (sin referencia_pago/qr_pago) para que los
+  // helpers de pagos puedan derivar referencia_pago del snapshot.
+  const facturaBase = deepFreeze({
     id: '',
     numero_factura,
-    estado: 'BORRADOR',
+    estado: 'BORRADOR' as const,
     fecha_emision: input.fechaEmision,
     snapshot,
     hash,
     codigo_verificacion: codigoVerificacion,
     version_tarifa_aplicada: versionTarifaAplicada,
+    created_at: '',
+  });
+  // Si se inyecta idGen, generamos referencia_pago y qr_pago en este momento.
+  let referenciaPago: string | undefined;
+  let qrPago: string | undefined;
+  if (idGen !== undefined) {
+    referenciaPago = generarReferenciaPago(facturaBase, input.consecutivo, hasher, idGen);
+    const facturaConRef = deepFreeze({ ...facturaBase, referencia_pago: referenciaPago });
+    qrPago = generarQrPago(facturaConRef);
+  }
+  return deepFreeze({
+    ...facturaBase,
     ...(referenciaPago !== undefined && { referencia_pago: referenciaPago }),
     ...(qrPago !== undefined && { qr_pago: qrPago }),
-    created_at: '',
   });
 }
 
 /**
  * Helper interno para derivar el codigo de verificacion sin reinjectar
- * el hasher: dado que el hash canonico ya es estable, tomamos los
- * primeros 16 chars del hash. Esto es leíble Y verificable.
+ * el hasher: dado que el hash canonico ya es estable, tomamos 16 chars
+ * hex del hash y los codificamos en base36, primeros 10 chars.
  *
- * Compat tests: si el hash es < 16 chars (hasher fake en tests
- * contractuales), padStart con '0' para llegar a 16. NO es un caso de
- * produccion — en prod SHA-256 hex SIEMPRE tiene 64 chars.
+ * Compat tests: si el hash es < 16 chars o tiene prefijos no-hex
+ * (hasher fake en tests contractuales como 'hash-fake-'), filtramos
+ * los chars no-hex y padStart con '0' para llegar a 16. NO es un caso
+ * de produccion — en prod SHA-256 hex SIEMPRE tiene 64 chars.
  */
 function calcularCodigoVerificacionPlaceholder(hash: string): string {
-  if (hash.length >= 16) return hash.slice(0, 16);
-  return hash.padStart(16, '0');
+  const hexOnly = (hash + '0'.repeat(16))
+    .split('')
+    .filter((ch) => /[0-9a-fA-F]/.test(ch))
+    .join('')
+    .slice(0, 16)
+    .padEnd(16, '0');
+  const valor = parseInt(hexOnly, 16);
+  const base36 = valor.toString(36).toUpperCase();
+  return base36.slice(0, 10).padStart(10, '0');
 }
 
 /**
