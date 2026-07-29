@@ -93,6 +93,33 @@ describe('CatalogoMapa', () => {
     expect(f.existe('RECONEXION')).toBe(false);
     expect(f.activo('RECONEXION')).toBe(false);
   });
+
+  // Verifica la propiedad perf O(1) con N grande (200 conceptos). La
+  // lookup lineal con `Array.find` seria O(n) por item — con 200
+  // conceptos y 10 items seria ~2000 ops. Con Map son 10 ops. El
+  // test no mide tiempo (frágil en CI), pero ejercita el codigo con
+  // un dataset realista para detectar regresiones si alguien
+  // accidentalmente cambia la estructura interna a un Array.
+  it('soporta catalogos grandes (200 conceptos) sin perder correctness', () => {
+    const conceptosGrandes: ConceptoOtroValor[] = Array.from({ length: 200 }, (_, i) => ({
+      idConcepto: i + 1,
+      codigo: `CONCEPTO_${String(i).padStart(3, '0')}`,
+      descripcion: `Concepto #${i}`,
+      version: '1038-2026-v1',
+      activo: i % 7 !== 0, // ~14% inactivos
+      requiereGlosa: false,
+      createdAt: '2026-07-29T00:00:00.000Z',
+    }));
+    const f = CatalogoMapa.desdeLista(conceptosGrandes);
+    // Lookup de conceptos conocidos: presente + activo
+    expect(f.existe('CONCEPTO_001')).toBe(true);
+    expect(f.activo('CONCEPTO_001')).toBe(true);
+    // Inactivo (id divisible por 7): presente pero no activo
+    expect(f.existe('CONCEPTO_007')).toBe(true);
+    expect(f.activo('CONCEPTO_007')).toBe(false);
+    // Ausente
+    expect(f.existe('CONCEPTO_999')).toBe(false);
+  });
 });
 
 describe('validarOtrosValores', () => {

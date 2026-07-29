@@ -80,7 +80,7 @@ export class CatalogoLegacy implements CatalogoFuente {
 
 /**
  * Adapter que toma una lista (o Map) de `ConceptoOtroValor` y
- * expone un `CatalogoFuente` sync con lookup O(1).
+ * expone un `CatalogoFuente` sync con lookup O(1) por codigo.
  *
  * Caso de uso: `emitirFacturaAsync` hace
  *   `const lista = await catalogoRepo.listar();`
@@ -89,6 +89,19 @@ export class CatalogoLegacy implements CatalogoFuente {
  *
  * Si `lista` esta vacia, `existe()` y `activo()` siempre retornan
  * `false` (caller decide si lanzar error o warn+fallback).
+ *
+ * ## Performance
+ *
+ * Indexa la lista en un `Map<codigo, ConceptoOtroValor>` en el
+ * constructor (O(n) one-shot). Cada `existe()` / `activo()` es O(1).
+ * Validar M `otrosValores` contra un catalogo de N conceptos cuesta
+ * O(n) (indexar) + O(m) (lookups) — versus O(n*m) del patron
+ * `conceptos.find(c => c.codigo === ov.concepto)` previo.
+ *
+ * En la practica, con N=7 (seed regulatorio actual) y M=2..5
+ * (otrosValores tipicos), la diferencia es despreciable. La
+ * optimizacion paga cuando N crezca (ej: regulacion agrega 50
+ * conceptos, o el repo carga catalogos historicos en batch).
  */
 export class CatalogoMapa implements CatalogoFuente {
   private readonly mapa: ReadonlyMap<string, ConceptoOtroValor>;
