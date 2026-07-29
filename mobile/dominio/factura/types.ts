@@ -28,11 +28,38 @@ export interface ConsumoHistorico {
   readonly total_facturado: number;
 }
 
+/**
+ * Snapshot del suscriptor al momento de emisión. Conformado por los
+ * campos EXIGIDOS por Res CRA 1038/2026 §3 (datos del suscriptor /
+ * usuario del servicio) que ya viven en la entidad `Suscriptor`.
+ *
+ * - Código identificador único del suscriptor.
+ * - Nombre y apellidos.
+ * - Cédula del titular (Res CRA 1038 §3 identificación).
+ * - Email y teléfono (Res CRA 1038 §3 contacto) — opcionales porque
+ *   la captura de campo no siempre los consigue.
+ * - Municipio, sector, calle y dirección completa (Res CRA 1038 §3
+ *   ubicación del predio).
+ * - Estrato socioeconómico (Res CRA 1038 §3 clasificación).
+ * - Matrícula inmobiliaria y número catastral — opcionales, no exigidos
+ *   por la norma pero presentes en `Suscriptor`.
+ *
+ * NO se exponen: `id_suscriptor` (interno), `aplica_subsidio` (cálculo),
+ * `estado` (filtro operativo), `created_at` (timestamp de fila).
+ */
 export interface FacturaSnapshotSuscriptor {
   readonly codigo: string;
   readonly nombre_apellidos: string;
+  readonly cedula: string;
+  readonly email?: string;
+  readonly telefono?: string;
+  readonly municipio: string;
+  readonly sector?: string;
+  readonly calle?: string;
   readonly direccion: string;
   readonly estrato: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly matricula_inmobiliaria?: string;
+  readonly numero_catastral?: string;
   /** FK al prestador del suscriptor (denormalizado en el snapshot). */
   readonly id_prestador: number;
   /** Categoría de uso (Q10 spec). */

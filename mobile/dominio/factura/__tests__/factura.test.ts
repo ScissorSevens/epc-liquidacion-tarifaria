@@ -171,7 +171,7 @@ describe('emitirFactura — happy path', () => {
     expect(factura.numero_factura).toBe('MZ-001-2981');
   });
 
-  it('snapshotea suscriptor (codigo, nombre, direccion, estrato, id_prestador, categoria_uso) y lo congela', () => {
+  it('snapshotea suscriptor (codigo, nombre, cedula, municipio, direccion, estrato, id_prestador, categoria_uso) y lo congela', () => {
     const suscriptor: Suscriptor = {
       ...suscriptorBase(),
       codigo: '00042',
@@ -183,6 +183,8 @@ describe('emitirFactura — happy path', () => {
     expect(factura.snapshot.suscriptor).toEqual({
       codigo: '00042',
       nombre_apellidos: 'Carlos Ruiz',
+      cedula: suscriptor.cedula,
+      municipio: suscriptor.municipio,
       direccion: 'Carrera 7 #14-30',
       estrato: 3,
       id_prestador: suscriptor.id_prestador,

@@ -144,10 +144,22 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
   const suscriptorSnapshot = deepFreeze({
     codigo: input.suscriptor.codigo,
     nombre_apellidos: input.suscriptor.nombre_apellidos,
+    cedula: input.suscriptor.cedula,
+    municipio: input.suscriptor.municipio,
     direccion: input.suscriptor.direccion,
     estrato: input.suscriptor.estrato,
     id_prestador: input.suscriptor.id_prestador,
     categoria_uso: input.suscriptor.categoria_uso,
+    ...(input.suscriptor.email !== undefined && { email: input.suscriptor.email }),
+    ...(input.suscriptor.telefono !== undefined && { telefono: input.suscriptor.telefono }),
+    ...(input.suscriptor.sector !== undefined && { sector: input.suscriptor.sector }),
+    ...(input.suscriptor.calle !== undefined && { calle: input.suscriptor.calle }),
+    ...(input.suscriptor.matricula_inmobiliaria !== undefined && {
+      matricula_inmobiliaria: input.suscriptor.matricula_inmobiliaria,
+    }),
+    ...(input.suscriptor.numero_catastral !== undefined && {
+      numero_catastral: input.suscriptor.numero_catastral,
+    }),
   });
   const medidorSnapshot = deepFreeze({
     numero_medidor: input.medidor.numero_medidor,
