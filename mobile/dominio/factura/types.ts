@@ -14,6 +14,10 @@ import type { Medidor } from '../medidores/types';
 import type { Periodo } from '../periodos/types';
 import type { Operario } from '../operarios/types';
 import type { EvidenciaFoto, Lectura } from '../captura-lecturas/types';
+import type { ConceptoOtroValor, OtroValor } from './otros-valores-catalogo';
+
+export type { ConceptoOtroValor, OtroValor } from './otros-valores-catalogo';
+export { crearOtroValor, OtrosValoresCatalogo } from './otros-valores-catalogo';
 
 export type EstadoFactura = 'BORRADOR' | 'EMITIDA' | 'PAGADA' | 'ANULADA';
 
@@ -205,8 +209,9 @@ export interface FacturaMetadata {
  * (design D5) — al evolucionar Suscriptor/Medidor/etc, el cambio queda
  * aislado en su sub-objeto.
  *
- * v2 (FacturaCompliance-Fase1, Res CRA 1038/2026): agrega `prestador`
- * y `lectura` con datos completos al momento de emisión.
+ * v2 (FacturaCompliance-Fase1, Res CRA 1038/2026): agrega `prestador`,
+ * `lectura`, `otros_valores`, `saldo_anterior` con datos completos al
+ * momento de emisión.
  */
 export interface FacturaSnapshot {
   readonly suscriptor: FacturaSnapshotSuscriptor;
@@ -217,6 +222,8 @@ export interface FacturaSnapshot {
   readonly lectura: FacturaSnapshotLectura;
   readonly liquidacion: FacturaSnapshotLiquidacion;
   readonly consumosHistoricos: readonly ConsumoHistorico[]; // 0..6
+  readonly otros_valores: readonly OtroValor[];
+  readonly saldo_anterior: number;
   readonly metadata: FacturaMetadata;
   readonly observaciones?: string;
 }
@@ -245,6 +252,8 @@ export interface EmitirFacturaInput {
   readonly consumosHistoricos: readonly ConsumoHistorico[];
   readonly fechaEmision: string; // ISO 8601 (YYYY-MM-DD)
   readonly consecutivo: number; // viene del ConsecutivoFacturaProvider
+  readonly otrosValores?: readonly OtroValor[];
+  readonly saldoAnterior?: number;
   readonly observaciones?: string;
 }
 

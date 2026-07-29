@@ -5,6 +5,7 @@ export {
   corregirFactura,
   extraerSnapshotPrestador,
   calcularHashFactura,
+  calcularTotalFactura,
 } from './factura';
 export {
   emitirFacturaConRepo,
@@ -29,8 +30,10 @@ export type {
   EmitirFacturaInput,
   FacturaRepository,
   ConsecutivoFacturaProvider,
+  ConceptoOtroValor,
+  OtroValor,
 } from './types';
-export { extraerSnapshotLectura } from './types';
+export { extraerSnapshotLectura, crearOtroValor, OtrosValoresCatalogo } from './types';
 export { MENSAJES_ERROR_FACTURA } from './types';
 export { crearBootstrapFacturaSqlite } from './bootstrap';
 export type {

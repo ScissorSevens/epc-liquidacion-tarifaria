@@ -19,6 +19,7 @@ import {
   type FacturaMetadata,
   type FacturaSnapshot,
   type FacturaSnapshotPrestador,
+  type OtroValor,
 } from './types';
 
 /**
@@ -97,6 +98,8 @@ export function calcularHashFactura(
       lectura: snapshot.lectura,
       liquidacion: snapshot.liquidacion,
       consumosHistoricos: snapshot.consumosHistoricos,
+      otros_valores: snapshot.otros_valores,
+      saldo_anterior: snapshot.saldo_anterior,
       metadata: snapshot.metadata,
       observaciones: snapshot.observaciones ?? null,
     },
@@ -142,6 +145,11 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
   const lectura = input.lectura;
   if (lectura === null || lectura === undefined) {
     throw new Error('emitirFactura: input.lectura es requerida');
+  }
+  const otrosValores: readonly OtroValor[] = input.otrosValores ?? [];
+  const saldoAnterior: number = input.saldoAnterior ?? 0;
+  if (saldoAnterior < 0) {
+    throw new Error('emitirFactura: saldo_anterior no puede ser negativo');
   }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
@@ -208,6 +216,9 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
       total_facturado: c.total_facturado,
     })),
   );
+  const otrosValoresSnapshot = Object.freeze(
+    otrosValores.map((ov) => Object.freeze({ ...ov })),
+  );
   const metadata: FacturaMetadata = deepFreeze({ hash_version: 'v2' });
   const snapshot: FacturaSnapshot = {
     suscriptor: suscriptorSnapshot,
@@ -218,6 +229,8 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     lectura: lecturaSnapshot,
     liquidacion: liquidacionSnapshot,
     consumosHistoricos: consumosHistoricosSnapshot,
+    otros_valores: otrosValoresSnapshot,
+    saldo_anterior: saldoAnterior,
     metadata,
     ...(input.observaciones !== undefined && { observaciones: input.observaciones }),
   };
@@ -344,4 +357,37 @@ export function corregirFactura(input: {
     created_at: '',
   });
   return { facturaAnulada, nuevoBorrador };
+}
+
+/**
+ * Calcula el total a pagar de la factura.
+ *
+ * Fórmula Res CRA 1038/2026 §4:
+ *   total = liquidacion.total + sum(otros_valores) + saldo_anterior
+ *
+ * Donde:
+ *  - liquidacion.total = suma de cargo_fijo + cc_total - subsidio + contribucion
+ *    (lo calcula el motor tarifario).
+ *  - otros_valores = lista de OtroValor (no negativos, dataset ≤ 7).
+ *  - saldo_anterior = deuda arrastrada de periodos previos (≥ 0).
+ *
+ * Función pura. NO muta la factura. NO lee el repo.
+ *
+ * La validación `total < 0` está cubierta por el guard de saldo_anterior
+ * (no se permite negativo) en emitirFactura. Esta función es una vista
+ * que siempre suma: si el usuario lograra pasar un snapshot con
+ * saldo_anterior negativo (vía JSON round-trip malicioso), el resultado
+ * puede ser < 0 y eso es señal de corrupción — debe lanzar.
+ */
+export function calcularTotalFactura(factura: Factura): number {
+  const liquidacionTotal = factura.snapshot.liquidacion.resultado.total;
+  const otrosValoresSum = factura.snapshot.otros_valores.reduce(
+    (acc, ov) => acc + ov.valor,
+    0,
+  );
+  const total = liquidacionTotal + otrosValoresSum + factura.snapshot.saldo_anterior;
+  if (!Number.isFinite(total)) {
+    throw new Error('calcularTotalFactura: total no es finito');
+  }
+  return total;
 }
