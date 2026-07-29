@@ -1,4 +1,11 @@
-export { emitirFactura, anularFactura, esVencida, corregirFactura } from './factura';
+export {
+  emitirFactura,
+  anularFactura,
+  esVencida,
+  corregirFactura,
+  extraerSnapshotPrestador,
+  calcularHashFactura,
+} from './factura';
 export {
   emitirFacturaConRepo,
   anularFacturaConRepo,
@@ -13,7 +20,10 @@ export type {
   FacturaSnapshotMedidor,
   FacturaSnapshotPeriodo,
   FacturaSnapshotOperario,
+  FacturaSnapshotPrestador,
   FacturaSnapshotLiquidacion,
+  FacturaMetadata,
+  HashVersion,
   Factura,
   EmitirFacturaInput,
   FacturaRepository,

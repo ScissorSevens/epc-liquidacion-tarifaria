@@ -9,7 +9,16 @@
 import type { Hasher } from '../shared/ports';
 import { verificarIntegridad } from '../calculo/calculo';
 import type { Liquidacion } from '../calculo/types';
-import { MENSAJES_ERROR_FACTURA, type EmitirFacturaInput, type EstadoFactura, type Factura, type FacturaSnapshot } from './types';
+import type { Prestador } from '../prestadores/types';
+import {
+  MENSAJES_ERROR_FACTURA,
+  type EmitirFacturaInput,
+  type EstadoFactura,
+  type Factura,
+  type FacturaMetadata,
+  type FacturaSnapshot,
+  type FacturaSnapshotPrestador,
+} from './types';
 
 /**
  * Congela recursivamente. Replicado de calculo.ts (3er duplicado pendiente
@@ -33,8 +42,38 @@ function formatearNumeroFactura(dispositivoId: string, consecutivo: number): str
 }
 
 /**
+ * Proyecta un `Prestador` (entidad origen) al `FacturaSnapshotPrestador`
+ * (sub-snapshot inmutable de la factura). Solo los 7 campos exigidos por
+ * Res CRA 1038/2026 §1: id, codigo, nombre, NIT, municipio, departamento
+ * y representante legal. NO expone `password_hash` ni datos sensibles.
+ *
+ * Función pura: deepFreeze + solo lee del input. Caller debe pasar el
+ * Prestador del workspace activo (no recargar desde DB).
+ */
+export function extraerSnapshotPrestador(prestador: Prestador): FacturaSnapshotPrestador {
+  if (prestador === null || prestador === undefined) {
+    throw new Error('extraerSnapshotPrestador: prestador es requerido');
+  }
+  return deepFreeze({
+    id_prestador: prestador.id_prestador,
+    codigo: prestador.codigo,
+    nombre: prestador.nombre,
+    nit: prestador.nit,
+    municipio: prestador.municipio,
+    departamento: prestador.departamento,
+    representante_legal: prestador.representante_legal,
+  });
+}
+
+/**
  * Hash SHA-256 reproducible sobre snapshot canónico + numero_factura + fecha_emision.
  * Serialización determinística — orden de claves explícito (D1).
+ *
+ * v2 (FacturaCompliance-Fase1): incluye `prestador` en el payload y
+ * `metadata.hash_version: 'v2'`. Las facturas v1 existentes fueron
+ * generadas con la forma previa; `calcularHashFactura` siempre firma
+ * con v2 hacia adelante para que todas las nuevas facturas sean
+ * verificables con el snapshot extendido.
  *
  * Exportado para que callers verifiquen integridad post-corrección
  * (ej: `verificarIntegridad(factura)` o tests de coherencia).
@@ -53,8 +92,10 @@ export function calcularHashFactura(
       medidor: snapshot.medidor,
       periodo: snapshot.periodo,
       operario: snapshot.operario,
+      prestador: snapshot.prestador,
       liquidacion: snapshot.liquidacion,
       consumosHistoricos: snapshot.consumosHistoricos,
+      metadata: snapshot.metadata,
       observaciones: snapshot.observaciones ?? null,
     },
   });
@@ -92,6 +133,10 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
   if (input.consumosHistoricos.length > 6) {
     throw new Error(MENSAJES_ERROR_FACTURA.CONSUMO_HISTORICO_INVALIDO);
   }
+  const prestador = input.prestador;
+  if (prestador === null || prestador === undefined) {
+    throw new Error('emitirFactura: input.prestador es requerido');
+  }
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
@@ -120,6 +165,7 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
     nombre: input.operario.nombre,
     dispositivo_id: input.operario.dispositivo_id ?? '',
   });
+  const prestadorSnapshot = extraerSnapshotPrestador(prestador);
   const liquidacionSnapshot = deepFreeze({
     id: input.liquidacion.id,
     hash: input.liquidacion.hash,
@@ -132,13 +178,16 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
       total_facturado: c.total_facturado,
     })),
   );
+  const metadata: FacturaMetadata = deepFreeze({ hash_version: 'v2' });
   const snapshot: FacturaSnapshot = {
     suscriptor: suscriptorSnapshot,
     medidor: medidorSnapshot,
     periodo: periodoSnapshot,
     operario: operarioSnapshot,
+    prestador: prestadorSnapshot,
     liquidacion: liquidacionSnapshot,
     consumosHistoricos: consumosHistoricosSnapshot,
+    metadata,
     ...(input.observaciones !== undefined && { observaciones: input.observaciones }),
   };
   const hash = calcularHashFactura(snapshot, numero_factura, input.fechaEmision, hasher);

@@ -17,6 +17,7 @@ import type { Suscriptor } from '../../suscriptores/types';
 import type { Medidor } from '../../medidores/types';
 import type { Periodo } from '../../periodos/types';
 import type { Operario } from '../../operarios/types';
+import type { Prestador } from '../../prestadores/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
 import type { Hasher, IdGenerator } from '../../shared/ports';
 
@@ -79,6 +80,26 @@ function operarioBase(): Operario {
     created_at: '2026-01-01T00:00:00.000Z',
   };
 }
+
+function prestadorBase(): Prestador {
+  return {
+    id_prestador: 1,
+    codigo: '0001',
+    nombre: 'Aguas del Valle S.A. E.S.P.',
+    nit: '900123456-7',
+    representante_legal: 'Carlos Ramírez',
+    representante_legal_cedula: '79123456',
+    municipio: 'Cali',
+    departamento: 'Valle del Cauca',
+    segmento: 2,
+    num_suscriptores_urbanos: 1200,
+    num_suscriptores_rurales: 800,
+    contacto: 'contacto@aguasdelvalle.co',
+    estado: 'activo',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  };
+}
 function resultadoBase(): ResultadoCalculo {
   return {
     id_prestador: 0, estrato: 4 as const, categoria_uso: 'residencial' as const, consumo_m3: 10, consumo_efectivo_m3: 10, bloques: [],
@@ -102,6 +123,7 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
     medidor: medidorBase(),
     periodo: periodoBase(),
     operario: operarioBase(),
+    prestador: prestadorBase(),
     liquidacion: liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
     consumosHistoricos: [],
     fechaEmision: '2026-02-01',

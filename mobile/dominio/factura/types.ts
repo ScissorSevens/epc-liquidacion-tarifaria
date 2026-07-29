@@ -8,6 +8,7 @@
 
 import type { Liquidacion } from '../calculo/types';
 import type { ResultadoCalculo } from '../motor-tarifario';
+import type { Prestador } from '../prestadores/types';
 import type { Suscriptor } from '../suscriptores/types';
 import type { Medidor } from '../medidores/types';
 import type { Periodo } from '../periodos/types';
@@ -42,12 +43,22 @@ export interface FacturaSnapshotSuscriptor {
  * Snapshot del prestador que emitió la factura. Se incluye en el
  * snapshot de la factura para que el reporte y la factura emitida
  * tengan la información del prestador al momento del cálculo.
+ *
+ * Res CRA 1038/2026 §1: el PDF/impresión de la factura debe identificar
+ * al prestador que la expide. Requerimos: id, codigo, nombre, NIT,
+ * municipio, departamento y representante legal. NO exponemos
+ * `representante_legal_cedula`, `contacto`, `segmento`,
+ * `num_suscriptores_*`, `estado`, ni timestamps: no son exigidos por
+ * la norma y reducen duplicación.
  */
 export interface FacturaSnapshotPrestador {
   readonly id_prestador: number;
   readonly codigo: string;
   readonly nombre: string;
+  readonly nit: string;
   readonly municipio: string;
+  readonly departamento: string;
+  readonly representante_legal: string;
 }
 
 export interface FacturaSnapshotMedidor {
@@ -76,17 +87,39 @@ export interface FacturaSnapshotLiquidacion {
 }
 
 /**
+ * Identifica la versión del serializador del snapshot. Cuando se
+ * agregan campos al `FacturaSnapshot` (design D — versionado hash), el
+ * cálculo del hash v2 los incluye. Facturas históricas v1 siguen
+ * verificables porque su payload no fue recalculado.
+ */
+export type HashVersion = 'v1' | 'v2';
+
+/**
+ * Metadata de la factura para trazabilidad. No se persiste en columnas
+ * dedicadas (idempotencia con schema legacy): vive en el snapshot
+ * JSON bajo la clave `metadata`.
+ */
+export interface FacturaMetadata {
+  readonly hash_version: HashVersion;
+}
+
+/**
  * Snapshot completo del aggregate FACTURA. NESTED por aggregate de origen
  * (design D5) — al evolucionar Suscriptor/Medidor/etc, el cambio queda
  * aislado en su sub-objeto.
+ *
+ * v2 (FacturaCompliance-Fase1, Res CRA 1038/2026): agrega `prestador`
+ * con datos del prestador al momento de emisión.
  */
 export interface FacturaSnapshot {
   readonly suscriptor: FacturaSnapshotSuscriptor;
   readonly medidor: FacturaSnapshotMedidor;
   readonly periodo: FacturaSnapshotPeriodo;
   readonly operario: FacturaSnapshotOperario;
+  readonly prestador: FacturaSnapshotPrestador;
   readonly liquidacion: FacturaSnapshotLiquidacion;
   readonly consumosHistoricos: readonly ConsumoHistorico[]; // 0..6
+  readonly metadata: FacturaMetadata;
   readonly observaciones?: string;
 }
 
@@ -108,6 +141,7 @@ export interface EmitirFacturaInput {
   readonly medidor: Medidor;
   readonly periodo: Periodo;
   readonly operario: Operario;
+  readonly prestador: Prestador;
   readonly liquidacion: Liquidacion;
   readonly consumosHistoricos: readonly ConsumoHistorico[];
   readonly fechaEmision: string; // ISO 8601 (YYYY-MM-DD)
