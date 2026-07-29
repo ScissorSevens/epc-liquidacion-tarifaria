@@ -54,9 +54,17 @@ function formatearNumeroFactura(dispositivoId: string, consecutivo: number): str
 
 /**
  * Proyecta un `Prestador` (entidad origen) al `FacturaSnapshotPrestador`
- * (sub-snapshot inmutable de la factura). Solo los 7 campos exigidos por
- * Res CRA 1038/2026 §1: id, codigo, nombre, NIT, municipio, departamento
- * y representante legal. NO expone `password_hash` ni datos sensibles.
+ * (sub-snapshot inmutable de la factura). Los 8 campos exigidos por
+ * Res CRA 1038/2026 §1: id, codigo, nombre, NIT, municipio,
+ * departamento, representante legal y representante legal cédula.
+ *
+ * `representante_legal` y `representante_legal_cedula` admiten `null`
+ * para preservar el shape normativo cuando el origen no los trae
+ * (legado, captura incompleta). El snapshot NUNCA omite la clave —
+ * siempre la expone, con `null` si falta.
+ *
+ * NO expone `contacto`, `segmento`, `num_suscriptores_*`, `estado`, ni
+ * timestamps: no son exigidos por la norma y reducen duplicación.
  *
  * Función pura: deepFreeze + solo lee del input. Caller debe pasar el
  * Prestador del workspace activo (no recargar desde DB).
@@ -65,6 +73,15 @@ export function extraerSnapshotPrestador(prestador: Prestador): FacturaSnapshotP
   if (prestador === null || prestador === undefined) {
     throw new Error('extraerSnapshotPrestador: prestador es requerido');
   }
+  const representanteLegal =
+    prestador.representante_legal === undefined || prestador.representante_legal === ''
+      ? null
+      : prestador.representante_legal;
+  const representanteLegalCedula =
+    prestador.representante_legal_cedula === undefined ||
+    prestador.representante_legal_cedula === ''
+      ? null
+      : prestador.representante_legal_cedula;
   return deepFreeze({
     id_prestador: prestador.id_prestador,
     codigo: prestador.codigo,
@@ -72,7 +89,8 @@ export function extraerSnapshotPrestador(prestador: Prestador): FacturaSnapshotP
     nit: prestador.nit,
     municipio: prestador.municipio,
     departamento: prestador.departamento,
-    representante_legal: prestador.representante_legal,
+    representante_legal: representanteLegal,
+    representante_legal_cedula: representanteLegalCedula,
   });
 }
 

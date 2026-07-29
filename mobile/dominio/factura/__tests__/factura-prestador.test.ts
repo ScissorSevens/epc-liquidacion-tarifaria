@@ -183,7 +183,7 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
 }
 
 describe('extraerSnapshotPrestador — helper puro', () => {
-  it('proyecta Prestador → FacturaSnapshotPrestador con 7 campos', () => {
+  it('proyecta Prestador → FacturaSnapshotPrestador con 8 campos (incluye representante_legal_cedula)', () => {
     const prestador = prestadorBase();
     const snap = extraerSnapshotPrestador(prestador);
     expect(snap).toEqual({
@@ -194,12 +194,27 @@ describe('extraerSnapshotPrestador — helper puro', () => {
       municipio: 'Cali',
       departamento: 'Valle del Cauca',
       representante_legal: 'Carlos Ramírez',
+      representante_legal_cedula: '79123456',
     });
   });
 
-  it('NO incluye representante_legal_cedula (no aparece en Res CRA 1038 §1)', () => {
-    const snap = extraerSnapshotPrestador(prestadorBase());
-    expect(snap).not.toHaveProperty('representante_legal_cedula');
+  it('preserva representante_legal_cedula como null cuando no existe en el origen', () => {
+    const prestadorSinCedula: Prestador = {
+      ...prestadorBase(),
+      representante_legal_cedula: undefined as unknown as string,
+    };
+    const snap = extraerSnapshotPrestador(prestadorSinCedula);
+    expect(snap.representante_legal_cedula).toBeNull();
+  });
+
+  it('preserva representante_legal como null cuando no existe en el origen', () => {
+    const prestadorSinRep: Prestador = {
+      ...prestadorBase(),
+      representante_legal: undefined as unknown as string,
+    };
+    const snap = extraerSnapshotPrestador(prestadorSinRep);
+    expect(snap.representante_legal).toBeNull();
+    expect(snap.representante_legal_cedula).toBe('79123456');
   });
 
   it('NO incluye contacto, segmento, num_suscriptores, estado, timestamps', () => {
@@ -213,6 +228,7 @@ describe('extraerSnapshotPrestador — helper puro', () => {
       'nit',
       'nombre',
       'representante_legal',
+      'representante_legal_cedula',
     ]);
   });
 
@@ -233,7 +249,7 @@ describe('extraerSnapshotPrestador — helper puro', () => {
 });
 
 describe('emitirFactura — snapshot.prestador presente', () => {
-  it('incluye snapshot.prestador con todos los campos del catalogo', () => {
+  it('incluye snapshot.prestador con todos los 8 campos del catalogo (incluye representante_legal_cedula)', () => {
     const factura = emitirFactura(inputBase(), hasher);
     expect(factura.snapshot.prestador).toEqual({
       id_prestador: 1,
@@ -243,6 +259,7 @@ describe('emitirFactura — snapshot.prestador presente', () => {
       municipio: 'Cali',
       departamento: 'Valle del Cauca',
       representante_legal: 'Carlos Ramírez',
+      representante_legal_cedula: '79123456',
     });
   });
 
@@ -305,7 +322,7 @@ describe('emitirFactura — hash v2 con prestador', () => {
 });
 
 describe('FacturaSnapshotPrestador — type constraints', () => {
-  it('shape inmutable: 7 campos readonly', () => {
+  it('shape inmutable: 8 campos readonly (incluye representante_legal_cedula)', () => {
     const snap: FacturaSnapshotPrestador = {
       id_prestador: 1,
       codigo: 'X',
@@ -314,9 +331,25 @@ describe('FacturaSnapshotPrestador — type constraints', () => {
       municipio: 'X',
       departamento: 'X',
       representante_legal: 'X',
+      representante_legal_cedula: 'X',
     };
     // Type-only test: si el shape del type cambiara, este cast rompera.
     const _check: Readonly<FacturaSnapshotPrestador> = snap;
     expect(_check).toBe(snap);
+  });
+
+  it('representante_legal admite null (preserva el shape cuando el origen no lo trae)', () => {
+    const snap: FacturaSnapshotPrestador = {
+      id_prestador: 1,
+      codigo: 'X',
+      nombre: 'X',
+      nit: 'X',
+      municipio: 'X',
+      departamento: 'X',
+      representante_legal: null,
+      representante_legal_cedula: null,
+    };
+    expect(snap.representante_legal).toBeNull();
+    expect(snap.representante_legal_cedula).toBeNull();
   });
 });

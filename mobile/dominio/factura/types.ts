@@ -77,11 +77,15 @@ export interface FacturaSnapshotSuscriptor {
  * tengan la información del prestador al momento del cálculo.
  *
  * Res CRA 1038/2026 §1: el PDF/impresión de la factura debe identificar
- * al prestador que la expide. Requerimos: id, codigo, nombre, NIT,
- * municipio, departamento y representante legal. NO exponemos
- * `representante_legal_cedula`, `contacto`, `segmento`,
- * `num_suscriptores_*`, `estado`, ni timestamps: no son exigidos por
- * la norma y reducen duplicación.
+ * al prestador que la expide. Requerimos 8 campos: id, codigo, nombre,
+ * NIT, municipio, departamento, representante legal y representante
+ * legal cédula. `representante_legal` y `representante_legal_cedula`
+ * admiten `null` para preservar el shape cuando el origen no los trae
+ * (cargues legacy, datos incompletos en captura de campo).
+ *
+ * NO exponemos: `contacto`, `segmento`, `num_suscriptores_*`,
+ * `estado`, ni timestamps: no son exigidos por la norma y reducen
+ * duplicación.
  */
 export interface FacturaSnapshotPrestador {
   readonly id_prestador: number;
@@ -90,7 +94,8 @@ export interface FacturaSnapshotPrestador {
   readonly nit: string;
   readonly municipio: string;
   readonly departamento: string;
-  readonly representante_legal: string;
+  readonly representante_legal: string | null;
+  readonly representante_legal_cedula: string | null;
 }
 
 /**
