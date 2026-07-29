@@ -22,16 +22,22 @@ import {
   type EstadoFactura,
   type Factura,
   type FacturaMetadata,
-  type FacturaSnapshot,
-  type FacturaSnapshotPrestador,
-  type OtroValor,
+} from './types';
+import type {
+  FacturaSnapshot,
+  FacturaSnapshotPrestador,
+  OtroValor,
 } from './types';
 import {
   calcularCodigoVerificacion,
   generarQrPago,
   generarReferenciaPago,
 } from './pagos';
-import { OtrosValoresCatalogo } from './otros-valores-catalogo';
+import {
+  CatalogoLegacy,
+  CatalogoMapa,
+  validarOtrosValores,
+} from './otros-valores-validacion';
 
 // Re-export de los helpers de pagos para que `import { ... } from '../factura'`
 // siga funcionando como API unica del modulo.
@@ -347,13 +353,12 @@ function emitirFacturaSync(
   if (saldoAnterior < 0) {
     throw new Error('emitirFactura: saldo_anterior no puede ser negativo');
   }
-  // Validacion de frontera contra el catalogo regulatorio (legacy).
-  // Validacion contra el `catalogoRepo` se hace en `emitirFacturaAsync`.
-  for (const ov of otrosValores) {
-    if (OtrosValoresCatalogo[ov.concepto] === undefined) {
-      throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
-    }
-  }
+  // Validacion contra el catalogo. `emitirFacturaSync` corre en modo
+  // sync (sin repo) y delega a `validarOtrosValores()` con
+  // `CatalogoLegacy`, que valida contra la constante hardcoded
+  // `OtrosValoresCatalogo`. La validacion contra la DB SQLite (catalogo
+  // versionado) ocurre en `emitirFacturaAsync` antes de llegar aca.
+  validarOtrosValores(otrosValores, new CatalogoLegacy());
   const numero_factura = formatearNumeroFactura(
     input.operario.dispositivo_id ?? '',
     input.consecutivo,
@@ -473,11 +478,11 @@ function emitirFacturaSync(
  * constante legacy con warning (defensa contra instalaciones con migration
  * 021 no aplicada o DB corrupta).
  *
- * La validacion contra el repo es post-deepeFreeze en `OtrosValoresCatalogo`
- * legacy — primero chequeamos el repo, y solo si falla, fallback al constante.
- *
- * Implementacion actual (Task 6): valida que el codigo exista en el repo
- * (sin importar `activo`). Task 7 endurece: rechaza conceptos `activo=false`.
+ * Refactor `factura-compliance-cleanup` Task 3: usa el helper
+ * `validarOtrosValores()` con un `CatalogoMapa` (pre-carga el listado
+ * del repo) en vez de duplicar el loop de validacion. La dedup
+ * preserva 1:1 el comportamiento previo — la logica de rechazo por
+ * codigo inexistente o inactivo es identica.
  */
 async function emitirFacturaAsync(
   input: EmitirFacturaInput,
@@ -489,18 +494,14 @@ async function emitirFacturaAsync(
   const otrosValores: readonly OtroValor[] = input.otrosValores ?? [];
   const conceptos = await catalogoRepo.listar();
   if (conceptos.length > 0) {
-    // Repo poblado → es la fuente de verdad. Validamos que cada codigo
-    // exista Y este activo (regla regulatoria Res CRA 1038/2026).
-    for (const ov of otrosValores) {
-      const encontrado = conceptos.find((c) => c.codigo === ov.concepto.toUpperCase());
-      if (!encontrado) {
-        throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
-      }
-      if (!encontrado.activo) {
-        // Concepto fue desactivado por la regulacion posterior: rechazar.
-        throw new Error(MENSAJES_ERROR_FACTURA.CONCEPTO_NO_AUTORIZADO);
-      }
-    }
+    // Repo poblado → fuente de verdad. Validamos cada codigo via el
+    // helper compartido con `emitirFacturaSync` (Task 3) usando un
+    // CatalogoMapa como adapter. El Map pre-cargado da lookup O(1)
+    // por codigo — la optimizacion perf (Task 4) cae naturalmente
+    // de la pre-carga. Si se quisiera revertir al O(n) por item, basta
+    // cambiar `CatalogoMapa.desdeLista(conceptos)` por una fuente con
+    // `find` lineal.
+    validarOtrosValores(otrosValores, CatalogoMapa.desdeLista(conceptos));
   } else if (typeof console !== 'undefined' && typeof console.warn === 'function') {
     console.warn(
       '[factura-compliance-hardening] catalogoRepo vacio; fallback a OtrosValoresCatalogo legacy',
