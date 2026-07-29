@@ -100,4 +100,9 @@ export const migrations: readonly Migration[] = Object.freeze([
     nombre: '020_factura_compliance_1038',
     sql: leerSQL('020_factura_compliance_1038.sql'),
   },
+  {
+    version: 21,
+    nombre: '021_concepto_otro_valor',
+    sql: leerSQL('021_concepto_otro_valor.sql'),
+  },
 ]);

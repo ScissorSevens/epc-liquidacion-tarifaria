@@ -317,9 +317,10 @@ CREATE INDEX IF NOT EXISTS idx_operario_id_prestador
  * mobile/dominio/persistencia/sqlite/migrations/020_factura_compliance_1038.sql.
  *
  * Idempotencia: la migration 020 NO es idempotente en SQLite 3.35
- * (no soporta 'ADD COLUMN IF NOT EXISTS'). El runner la aplica una
- * sola vez por device via __migraciones_aplicadas. Para DBs muy viejas
- * con la tabla ya modificada, se necesita un skip explicito.
+ * (no soporta 'ADD COLUMN IF NOT EXISTS'). El helper
+ * `aplicarMigration020IdempotenteExpo` (en `dominio/persistencia/sqlite/`)
+ * consulta PRAGMA table_info y filtra columnas ya existentes antes de
+ * cada ALTER.
  */
 const MIGRACION_020_FACTURA_COMPLIANCE_1038 = `
 ALTER TABLE factura ADD COLUMN codigo_verificacion TEXT;
@@ -330,6 +331,56 @@ ALTER TABLE factura ADD COLUMN version_tarifa_aplicada TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_factura_referencia_pago_unique
   ON factura (referencia_pago)
   WHERE referencia_pago IS NOT NULL;
+`;
+
+/**
+ * Migration 021: catálogo regulatorio `concepto_otro_valor` (Res CRA
+ * 1038/2026 §4 §10). Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/021_concepto_otro_valor.sql`.
+ *
+ * Idempotente via `CREATE TABLE IF NOT EXISTS` + `INSERT OR IGNORE`,
+ * asi que la corren tal cual via `db.execAsync` es seguro.
+ */
+const MIGRACION_021_CONCEPTO_OTRO_VALOR = `
+CREATE TABLE IF NOT EXISTS concepto_otro_valor (
+  id_concepto    INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo         TEXT    NOT NULL UNIQUE,
+  descripcion    TEXT    NOT NULL,
+  version        TEXT    NOT NULL,
+  activo         INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+  requiere_glosa INTEGER NOT NULL DEFAULT 0 CHECK (requiere_glosa IN (0, 1)),
+  created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_concepto_otro_valor_activo
+  ON concepto_otro_valor (activo);
+CREATE INDEX IF NOT EXISTS idx_concepto_otro_valor_version
+  ON concepto_otro_valor (version);
+
+INSERT OR IGNORE INTO concepto_otro_valor
+  (codigo, descripcion, version, activo, requiere_glosa)
+VALUES
+  ('SALDO_ANTERIOR',
+   'Saldo pendiente de periodos anteriores',
+   '1038-2026-v1', 1, 0),
+  ('INTERESES_AUTORIZADOS',
+   'Intereses de mora autorizados por la regulación',
+   '1038-2026-v1', 1, 1),
+  ('RECONEXION',
+   'Cargo por reconexión del servicio',
+   '1038-2026-v1', 1, 0),
+  ('FINANCIACION',
+   'Cuota de financiación de deuda previa',
+   '1038-2026-v1', 1, 1),
+  ('MATERIALES_ACOMETIDA',
+   'Materiales de acometida',
+   '1038-2026-v1', 1, 0),
+  ('AJUSTES_DEVOLUCIONES',
+   'Ajustes o devoluciones de periodos anteriores',
+   '1038-2026-v1', 1, 1),
+  ('OTROS_AUTORIZADOS',
+   'Otros conceptos autorizados por la regulación',
+   '1038-2026-v1', 1, 1);
 `;
 
 /**
@@ -432,6 +483,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 18, nombre: '018_suscriptor_email_telefono', sql: MIGRACION_018_SUSCRIPTOR_EMAIL_TELEFONO },
   { version: 19, nombre: '019_parametros_tarifa_completo', sql: MIGRACION_019_PARAMETROS_TARIFA_COMPLETO },
   { version: 20, nombre: '020_factura_compliance_1038', sql: MIGRACION_020_FACTURA_COMPLIANCE_1038 },
+  { version: 21, nombre: '021_concepto_otro_valor', sql: MIGRACION_021_CONCEPTO_OTRO_VALOR },
 ];
 
 
