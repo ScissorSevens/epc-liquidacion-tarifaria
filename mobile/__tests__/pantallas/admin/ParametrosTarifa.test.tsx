@@ -419,4 +419,106 @@ describe('ParametrosTarifaForm', () => {
       });
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // T-SYNC: sincronización de state local con parametrosActuales
+  // async (admin-screen-perf-fixes, Task 2).
+  //
+  // El componente recibe parametrosActuales=null en el primer mount
+  // y el useEffect async eventualmente lo hidrata con valores de DB.
+  // El state local debe sincronizarse UNA vez para que el form
+  // muestre los valores cargados, pero NO debe sobrescribir una
+  // edición posterior del usuario.
+  // ─────────────────────────────────────────────────────────────
+  describe('T-SYNC: sincronización async parametrosActuales → state local', () => {
+    it('T-SYNC-1 inputs muestran valores de DB cuando parametrosActuales transiciona de null a populated', async () => {
+      const repo = crearRepoFake();
+      // Primer fetch devuelve null (caso "primera alta"). Luego
+      // llegue parametrosActuales desde prop → el state local
+      // debe sincronizar una sola vez.
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, rerender } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Sin hidratacion, el form muestra defaults (cma=0, cmo=0).
+      await waitFor(() => {
+        expect(getByTestId('param-cma').props.value).toBe('0');
+      });
+      expect(getByTestId('param-cmo').props.value).toBe('0');
+
+      // Re-render con parametrosActuales populated ⇒ el useEffect
+      // de hidratación debe poblar los inputs con los valores de DB.
+      rerender(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(getByTestId('param-cma').props.value).toBe('12345678');
+      });
+      expect(getByTestId('param-cmo').props.value).toBe('450');
+      expect(getByTestId('param-periodo').props.value).toBe('2026');
+      // Suscriptores: 350
+      expect(getByTestId('param-suscriptores').props.value).toBe('350');
+      // IPUF: 6 (default coincide con valor DB ⇒ string '6')
+      expect(getByTestId('param-ipuf').props.value).toBe('6');
+      // Agua: 50_000
+      expect(getByTestId('param-agua').props.value).toBe('50000');
+      // Vigente desde: 2025-01-01
+      expect(getByTestId('param-vigente-desde').props.value).toBe('2025-01-01');
+      // Vigente hasta: 2029-12-31
+      expect(getByTestId('param-vigente-hasta').props.value).toBe('2029-12-31');
+    });
+
+    it('T-SYNC-2 edición local del usuario NO se sobrescribe cuando llega una actualización de parametrosActuales', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, rerender } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+
+      // Hidratación inicial: el form ya muestra los valores de DB.
+      await waitFor(() => {
+        expect(getByTestId('param-cma').props.value).toBe('12345678');
+      });
+
+      // User edita cma → 999.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '999');
+      });
+      expect(getByTestId('param-cma').props.value).toBe('999');
+
+      // Re-render con parametrosActuales igual o nuevo (simula re-fetch).
+      // La hidratación es one-shot: el state local editado debe prevalecer.
+      rerender(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El cma editado a 999 NO debe volver a 12345678.
+      expect(getByTestId('param-cma').props.value).toBe('999');
+    });
+  });
 });

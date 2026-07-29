@@ -15,7 +15,7 @@
  *   - Toggles preservados inline (no son text inputs).
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
@@ -69,6 +69,16 @@ export default function ParametrosTarifaForm({
   const [parametrosActuales, setParametrosActuales] = useState<ParametrosTarifa | null>(parametrosProp ?? null);
   const [cargando, setCargando] = useState(true);
 
+  // Cuando el Stack o el test inyecta `parametrosActuales` como prop,
+  // el state interno debe reflejar esa prop. Sin esta sincronización,
+  // useState solo toma el valor inicial del primer mount y un rerender
+  // con prop distinta queda ignorado. Tests T-SYNC-1/T-SYNC-2 dependen
+  // de esta transición null → valor para hidratar el state local.
+  useEffect(() => {
+    if (parametrosProp === undefined) return;
+    setParametrosActuales(parametrosProp);
+  }, [parametrosProp]);
+
   // Resolver repos internamente si no vinieron inyectados desde el Stack.
   useEffect(() => {
     if (repo !== null && acuerdoRepo !== null) return;
@@ -105,6 +115,9 @@ export default function ParametrosTarifaForm({
   // Cargar parámetros tarifarios vigentes para el prestador en uso.
   useEffect(() => {
     if (id_prestador <= 0 || repo === null) return;
+    // Si la prop `parametrosActuales` viene provista, NO fetchamos —
+    // la prop es la fuente de verdad (Stack Navigation o test).
+    if (parametrosProp !== undefined) return;
     let cancelado = false;
     void (async () => {
       setCargando(true);
@@ -119,7 +132,7 @@ export default function ParametrosTarifaForm({
       }
     })();
     return () => { cancelado = true; };
-  }, [repo, id_prestador]);
+  }, [repo, id_prestador, parametrosProp]);
 
   const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
   const [cma, setCma] = useState(String(parametrosActuales?.cma ?? 0));
@@ -140,6 +153,32 @@ export default function ParametrosTarifaForm({
     parametrosActuales?.vigente_hasta?.slice(0, 10) ?? `${Number(periodoDefault()) + 4}-12-31`,
   );
   const [guardando, setGuardando] = useState(false);
+
+  // Hidratar el state local cuando parametrosActuales se carga async.
+  // Solo sincroniza en la transición null → valor (evita sobrescribir
+  // edición del usuario). El ref guardea la primera hidratación para
+  // que un re-fetch posterior (mismos datos) no pise lo que el
+  // operador tipeó. Ver scenario T-SYNC-1/T-SYNC-2.
+  const yaSincronizadoRef = useRef(false);
+  useEffect(() => {
+    if (parametrosActuales === null) return;
+    if (yaSincronizadoRef.current) return;
+    setPeriodo(String(parametrosActuales.periodo));
+    setCma(String(parametrosActuales.cma));
+    setCmo(String(parametrosActuales.cmo));
+    setCmi(String(parametrosActuales.cmi));
+    setCmt(String(parametrosActuales.cmt));
+    setCmviaa(String(parametrosActuales.cmviaa));
+    setAplicaCmviaa(parametrosActuales.aplica_cmviaa);
+    setAguaSuministrada(String(parametrosActuales.agua_suministrada_m3_anio));
+    setIpuf(String(parametrosActuales.ipuf_m3_suscriptor_mes));
+    setSuscriptoresPromedio(String(parametrosActuales.suscriptores_promedio));
+    setAplicaMinimoVital(parametrosActuales.aplica_minimo_vital);
+    setM3Gratis(String(parametrosActuales.m3_gratis_minimo_vital));
+    setVigenteDesde(parametrosActuales.vigente_desde.slice(0, 10));
+    setVigenteHasta(parametrosActuales.vigente_hasta.slice(0, 10));
+    yaSincronizadoRef.current = true;
+  }, [parametrosActuales]);
 
   const num = (s: string): number => {
     const n = parseFloat(s);
