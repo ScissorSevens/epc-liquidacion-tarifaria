@@ -13,6 +13,8 @@ import type { Prestador } from '../prestadores/types';
 import {
   extraerSnapshotLectura,
   MENSAJES_ERROR_FACTURA,
+  relojSistema,
+  type Clock,
   type EmitirFacturaInput,
   type EstadoFactura,
   type Factura,
@@ -216,7 +218,12 @@ export function verificarIntegridadFactura(factura: Factura, hasher: Hasher): bo
   return factura.hash === esperado;
 }
 
-export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher, idGen?: IdGenerator): Factura {
+export function emitirFactura(
+  input: EmitirFacturaInput,
+  hasher: Hasher,
+  idGen?: IdGenerator,
+  clock: Clock = relojSistema,
+): Factura {
   if (!verificarIntegridad(input.liquidacion, hasher)) {
     throw new Error(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
   }
@@ -491,6 +498,15 @@ export function esTransicionLegal(
  * incompleto (consumosHistoricos no están allí). Las invariantes de la
  * corrección son las verificadas en este orquestador (mismatch, etc.).
  *
+ * Regenera `codigo_verificacion`, `referencia_pago`, `qr_pago`,
+ * `version_tarifa_aplicada` con el nuevo numero_factura y la nueva
+ * liquidacion. Sin esto, el borrador tendria codigo/referencia/QR del
+ * original — inconsistencia detectable por un auditor.
+ *
+ * Si `idGen` se inyecta, genera nueva referencia_pago y qr_pago. Si NO,
+ * el borrador hereda esos campos como `undefined` (estado BORRADOR
+ * pre-persistencia).
+ *
  * Design D2.
  */
 export function corregirFactura(input: {
@@ -500,7 +516,7 @@ export function corregirFactura(input: {
   consecutivoNuevo: number;
   fechaEmision: string;
   observaciones?: string;
-}, hasher: Hasher): { facturaAnulada: Factura; nuevoBorrador: Factura } {
+}, hasher: Hasher, idGen?: IdGenerator): { facturaAnulada: Factura; nuevoBorrador: Factura } {
   if (input.liquidacionAnulada.id !== input.facturaOriginal.snapshot.liquidacion.id) {
     throw new Error(MENSAJES_ERROR_FACTURA.CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE);
   }
@@ -523,7 +539,11 @@ export function corregirFactura(input: {
     },
   };
   const nuevoHash = calcularHashFactura(nuevoSnapshot, nuevoNumeroFactura, input.fechaEmision, hasher);
-  const nuevoBorrador = deepFreeze({
+  const nuevoCodigoVerificacion = calcularCodigoVerificacionPlaceholder(nuevoHash);
+  const nuevoVersionTarifa = input.liquidacionNueva.resultado.metadata.version_motor;
+  // Armamos el borrador base para que `generarReferenciaPago` y
+  // `generarQrPago` puedan derivar del nuevo snapshot.
+  let nuevoBorrador: Factura = deepFreeze({
     ...input.facturaOriginal,
     id: '',
     numero_factura: nuevoNumeroFactura,
@@ -531,9 +551,26 @@ export function corregirFactura(input: {
     fecha_emision: input.fechaEmision,
     snapshot: nuevoSnapshot,
     hash: nuevoHash,
+    codigo_verificacion: nuevoCodigoVerificacion,
+    version_tarifa_aplicada: nuevoVersionTarifa,
     reemplaza_a: input.facturaOriginal.id,
     created_at: '',
   });
+  // Si se inyecta idGen, regeneramos referencia_pago y qr_pago con
+  // el nuevo numero de factura. Si NO, quedan undefined (estado
+  // BORRADOR pre-persistencia — el orquestador *ConRepo los asigna
+  // al persistir).
+  if (idGen !== undefined) {
+    const nuevaReferenciaPago = generarReferenciaPago(
+      nuevoBorrador,
+      input.consecutivoNuevo,
+      hasher,
+      idGen,
+    );
+    const borradorConRef = deepFreeze({ ...nuevoBorrador, referencia_pago: nuevaReferenciaPago });
+    const nuevoQrPago = generarQrPago(borradorConRef);
+    nuevoBorrador = deepFreeze({ ...borradorConRef, qr_pago: nuevoQrPago });
+  }
   return { facturaAnulada, nuevoBorrador };
 }
 

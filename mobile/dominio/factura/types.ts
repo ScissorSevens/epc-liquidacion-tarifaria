@@ -363,6 +363,32 @@ export interface ConsecutivoFacturaProvider {
 }
 
 /**
+ * Puerto de reloj. Inyectado para garantizar determinismo en tests
+ * y para que `emitirFactura` y `corregirFactura` produzcan campos
+ * dependientes del tiempo (ej: timestamp) reproducibles.
+ *
+ * Implementación default: `relojSistema()` retorna `new Date().toISOString()`.
+ * Implementación test: `relojFijo('2026-02-01T10:00:00.000Z')`.
+ */
+export interface Clock {
+  /** Retorna timestamp ISO 8601 actual. */
+  now(): string;
+}
+
+/** Reloj de sistema — `new Date().toISOString()`. Default para producción. */
+export const relojSistema: Clock = Object.freeze({
+  now: () => new Date().toISOString(),
+});
+
+/**
+ * Helper de test: retorna un Clock fijo con un timestamp constante.
+ * Garantiza determinismo de codigo_verificacion, qr_pago, etc.
+ */
+export function relojFijo(timestamp: string): Clock {
+  return Object.freeze({ now: () => timestamp });
+}
+
+/**
  * Catálogo de mensajes de error del módulo. Tests y código importan de la
  * misma fuente para impedir mistypes. Las 12 claves del spec.
  */
@@ -390,6 +416,8 @@ export const MENSAJES_ERROR_FACTURA = {
     'consumos_historicos no puede tener más de 6 elementos',
   CONCEPTO_NO_AUTORIZADO:
     'concepto de otro valor no autorizado por el catálogo regulatorio',
+  CLOCK_REQUERIDO_PARA_REFERENCIA:
+    'clock es requerido para generar referencia_pago determinista',
   FACTURA_NO_ANULABLE_DESDE_ESTADO_ACTUAL:
     'factura solo puede anularse desde estado EMITIDA',
   CORRECCION_LIQUIDACION_ANULADA_NO_COINCIDE:

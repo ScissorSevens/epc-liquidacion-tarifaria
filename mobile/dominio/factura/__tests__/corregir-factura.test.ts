@@ -26,7 +26,7 @@ import type { Operario } from '../../operarios/types';
 import type { Prestador } from '../../prestadores/types';
 import type { Lectura } from '../../captura-lecturas/types';
 import type { ResultadoCalculo } from '../../motor-tarifario';
-import type { Hasher } from '../../shared/ports';
+import type { Hasher, IdGenerator } from '../../shared/ports';
 
 function fakeChecksum(s: string): string {
   let h = 0;
@@ -319,5 +319,100 @@ describe('corregirFactura — orquestador puro', () => {
 
     // Anulación es metadata fuera del snapshot — hash del snapshot no cambia.
     expect(facturaAnulada.hash).toBe(facturaOriginal.hash);
+  });
+
+  it('nuevoBorrador regenera codigo_verificacion con el nuevo hash (numero_factura cambia)', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const { nuevoBorrador } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 99,
+      fechaEmision: '2026-02-15',
+    }, hasher);
+
+    // codigo_verificacion del nuevoBorrador se derivó del nuevo hash
+    // (distinto del original porque el snapshot cambió).
+    expect(nuevoBorrador.codigo_verificacion).not.toBe(facturaOriginal.codigo_verificacion);
+    expect(nuevoBorrador.codigo_verificacion.length).toBe(10);
+  });
+
+  it('nuevoBorrador regenera referencia_pago cuando se inyecta idGen', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const idGen: IdGenerator = { uuid: () => 'fixed-uuid' };
+    const { nuevoBorrador } = corregirFactura(
+      {
+        facturaOriginal,
+        liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+        liquidacionNueva: liqNueva,
+        consecutivoNuevo: 99,
+        fechaEmision: '2026-02-15',
+      },
+      hasher,
+      idGen,
+    );
+
+    expect(nuevoBorrador.referencia_pago).toBeDefined();
+    expect(nuevoBorrador.referencia_pago).toMatch(/^.+-.+-.+-.{4}$/);
+    // La referencia refleja el consecutivoNuevo=99, no el original.
+    expect(nuevoBorrador.referencia_pago).toContain('99');
+  });
+
+  it('nuevoBorrador regenera qr_pago cuando se inyecta idGen', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const idGen: IdGenerator = { uuid: () => 'fixed-uuid' };
+    const { nuevoBorrador } = corregirFactura(
+      {
+        facturaOriginal,
+        liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+        liquidacionNueva: liqNueva,
+        consecutivoNuevo: 42,
+        fechaEmision: '2026-02-15',
+      },
+      hasher,
+      idGen,
+    );
+
+    expect(nuevoBorrador.qr_pago).toBeDefined();
+    const parsed = JSON.parse(nuevoBorrador.qr_pago!) as Record<string, unknown>;
+    expect(Object.keys(parsed).sort()).toEqual([
+      'codigo_verificacion',
+      'fecha_emision',
+      'referencia_pago',
+      'valor_total',
+    ]);
+    // El codigo_verificacion del QR coincide con el del borrador (regenerado).
+    expect(parsed.codigo_verificacion).toBe(nuevoBorrador.codigo_verificacion);
+    // La referencia del QR coincide con la del borrador (regenerada).
+    expect(parsed.referencia_pago).toBe(nuevoBorrador.referencia_pago);
+  });
+
+  it('nuevoBorrador regenera version_tarifa_aplicada desde liquidacionNueva', () => {
+    const liqOriginal = liquidacionConId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const resultadoNuevo: ResultadoCalculo = {
+      ...resultadoBase(),
+      metadata: { ...resultadoBase().metadata, version_motor: 'v825-2017-2.0' },
+    };
+    const liqNueva = liquidacionConId('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', resultadoNuevo);
+    const facturaOriginal = facturaOriginalConLiquidacion(liqOriginal);
+
+    const { nuevoBorrador } = corregirFactura({
+      facturaOriginal,
+      liquidacionAnulada: { ...liqOriginal, estado: 'ANULADA' },
+      liquidacionNueva: liqNueva,
+      consecutivoNuevo: 2,
+      fechaEmision: '2026-02-15',
+    }, hasher);
+
+    expect(nuevoBorrador.version_tarifa_aplicada).toBe('v825-2017-2.0');
   });
 });
