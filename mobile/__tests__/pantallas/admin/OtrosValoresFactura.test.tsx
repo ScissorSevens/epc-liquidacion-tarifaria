@@ -59,7 +59,10 @@ jest.mock('../../../src/composition/get-bootstrap', () => ({
 }));
 
 interface OtroValorTest {
-  readonly concepto: string;
+  // Tras el refactor `factura-compliance-cleanup` Task 5, `OtroValor.concepto`
+  // es el union `ConceptoOtroValor` (los 7 codigos canonicos). El test
+  // sigue usando un local type para flexibilidad.
+  readonly concepto: import('@dominio/factura').ConceptoOtroValor;
   readonly valor: number;
   readonly glosa?: string;
 }

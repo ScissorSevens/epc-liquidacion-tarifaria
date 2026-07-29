@@ -6,6 +6,16 @@
  * ANTES de emitir la factura. Esta pantalla es el editor admin que
  * prepara esos datos — la persistencia la hace el caller via `onGuardar`.
  *
+ * Refactor `factura-compliance-cleanup` Task 8: la pantalla se splittea
+ * en sub-componentes:
+ *  - `ListaOtrosValores` (carpeta `OtrosValoresFactura/`) — render de
+ *    la lista de conceptos aplicados.
+ *  - `OtroValorItem` (carpeta `OtrosValoresFactura/`) — render de
+ *    cada item individual.
+ * El orquestador `OtrosValoresFactura.tsx` mantiene el estado
+ * (otrosValores, saldoAnterior, catalogo) y delega el render a
+ * los sub-componentes. Comportamiento preservado 1:1.
+ *
  * Cambio introducido en `factura-compliance-hardening` Task 8: el catalogo
  * de conceptos se carga desde `ConceptoOtroValorRepository` (tabla SQLite
  * `concepto_otro_valor`, version regulatoria `1038-2026-v1`) en vez de la
@@ -17,8 +27,7 @@
  *  - Auditoria: cada concepto lleva `version` y `created_at`.
  *
  * UI:
- *  - Lista actual de otros_valores (readonly inline; el admin edita el
- *    valor numerico o elimina el item).
+ *  - Lista actual de otros_valores (sub-componente `ListaOtrosValores`).
  *  - Selector de catalogo con los N conceptos seed vigentes.
  *  - Input para saldo_anterior (default 0).
  *  - Botones guardar / cancelar.
@@ -43,11 +52,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { getBootstrap } from '../../composition/get-bootstrap';
-import type { ConceptoOtroValor } from '@dominio/concepto-otro-valor';
+import type { ConceptoOtroValor, CodigoConceptoOtroValor } from '@dominio/concepto-otro-valor';
+import type { OtroValor } from '@dominio/factura';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
+import ListaOtrosValores from './OtrosValoresFactura/ListaOtrosValores';
 
 interface Props {
   readonly otrosValoresIniciales: readonly OtroValor[];
@@ -57,17 +67,6 @@ interface Props {
     saldoAnterior: number;
   }) => void;
   readonly onCancelar: () => void;
-}
-
-/**
- * Shape local del OtroValor (Codigo + Valor + Glosa) — match con el
- * @dominio/factura/otros-valores-catalogo.OtroValor legacy. El caller
- * (orquestador `emitirFactura`) acepta este shape directamente.
- */
-interface OtroValor {
-  readonly concepto: string;
-  readonly valor: number;
-  readonly glosa?: string;
 }
 
 const TOUCH_TARGET = 56; // ≥ 44px (WCAG 2.5.5)
@@ -121,10 +120,14 @@ export default function OtrosValoresFactura({
     if (otrosValores.some((ov) => ov.concepto === concepto)) return;
     if (estado.tipo !== 'listo') return;
     const meta = estado.catalogo.find((c) => c.codigo === concepto);
+    // El codigo viene del catalogo validado (repo), asi que es seguro
+    // castear a `CodigoConceptoOtroValor` que es el union de los 7
+    // codigos canonicos Res CRA 1038/2026.
+    const codigo = concepto as CodigoConceptoOtroValor;
     if (meta?.requiereGlosa) {
-      setOtrosValores((prev) => [...prev, { concepto, valor: 0, glosa: '' }]);
+      setOtrosValores((prev) => [...prev, { concepto: codigo, valor: 0, glosa: '' }]);
     } else {
-      setOtrosValores((prev) => [...prev, { concepto, valor: 0 }]);
+      setOtrosValores((prev) => [...prev, { concepto: codigo, valor: 0 }]);
     }
   }
 
@@ -173,59 +176,14 @@ export default function OtrosValoresFactura({
         </Text>
       </View>
 
-      {/* Lista de otros_valores actuales */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitulo}>Conceptos aplicados</Text>
-        {otrosValores.length === 0 ? (
-          <Text style={styles.empty}>No hay conceptos aplicados.</Text>
-        ) : (
-          otrosValores.map((ov) => (
-            <View key={ov.concepto} style={styles.itemCard} testID={`item-${ov.concepto}`}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemConcepto}>{ov.concepto}</Text>
-                <Pressable
-                  testID={`eliminar-${ov.concepto}`}
-                  onPress={() => eliminarConcepto(ov.concepto)}
-                  style={({ pressed }) => [
-                    styles.btnEliminar,
-                    pressed && styles.btnEliminarPressed,
-                  ]}
-                  hitSlop={8}
-                >
-                  <MaterialIcons name="close" size={18} color={COLORS.error} />
-                </Pressable>
-              </View>
-              {estado.tipo === 'listo' && (
-                <Text style={styles.itemDesc}>
-                  {estado.catalogo.find((c) => c.codigo === ov.concepto)?.descripcion ?? ov.concepto}
-                </Text>
-              )}
-              <View style={styles.itemRow}>
-                <Text style={styles.itemLabel}>Valor (COP)</Text>
-                <TextInput
-                  testID={`valor-${ov.concepto}`}
-                  value={String(ov.valor)}
-                  onChangeText={(t) => editarValor(ov.concepto, t)}
-                  keyboardType="numeric"
-                  style={styles.inputValor}
-                />
-              </View>
-              {estado.tipo === 'listo' &&
-                estado.catalogo.find((c) => c.codigo === ov.concepto)?.requiereGlosa && (
-                  <View style={styles.itemRow}>
-                    <Text style={styles.itemLabel}>Glosa</Text>
-                    <TextInput
-                      testID={`glosa-${ov.concepto}`}
-                      value={ov.glosa ?? ''}
-                      onChangeText={(t) => editarGlosa(ov.concepto, t)}
-                      style={styles.inputGlosa}
-                    />
-                  </View>
-                )}
-            </View>
-          ))
-        )}
-      </View>
+      {/* Lista de otros_valores actuales (sub-componente) */}
+      <ListaOtrosValores
+        otrosValores={otrosValores}
+        catalogo={estado.tipo === 'listo' ? estado.catalogo : []}
+        onEliminar={eliminarConcepto}
+        onEditarValor={editarValor}
+        onEditarGlosa={editarGlosa}
+      />
 
       {/* Selector de catalogo */}
       <View style={styles.section}>
@@ -323,22 +281,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.outlineVariant,
   },
   sectionTitulo: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
-  empty: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, fontStyle: 'italic' },
-  itemCard: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
-    gap: SPACING.xs,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  itemConcepto: { ...TYPOGRAPHY.bodyMd, color: COLORS.primary, fontWeight: '700' },
-  itemDesc: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -357,24 +299,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceContainerLowest,
     textAlign: 'right',
   },
-  inputGlosa: {
-    flex: 2,
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.sm,
-    color: COLORS.onSurface,
-    backgroundColor: COLORS.surfaceContainerLowest,
-  },
-  btnEliminar: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.sm,
-  },
-  btnEliminarPressed: { backgroundColor: COLORS.errorContainer },
   catalogoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
