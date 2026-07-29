@@ -217,6 +217,7 @@ describe('FacturaSnapshotSuscriptor — expansion v2', () => {
       calle: 'Calle 5',
       direccion: 'Calle 5 #2-10',
       estrato: 2,
+      estado: 'activo',
       matricula_inmobiliaria: 'MAT-001',
       numero_catastral: 'CAT-001',
       id_prestador: 0,
@@ -224,15 +225,37 @@ describe('FacturaSnapshotSuscriptor — expansion v2', () => {
     });
   });
 
-  it('campos opcionales (email, telefono, sector, calle, matricula, catastral) son undefined cuando no se proveen', () => {
+  it('campos opcionales (email, telefono, sector, calle, matricula, catastral) son null cuando no se proveen', () => {
     const factura = emitirFactura(inputBase({ suscriptor: suscriptorSinCamposOpcionales() }), hasher);
     const snap = factura.snapshot.suscriptor;
-    expect(snap.email).toBeUndefined();
-    expect(snap.telefono).toBeUndefined();
-    expect(snap.sector).toBeUndefined();
-    expect(snap.calle).toBeUndefined();
-    expect(snap.matricula_inmobiliaria).toBeUndefined();
-    expect(snap.numero_catastral).toBeUndefined();
+    expect(snap.email).toBeNull();
+    expect(snap.telefono).toBeNull();
+    expect(snap.sector).toBeNull();
+    expect(snap.calle).toBeNull();
+    expect(snap.matricula_inmobiliaria).toBeNull();
+    expect(snap.numero_catastral).toBeNull();
+  });
+
+  it('expone estado del suscriptor denormalizado (activo en el happy path)', () => {
+    // emitirFactura solo emite si suscriptor.estado === 'activo'. Cuando
+    // pasa, el snapshot preserva 'activo' en su sub-objeto para que la
+    // auditoria historica NO tenga que volver al origen para saber el
+    // estado al momento de emision.
+    const factura = emitirFactura(inputBase(), hasher);
+    expect(factura.snapshot.suscriptor.estado).toBe('activo');
+  });
+
+  it('el tipo de estado cubre los 3 valores del spec (activo, suspendido, facturado)', () => {
+    // Cobertura del shape: el type del snapshot admite los 3 valores
+    // del estado del suscriptor. Esto es test a nivel type — verifica
+    // que el contrato del spec no se restringio a 'activo' por bug.
+    type EstadoSpec = 'activo' | 'suspendido' | 'facturado';
+    const estados: EstadoSpec[] = ['activo', 'suspendido', 'facturado'];
+    expect(estados.length).toBe(3);
+    // el snapshot del happy path emite 'activo' por la validacion de
+    // emitirFactura, pero el TIPO del campo admite los 3.
+    const _tipoAcepta: FacturaSnapshotSuscriptor['estado'] = 'suspendido';
+    expect(_tipoAcepta).toBe('suspendido');
   });
 
   it('snapshot.suscriptor esta deepFrozen', () => {
@@ -321,7 +344,7 @@ describe('FacturaSnapshotSuscriptor — expansion v2', () => {
     expect(a.hash).toBe(b.hash);
   });
 
-  it('FacturaSnapshotSuscriptor tiene 12+ campos (shape v2 con todos los opcionales presentes)', () => {
+  it('FacturaSnapshotSuscriptor tiene 14 campos (shape v2 con estado + null explicito)', () => {
     const factura = emitirFactura(inputBase(), hasher);
     const keys = Object.keys(factura.snapshot.suscriptor).sort();
     // Suscriptor base del test incluye matricula_inmobiliaria y numero_catastral.
@@ -332,6 +355,7 @@ describe('FacturaSnapshotSuscriptor — expansion v2', () => {
       'codigo',
       'direccion',
       'email',
+      'estado',
       'estrato',
       'id_prestador',
       'matricula_inmobiliaria',

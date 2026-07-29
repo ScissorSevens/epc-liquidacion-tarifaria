@@ -186,21 +186,37 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher, idGen?:
     codigo: input.suscriptor.codigo,
     nombre_apellidos: input.suscriptor.nombre_apellidos,
     cedula: input.suscriptor.cedula,
+    email:
+      input.suscriptor.email === undefined || input.suscriptor.email === ''
+        ? null
+        : input.suscriptor.email,
+    telefono:
+      input.suscriptor.telefono === undefined || input.suscriptor.telefono === ''
+        ? null
+        : input.suscriptor.telefono,
     municipio: input.suscriptor.municipio,
+    sector:
+      input.suscriptor.sector === undefined || input.suscriptor.sector === ''
+        ? null
+        : input.suscriptor.sector,
+    calle:
+      input.suscriptor.calle === undefined || input.suscriptor.calle === ''
+        ? null
+        : input.suscriptor.calle,
     direccion: input.suscriptor.direccion,
     estrato: input.suscriptor.estrato,
+    estado: input.suscriptor.estado,
+    matricula_inmobiliaria:
+      input.suscriptor.matricula_inmobiliaria === undefined ||
+      input.suscriptor.matricula_inmobiliaria === ''
+        ? null
+        : input.suscriptor.matricula_inmobiliaria,
+    numero_catastral:
+      input.suscriptor.numero_catastral === undefined || input.suscriptor.numero_catastral === ''
+        ? null
+        : input.suscriptor.numero_catastral,
     id_prestador: input.suscriptor.id_prestador,
     categoria_uso: input.suscriptor.categoria_uso,
-    ...(input.suscriptor.email !== undefined && { email: input.suscriptor.email }),
-    ...(input.suscriptor.telefono !== undefined && { telefono: input.suscriptor.telefono }),
-    ...(input.suscriptor.sector !== undefined && { sector: input.suscriptor.sector }),
-    ...(input.suscriptor.calle !== undefined && { calle: input.suscriptor.calle }),
-    ...(input.suscriptor.matricula_inmobiliaria !== undefined && {
-      matricula_inmobiliaria: input.suscriptor.matricula_inmobiliaria,
-    }),
-    ...(input.suscriptor.numero_catastral !== undefined && {
-      numero_catastral: input.suscriptor.numero_catastral,
-    }),
   });
   const medidorSnapshot = deepFreeze({
     id_medidor: input.medidor.id_medidor,

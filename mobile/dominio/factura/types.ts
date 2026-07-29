@@ -41,30 +41,36 @@ export interface ConsumoHistorico {
  * - Código identificador único del suscriptor.
  * - Nombre y apellidos.
  * - Cédula del titular (Res CRA 1038 §3 identificación).
- * - Email y teléfono (Res CRA 1038 §3 contacto) — opcionales porque
- *   la captura de campo no siempre los consigue.
+ * - Email y teléfono (Res CRA 1038 §3 contacto) — `null` cuando la
+ *   captura de campo no los consigue (NO `undefined`: el snapshot es
+ *   contrato normativo, no API parcial).
  * - Municipio, sector, calle y dirección completa (Res CRA 1038 §3
  *   ubicación del predio).
  * - Estrato socioeconómico (Res CRA 1038 §3 clasificación).
- * - Matrícula inmobiliaria y número catastral — opcionales, no exigidos
- *   por la norma pero presentes en `Suscriptor`.
+ * - Estado (`activo` | `suspendido` | `facturado`): denormalizado del
+ *   origen para auditoría histórica (la factura no cambia si luego
+ *   el suscriptor se suspende).
+ * - Matrícula inmobiliaria y número catastral — `null` cuando no
+ *   existen en el origen (NO exigidos por la norma pero presentes
+ *   en `Suscriptor`).
  *
  * NO se exponen: `id_suscriptor` (interno), `aplica_subsidio` (cálculo),
- * `estado` (filtro operativo), `created_at` (timestamp de fila).
+ * `created_at` (timestamp de fila).
  */
 export interface FacturaSnapshotSuscriptor {
   readonly codigo: string;
   readonly nombre_apellidos: string;
   readonly cedula: string;
-  readonly email?: string;
-  readonly telefono?: string;
+  readonly email: string | null;
+  readonly telefono: string | null;
   readonly municipio: string;
-  readonly sector?: string;
-  readonly calle?: string;
+  readonly sector: string | null;
+  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: 1 | 2 | 3 | 4 | 5 | 6;
-  readonly matricula_inmobiliaria?: string;
-  readonly numero_catastral?: string;
+  readonly estado: 'activo' | 'suspendido' | 'facturado';
+  readonly matricula_inmobiliaria: string | null;
+  readonly numero_catastral: string | null;
   /** FK al prestador del suscriptor (denormalizado en el snapshot). */
   readonly id_prestador: number;
   /** Categoría de uso (Q10 spec). */
