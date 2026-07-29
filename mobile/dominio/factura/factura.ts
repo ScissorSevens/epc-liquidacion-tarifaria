@@ -180,7 +180,12 @@ export function emitirFactura(input: EmitirFacturaInput, hasher: Hasher): Factur
   });
   const operarioSnapshot = deepFreeze({
     id_operario: input.operario.id_operario,
+    id_prestador: input.operario.id_prestador,
+    numero_cedula: input.operario.numero_cedula,
     nombre: input.operario.nombre,
+    email: input.operario.email,
+    rol: input.operario.rol,
+    estado: input.operario.estado,
     dispositivo_id: input.operario.dispositivo_id ?? '',
   });
   const prestadorSnapshot = extraerSnapshotPrestador(prestador);

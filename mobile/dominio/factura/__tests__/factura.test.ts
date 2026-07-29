@@ -227,7 +227,7 @@ describe('emitirFactura — happy path', () => {
     expect(Object.isFrozen(factura.snapshot.periodo)).toBe(true);
   });
 
-  it('snapshotea operario (id, nombre, dispositivo_id) y lo congela', () => {
+  it('snapshotea operario (id, id_prestador, cedula, nombre, email, rol, estado, dispositivo_id) y lo congela', () => {
     const operario: Operario = {
       ...operarioBase(),
       id_operario: 42,
@@ -237,7 +237,12 @@ describe('emitirFactura — happy path', () => {
     const factura = emitirFactura({ ...inputBase(), operario }, hasher);
     expect(factura.snapshot.operario).toEqual({
       id_operario: 42,
+      id_prestador: operario.id_prestador,
+      numero_cedula: operario.numero_cedula,
       nombre: 'Pedro Sánchez',
+      email: operario.email,
+      rol: operario.rol,
+      estado: operario.estado,
       dispositivo_id: 'MZ-007',
     });
     expect(Object.isFrozen(factura.snapshot.operario)).toBe(true);

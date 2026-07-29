@@ -113,9 +113,25 @@ export interface FacturaSnapshotPeriodo {
   readonly dias_consumo: number;
 }
 
+/**
+ * Snapshot del operario que emitió la factura. Res CRA 1038/2026 §9
+ * exige identificar al operario de campo responsable de la lectura.
+ *
+ * **Security**: `password_hash` NUNCA se incluye — quedaría en
+ * evidencia impresa de la factura. El hash del snapshot excluye
+ * password_hash, garantizando que un cambio de password no invalida
+ * la firma forense de la factura.
+ *
+ * NO se expone: `created_at` (timestamp de fila).
+ */
 export interface FacturaSnapshotOperario {
   readonly id_operario: number;
+  readonly id_prestador: number;
+  readonly numero_cedula: string;
   readonly nombre: string;
+  readonly email: string;
+  readonly rol: 'operario' | 'supervisor' | 'admin';
+  readonly estado: 'activo' | 'inactivo';
   readonly dispositivo_id: string;
 }
 
