@@ -338,12 +338,16 @@ jest.mock('../../src/composition/bootstrap-completo', () => ({
 
 jest.mock('../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn().mockResolvedValue({
-    prestadorRepo: {},
-    acuerdoRepo: {},
-    parametrosRepo: {},
-    operarioRepo: {},
-    hasher: { sha256: (s: string) => `sha256(${s})` },
-    idGenerator: { uuid: () => 'uuid-x' },
+    repos: {
+      prestadorRepo: {},
+      acuerdoMunicipalRepo: {},
+      parametrosTarifaRepo: {},
+      operarioRepo: {},
+    },
+    adapters: {
+      hasher: { sha256: (s: string) => `sha256(${s})` },
+      idGenerator: { uuid: () => 'uuid-x' },
+    },
   }),
 }));
 

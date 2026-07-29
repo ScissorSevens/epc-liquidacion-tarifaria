@@ -97,11 +97,13 @@ function configurarBootstrap(opciones: {
   } = opciones;
 
   mockGetBootstrap.mockResolvedValue({
-    suscriptorRepo: { listar: jest.fn().mockResolvedValue(suscriptores) },
-    lecturaRepo: { listar: jest.fn().mockResolvedValue(lecturas) },
-    colaRepo: { listar: jest.fn().mockResolvedValue(cola) },
-    medidorRepo: { listar: jest.fn().mockResolvedValue(medidores) },
-    prestadorRepo: { obtenerPorId: prestadorPorId },
+    repos: {
+      suscriptorRepo: { listar: jest.fn().mockResolvedValue(suscriptores) },
+      lecturaRepo: { listar: jest.fn().mockResolvedValue(lecturas) },
+      colaRepo: { listar: jest.fn().mockResolvedValue(cola) },
+      medidorRepo: { listar: jest.fn().mockResolvedValue(medidores) },
+      prestadorRepo: { obtenerPorId: prestadorPorId },
+    },
   } as any);
 }
 

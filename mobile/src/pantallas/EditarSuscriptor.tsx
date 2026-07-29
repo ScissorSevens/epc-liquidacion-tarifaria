@@ -159,7 +159,7 @@ export default function EditarSuscriptor({ navigation, route }: Props) {
     }
     setEnviando(true);
     try {
-      const { suscriptorRepo, colaRepo, idGenerator, hasher } = await getBootstrap();
+      const { repos: { suscriptorRepo, colaRepo }, adapters: { idGenerator, hasher } } = await getBootstrap();
       const cambios: ActualizarSuscriptorInput = {
         nombre_apellidos: form.nombre_apellidos.trim(),
         email: form.email.trim() || undefined,

@@ -44,12 +44,14 @@ const CATALOGO_SEED: readonly ConceptoOtroValor[] = [
 jest.mock('../../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn(() =>
     Promise.resolve({
-      conceptoOtroValorRepo: {
-        async listar() {
-          return CATALOGO_SEED;
-        },
-        async buscarPorCodigo(codigo: string) {
-          return CATALOGO_SEED.find((c) => c.codigo === codigo.toUpperCase()) ?? null;
+      repos: {
+        conceptoOtroValorRepo: {
+          async listar() {
+            return CATALOGO_SEED;
+          },
+          async buscarPorCodigo(codigo: string) {
+            return CATALOGO_SEED.find((c) => c.codigo === codigo.toUpperCase()) ?? null;
+          },
         },
       },
     }),

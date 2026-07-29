@@ -96,10 +96,16 @@ jest.mock('../../src/composition/login-local', () => ({
 // Mock de getBootstrap: provee operarioRepo + hasher con stubs deterministas.
 // Login.tsx solo usa estos dos del bootstrap; los demas son irrelevantes para
 // el handler (AuthGate los consume en otra capa).
+// Refactor `factura-compliance-cleanup` Task 7: el shape se agrupa en
+// `repos` y `adapters`.
 jest.mock('../../src/composition/get-bootstrap', () => ({
-  getBootstrap: jest.fn().mockResolvedValue({
-    operarioRepo: { buscarPorCedula: jest.fn() },
-    hasher: { sha256: (s: string) => `sha256(${s})` },
+  getBootstrap: jest.fn().mockResolvedValue({/*refactored*/
+    repos: {
+      operarioRepo: { buscarPorCedula: jest.fn() },
+    },
+    adapters: {
+      hasher: { sha256: (s: string) => `sha256(${s})` },
+    },
   }),
 }));
 

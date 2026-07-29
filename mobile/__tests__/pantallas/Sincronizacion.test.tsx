@@ -81,11 +81,17 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
 
 jest.mock('../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn().mockResolvedValue({
-    apiBaseUrl: 'http://localhost:3000',
-    procesadorCola: jest.fn().mockResolvedValue({
-      enviados: 0, conflictos: 0, fallidos: 0, pendientes: 0,
-    }),
-    colaRepo: { listar: jest.fn().mockResolvedValue([]) },
+    adapters: {
+      apiBaseUrl: 'http://localhost:3000',
+    },
+    services: {
+      procesadorCola: jest.fn().mockResolvedValue({
+        enviados: 0, conflictos: 0, fallidos: 0, pendientes: 0,
+      }),
+    },
+    repos: {
+      colaRepo: { listar: jest.fn().mockResolvedValue([]) },
+    },
   }),
 }));
 

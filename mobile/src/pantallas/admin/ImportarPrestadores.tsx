@@ -58,7 +58,7 @@ export default function ImportarPrestadores({ repo: repoProp }: Props) {
     void (async () => {
       const bs = await getBootstrap();
       if (cancelado) return;
-      const prestadorRepo = bs.prestadorRepo as unknown as PrestadorRepositoryExpoSqlite & ImportarPrestadoresRepo;
+      const prestadorRepo = bs.repos.prestadorRepo as unknown as PrestadorRepositoryExpoSqlite & ImportarPrestadoresRepo;
       setRepo(prestadorRepo);
     });
     return () => { cancelado = true; };

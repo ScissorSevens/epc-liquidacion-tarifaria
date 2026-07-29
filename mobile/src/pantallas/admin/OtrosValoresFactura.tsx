@@ -99,7 +99,7 @@ export default function OtrosValoresFactura({
     (async () => {
       try {
         const bootstrap = await getBootstrap();
-        const conceptos = await bootstrap.conceptoOtroValorRepo.listar(true);
+        const conceptos = await bootstrap.repos.conceptoOtroValorRepo.listar(true);
         // Solo activos (`activo=true`) — la UI los renderiza como opciones
         // elegibles. Conceptos `activo=false` quedan ocultos (auditable via DB).
         if (!cancelado) {

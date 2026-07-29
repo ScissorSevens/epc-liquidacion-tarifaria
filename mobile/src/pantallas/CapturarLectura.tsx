@@ -223,7 +223,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
     let cancelado = false;
     (async () => {
       try {
-        const { lecturaRepo } = await getBootstrap();
+        const { repos: { lecturaRepo } } = await getBootstrap();
         const previas = await lecturaRepo.listar({ id_medidor });
         if (cancelado) return;
         if (previas.length > 0) {
@@ -255,7 +255,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
     let cancelado = false;
     (async () => {
       try {
-        const { suscriptorRepo } = await getBootstrap();
+        const { repos: { suscriptorRepo } } = await getBootstrap();
         const s = await suscriptorRepo.buscarPorId(id_suscriptor);
         if (cancelado) return;
         if (s !== null) {
@@ -263,7 +263,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           // Tambien cargar el contexto multi-tenant del prestador del suscriptor
           if (s.id_prestador > 0 || contextoMultiTenant === undefined) {
             try {
-              const { resolverContextoPrestador } = await getBootstrap();
+              const { services: { resolverContextoPrestador } } = await getBootstrap();
               const ctx = await resolverContextoPrestador(s.id_prestador);
               if (!cancelado) setContextoMultiTenant(ctx);
             } catch (eCtx) {
@@ -367,10 +367,10 @@ export default function CapturarLectura({ navigation, route }: Props) {
       const bootstrap = await getBootstrap();
       await persistirYEncolarLectura({
         lectura,
-        lecturaRepo: bootstrap.lecturaRepo,
-        colaRepo: bootstrap.colaRepo,
-        idGenerator: bootstrap.idGenerator,
-        hasher: bootstrap.hasher,
+        lecturaRepo: bootstrap.repos.lecturaRepo,
+        colaRepo: bootstrap.repos.colaRepo,
+        idGenerator: bootstrap.adapters.idGenerator,
+        hasher: bootstrap.adapters.hasher,
       });
       navigation.navigate('ResultadoCalculo', {
         lectura,

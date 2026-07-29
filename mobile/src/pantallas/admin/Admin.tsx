@@ -92,7 +92,7 @@ export default function Admin({ navigation }: Props) {
    * `cambiarPrestadorYCargarContexto` resuelve esto en un solo paso.
    */
   const onCambiarPrestador = async (id: number): Promise<void> => {
-    const { prestadorRepo, acuerdoMunicipalRepo, parametrosTarifaRepo } =
+    const { repos: { prestadorRepo, acuerdoMunicipalRepo, parametrosTarifaRepo } } =
       await getBootstrap();
     await cambiarPrestadorYCargarContexto(id, {
       prestador: prestadorRepo,

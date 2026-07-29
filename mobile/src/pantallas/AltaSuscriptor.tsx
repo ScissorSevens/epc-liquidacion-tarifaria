@@ -285,7 +285,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
     try {
       const bs = await getBootstrap();
 
-      const codigoGenerado = siguienteCodigo(await bs.suscriptorRepo.maxCodigo());
+      const codigoGenerado = siguienteCodigo(await bs.repos.suscriptorRepo.maxCodigo());
       const numeroMedidorGenerado = codigoANumeroMedidor(codigoGenerado);
 
       const estratoNum = Number.parseInt(form.estrato, 10) as 1 | 2 | 3 | 4 | 5 | 6;
@@ -329,11 +329,11 @@ export default function AltaSuscriptor({ navigation }: Props) {
           const out = await persistirYEncolarAltaSuscriptor({
             borradorSuscriptor: borradorSus,
             borradorMedidor: borradorMedSinSus,
-            suscriptorRepo: bs.suscriptorRepo,
-            medidorRepo: bs.medidorRepo,
-            colaRepo: bs.colaRepo,
-            idGenerator: bs.idGenerator,
-            hasher: bs.hasher,
+            suscriptorRepo: bs.repos.suscriptorRepo,
+            medidorRepo: bs.repos.medidorRepo,
+            colaRepo: bs.repos.colaRepo,
+            idGenerator: bs.adapters.idGenerator,
+            hasher: bs.adapters.hasher,
           });
           return out.suscriptor;
         } catch (errAlta) {

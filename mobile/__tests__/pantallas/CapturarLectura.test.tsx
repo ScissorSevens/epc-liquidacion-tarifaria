@@ -216,26 +216,32 @@ function configurarMocksExito(opts: {
 
   // Repos del bootstrap.
   (mockGetBootstrap as jest.Mock).mockResolvedValue({
-    lecturaRepo: {
-      listar: jest.fn().mockResolvedValue([]), // sin lecturas previas → no prefill
+    repos: {
+      lecturaRepo: {
+        listar: jest.fn().mockResolvedValue([]), // sin lecturas previas → no prefill
+      },
+      suscriptorRepo: {
+        buscarPorId: jest.fn().mockResolvedValue(SUSCRIPTOR_BASE),
+      },
+      lecturaRepoPersistir: {
+        guardar: jest.fn().mockResolvedValue(opts.lecturaPersistida),
+      },
+      colaRepo: {
+        guardar: jest.fn().mockResolvedValue(undefined),
+        listar: jest.fn().mockResolvedValue([]),
+      },
     },
-    suscriptorRepo: {
-      buscarPorId: jest.fn().mockResolvedValue(SUSCRIPTOR_BASE),
+    services: {
+      resolverContextoPrestador: jest.fn().mockResolvedValue({
+        prestador: PRESTADOR,
+        parametros: PARAMETROS,
+        acuerdo: ACUERDO,
+      }),
     },
-    lecturaRepoPersistir: {
-      guardar: jest.fn().mockResolvedValue(opts.lecturaPersistida),
+    adapters: {
+      idGenerator: { uuid: jest.fn(() => 'uuid-1') },
+      hasher: { sha256: jest.fn((s: string) => `sha256(${s})`) },
     },
-    colaRepo: {
-      guardar: jest.fn().mockResolvedValue(undefined),
-      listar: jest.fn().mockResolvedValue([]),
-    },
-    resolverContextoPrestador: jest.fn().mockResolvedValue({
-      prestador: PRESTADOR,
-      parametros: PARAMETROS,
-      acuerdo: ACUERDO,
-    }),
-    idGenerator: { uuid: jest.fn(() => 'uuid-1') },
-    hasher: { sha256: jest.fn((s: string) => `sha256(${s})`) },
   });
 
   // spy del persistirYEncolar — guarda la llamada para inspeccionar.

@@ -100,7 +100,12 @@ jest.mock('../../src/composicion/useWorkspace', () => {
 });
 
 jest.mock('../../src/composition/get-bootstrap', () => ({
-  getBootstrap: jest.fn().mockResolvedValue({}),
+  getBootstrap: jest.fn().mockResolvedValue({
+    db: {} as never,
+    repos: {} as never,
+    adapters: {} as never,
+    services: {} as never,
+  }),
 }));
 
 jest.mock('@react-navigation/native', () => {

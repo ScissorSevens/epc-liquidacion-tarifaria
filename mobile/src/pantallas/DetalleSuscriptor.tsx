@@ -253,7 +253,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const { suscriptorRepo, medidorRepo } = await getBootstrap();
+      const { repos: { suscriptorRepo, medidorRepo } } = await getBootstrap();
       const [s, m] = await Promise.all([
         suscriptorRepo.buscarPorId(id_suscriptor),
         medidorRepo.listarPorSuscriptor(id_suscriptor),
@@ -273,7 +273,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
 
   const cargarHistorial = useCallback(async (idMedidor: number) => {
     try {
-      const { lecturaRepo } = await getBootstrap();
+      const { repos: { lecturaRepo } } = await getBootstrap();
       const lecturas = await lecturaRepo.listarPorMedidor(idMedidor);
       setHistorialMap(prev => new Map(prev).set(idMedidor, lecturas));
     } catch (e) {
@@ -300,7 +300,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
     if (suscriptor === null || guardandoSubsidio) return;
     setGuardandoSubsidio(true);
     try {
-      const { suscriptorRepo } = await getBootstrap();
+      const { repos: { suscriptorRepo } } = await getBootstrap();
       // El repo expo-sqlite expone toggleSubsidio; lo casteamos para no
       // tocar el interface de dominio que todavia tiene actualizar como stub.
       const repo = suscriptorRepo as unknown as {

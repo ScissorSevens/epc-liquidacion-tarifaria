@@ -174,7 +174,9 @@ describe('Configuracion — perfil mobile-first', () => {
       limpiarWorkspace: mockLimpiarWorkspace,
     } as never);
     mockGetBootstrap.mockResolvedValue({
-      operarioRepo: mockOperarioRepo,
+      repos: {
+        operarioRepo: mockOperarioRepo,
+      },
       db: {} as never,
     } as never);
   });
@@ -251,7 +253,9 @@ describe('Configuracion — cerrar sesión (Punto B)', () => {
       limpiarWorkspace: mockLimpiarWorkspace,
     } as never);
     mockGetBootstrap.mockResolvedValue({
-      operarioRepo: mockOperarioRepo,
+      repos: {
+        operarioRepo: mockOperarioRepo,
+      },
       db: {} as never,
     } as never);
   });
@@ -394,7 +398,9 @@ describe('Configuracion — entrada a parámetros tarifarios (bug fix)', () => {
       limpiarWorkspace: mockLimpiarWorkspace,
     } as never);
     mockGetBootstrap.mockResolvedValue({
-      operarioRepo: mockOperarioRepo,
+      repos: {
+        operarioRepo: mockOperarioRepo,
+      },
       db: {} as never,
     } as never);
     // Hook `useWorkspace` con `parametros_vigentes: null` por default

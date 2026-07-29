@@ -59,7 +59,7 @@ export default function Historial({ navigation, route }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const { medidorRepo, lecturaRepo } = await getBootstrap();
+      const { repos: { medidorRepo, lecturaRepo } } = await getBootstrap();
       const medidores = await medidorRepo.listarPorSuscriptor(id_suscriptor);
       const todasLecturas = (
         await Promise.all(medidores.map((m) => lecturaRepo.listarPorMedidor(m.id_medidor)))

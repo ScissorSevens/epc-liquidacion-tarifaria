@@ -70,7 +70,7 @@ export default function AcuerdoMunicipalForm({
     void (async () => {
       const bs = await getBootstrap();
       if (!cancelado) {
-        setRepo(bs.acuerdoMunicipalRepo as unknown as AcuerdoMunicipalRepo);
+        setRepo(bs.repos.acuerdoMunicipalRepo as unknown as AcuerdoMunicipalRepo);
       }
     })();
     return () => { cancelado = true; };

@@ -128,15 +128,17 @@ function configurarBootstrap({
   medidores = [MEDIDOR_BASE],
 } = {}) {
   mockGetBootstrap.mockResolvedValue({
-    suscriptorRepo: {
-      buscarPorId: jest.fn().mockResolvedValue(suscriptor),
-      toggleSubsidio: jest.fn(),
-    },
-    medidorRepo: {
-      listarPorSuscriptor: jest.fn().mockResolvedValue(medidores),
-    },
-    lecturaRepo: {
-      listarPorMedidor: jest.fn().mockResolvedValue([]),
+    repos: {
+      suscriptorRepo: {
+        buscarPorId: jest.fn().mockResolvedValue(suscriptor),
+        toggleSubsidio: jest.fn(),
+      },
+      medidorRepo: {
+        listarPorSuscriptor: jest.fn().mockResolvedValue(medidores),
+      },
+      lecturaRepo: {
+        listarPorMedidor: jest.fn().mockResolvedValue([]),
+      },
     },
   } as any);
 }

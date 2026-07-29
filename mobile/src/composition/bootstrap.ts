@@ -93,8 +93,7 @@ export interface ResultadoSync {
   readonly pendientes: number;
 }
 
-export interface BootstrapApp {
-  readonly db: SQLite.SQLiteDatabase;
+export interface BootstrapRepos {
   readonly facturaRepo: FacturaRepositoryExpoSqlite;
   readonly lecturaRepo: LecturaRepositoryExpoSqlite;
   readonly colaRepo: ColaRepositoryExpoSqlite;
@@ -115,10 +114,16 @@ export interface BootstrapApp {
   // de verdad para la UI `OtrosValoresFactura`. Inyectado via
   // `getBootstrap().conceptoOtroValorRepo.listar(true)` desde la pantalla.
   readonly conceptoOtroValorRepo: ConceptoOtroValorRepositoryExpoSqlite;
+}
+
+export interface BootstrapAdapters {
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
   readonly clienteHttp: ClienteSincronizacion;
   readonly apiBaseUrl: string;
+}
+
+export interface BootstrapServices {
   /**
    * Procesa la cola completa una sola vez (no hace polling).
    * Devuelve los contadores del estado final para mostrar feedback.
@@ -135,6 +140,13 @@ export interface BootstrapApp {
     parametros: ParametrosTarifa | null;
     acuerdo: AcuerdoMunicipal | null;
   }>;
+}
+
+export interface BootstrapApp {
+  readonly db: SQLite.SQLiteDatabase;
+  readonly repos: BootstrapRepos;
+  readonly adapters: BootstrapAdapters;
+  readonly services: BootstrapServices;
 }
 
 /**
@@ -224,22 +236,28 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
 
   return {
     db,
-    facturaRepo,
-    lecturaRepo,
-    colaRepo,
-    suscriptorRepo,
-    medidorRepo,
-    prestadorRepo,
-    acuerdoMunicipalRepo,
-    parametrosTarifaRepo,
-    operarioRepo,
-    conceptoOtroValorRepo,
-    hasher,
-    idGenerator,
-    clienteHttp,
-    apiBaseUrl,
-    procesadorCola,
-    smoke,
-    resolverContextoPrestador,
+    repos: {
+      facturaRepo,
+      lecturaRepo,
+      colaRepo,
+      suscriptorRepo,
+      medidorRepo,
+      prestadorRepo,
+      acuerdoMunicipalRepo,
+      parametrosTarifaRepo,
+      operarioRepo,
+      conceptoOtroValorRepo,
+    },
+    adapters: {
+      hasher,
+      idGenerator,
+      clienteHttp,
+      apiBaseUrl,
+    },
+    services: {
+      procesadorCola,
+      smoke,
+      resolverContextoPrestador,
+    },
   };
 }

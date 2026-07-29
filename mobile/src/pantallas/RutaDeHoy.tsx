@@ -74,7 +74,7 @@ export default function RutaDeHoy({ navigation }: Props) {
     let cancelado = false;
     void (async () => {
       try {
-        const { prestadorRepo } = await getBootstrap();
+        const { repos: { prestadorRepo } } = await getBootstrap();
         const p = await prestadorRepo.obtenerPorId(id_prestador_activo);
         if (cancelado) return;
         if (p) {
@@ -101,10 +101,10 @@ export default function RutaDeHoy({ navigation }: Props) {
     try {
       const bootstrap = await getBootstrap();
       const [listaSuscriptores, todasLecturas, itemsCola, todosMedidores] = await Promise.all([
-        bootstrap.suscriptorRepo.listar(),
-        bootstrap.lecturaRepo.listar(),
-        bootstrap.colaRepo.listar(),
-        bootstrap.medidorRepo.listar(),
+        bootstrap.repos.suscriptorRepo.listar(),
+        bootstrap.repos.lecturaRepo.listar(),
+        bootstrap.repos.colaRepo.listar(),
+        bootstrap.repos.medidorRepo.listar(),
       ]);
 
       // Contar lecturas capturadas en el mes actual (YYYY-MM)
@@ -156,7 +156,7 @@ export default function RutaDeHoy({ navigation }: Props) {
 
   const navegarACapturar = useCallback(async (item: Suscriptor) => {
     try {
-      const { medidorRepo } = await getBootstrap();
+      const { repos: { medidorRepo } } = await getBootstrap();
       const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
       if (medidores.length === 0) return;
       if (medidores.length === 1 && medidores[0]) {

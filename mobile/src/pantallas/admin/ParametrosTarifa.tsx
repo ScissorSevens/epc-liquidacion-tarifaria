@@ -79,11 +79,11 @@ export default function ParametrosTarifaForm({
       // El bootstrap retorna el adapter expo-sqlite que implementa el
       // contract `ParametrosTarifaRepository`. Sin cast: TS verifica
       // adhesion estructural directamente. Antes esto era:
-      //   `bs.parametrosTarifaRepo as unknown as ParametrosTarifaRepo`
+      //   `bs.repos.parametrosTarifaRepo as unknown as ParametrosTarifaRepo`
       // (cast inseguro que tapaba el bug `repo.guardar is not a function`
       //  — ver TAREA 11 sdd-apply).
-      if (repo === null) setRepo(bs.parametrosTarifaRepo);
-      if (acuerdoRepo === null) setAcuerdoRepo(bs.acuerdoMunicipalRepo);
+      if (repo === null) setRepo(bs.repos.parametrosTarifaRepo);
+      if (acuerdoRepo === null) setAcuerdoRepo(bs.repos.acuerdoMunicipalRepo);
     })();
     return () => { cancelado = true; };
   }, [repo, acuerdoRepo]);

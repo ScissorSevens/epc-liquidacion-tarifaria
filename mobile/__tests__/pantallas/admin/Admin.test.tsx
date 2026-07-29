@@ -71,14 +71,16 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
 
 jest.mock('../../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn().mockResolvedValue({
-    prestadorRepo: {
-      obtenerPorId: jest.fn().mockResolvedValue(null),
-    },
-    acuerdoMunicipalRepo: {
-      buscarVigente: jest.fn().mockResolvedValue(null),
-    },
-    parametrosTarifaRepo: {
-      buscarVigente: jest.fn().mockResolvedValue(null),
+    repos: {
+      prestadorRepo: {
+        obtenerPorId: jest.fn().mockResolvedValue(null),
+      },
+      acuerdoMunicipalRepo: {
+        buscarVigente: jest.fn().mockResolvedValue(null),
+      },
+      parametrosTarifaRepo: {
+        buscarVigente: jest.fn().mockResolvedValue(null),
+      },
     },
   }),
 }));

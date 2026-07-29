@@ -95,7 +95,7 @@ export default function Sincronizacion(_props: Props) {
     setCargando('health');
     try {
       const bootstrap = await getBootstrap();
-      const url = `${bootstrap.apiBaseUrl}/health`;
+      const url = `${bootstrap.adapters.apiBaseUrl}/health`;
       const resp = await fetch(url);
       const txt = await resp.text();
       const ok = resp.ok && txt.toLowerCase().includes('healthy');
@@ -120,7 +120,7 @@ export default function Sincronizacion(_props: Props) {
     setCargando('sync');
     try {
       const bootstrap = await getBootstrap();
-      const r: ResultadoSync = await bootstrap.procesadorCola();
+      const r: ResultadoSync = await bootstrap.services.procesadorCola();
       setContadores({
         exitosos: r.enviados,
         fallidos: r.fallidos,
@@ -144,7 +144,7 @@ export default function Sincronizacion(_props: Props) {
     setCargando('cola');
     try {
       const bootstrap = await getBootstrap();
-      const items = await bootstrap.colaRepo.listar();
+      const items = await bootstrap.repos.colaRepo.listar();
       if (items.length === 0) {
         agregarEvento('cola', 'Cola vacia');
         return;

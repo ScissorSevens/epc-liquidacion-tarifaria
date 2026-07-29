@@ -113,12 +113,12 @@ export default function SetupInicial({ onComplete }: Props) {
       // 2. Bootstrap del tenant via getBootstrap (cached) + bootstrapCompleto.
       const bs = await getBootstrap();
       const resultado = await bootstrapCompleto({
-        prestadorRepo: bs.prestadorRepo,
-        acuerdoRepo: bs.acuerdoMunicipalRepo,
-        parametrosRepo: bs.parametrosTarifaRepo,
-        operarioRepo: bs.operarioRepo,
-        hasher: bs.hasher,
-        idGenerator: bs.idGenerator,
+        prestadorRepo: bs.repos.prestadorRepo,
+        acuerdoRepo: bs.repos.acuerdoMunicipalRepo,
+        parametrosRepo: bs.repos.parametrosTarifaRepo,
+        operarioRepo: bs.repos.operarioRepo,
+        hasher: bs.adapters.hasher,
+        idGenerator: bs.adapters.idGenerator,
         input: {
           prestadorData: prestadorFormABootstrap(prestadorForm),
           operarioData: {

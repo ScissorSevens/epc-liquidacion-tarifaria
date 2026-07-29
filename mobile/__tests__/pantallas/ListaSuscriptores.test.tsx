@@ -57,7 +57,9 @@ const SUSCRIPTORES_DEFECTO = [
 
 function configurarBootstrap(lista = SUSCRIPTORES_DEFECTO) {
   mockGetBootstrap.mockResolvedValue({
-    suscriptorRepo: { listar: jest.fn().mockResolvedValue(lista) },
+    repos: {
+      suscriptorRepo: { listar: jest.fn().mockResolvedValue(lista) },
+    },
   } as any);
 }
 

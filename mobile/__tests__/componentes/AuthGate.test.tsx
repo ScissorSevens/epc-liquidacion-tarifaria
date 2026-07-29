@@ -183,8 +183,10 @@ function mockBootstrapConPrestadores(prestadores: unknown[]): void {
     ...(p as object),
   }));
   mockedGetBootstrap.mockResolvedValue({
-    prestadorRepo: {
-      listar: jest.fn().mockResolvedValue(prestadoresComoReales),
+    repos: {
+      prestadorRepo: {
+        listar: jest.fn().mockResolvedValue(prestadoresComoReales),
+      },
     },
     db: {} as never,
   } as never);
@@ -462,11 +464,13 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       mockedGetBootstrap.mockImplementationOnce(async () => {
         ordenLlamadas.push('bootstrap');
         return {
-          prestadorRepo: {
-            listar: jest.fn().mockImplementation(async () => {
-              ordenLlamadas.push('prestadorRepo.listar');
-              return [];
-            }),
+          repos: {
+            prestadorRepo: {
+              listar: jest.fn().mockImplementation(async () => {
+                ordenLlamadas.push('prestadorRepo.listar');
+                return [];
+              }),
+            },
           },
           db: {} as never,
         } as never;

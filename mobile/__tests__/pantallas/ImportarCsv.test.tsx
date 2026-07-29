@@ -146,11 +146,15 @@ describe('ImportarCsv — BotonPrimario migration', () => {
     nav = crearNavMock();
     jest.clearAllMocks();
     mockGetBootstrap.mockResolvedValue({
-      suscriptorRepo: {},
-      medidorRepo: {},
-      colaRepo: {},
-      idGenerator: { uuid: () => 'uuid' },
-      hasher: { sha256: (s: string) => `sha256(${s})` },
+      repos: {
+        suscriptorRepo: {},
+        medidorRepo: {},
+        colaRepo: {},
+      },
+      adapters: {
+        idGenerator: { uuid: () => 'uuid' },
+        hasher: { sha256: (s: string) => `sha256(${s})` },
+      },
     } as any);
     mockPersistir.mockResolvedValue({ reporte: REPORTE_EXITO, itemsEncolados: [] });
   });

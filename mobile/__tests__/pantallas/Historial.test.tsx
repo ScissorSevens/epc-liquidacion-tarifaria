@@ -115,11 +115,13 @@ describe('Historial — TarjetaMetrica migration', () => {
 
   function configurarBootstrap(lecturas: ReturnType<typeof generarLecturas>) {
     mockGetBootstrap.mockResolvedValue({
-      medidorRepo: {
-        listarPorSuscriptor: jest.fn().mockResolvedValue([{ id_medidor: 99, numero_medidor: 'M1' }]),
-      },
-      lecturaRepo: {
-        listarPorMedidor: jest.fn().mockResolvedValue(lecturas),
+      repos: {
+        medidorRepo: {
+          listarPorSuscriptor: jest.fn().mockResolvedValue([{ id_medidor: 99, numero_medidor: 'M1' }]),
+        },
+        lecturaRepo: {
+          listarPorMedidor: jest.fn().mockResolvedValue(lecturas),
+        },
       },
     } as any);
   }

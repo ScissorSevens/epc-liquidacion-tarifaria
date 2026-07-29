@@ -178,11 +178,11 @@ export default function ImportarCsv({ navigation }: Props) {
       // quedaba vacia → el backend nunca veia los suscriptores nuevos.
       const { reporte } = await persistirYEncolarImportacion({
         filas: archivo.filas,
-        suscriptorRepo: bs.suscriptorRepo,
-        medidorRepo: bs.medidorRepo,
-        colaRepo: bs.colaRepo,
-        idGenerator: bs.idGenerator,
-        hasher: bs.hasher,
+        suscriptorRepo: bs.repos.suscriptorRepo,
+        medidorRepo: bs.repos.medidorRepo,
+        colaRepo: bs.repos.colaRepo,
+        idGenerator: bs.adapters.idGenerator,
+        hasher: bs.adapters.hasher,
       });
       setEstado({
         fase: 'resultado',

@@ -99,7 +99,7 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
     setCargando(true);
 
     try {
-      const { operarioRepo, hasher } = await getBootstrap();
+      const { repos: { operarioRepo }, adapters: { hasher } } = await getBootstrap();
       const resultado = await loginLocal({
         operarioRepo,
         hasher,

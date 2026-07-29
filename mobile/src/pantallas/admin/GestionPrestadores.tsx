@@ -56,9 +56,9 @@ export default function GestionPrestadores({
       const bs = await getBootstrap();
       if (!cancelado) {
         setRepo({
-          listar: () => bs.prestadorRepo.listar(),
+          listar: () => bs.repos.prestadorRepo.listar(),
           suspender: async (id: number) => {
-            await bs.prestadorRepo.suspender(id);
+            await bs.repos.prestadorRepo.suspender(id);
           },
         });
       }

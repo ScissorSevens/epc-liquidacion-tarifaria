@@ -61,7 +61,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const { suscriptorRepo } = await getBootstrap();
+      const { repos: { suscriptorRepo } } = await getBootstrap();
       const lista = await suscriptorRepo.listar();
       setSuscriptores(lista);
     } catch (e) {
@@ -88,7 +88,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
   const navegarACapturar = useCallback(
     async (item: Suscriptor) => {
       try {
-        const { medidorRepo } = await getBootstrap();
+        const { repos: { medidorRepo } } = await getBootstrap();
         const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
         if (medidores.length === 0) return;
         if (medidores.length === 1 && medidores[0]) {

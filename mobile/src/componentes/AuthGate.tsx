@@ -115,7 +115,7 @@ export function AuthGate() {
         //    - si id=0 → legacy placeholder
         //    - si codigo='EPC-LEGACY' → legacy placeholder (defensa extra)
         //    - si estado='suspendido' → no es un prestador activo para login
-        const todosPrestadores = await bootstrap.prestadorRepo.listar();
+        const todosPrestadores = await bootstrap.repos.prestadorRepo.listar();
         if (cancelado) return;
 
         const prestadoresReales = todosPrestadores.filter(
