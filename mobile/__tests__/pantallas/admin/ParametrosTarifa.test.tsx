@@ -31,6 +31,20 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/composition/get-bootstrap', () => ({
+  getBootstrap: jest.fn().mockResolvedValue({
+    repos: {
+      parametrosTarifaRepo: {
+        guardar: jest.fn().mockResolvedValue({}),
+        buscarVigente: jest.fn().mockResolvedValue(null),
+      },
+      acuerdoMunicipalRepo: {
+        buscarVigente: jest.fn().mockResolvedValue(null),
+      },
+    },
+  }),
+}));
+
 jest.mock('../../../src/theme/skeletal-tokens', () => ({
   BORDERS: { thin: { borderWidth: 1 } },
   COLORS: {
@@ -46,7 +60,7 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
   },
   RADIUS: { sm: 4, md: 8, full: 999 },
   SHADOWS: { card: {} },
-  SPACING: { xs: 4, sm: 8, md: 16 },
+  SPACING: { xs: 4, sm: 8, md: 16, lg: 24 },
   TYPOGRAPHY: {
     labelMd: { fontSize: 14 },
     labelLg: { fontSize: 18 },
@@ -519,6 +533,86 @@ describe('ParametrosTarifaForm', () => {
       );
       // El cma editado a 999 NO debe volver a 12345678.
       expect(getByTestId('param-cma').props.value).toBe('999');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // T-LOAD: loading guard durante bootstrap (admin-screen-perf-fixes,
+  // Task 3). Todos los FormFields + Switches deben estar disabled
+  // mientras repo === null O cargando === true. Mientras dure ese
+  // período, un ActivityIndicator visible debe estar en el árbol.
+  // ─────────────────────────────────────────────────────────────
+  describe('T-LOAD: loading guard durante bootstrap', () => {
+    it('T-LOAD-1 FormFields y Switches tienen disabled=true cuando repo === null', async () => {
+      // Sin repo inyectado ⇒ el componente entra en estado de carga.
+      // Todos los FormFields deben tener editable=false.
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, getByLabelText, queryByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          // repo omitido a proposito
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Periodo: editable debe ser false (repo === null).
+      const inputPeriodo = getByTestId('param-periodo');
+      expect(inputPeriodo.props.editable).toBe(false);
+      // CMA tambien.
+      const inputCma = getByTestId('param-cma');
+      expect(inputCma.props.editable).toBe(false);
+      // Verifico que al menos algun FormField adicional tambien esta disabled.
+      const inputCmo = getByTestId('param-cmo');
+      expect(inputCmo.props.editable).toBe(false);
+      // Switches: el primero tiene accessibilityLabel "Aplicar costo medio
+      // variable de inversion ambiental".
+      const switchCmviaa = getByLabelText('Aplicar costo medio variable de inversión ambiental');
+      expect(switchCmviaa.props.disabled).toBe(true);
+      const switchMinimoVital = getByLabelText('Aplicar mínimo vital');
+      expect(switchMinimoVital.props.disabled).toBe(true);
+      // El ActivityIndicator debe estar visible.
+      expect(queryByTestId('bootstrap-indicator')).toBeTruthy();
+    });
+
+    it('T-LOAD-2 ActivityIndicator visible mientras cargando === true', async () => {
+      // Sin repo, sin parametrosActuales, sin acuerdoRepo.
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+        />,
+      );
+      // El ActivityIndicator con testID='bootstrap-indicator' debe estar
+      // en el árbol (testID estable para tests).
+      const indicator = getByTestId('bootstrap-indicator');
+      expect(indicator).toBeTruthy();
+    });
+
+    it('T-LOAD-3 FormFields y Switches tienen disabled=false cuando bootstrap terminó (repo !== null && !cargando)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, getByLabelText, queryByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Esperar a que el formulario llegue al estado estable.
+      await waitFor(() => {
+        expect(getByTestId('param-periodo').props.editable).toBe(true);
+      });
+      // Switches deben estar enabled.
+      const switchCmviaa = getByLabelText('Aplicar costo medio variable de inversión ambiental');
+      expect(switchCmviaa.props.disabled).toBe(false);
+      const switchMinimoVital = getByLabelText('Aplicar mínimo vital');
+      expect(switchMinimoVital.props.disabled).toBe(false);
+      // El ActivityIndicator NO debe estar presente.
+      expect(queryByTestId('bootstrap-indicator')).toBeNull();
     });
   });
 });

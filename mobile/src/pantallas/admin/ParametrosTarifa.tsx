@@ -16,7 +16,7 @@
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
@@ -67,7 +67,11 @@ export default function ParametrosTarifaForm({
   const [acuerdoRepo, setAcuerdoRepo] = useState<AcuerdoMunicipalRepository | null>(acuerdoRepoProp ?? null);
   const [id_acuerdo, setIdAcuerdo] = useState<number>(idAcuerdoProp ?? 0);
   const [parametrosActuales, setParametrosActuales] = useState<ParametrosTarifa | null>(parametrosProp ?? null);
-  const [cargando, setCargando] = useState(true);
+  // cargando arranca true solo si vamos a fetchear (prop undefined).
+  // Si la prop viene provista, no hay fetch → cargando=false desde el
+  // inicio. Esto evita mantener los FormFields disabled infinitamente
+  // cuando el caller ya inyectó los datos (Stack Navigation, test).
+  const [cargando, setCargando] = useState(parametrosProp === undefined);
 
   // Cuando el Stack o el test inyecta `parametrosActuales` como prop,
   // el state interno debe reflejar esa prop. Sin esta sincronización,
@@ -244,11 +248,25 @@ export default function ParametrosTarifaForm({
     }
   };
 
+  // Flag global de indisponibilidad. Activo mientras el bootstrap no
+  // resuelve (repo null) o la carga inicial sigue en curso (cargando).
+  // Mientras dure, todos los FormFields + Switches + el botón guardar
+  // quedan disabled, y un ActivityIndicator visible señala el estado.
+  // Ver admin-screen-perf-fixes #T-LOAD-1/#T-LOAD-2/#T-LOAD-3.
+  const cargandoInputs = repo === null || cargando;
+
   return (
     <ScrollView style={estilos.root} contentContainerStyle={estilos.content}>
-      {id_prestador <= 0 || id_acuerdo <= 0 || (repo === null && cargando) ? (
-        <Text style={estilos.sub}>Cargando contexto del prestador...</Text>
-      ) : null}
+      {cargandoInputs && (
+        <View style={estilos.cargandoContenedor}>
+          <ActivityIndicator
+            size="large"
+            color={COLORS.primary}
+            testID="bootstrap-indicator"
+          />
+          <Text style={estilos.cargandoTexto}>Cargando contexto del prestador...</Text>
+        </View>
+      )}
       <Text style={estilos.titulo}>Parámetros Tarifarios · Prestador #{id_prestador}</Text>
       <Text style={estilos.sub}>Conforme a Res CRA 825/2017 + 907/2019 art. 14</Text>
 
@@ -260,7 +278,7 @@ export default function ParametrosTarifaForm({
           value={periodo}
           onChangeText={setPeriodo}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-periodo"
         />
       </View>
@@ -269,7 +287,7 @@ export default function ParametrosTarifaForm({
           label="Vigente desde (YYYY-MM-DD)"
           value={vigenteDesde}
           onChangeText={setVigenteDesde}
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           accessibilityHint="Fecha de inicio de vigencia del periodo tarifario"
           testID="param-vigente-desde"
         />
@@ -279,7 +297,7 @@ export default function ParametrosTarifaForm({
           label="Vigente hasta (YYYY-MM-DD)"
           value={vigenteHasta}
           onChangeText={setVigenteHasta}
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
           testID="param-vigente-hasta"
         />
@@ -293,7 +311,7 @@ export default function ParametrosTarifaForm({
           value={cma}
           onChangeText={setCma}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-cma"
         />
       </View>
@@ -303,7 +321,7 @@ export default function ParametrosTarifaForm({
           value={cmo}
           onChangeText={setCmo}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-cmo"
         />
       </View>
@@ -313,7 +331,7 @@ export default function ParametrosTarifaForm({
           value={cmi}
           onChangeText={setCmi}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-cmi"
         />
       </View>
@@ -323,7 +341,7 @@ export default function ParametrosTarifaForm({
           value={cmt}
           onChangeText={setCmt}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-cmt"
         />
       </View>
@@ -333,7 +351,7 @@ export default function ParametrosTarifaForm({
         <Switch
           value={aplicaCmviaa}
           onValueChange={setAplicaCmviaa}
-          disabled={guardando}
+          disabled={guardando || cargandoInputs}
           accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
         />
       </View>
@@ -344,7 +362,7 @@ export default function ParametrosTarifaForm({
             value={cmviaa}
             onChangeText={setCmviaa}
             keyboardType="numeric"
-            editable={!guardando}
+            editable={!guardando && !cargandoInputs}
             testID="param-cmviaa"
           />
         </View>
@@ -357,7 +375,7 @@ export default function ParametrosTarifaForm({
           value={aguaSuministrada}
           onChangeText={setAguaSuministrada}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-agua"
         />
       </View>
@@ -367,7 +385,7 @@ export default function ParametrosTarifaForm({
           value={ipuf}
           onChangeText={setIpuf}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           helperText="Estándar CRA: 6 m³/suscriptor/mes"
           testID="param-ipuf"
         />
@@ -378,7 +396,7 @@ export default function ParametrosTarifaForm({
           value={suscriptoresPromedio}
           onChangeText={setSuscriptoresPromedio}
           keyboardType="numeric"
-          editable={!guardando}
+          editable={!guardando && !cargandoInputs}
           testID="param-suscriptores"
         />
       </View>
@@ -389,7 +407,7 @@ export default function ParametrosTarifaForm({
         <Switch
           value={aplicaMinimoVital}
           onValueChange={setAplicaMinimoVital}
-          disabled={guardando}
+          disabled={guardando || cargandoInputs}
           accessibilityLabel="Aplicar mínimo vital"
         />
       </View>
@@ -400,7 +418,7 @@ export default function ParametrosTarifaForm({
             value={m3Gratis}
             onChangeText={setM3Gratis}
             keyboardType="numeric"
-            editable={!guardando}
+            editable={!guardando && !cargandoInputs}
             testID="param-m3gratis"
           />
         </View>
@@ -412,6 +430,7 @@ export default function ParametrosTarifaForm({
         icono="save"
         tono="azul"
         onPress={guardar}
+        disabled={cargandoInputs}
         cargando={guardando}
         testID="param-guardar"
       />
@@ -433,6 +452,20 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
   },
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
+  // Loading indicator overlay. Visible mientras repo === null O cargando.
+  // Centrado verticalmente con un label debajo para que el screen
+  // reader anuncie el estado. El testID `bootstrap-indicator` vive en
+  // el ActivityIndicator interno para que los tests puedan
+  // identificar el spinner.
+  cargandoContenedor: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  cargandoTexto: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurfaceVariant,
+  },
   // Mantenemos 'input' por si se agrega algun campo no-FormField en el
   // futuro. Los FormField tienen su propio style interno.
   input: {
