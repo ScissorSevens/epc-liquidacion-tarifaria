@@ -182,21 +182,26 @@ function inputBase(overrides: Partial<EmitirFacturaInput> = {}): EmitirFacturaIn
 }
 
 describe('FacturaSnapshotLectura — expansion v2', () => {
-  it('incluye lecturas, evidencia, timestamp y observaciones', () => {
+  it('incluye las 7 claves planas: lectura_actual, lectura_anterior, estado_validacion, evidencia_foto_path, evidencia_foto_hash, timestamp_captura, observaciones', () => {
     const factura = emitirFactura(inputBase(), hasher);
     expect(factura.snapshot.lectura).toEqual({
       lectura_actual: 1234,
       lectura_anterior: 1200,
-      evidencia: {
-        foto_path: 'file:///photo.jpg',
-        foto_hash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
-      },
+      estado_validacion: 'validado',
+      evidencia_foto_path: 'file:///photo.jpg',
+      evidencia_foto_hash:
+        'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
       timestamp_captura: '2026-02-01T08:30:00.000Z',
       observaciones: 'Sin novedad',
     });
   });
 
-  it('evidencia opcional se omite cuando no se provee', () => {
+  it('NO usa objeto evidencia anidado (snapshot aplanado)', () => {
+    const factura = emitirFactura(inputBase(), hasher);
+    expect(factura.snapshot.lectura).not.toHaveProperty('evidencia');
+  });
+
+  it('claves evidencia_* son null cuando no hay foto', () => {
     const lecturaSinFoto: Lectura = {
       id_medidor: 10,
       id_periodo: '202601',
@@ -208,16 +213,32 @@ describe('FacturaSnapshotLectura — expansion v2', () => {
       estado_sync: 'pendiente',
     };
     const factura = emitirFactura(inputBase({ lectura: lecturaSinFoto }), hasher);
-    expect(factura.snapshot.lectura.evidencia).toBeUndefined();
+    expect(factura.snapshot.lectura.evidencia_foto_path).toBeNull();
+    expect(factura.snapshot.lectura.evidencia_foto_hash).toBeNull();
   });
 
-  it('observaciones opcional se omite cuando no se provee', () => {
+  it('observaciones es null cuando no se provee', () => {
     const lecturaSinObs: Lectura = {
       ...lecturaBase(),
       observaciones: undefined,
     };
     const factura = emitirFactura(inputBase({ lectura: lecturaSinObs }), hasher);
-    expect(factura.snapshot.lectura.observaciones).toBeUndefined();
+    expect(factura.snapshot.lectura.observaciones).toBeNull();
+  });
+
+  it('estado_validacion preserva valor origen (pendiente | validado | error)', () => {
+    const estados: Array<'pendiente' | 'validado' | 'error'> = [
+      'pendiente',
+      'validado',
+      'error',
+    ];
+    for (const estado of estados) {
+      const factura = emitirFactura(
+        inputBase({ lectura: { ...lecturaBase(), estado_validacion: estado } }),
+        hasher,
+      );
+      expect(factura.snapshot.lectura.estado_validacion).toBe(estado);
+    }
   });
 
   it('snapshot.lectura esta deepFrozen', () => {
@@ -255,6 +276,15 @@ describe('FacturaSnapshotLectura — expansion v2', () => {
     expect(a.hash).not.toBe(b.hash);
   });
 
+  it('cambiar estado_validacion cambia el hash', () => {
+    const a = emitirFactura(inputBase(), hasher);
+    const b = emitirFactura(
+      inputBase({ lectura: { ...lecturaBase(), estado_validacion: 'error' } }),
+      hasher,
+    );
+    expect(a.hash).not.toBe(b.hash);
+  });
+
   it('cambiar foto_path de la evidencia cambia el hash', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
@@ -262,6 +292,20 @@ describe('FacturaSnapshotLectura — expansion v2', () => {
         lectura: {
           ...lecturaBase(),
           evidencia: { foto_path: 'file:///otra.jpg', foto_hash: 'h' },
+        },
+      }),
+      hasher,
+    );
+    expect(a.hash).not.toBe(b.hash);
+  });
+
+  it('cambiar foto_hash de la evidencia cambia el hash', () => {
+    const a = emitirFactura(inputBase(), hasher);
+    const b = emitirFactura(
+      inputBase({
+        lectura: {
+          ...lecturaBase(),
+          evidencia: { foto_path: 'file:///photo.jpg', foto_hash: 'otro-hash' },
         },
       }),
       hasher,
@@ -290,15 +334,23 @@ describe('FacturaSnapshotLectura — expansion v2', () => {
     expect(() => emitirFactura(inputRoto, hasher)).toThrow(/lectura/i);
   });
 
-  it('FacturaSnapshotLectura shape v2 (5 campos + evidencia opcional)', () => {
+  it('FacturaSnapshotLectura shape v2 — exactamente 7 claves planas', () => {
     const snap: FacturaSnapshotLectura = {
       lectura_actual: 1,
       lectura_anterior: 0,
+      estado_validacion: 'validado',
+      evidencia_foto_path: 'x',
+      evidencia_foto_hash: 'y',
       timestamp_captura: 'X',
+      observaciones: 'z',
     };
     expect(Object.keys(snap).sort()).toEqual([
+      'estado_validacion',
+      'evidencia_foto_hash',
+      'evidencia_foto_path',
       'lectura_actual',
       'lectura_anterior',
+      'observaciones',
       'timestamp_captura',
     ]);
   });

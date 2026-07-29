@@ -163,37 +163,69 @@ export interface FacturaSnapshotLiquidacion {
  * factura. Datos proyectados de la entidad `Lectura`:
  *
  * - lectura_actual / lectura_anterior: valores del medidor (m³).
- * - evidencia: foto_path + foto_hash (cuando el operario tomó foto).
+ * - estado_validacion: 'pendiente' | 'validado' | 'error' — estado
+ *   del workflow de la lectura al momento de la emisión (alias del
+ *   EstadoValidacion del módulo captura-lecturas). Se proyecta al
+ *   snapshot para auditoría histórica.
+ * - evidencia_foto_path / evidencia_foto_hash: null cuando no hay
+ *   foto tomada. **Claves planas** (NO objeto `evidencia` anidado) —
+ *   el snapshot normativo se aplana para que el reporte y la factura
+ *   emitida tengan las 7 claves top-level estables.
  * - timestamp_captura: ISO 8601 del momento de captura.
- * - observaciones: notas del operario.
+ * - observaciones: `null` cuando no hay notas (NO `undefined`: snapshot
+ *   es contrato normativo, no API parcial).
  *
  * NO se proyecta: id_lectura (interno), id_medidor (ya en snapshot.medidor),
  * id_periodo (ya en snapshot.periodo), id_operario (ya en snapshot.operario),
- * estado_validacion (workflow), estado_sync (workflow), timestamp_sync
- * (workflow), id_prestador (ya en snapshot.prestador).
+ * estado_sync (workflow), timestamp_sync (workflow), id_prestador
+ * (ya en snapshot.prestador).
  */
 export interface FacturaSnapshotLectura {
   readonly lectura_actual: number;
   readonly lectura_anterior: number;
-  readonly evidencia?: EvidenciaFoto;
+  readonly estado_validacion: 'pendiente' | 'validado' | 'error';
+  readonly evidencia_foto_path: string | null;
+  readonly evidencia_foto_hash: string | null;
   readonly timestamp_captura: string;
-  readonly observaciones?: string;
+  readonly observaciones: string | null;
 }
 
 /**
- * Helper de proyeccion Lectura → FacturaSnapshotLectura. Reusa
- * `EvidenciaFoto` del módulo de captura.
+ * Helper de proyeccion Lectura → FacturaSnapshotLectura.
+ *
+ * Aplana `lectura.evidencia` a claves top-level y proyecta los 7
+ * campos normativos. `estado_validacion` se copia del origen;
+ * valores nulos o `undefined` se preservan como `null`.
  */
 export function extraerSnapshotLectura(lectura: Lectura): FacturaSnapshotLectura {
   if (lectura === null || lectura === undefined) {
     throw new Error('extraerSnapshotLectura: lectura es requerida');
   }
+  const estadoValidacion = lectura.estado_validacion;
+  const evidenciaFotoPath =
+    lectura.evidencia === undefined || lectura.evidencia === null
+      ? null
+      : lectura.evidencia.foto_path === undefined || lectura.evidencia.foto_path === ''
+        ? null
+        : lectura.evidencia.foto_path;
+  const evidenciaFotoHash =
+    lectura.evidencia === undefined || lectura.evidencia === null
+      ? null
+      : lectura.evidencia.foto_hash === undefined || lectura.evidencia.foto_hash === ''
+        ? null
+        : lectura.evidencia.foto_hash;
+  const observaciones =
+    lectura.observaciones === undefined || lectura.observaciones === ''
+      ? null
+      : lectura.observaciones;
   const snap: FacturaSnapshotLectura = {
     lectura_actual: lectura.lectura_actual,
     lectura_anterior: lectura.lectura_anterior,
+    estado_validacion: estadoValidacion,
+    evidencia_foto_path: evidenciaFotoPath,
+    evidencia_foto_hash: evidenciaFotoHash,
     timestamp_captura: lectura.timestamp_captura,
-    ...(lectura.evidencia !== undefined && { evidencia: { ...lectura.evidencia } }),
-    ...(lectura.observaciones !== undefined && { observaciones: lectura.observaciones }),
+    observaciones,
   };
   return Object.freeze(snap);
 }
