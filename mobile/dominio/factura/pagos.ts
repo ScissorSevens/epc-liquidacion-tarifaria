@@ -17,13 +17,16 @@
 
 import type { Factura } from './types';
 import type { Hasher, IdGenerator } from '../shared/ports';
+import {
+  CODIGO_VERIFICACION_LONGITUD,
+  calcularCodigoVerificacionPlaceholder,
+} from '../shared/codigos';
 
-/**
- * Longitud del codigo de verificacion. 10 chars base36 — contrato
- * normativo Res CRA 1038/2026: codigo legible por el usuario + robusto
- * para busqueda (~60 bits de entropia en 36^10).
- */
-const CODIGO_VERIFICACION_LONGITUD = 10;
+// Re-export para callers legacy que importaban `CODIGO_VERIFICACION_LONGITUD`
+// o `calcularCodigoVerificacionPlaceholder` desde `pagos.ts`. La fuente
+// canonica es `dominio/shared/codigos`.
+export { CODIGO_VERIFICACION_LONGITUD, calcularCodigoVerificacionPlaceholder };
+
 const BASE36_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /**

@@ -20,6 +20,7 @@
 
 import type * as SQLite from 'expo-sqlite';
 import { esTransicionLegal } from '@dominio/factura/factura';
+import { calcularCodigoVerificacionPlaceholder } from '@dominio/shared/codigos';
 import {
   MENSAJES_ERROR_FACTURA,
   type EstadoFactura,
@@ -93,6 +94,8 @@ function fromRow(row: FacturaRow): Factura {
   const snapshot = JSON.parse(row.snapshot) as FacturaSnapshot;
   // Codigo de verificacion: leemos de la columna migration 020. Si la
   // fila es legacy (pre-2027) y la columna es null, derivamos del hash.
+  // Helper consolidado en `dominio/shared/codigos` (change
+  // `factura-compliance-hardening`).
   const codigoVerificacion =
     row.codigo_verificacion !== null && row.codigo_verificacion !== ''
       ? row.codigo_verificacion
@@ -125,21 +128,6 @@ function fromRow(row: FacturaRow): Factura {
     ...(row.reemplaza_a !== null && { reemplaza_a: row.reemplaza_a }),
   };
   return factura;
-}
-
-function calcularCodigoVerificacionPlaceholder(hash: string): string {
-  // Espejo del helper en pagos.ts: filtra chars no-hex (compat con
-  // hasher fake en tests), convierte primeros 16 hex chars a base36,
-  // padStart a 10. En prod el hash es SHA-256 hex de 64 chars.
-  const hexOnly = (hash + '0'.repeat(16))
-    .split('')
-    .filter((ch) => /[0-9a-fA-F]/.test(ch))
-    .join('')
-    .slice(0, 16)
-    .padEnd(16, '0');
-  const valor = parseInt(hexOnly, 16);
-  const base36 = valor.toString(36).toUpperCase();
-  return base36.slice(0, 10).padStart(10, '0');
 }
 
 const SQL_INSERT = `
