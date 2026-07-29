@@ -16,6 +16,7 @@
  */
 
 import type * as SQLite from 'expo-sqlite';
+import { aplicarMigration020IdempotenteExpo } from '../../../dominio/persistencia/sqlite/migraciones-idempotente';
 
 interface Migracion {
   readonly version: number;
@@ -490,6 +491,22 @@ export async function aplicarMigracionesAsync(
         );
         continue;
       }
+    }
+
+    // Migration 020 (factura-compliance 1038): SQLite < 3.35 NO soporta
+    // `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, por lo que si la DB fue
+    // restaurada parcialmente (user_version atras del schema) el ALTER
+    // tira "duplicate column". Usamos el helper idempotente basado en
+    // PRAGMA table_info. Misma logica que el runner Node.
+    if (migracion.version === 20) {
+      await aplicarMigration020IdempotenteExpo(db, migracion.sql);
+      await db.runAsync(
+        'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
+        migracion.version,
+        migracion.nombre,
+        new Date().toISOString(),
+      );
+      continue;
     }
 
     await db.execAsync(migracion.sql);

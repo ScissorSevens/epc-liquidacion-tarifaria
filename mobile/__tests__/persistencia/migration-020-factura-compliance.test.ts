@@ -96,7 +96,7 @@ describe('migration 020_factura_compliance_1038.sql', () => {
     }
   });
 
-  it('idempotente: ejecutar 2 veces no falla (catch duplicates)', () => {
+  it('helper `aplicarMigration020Idempotente` ejecuta 2 veces sin error', () => {
     const db = new Database(':memory:');
     try {
       db.exec(`
@@ -108,28 +108,74 @@ describe('migration 020_factura_compliance_1038.sql', () => {
         );
       `);
       const sql = readFileSync(join(MIGRATION_DIR, '020_factura_compliance_1038.sql'), 'utf-8');
+      const { aplicarMigration020IdempotenteNode } = require('../../dominio/persistencia/sqlite/migraciones-idempotente');
 
-      // Primer apply: OK.
-      db.exec(sql);
-      // Segundo apply: el código de la migration debe usar try/catch o
-      // PRAGMA table_info para detectar columnas existentes. Test
-      // verifica que NO rompe la DB.
-      // (Si la migration usa idempotencia via try/catch interno, OK.)
-      // Para este test, aceptamos ambas políticas: si el script tiene
-      // try/catch dentro, podemos llamarlo 2 veces. Si NO lo tiene,
-      // el test fallara con "duplicate column" — lo cual es valido
-      // siempre que el runner lo gestione.
-      // Como la migration es idempotente (verificamos esto en el
-      // archivo), ejecutamos 2 veces y esperamos que ninguna caiga:
-      try {
-        db.exec(sql);
-      } catch (e) {
-        // SQLite 'duplicate column' para ALTER TABLE es normal
-        // en re-ejecución si no hay try/catch. Lo aceptamos solo en
-        // tests de idempotencia.
-        const msg = e instanceof Error ? e.message : String(e);
-        expect(msg).toMatch(/duplicate column/i);
+      // Primera ejecución: aplica las 4 columnas.
+      aplicarMigration020IdempotenteNode(db, sql);
+      // Segunda ejecución: no debe lanzar error de "duplicate column"
+      // porque el helper consulta `PRAGMA table_info` antes de cada ALTER.
+      expect(() => aplicarMigration020IdempotenteNode(db, sql)).not.toThrow();
+
+      const cols = db.prepare("PRAGMA table_info(factura)").all() as Array<{ name: string }>;
+      const names = cols.map((c) => c.name);
+      expect(names).toContain('codigo_verificacion');
+      expect(names).toContain('referencia_pago');
+      expect(names).toContain('qr_pago');
+      expect(names).toContain('version_tarifa_aplicada');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('idempotencia: 5 ejecuciones consecutivas del helper no fallan ni duplican', () => {
+    const db = new Database(':memory:');
+    try {
+      db.exec(`
+        CREATE TABLE factura (
+          id TEXT PRIMARY KEY, numero_factura TEXT, estado TEXT,
+          fecha_emision TEXT, snapshot TEXT, hash TEXT,
+          liquidacion_id TEXT, id_periodo TEXT, id_suscriptor INTEGER,
+          created_at TEXT, motivo_anulacion TEXT, fecha_anulacion TEXT, reemplaza_a TEXT
+        );
+      `);
+      const sql = readFileSync(join(MIGRATION_DIR, '020_factura_compliance_1038.sql'), 'utf-8');
+      const { aplicarMigration020IdempotenteNode } = require('../../dominio/persistencia/sqlite/migraciones-idempotente');
+
+      for (let i = 0; i < 5; i++) {
+        aplicarMigration020IdempotenteNode(db, sql);
       }
+      const cols = db.prepare("PRAGMA table_info(factura)").all() as Array<{ name: string }>;
+      const codigoCount = cols.filter((c) => c.name === 'codigo_verificacion').length;
+      expect(codigoCount).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('idempotencia: base parcialmente migrada solo agrega columnas faltantes', () => {
+    const db = new Database(':memory:');
+    try {
+      db.exec(`
+        CREATE TABLE factura (
+          id TEXT PRIMARY KEY, numero_factura TEXT, estado TEXT,
+          fecha_emision TEXT, snapshot TEXT, hash TEXT,
+          liquidacion_id TEXT, id_periodo TEXT, id_suscriptor INTEGER,
+          created_at TEXT, motivo_anulacion TEXT, fecha_anulacion TEXT, reemplaza_a TEXT
+        );
+        ALTER TABLE factura ADD COLUMN codigo_verificacion TEXT;
+      `);
+      const sql = readFileSync(join(MIGRATION_DIR, '020_factura_compliance_1038.sql'), 'utf-8');
+      const { aplicarMigration020IdempotenteNode } = require('../../dominio/persistencia/sqlite/migraciones-idempotente');
+
+      aplicarMigration020IdempotenteNode(db, sql);
+      const cols = db.prepare("PRAGMA table_info(factura)").all() as Array<{ name: string }>;
+      const names = cols.map((c) => c.name);
+      expect(names).toContain('codigo_verificacion');
+      expect(names).toContain('referencia_pago');
+      expect(names).toContain('qr_pago');
+      expect(names).toContain('version_tarifa_aplicada');
+      const codigoCount = cols.filter((c) => c.name === 'codigo_verificacion').length;
+      expect(codigoCount).toBe(1);
     } finally {
       db.close();
     }
