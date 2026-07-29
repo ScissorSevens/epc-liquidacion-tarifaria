@@ -220,9 +220,59 @@ export function verificarIntegridadFactura(factura: Factura, hasher: Hasher): bo
   return factura.hash === esperado;
 }
 
-// Overloads: emitirFactura devuelve Factura sincronico cuando NO se
-// inyecta catalogoRepo (compat callers legacy); devuelve Promise<Factura>
-// cuando se inyecta (path async validando contra DB).
+/**
+ * Emite una Factura a partir de un `EmitirFacturaInput` validado.
+ *
+ * ## Overloads sync vs async
+ *
+ * La funcion tiene DOS overloads declarados segun si se inyecta o no
+ * un `catalogoRepo`:
+ *
+ *  1. **Path sync (sin `catalogoRepo`)** — devuelve `Factura` directo.
+ *     Usa la constante `OtrosValoresCatalogo` como fuente de verdad para
+ *     validar codigos de `otros_valores`. Backward-compatible con todos
+ *     los callers existentes que invocan
+ *     `emitirFactura(input, hasher, [idGen], [clock])`.
+ *
+ *  2. **Path async (con `catalogoRepo`)** — devuelve `Promise<Factura>`.
+ *     Interroga la DB via `catalogoRepo.listar()` para validar que cada
+ *     codigo exista Y este `activo`. Conceptos `activo=false` o no
+ *     existentes lanzan `CONCEPTO_NO_AUTORIZADO`. Si el repo esta
+ *     vacio, cae al constante legacy con un warning (defensa contra
+ *     installations con migration 021 no aplicada o DB corrupta).
+ *
+ * ## Cuando usar cada overload
+ *
+ *  - **Sync (sin repo)**: tests puros, simulaciones, herramientas
+ *    offline que no necesitan enforcement regulatorio. NO usar en
+ *    orquestadores de emision real porque la UI expone conceptos
+ *    `activo=false` como filtro opcional (regulatorio).
+ *
+ *  - **Async (con repo)**: orquestadores de emision en la app
+ *    (compose `emitirFacturaConRepo` en `factura-con-repo.ts`). Es
+ *    la fuente regulatoria de verdad y debe preferirse siempre que
+ *    haya un `Bootstrap` configurado.
+ *
+ * ## Cuando es necesario pasar `catalogoRepo`
+ *
+ *  - Cuando la operacion es de campo (operario en captura) y la
+ *    regulacion `1038-2026-v1` exige validar contra el catalogo
+ *    vigente. Pase el repo de bootstrap.
+ *  - NO es necesario cuando la validacion ya se realizo en una capa
+ *    superior (ej: `OtrosValoresFactura.tsx` filtra los conceptos
+ *    `activo=true` antes de invocar `emitirFactura`).
+ *
+ * ## Implementacion
+ *
+ * Internamente, cuando se inyecta `catalogoRepo`, delega a
+ * `emitirFacturaAsync`, que tras validar contra la DB llama al
+ * `emitirFacturaSync` para producir el Factura. Asi se evita
+ * duplicar el cuerpo del snapshot v2.
+ *
+ * TDD: este patron de overloads esta testeado en
+ * `dominio/factura/__tests__/factura-catalogo-rechazo.test.ts`
+ * (T-7.1 typecheck + T-7.4 a T-7.8 behaviour).
+ */
 export function emitirFactura(
   input: EmitirFacturaInput,
   hasher: Hasher,
