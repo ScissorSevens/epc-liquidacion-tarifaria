@@ -106,6 +106,11 @@ export const migrations: readonly Migration[] = Object.freeze([
     sql: leerSQL('021_concepto_otro_valor.sql'),
   },
   {
+    version: 22,
+    nombre: '022_prestador_aps',
+    sql: leerSQL('022_prestador_aps.sql'),
+  },
+  {
     version: 23,
     nombre: '023_parametros_tarifa_anio_base',
     sql: leerSQL('023_parametros_tarifa_anio_base.sql'),

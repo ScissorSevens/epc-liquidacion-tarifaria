@@ -37,21 +37,31 @@ export interface Prestador {
   readonly estado: EstadoPrestador;
   readonly created_at: string;
   readonly updated_at: string;
+  /**
+   * Área de Prestación del Servicio (APS) declarada ante la CRA
+   * (Res CRA 825/2017 Art. 5). Opcional: `null` para prestadores
+   * legacy sin APS registrada.
+   *
+   * Fase 1 (`param-tarifa-res-825-compliance-phase1`).
+   */
+  readonly aps: string | null;
 }
 
 export type PrestadorBorrador = Omit<Prestador, 'id_prestador' | 'created_at' | 'updated_at'>;
 
 /**
- * Input para crear un prestador. `estado` y `contacto` son opcionales para
- * que la factory `crearPrestador` aplique defaults (`'activo'` y `null`).
- * El resto replica el shape de `PrestadorBorrador` y se exige en creación.
+ * Input para crear un prestador. `estado`, `contacto` y `aps` son opcionales
+ * para que la factory `crearPrestador` aplique defaults (`'activo'`, `null`,
+ * `null` respectivamente). El resto replica el shape de `PrestadorBorrador`
+ * y se exige en creación.
  */
 export type CrearPrestadorInput = Omit<
   PrestadorBorrador,
-  'estado' | 'contacto'
+  'estado' | 'contacto' | 'aps'
 > & {
   readonly estado?: EstadoPrestador;
   readonly contacto?: string | null;
+  readonly aps?: string | null;
 };
 
 export type ActualizarPrestadorInput = Partial<
@@ -67,6 +77,7 @@ export type ActualizarPrestadorInput = Partial<
     | 'contacto'
     | 'representante_legal'
     | 'representante_legal_cedula'
+    | 'aps'
   >
 >;
 

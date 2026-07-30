@@ -316,8 +316,9 @@ describe('Integracion captura → motor tarifario (multi-tenant)', () => {
     minimo_vital: null,
     vigente_desde: '2026-01-01',
     vigente_hasta: '2026-12-31',
-    created_at: '2026-01-01T00:00:00',
-  };
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
+    created_at: '2026-01-01T00:00:00',  };
 
   const acuerdoBase: AcuerdoMunicipal = {
     id_acuerdo: 1,
@@ -333,8 +334,7 @@ describe('Integracion captura → motor tarifario (multi-tenant)', () => {
     fecha_vigencia_hasta: '2026-12-31',
     acto_administrativo_url: null,
     observaciones: null,
-    created_at: '2026-01-01T00:00:00',
-  };
+    created_at: '2026-01-01T00:00:00',  };
 
   const suscriptorBase: Suscriptor = {
     id_suscriptor: 1,

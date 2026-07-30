@@ -158,6 +158,7 @@ function crearPrestadorFixture(): Prestador {
     estado: 'activo',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+    aps: null,
   };
 }
 
@@ -186,6 +187,8 @@ function crearParametrosFixture(overrides: Partial<ParametrosTarifa> = {}): Para
     minimo_vital: null,
     vigente_desde: '2025-01-01',
     vigente_hasta: '2029-12-31',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
     created_at: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };

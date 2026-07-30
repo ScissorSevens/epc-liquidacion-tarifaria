@@ -202,6 +202,8 @@ export function prestadorFormABootstrap(form: PrestadorForm): {
   num_suscriptores_urbanos: number;
   num_suscriptores_rurales: number;
   contacto: string | null;
+  // Res CRA 825/2017 Art. 5: APS opcional. Default null (legacy compatible).
+  aps: string | null;
 } {
   return {
     nombre: form.nombre.trim(),
@@ -214,5 +216,6 @@ export function prestadorFormABootstrap(form: PrestadorForm): {
     num_suscriptores_urbanos: form.num_suscriptores_urbanos,
     num_suscriptores_rurales: form.num_suscriptores_rurales,
     contacto: form.telefono.trim() || null,
+    aps: null,
   };
 }

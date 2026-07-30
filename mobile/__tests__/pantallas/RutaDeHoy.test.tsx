@@ -128,6 +128,7 @@ describe('RutaDeHoy', () => {
     estado: 'activo' as const,
     created_at: '',
     updated_at: '',
+    aps: null,
   };
 
   beforeEach(() => {

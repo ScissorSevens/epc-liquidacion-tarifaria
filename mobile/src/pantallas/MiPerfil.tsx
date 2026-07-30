@@ -194,6 +194,8 @@ function parametrosDefaults(id_prestador: number): ParametrosTarifa {
     vigente_desde: hoy.toISOString().slice(0, 10),
     vigente_hasta: hasta.toISOString().slice(0, 10),
     created_at: hoy.toISOString(),
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
   };
   // Pre-calculamos los cargos con la misma fórmula que se va a persistir.
   // Así el modal muestra el cargo updated incluso antes de guardar.
@@ -390,6 +392,9 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         vigente_desde: form.vigenteDesde,
         vigente_hasta: form.vigenteHasta,
         created_at: new Date().toISOString(),
+        // Res CRA 825/2017 Art. 7 (anio_base) + Art. 11 (factor IPC).
+        anio_base: parametros?.anio_base ?? 2016,
+        factor_indexacion_ipc: parametros?.factor_indexacion_ipc ?? 1.0,
       })
     : { cargo_fijo: 0, cargo_consumo: 0 };
 

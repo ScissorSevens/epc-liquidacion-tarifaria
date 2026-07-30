@@ -49,6 +49,7 @@ interface PrestadorRow {
   readonly estado: string;
   readonly created_at: string;
   readonly updated_at: string;
+  readonly aps: string | null;
 }
 
 function fromRow(row: PrestadorRow): Prestador {
@@ -68,6 +69,7 @@ function fromRow(row: PrestadorRow): Prestador {
     created_at: row.created_at,
     updated_at: row.updated_at,
     contacto: row.contacto,
+    aps: row.aps,
   };
 }
 
@@ -75,11 +77,11 @@ const SQL_INSERT = `
   INSERT INTO prestador (
     codigo, nombre, nit, representante_legal, representante_legal_cedula,
     municipio, departamento, segmento,
-    num_suscriptores_urbanos, num_suscriptores_rurales, contacto, estado
+    num_suscriptores_urbanos, num_suscriptores_rurales, contacto, estado, aps
   ) VALUES (
     @codigo, @nombre, @nit, @representante_legal, @representante_legal_cedula,
     @municipio, @departamento, @segmento,
-    @num_suscriptores_urbanos, @num_suscriptores_rurales, @contacto, @estado
+    @num_suscriptores_urbanos, @num_suscriptores_rurales, @contacto, @estado, @aps
   )
 `;
 
@@ -115,6 +117,7 @@ export function crearPrestadorRepositorySqlite(
         num_suscriptores_urbanos = @num_suscriptores_urbanos,
         num_suscriptores_rurales = @num_suscriptores_rurales,
         contacto = @contacto,
+        aps = @aps,
         updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now')
     WHERE id_prestador = @id_prestador
   `);
@@ -149,6 +152,7 @@ export function crearPrestadorRepositorySqlite(
       num_suscriptores_rurales: p.num_suscriptores_rurales,
       contacto: p.contacto ?? null,
       estado: p.estado ?? 'activo',
+      aps: p.aps ?? null,
     };
   }
 
@@ -223,6 +227,7 @@ export function crearPrestadorRepositorySqlite(
         num_suscriptores_urbanos: cambios.num_suscriptores_urbanos ?? actual.num_suscriptores_urbanos,
         num_suscriptores_rurales: cambios.num_suscriptores_rurales ?? actual.num_suscriptores_rurales,
         contacto: cambios.contacto ?? actual.contacto,
+        aps: cambios.aps !== undefined ? cambios.aps : actual.aps,
       };
       stmtUpdate.run(params);
       const row = stmtSelectById.get(id_prestador) as PrestadorRow | undefined;

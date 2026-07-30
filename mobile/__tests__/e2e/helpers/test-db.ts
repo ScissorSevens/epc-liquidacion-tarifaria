@@ -196,6 +196,7 @@ export function buildE2EFixture(): E2EFixture {
         estado: data.estado ?? 'activo',
         created_at: now,
         updated_at: now,
+    aps: null,
       };
       state.prestadores.set(id, p);
       return p;

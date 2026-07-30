@@ -35,6 +35,7 @@ interface PrestadorRow {
   readonly estado: string;
   readonly created_at: string;
   readonly updated_at: string;
+  readonly aps: string | null;
 }
 
 function fromRow(row: PrestadorRow): Prestador {
@@ -54,6 +55,7 @@ function fromRow(row: PrestadorRow): Prestador {
     created_at: row.created_at,
     updated_at: row.updated_at,
     contacto: row.contacto,
+    aps: row.aps,
   };
 }
 
@@ -70,12 +72,12 @@ export function crearPrestadorRepositoryExpoSqlite(
         `INSERT INTO prestador (
           codigo, nombre, nit, representante_legal, representante_legal_cedula,
           municipio, departamento, segmento,
-          num_suscriptores_urbanos, num_suscriptores_rurales, contacto, estado
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          num_suscriptores_urbanos, num_suscriptores_rurales, contacto, estado, aps
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         data.codigo, data.nombre, data.nit, data.representante_legal,
         data.representante_legal_cedula, data.municipio, data.departamento, data.segmento,
         data.num_suscriptores_urbanos, data.num_suscriptores_rurales,
-        data.contacto ?? null, data.estado ?? 'activo',
+        data.contacto ?? null, data.estado ?? 'activo', data.aps ?? null,
       );
       const id = Number(result.lastInsertRowId);
       const row = await db.getFirstAsync<PrestadorRow>(
@@ -128,6 +130,7 @@ export function crearPrestadorRepositoryExpoSqlite(
         `UPDATE prestador
          SET nombre = ?, nit = ?, municipio = ?, departamento = ?, segmento = ?,
              num_suscriptores_urbanos = ?, num_suscriptores_rurales = ?, contacto = ?,
+             aps = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%S', 'now')
          WHERE id_prestador = ?`,
         cambios.nombre ?? actual.nombre,
@@ -138,6 +141,7 @@ export function crearPrestadorRepositoryExpoSqlite(
         cambios.num_suscriptores_urbanos ?? actual.num_suscriptores_urbanos,
         cambios.num_suscriptores_rurales ?? actual.num_suscriptores_rurales,
         cambios.contacto ?? actual.contacto,
+        cambios.aps !== undefined ? cambios.aps : actual.aps,
         id_prestador,
       );
       const row = await db.getFirstAsync<PrestadorRow>(

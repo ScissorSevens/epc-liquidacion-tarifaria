@@ -93,6 +93,7 @@ const prestadorFixture: Prestador = {
   estado: 'activo',
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
+    aps: null,
 };
 
 /** Repo fake que devuelve la lista de fixtures. */

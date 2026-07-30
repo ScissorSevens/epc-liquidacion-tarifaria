@@ -480,6 +480,21 @@ ALTER TABLE parametros_tarifa ADD COLUMN factor_indexacion_ipc REAL NOT NULL DEF
   CHECK (factor_indexacion_ipc >= 0);
 `;
 
+/**
+ * Migration 022_prestador_aps. Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/022_prestador_aps.sql`.
+ *
+ * Cambia `param-tarifa-res-825-compliance-phase1` (fase 1). Res CRA
+ * 825/2017 Art. 5: el prestador debe declarar el Área de Prestación
+ * del Servicio (APS).
+ *
+ * Idempotente: simple ALTER ADD COLUMN. El runner controla via
+ * `__migraciones_aplicadas` (no se re-ejecuta si la version coincide).
+ */
+const MIGRACION_022_PRESTADOR_APS = `
+ALTER TABLE prestador ADD COLUMN aps TEXT NULL DEFAULT NULL;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -502,6 +517,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 19, nombre: '019_parametros_tarifa_completo', sql: MIGRACION_019_PARAMETROS_TARIFA_COMPLETO },
   { version: 20, nombre: '020_factura_compliance_1038', sql: MIGRACION_020_FACTURA_COMPLIANCE_1038 },
   { version: 21, nombre: '021_concepto_otro_valor', sql: MIGRACION_021_CONCEPTO_OTRO_VALOR },
+  { version: 22, nombre: '022_prestador_aps', sql: MIGRACION_022_PRESTADOR_APS },
   { version: 23, nombre: '023_parametros_tarifa_anio_base', sql: MIGRACION_023_PARAMETROS_TARIFA_ANIO_BASE },
 ];
 

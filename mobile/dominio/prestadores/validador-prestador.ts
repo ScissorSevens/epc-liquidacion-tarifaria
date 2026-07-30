@@ -132,6 +132,8 @@ export function crearPrestador(input: CrearPrestadorInput): PrestadorBorrador {
     num_suscriptores_rurales: input.num_suscriptores_rurales,
     contacto: input.contacto ?? null,
     estado: input.estado ?? 'activo',
+    // Res CRA 825/2017 Art. 5: APS opcional. null = legacy compatible.
+    aps: input.aps ?? null,
   };
 }
 

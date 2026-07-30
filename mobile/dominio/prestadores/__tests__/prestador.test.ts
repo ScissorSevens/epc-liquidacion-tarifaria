@@ -96,6 +96,7 @@ describe('crearPrestador — happy path', () => {
       num_suscriptores_rurales: 120,
       contacto: null,
       estado: 'activo',
+      aps: null,
     });
     expect(resultado).not.toHaveProperty('id_prestador');
     expect(resultado).not.toHaveProperty('created_at');

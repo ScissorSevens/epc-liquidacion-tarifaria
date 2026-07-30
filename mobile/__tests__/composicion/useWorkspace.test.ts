@@ -135,6 +135,7 @@ describe('useWorkspace (Fase 4.2.1)', () => {
           estado: 'activo',
           created_at: '2026-01-01T00:00:00.000Z',
           updated_at: '2026-01-01T00:00:00.000Z',
+    aps: null,
         } as never,
       });
 
@@ -202,6 +203,7 @@ describe('useWorkspace (Fase 4.2.1)', () => {
       estado: 'activo' as const,
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
+    aps: null,
     };
 
     /** Prestador nuevo devuelto por el mock de prestadorRepo. */
@@ -259,6 +261,8 @@ describe('useWorkspace (Fase 4.2.1)', () => {
       vigente_desde: '2025-01-01',
       vigente_hasta: '2029-12-31',
       created_at: '2026-01-01T00:00:00.000Z',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
     };
 
     /** Mock de los 3 repos del contexto tarifario. Cada uno expone
@@ -481,6 +485,8 @@ describe('useWorkspace (Fase 4.2.1)', () => {
       vigente_desde: '2025-01-01',
       vigente_hasta: '2029-12-31',
       created_at: '2026-01-01T00:00:00.000Z',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
     };
 
     it('T-WKS-7.1 setea parametros_vigentes al objeto provisto', () => {

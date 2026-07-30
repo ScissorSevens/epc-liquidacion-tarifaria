@@ -61,6 +61,8 @@ const PARAMS: ParametrosTarifa = {
   vigente_desde: '2026-01-01',
   vigente_hasta: '2026-12-31',
   created_at: '2026-01-01T00:00:00',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
 };
 
 // Suscriptor multi-tenant mínimo — id_prestador = 0 (legacy) para matchear PARAMS

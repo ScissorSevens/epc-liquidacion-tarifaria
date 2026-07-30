@@ -149,6 +149,7 @@ function buildRepos(state: RepoState) {
           estado: data.estado ?? 'activo',
           created_at: now,
           updated_at: now,
+    aps: null,
         };
         state.prestadores.set(id, p);
         return p;
@@ -213,6 +214,8 @@ function buildRepos(state: RepoState) {
           vigente_desde: data.vigente_desde,
           vigente_hasta: data.vigente_hasta,
           created_at: new Date().toISOString(),
+          anio_base: 2016,
+          factor_indexacion_ipc: 1.0,
         };
         state.parametros.set(id, p);
         return p;

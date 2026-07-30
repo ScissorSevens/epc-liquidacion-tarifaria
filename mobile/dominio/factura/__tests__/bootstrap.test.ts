@@ -248,6 +248,7 @@ function inputE2E(): EmitirFacturaInput {
       estado: 'activo',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
+    aps: null,
     },
     lectura: {
       id_medidor: 10,

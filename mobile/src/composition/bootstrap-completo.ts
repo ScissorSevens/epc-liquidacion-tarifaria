@@ -235,6 +235,9 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       ipuf_indice: 1.0,
       componentes_aplicables: [...COMPONENTES_TARIFARIOS],
       minimo_vital: null,
+      // Res CRA 825/2017 Art. 7 (anio_base) + Art. 11 (factor IPC).
+      anio_base: 2016,
+      factor_indexacion_ipc: 1.0,
       vigente_desde: fecha_vigencia_desde,
       vigente_hasta: fecha_vigencia_hasta,
     };
