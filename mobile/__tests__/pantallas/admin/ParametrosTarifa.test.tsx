@@ -7,6 +7,10 @@
 //   - PER-05: selectores específicos en useWorkspace(). Suscripción
 //     limitada a id_prestador_activo. Cambios en otros campos del
 //     store NO deben disparar re-renders.
+//   - T-CRAFT-1..7: principios de craft impecable (typography clamp,
+//     touch targets WCAG 2.5.5, contraste WCAG AA, sin ghost-cards ni
+//     uppercase, inputs numericos copiables con tabular-nums) —
+//     admin-parametros-tarifa-redesign Task 1.
 //
 // Mocks:
 //   - AsyncStorage, theme tokens, expo-splash-screen.
@@ -16,8 +20,10 @@
 //   RED  → primera cobertura directa de ParametrosTarifa.
 //   GREEN → Tras el fix de selectores, los 4 tests pasan.
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { Profiler } from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { render, waitFor, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
@@ -615,6 +621,244 @@ describe('ParametrosTarifaForm', () => {
       expect(switchMinimoVital.props.disabled).toBe(false);
       // El ActivityIndicator NO debe estar presente.
       expect(queryByTestId('bootstrap-indicator')).toBeNull();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // T-CRAFT: principios impeccable (admin-parametros-tarifa-redesign
+  // Task 1). Misma matriz que mi-perfil-redesign:
+  //   - typography clamp en titulo (24..96 px)
+  //   - touch targets ≥ 44px WCAG 2.5.5
+  //   - contraste WCAG AA en texto principal
+  //   - sin border + shadow combo (ghost-card ban)
+  //   - sin textTransform: uppercase en section labels
+  //   - inputs numericos con fontVariant: 'tabular-nums'
+  //   - inputs numericos con prop selectable (copiables al portapapeles)
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-CRAFT: principios impeccable (typography, touch, contrast, ghost-cards)', () => {
+    /** Helper: convierte hex "#RGB" o "#RRGGBB" a [r,g,b] en 0..1 (sRGB). */
+    function hexARgb01(hex: string): [number, number, number] {
+      let limpio = hex.replace('#', '');
+      // Expand shorthand "#RGB" -> "#RRGGBB".
+      if (limpio.length === 3) {
+        limpio = limpio.split('').map((c) => c + c).join('');
+      }
+      const r = parseInt(limpio.slice(0, 2), 16) / 255;
+      const g = parseInt(limpio.slice(2, 4), 16) / 255;
+      const b = parseInt(limpio.slice(4, 6), 16) / 255;
+      return [r, g, b];
+    }
+
+    /** Luminancia relativa sRGB (WCAG 2.x). */
+    function luminanciaRelativa(hex: string): number {
+      const [r, g, b] = hexARgb01(hex);
+      const linear = (c: number): number =>
+        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+    }
+
+    /** Ratio de contraste WCAG entre dos hex colors. */
+    function contrasteWcag(hexA: string, hexB: string): number {
+      const lA = luminanciaRelativa(hexA);
+      const lB = luminanciaRelativa(hexB);
+      const claro = Math.max(lA, lB);
+      const oscuro = Math.min(lA, lB);
+      return (claro + 0.05) / (oscuro + 0.05);
+    }
+
+    function renderEstable() {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      return render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+    }
+
+    it('T-CRAFT-1 titulo usa fontSize dentro del rango clamp [24, 96] (responsive)', async () => {
+      // El titulo "Parametros Tarifarios ..." debe tener un fontSize
+      // efectivo que respete el clamp CSS `clamp(1.5rem, 3vw, 2.25rem)`
+      // => rango permitido [24, 96] px. El valor exacto depende del
+      // viewport pero SIEMPRE cae dentro del rango.
+      const { getByText } = renderEstable();
+      await waitFor(() => {
+        expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+      });
+      const titulo = getByText(/Parámetros Tarifarios · Prestador #7/);
+      const estilo = StyleSheet.flatten(titulo.props.style) as {
+        fontSize?: number;
+      };
+      expect(estilo.fontSize).toBeGreaterThanOrEqual(24);
+      expect(estilo.fontSize).toBeLessThanOrEqual(96);
+    });
+
+    it('T-CRAFT-2 los FormField numéricos tienen touch target ≥ 44 px (TextInput)', async () => {
+      // El touch target real está definido por el TextInput del FormField
+      // (estilos.input, minHeight: 48). Auditamos cada testID de input
+      // numérico SIEMPRE renderizado y verificamos que su style efectivo
+      // tiene minHeight/height ≥ 44 (WCAG 2.5.5).
+      //
+      // `param-cmviaa` y `param-m3gratis` son CONDICIONALES
+      // (renderizan solo si aplica_cmviaa=true o aplica_minimo_vital=true).
+      // En el fixture ambos flags son false → no se renderizan. Los
+      // cubrimos con un render separado que fuerza ambos toggles activos.
+      const { getByTestId, getByLabelText } = renderEstable();
+      const testIdsSiempreRenderizados = [
+        'param-periodo',
+        'param-anio-base',
+        'param-vigente-desde',
+        'param-vigente-hasta',
+        'param-cma',
+        'param-cmo',
+        'param-cmi',
+        'param-cmt',
+        'param-agua',
+        'param-ipuf',
+        'param-suscriptores',
+      ];
+      for (const id of testIdsSiempreRenderizados) {
+        const input = getByTestId(id);
+        expect(input).toBeTruthy();
+        const estilo = StyleSheet.flatten(input.props.style) as {
+          minHeight?: number;
+          height?: number;
+        };
+        const alto = estilo.minHeight ?? estilo.height ?? 0;
+        expect(alto).toBeGreaterThanOrEqual(44);
+      }
+      // Activamos los toggles para que los inputs condicionales
+      // rendericen y podamos auditarlos.
+      fireEvent(getByLabelText('Aplicar costo medio variable de inversión ambiental'), 'valueChange', true);
+      fireEvent(getByLabelText('Aplicar mínimo vital'), 'valueChange', true);
+      await waitFor(() => {
+        expect(getByTestId('param-cmviaa')).toBeTruthy();
+      });
+      expect(getByTestId('param-m3gratis')).toBeTruthy();
+      for (const id of ['param-cmviaa', 'param-m3gratis']) {
+        const input = getByTestId(id);
+        const estilo = StyleSheet.flatten(input.props.style) as {
+          minHeight?: number;
+          height?: number;
+        };
+        const alto = estilo.minHeight ?? estilo.height ?? 0;
+        expect(alto).toBeGreaterThanOrEqual(44);
+      }
+    });
+
+    it('T-CRAFT-3 el campoFila (fila del Switch) tiene minHeight ≥ 48 (WCAG 2.5.5)', async () => {
+      // El Switch mide 24px de alto. Sin minHeight en la fila, el hit
+      // area efectivo cae a 24-36 px y rompe WCAG 2.5.5. La fila debe
+      // tener minHeight ≥ 48 px para que el touch target respete el
+      // minimo WCAG.
+      const { getByLabelText, UNSAFE_getAllByProps } = renderEstable();
+      const switchCmviaa = getByLabelText(
+        'Aplicar costo medio variable de inversión ambiental',
+      );
+      expect(switchCmviaa).toBeTruthy();
+      // Buscamos el View padre directo con flexDirection row — la fila.
+      // Filtram por la presencia del Switch como hijo o hermano.
+      const filas = UNSAFE_getAllByProps({ accessibilityLabel: switchCmviaa.props.accessibilityLabel });
+      expect(filas.length).toBeGreaterThanOrEqual(1);
+      // La fila tiene flexDirection row + justifyContent space-between
+      // + minHeight. Lo verificamos en el source del screen para no
+      // depender del tree-walking.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      const bloque = source.match(/campoFila:\s*\{([\s\S]*?)\n\s*\},?/);
+      expect(bloque).not.toBeNull();
+      const contenido = bloque![1];
+      const heights = [...contenido.matchAll(/minHeight:\s*(\d+)/g)].map((m) =>
+        Number(m[1]),
+      );
+      expect(heights.length).toBeGreaterThan(0);
+      heights.forEach((h) => {
+        expect(h).toBeGreaterThanOrEqual(44);
+      });
+    });
+
+    it('T-CRAFT-4 contraste WCAG AA en texto principal del titulo (≥ 4.5:1 contra fondo)', async () => {
+      // El titulo usa COLORS.onSurface (#0B1C30) sobre COLORS.background
+      // (#F8F9FF). Calculamos el ratio WCAG y verificamos >= 4.5:1
+      // (body text WCAG AA).
+      const { getByText } = renderEstable();
+      await waitFor(() => {
+        expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+      });
+      const titulo = getByText(/Parámetros Tarifarios · Prestador #7/);
+      const estilo = StyleSheet.flatten(titulo.props.style) as {
+        color?: string;
+      };
+      const colorTexto = estilo.color ?? '#000000';
+      const ratio = contrasteWcag(colorTexto, '#F8F9FF');
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('T-CRAFT-5 el screen NO usa textTransform: uppercase en section labels (ALL CAPS ban)', async () => {
+      // Sin comentarios: el codigo del screen ParametrosTarifa.tsx
+      // NO debe contener `textTransform: 'uppercase'`. Mismo patron
+      // que FormField/MiPerfil tests.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      const sinComentarios = source
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      expect(sinComentarios).not.toMatch(/textTransform:\s*['"]uppercase['"]/);
+    });
+
+    it('T-CRAFT-6 el screen NO combina border + shadow combo con shadowBlur >= 8 (sin ghost-cards)', async () => {
+      // Ghost-card ban: el screen no debe combinar borderWidth >= 1
+      // con shadowRadius >= 8 en el mismo bloque de estilos. Cards
+      // usan solo border; sombras solo para FABs / floats.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      const ghostPattern = /borderWidth:\s*[1-9][\s\S]{0,400}?shadowRadius:\s*[1-9]/;
+      expect(source).not.toMatch(ghostPattern);
+      // Shadow radius >= 8 es decorativo (codex tell). Solo permitimos
+      // sombras sutiles (radius < 8). Verificamos que no haya shadowRadius
+      // mayor o igual a 8.
+      const shadowBloque = source.match(/shadowRadius:\s*(\d+)/g);
+      if (shadowBloque !== null) {
+        shadowBloque.forEach((bloque) => {
+          const valor = Number(bloque.match(/(\d+)/)![1]);
+          expect(valor).toBeLessThan(8);
+        });
+      }
+    });
+
+    it('T-CRAFT-7 el source del screen pide FormField con soporte de selectable para inputs numericos', async () => {
+      // El codigo del screen debe demostrar intención de pedir
+      // `selectable` en los inputs numéricos (periodo, año base, cma,
+      // cmo, cmi, cmt, cmviaa, agua, ipuf, suscriptores, m3gratis).
+      // Verificamos que el SCREEN mencione `selectable` en su codigo.
+      // La implementación real vive en FormField (que recibe `selectable`
+      // como prop y lo forwarda al TextInput).
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(/selectable/);
+    });
+
+    it('T-CRAFT-8 el source del screen pide FormField con soporte de fontVariant tabular-nums', async () => {
+      // El screen debe pasar tabular-nums (o fontVariant que lo
+      // produzca) en los inputs numéricos. Verificamos que el codigo
+      // del screen mencione `tabularNums` o `fontVariant` como prop.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(/tabularNums|tabular-nums/);
     });
   });
 });

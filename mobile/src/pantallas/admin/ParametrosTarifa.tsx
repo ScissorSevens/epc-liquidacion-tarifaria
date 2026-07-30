@@ -16,7 +16,7 @@
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
@@ -52,6 +52,24 @@ interface Props {
 }
 
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
+
+/**
+ * TITULO_FONT_SIZE_CLAMP — H1 clamp del título del screen.
+ *
+ * Simula `clamp(1.5rem, 3vw, 2.25rem)` de CSS en runtime React Native.
+ * Rango efectivo: 24 px (1.5rem) a 36 px (2.25rem). El preferred 3vw
+ * se computa contra el ancho de pantalla — al frame default de jest
+ * (320×568) cae en el piso (24 px) sin overflow.
+ *
+ * admin-parametros-tarifa-redesign Task 1 — impeccable craft typography.
+ */
+const TITULO_FONT_SIZE_CLAMP = ((): number => {
+  const { width } = Dimensions.get('window');
+  const minimo = 24; // 1.5rem
+  const maximo = 36; // 2.25rem
+  const preferido = width * 0.03; // 3vw
+  return Math.min(Math.max(minimo, preferido), maximo);
+})();
 
 export default function ParametrosTarifaForm({
   id_prestador: idProp,
@@ -288,6 +306,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setPeriodo}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-periodo"
         />
       </View>
@@ -298,6 +318,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setAnioBase}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           helperText="Norma CRA 825: anio_base=2016 (default). Override posible."
           testID="param-anio-base"
         />
@@ -308,6 +330,8 @@ export default function ParametrosTarifaForm({
           value={vigenteDesde}
           onChangeText={setVigenteDesde}
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           accessibilityHint="Fecha de inicio de vigencia del periodo tarifario"
           testID="param-vigente-desde"
         />
@@ -318,6 +342,8 @@ export default function ParametrosTarifaForm({
           value={vigenteHasta}
           onChangeText={setVigenteHasta}
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
           testID="param-vigente-hasta"
         />
@@ -332,6 +358,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setCma}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-cma"
         />
       </View>
@@ -347,6 +375,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setCmo}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-cmo"
         />
       </View>
@@ -357,6 +387,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setCmi}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-cmi"
         />
       </View>
@@ -367,6 +399,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setCmt}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-cmt"
         />
       </View>
@@ -388,6 +422,8 @@ export default function ParametrosTarifaForm({
             onChangeText={setCmviaa}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
             testID="param-cmviaa"
           />
         </View>
@@ -401,6 +437,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setAguaSuministrada}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-agua"
         />
       </View>
@@ -411,6 +449,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setIpuf}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           helperText="Estándar CRA: 6 m³/suscriptor/mes"
           testID="param-ipuf"
         />
@@ -422,6 +462,8 @@ export default function ParametrosTarifaForm({
           onChangeText={setSuscriptoresPromedio}
           keyboardType="numeric"
           editable={!guardando && !cargandoInputs}
+          selectable
+          tabularNums
           testID="param-suscriptores"
         />
       </View>
@@ -444,6 +486,8 @@ export default function ParametrosTarifaForm({
             onChangeText={setM3Gratis}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
             testID="param-m3gratis"
           />
         </View>
@@ -466,15 +510,26 @@ export default function ParametrosTarifaForm({
 const estilos = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.md, gap: SPACING.sm },
-  titulo: { ...TYPOGRAPHY.headlineLg, color: COLORS.onSurface },
+  // H1 clamp: fontSize entre 24 y 36 px efectivo (clamp 1.5rem .. 2.25rem).
+  // Computado en TITULO_FONT_SIZE_CLAMP respetando el viewport real.
+  titulo: {
+    ...TYPOGRAPHY.headlineLg,
+    color: COLORS.onSurface,
+    fontSize: TITULO_FONT_SIZE_CLAMP,
+    lineHeight: TITULO_FONT_SIZE_CLAMP * 1.2,
+  },
   sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
   seccion: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, marginTop: SPACING.md },
   nota: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, fontStyle: 'italic', marginBottom: SPACING.xs },
   campo: { gap: SPACING.xs },
+  // Fila del Switch: el Switch mide 24 px nativo. Sin minHeight explicito,
+  // el hit-area efectivo cae a ~36 px y rompe WCAG 2.5.5 (≥ 44 px).
+  // minHeight: 48 da margen suficiente sobre el switch.
   campoFila: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: 48,
   },
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
   // Loading indicator overlay. Visible mientras repo === null O cargando.

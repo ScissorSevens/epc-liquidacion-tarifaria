@@ -91,6 +91,26 @@ export interface FormFieldProps {
   readonly onBlur?: () => void;
   /** onFocus opcional. */
   readonly onFocus?: () => void;
+  /**
+   * selectable — permite al operario copiar el valor del input al
+   * portapapeles del sistema (long-press → Copy). Default: false
+   * (compatibilidad con el comportamiento previo). Aplicado al
+   * TextInput nativo via prop `selectable`.
+   *
+   * Use case: inputs numéricos de admin (parametros-tarifa) donde el
+   * operario a veces necesita pegar valores desde planillas externas.
+   */
+  readonly selectable?: boolean;
+  /**
+   * tabularNums — alinea los dígitos con `fontVariant: ['tabular-nums']`
+   * para que los valores numéricos sean visualmente consistentes
+   * (1 ocupa el mismo ancho que 0, etc.). Default: false. El style
+   * se aplica sobre `estilos.input` para preservar el resto.
+   *
+   * Use case: inputs numéricos donde la alineación vertical de los
+   * dígitos reduce el ruido cognitivo al comparar magnitudes.
+   */
+  readonly tabularNums?: boolean;
 }
 
 export const FormField = memo(forwardRef<View, FormFieldProps>(function FormField({
@@ -115,6 +135,8 @@ export const FormField = memo(forwardRef<View, FormFieldProps>(function FormFiel
   editable = true,
   onBlur,
   onFocus,
+  selectable = false,
+  tabularNums = false,
 }, ref) {
   const autoId = useId();
   const labelId = `ff-label-${autoId}`;
@@ -191,6 +213,7 @@ export const FormField = memo(forwardRef<View, FormFieldProps>(function FormFiel
           style={[
             estilos.input,
             multiline && estilos.inputMultilinea,
+            tabularNums && estilos.tabularNums,
           ]}
           value={value}
           onChangeText={onChangeText}
@@ -215,6 +238,7 @@ export const FormField = memo(forwardRef<View, FormFieldProps>(function FormFiel
           testID={testID}
           aria-invalid={conError}
           nativeID={testID !== undefined ? `${testID}-input` : undefined}
+          {...(selectable ? ({ selectable: true } as Record<string, unknown>) : {})}
         />
       </View>
 
@@ -308,6 +332,15 @@ const estilos = StyleSheet.create({
     minHeight: 96,
     paddingTop: SPACING.md,
     textAlignVertical: 'top',
+  },
+  // ── Tabular nums ──────────────────────────────────────────────────────────
+  // `fontVariant: ['tabular-nums']` alinea los dígitos en columnas de
+  // ancho fijo. Util en inputs numéricos administrativos donde el
+  // operario compara magnitudes a ojo (CMA, N, m³ gratis). Soportado
+  // en iOS y Android desde RN 0.66. Default: no se aplica (zero-cost
+  // para callsites que no lo piden).
+  tabularNums: {
+    fontVariant: ['tabular-nums'] as const,
   },
   // ── Error ────────────────────────────────────────────────────────────────
   // Fila con icono + texto. Color semantico COLORS.error (NO hex).
