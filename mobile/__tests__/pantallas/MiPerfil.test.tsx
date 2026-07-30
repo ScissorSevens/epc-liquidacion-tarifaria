@@ -16,7 +16,7 @@
 //     explote si se llega a invocar.
 
 import { render, waitFor, fireEvent } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, Pressable } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { ComponentProps, ReactElement } from 'react';
 
@@ -194,7 +194,7 @@ function renderMiPerfil() {
   );
 }
 
-describe('MiPerfil — paleta institucional EPC', () => {
+describe('MiPerfil — Avatar & Paleta institucional EPC', () => {
   it('MP-1 el avatar usa brandAzulOscuro (#093C5D) como fondo', () => {
     const { getByTestId } = renderMiPerfil();
     const avatar = getByTestId('avatar');
@@ -352,7 +352,7 @@ describe('MiPerfil — paleta institucional EPC', () => {
   });
 });
 
-describe('MiPerfil — datos reales del operario (Sesion + useWorkspace)', () => {
+describe('MiPerfil — Información personal (Sesion + useWorkspace)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset del mock de useWorkspace al default (prestador null) ANTES
@@ -592,5 +592,342 @@ describe('MiPerfil — T-REMOVE: sección Parámetros Tarifarios removida', () =
     const { queryByTestId } = renderMiPerfil();
     expect(queryByTestId('param-cma')).toBeNull();
     expect(queryByTestId('param-periodo')).toBeNull();
+  });
+});
+
+// =====================================================================
+// mi-perfil-redesign — Task 4 (test: add coverage for accessibility +
+// integration). Estos tests verifican que la pantalla rediseñada cumple
+// con WCAG 2.5.5 (touch targets) y que la jerarquía visual / estructura
+// de datos fluye correctamente para casos reales.
+// =====================================================================
+
+/**
+ * Helper compartido por los describe blocks de Accesibilidad e Integración.
+ * Mockea useWorkspace con un prestador activo y AsyncStorage vacío.
+ */
+function setupMocksConPrestador(): void {
+  const { useWorkspace, __acciones } = jest.requireMock(
+    '../../src/composicion/useWorkspace',
+  );
+  useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+    sel({
+      id_prestador_activo: 42,
+      prestador: crearPrestadorFixture(),
+      prestadores_disponibles: [],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+      setParametrosVigentes: __acciones.setParametrosVigentes,
+    }),
+  );
+}
+
+/**
+ * Recorre el árbol de testing-library recursivamente y devuelve todos
+ * los nodos cuyo `type` es `Pressable` (referencia importada de
+ * `react-native`). Esto es necesario porque `UNSAFE_queryAllByType`
+ * no retorna resultados fiables en jest-expo + react-test-renderer
+ * para componentes como Pressable (que internamente renderizan a
+ * un View host con un tipo distinto).
+ *
+ * IMPORTANTE: en jest-expo + react-test-renderer, los children de un
+ * nodo NO están en `node.props.children` — están directamente en
+ * `node.children` (un array). El walk recorre ambos por las dudas.
+ *
+ * NOTA: NO usamos `hasOnPress` como heurística porque capturaría
+ * falsos positivos (cualquier componente custom como BotonPrimario
+ * que reciba onPress como prop aparecería como Pressable, falseando
+ * los checks).
+ */
+function collectPressables(nodo: unknown, acc: Array<{
+  props: Record<string, unknown>;
+  testID?: string;
+}> = []): Array<{ props: Record<string, unknown>; testID?: string }> {
+  if (nodo === null || nodo === undefined) return acc;
+  const n = nodo as {
+    type?: unknown;
+    children?: unknown | unknown[];
+    props?: Record<string, unknown> & { children?: unknown; testID?: string };
+  };
+  const typeName =
+    typeof n.type === 'function'
+      ? (n.type as { displayName?: string; name?: string }).displayName ??
+        (n.type as { name?: string }).name
+      : typeof n.type === 'string'
+        ? n.type
+        : undefined;
+  const isPressable =
+    n.type === Pressable ||
+    typeName === 'Pressable' ||
+    typeName === 'Animated(View)';
+  if (isPressable) {
+    acc.push({ props: n.props ?? {}, testID: n.props?.testID });
+  }
+  // Recorrer vía .children (test-renderer) Y .props.children (DOM-like)
+  const children1 = n.children;
+  if (Array.isArray(children1)) {
+    for (const child of children1) collectPressables(child, acc);
+  } else if (children1 !== null && typeof children1 === 'object') {
+    collectPressables(children1, acc);
+  }
+  const children2 = n.props?.children;
+  if (Array.isArray(children2)) {
+    for (const child of children2) collectPressables(child, acc);
+  } else if (
+    children2 !== null &&
+    typeof children2 === 'object' &&
+    (children2 as { type?: unknown }).type !== undefined
+  ) {
+    collectPressables(children2, acc);
+  }
+  return acc;
+}
+
+/**
+ * Igual que `collectPressables` pero devuelve todos los testIDs en orden
+ * de aparición en el árbol. Útil para verificar la jerarquía visual.
+ */
+function collectTestIds(nodo: unknown, acc: string[] = []): string[] {
+  if (nodo === null || nodo === undefined) return acc;
+  const n = nodo as {
+    children?: unknown;
+    props?: { testID?: string; children?: unknown };
+  };
+  if (n.props?.testID !== undefined) acc.push(n.props.testID);
+  // Recorrer vía .children (test-renderer) Y .props.children
+  const children1 = n.children;
+  if (Array.isArray(children1)) {
+    for (const child of children1) collectTestIds(child, acc);
+  } else if (children1 !== null && typeof children1 === 'object') {
+    collectTestIds(children1, acc);
+  }
+  const children2 = n.props?.children;
+  if (Array.isArray(children2)) {
+    for (const child of children2) collectTestIds(child, acc);
+  } else if (
+    children2 !== null &&
+    typeof children2 === 'object' &&
+    (children2 as { type?: unknown }).type !== undefined
+  ) {
+    collectTestIds(children2, acc);
+  }
+  return acc;
+}
+
+describe('MiPerfil — Accesibilidad (WCAG 2.x)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  /**
+   * T-A11Y-1 — Recorre los `<Pressable>` user-facing del árbol
+   * renderizado y verifica que cada uno tiene un touch target mínimo
+   * de 44px de alto (WCAG 2.5.5 Target Size — iOS HIG baseline 44pt).
+   *
+   * "User-facing" = tiene `accessibilityLabel`. Los Pressables internos
+   * (wrappers de Animated.View, contenedores sin label explícito) NO
+   * necesitan hit-area propio: el control accesible es el wrapper con
+   * label, no sus hijos sin label.
+   *
+   * Aplica a: botón cerrar-sesión, toggle de notificaciones, label
+   * "Notificaciones" (fila completa), back button del TopBar.
+   */
+  it('T-A11Y-1: TODOS los Pressable user-facing tienen minHeight >= 44px', () => {
+    const { UNSAFE_root } = renderMiPerfil();
+    const pressables = collectPressables(UNSAFE_root);
+    const userFacing = pressables.filter((p) => {
+      const label = p.props.accessibilityLabel;
+      return typeof label === 'string' && label.length > 0;
+    });
+    expect(userFacing.length).toBeGreaterThan(0);
+    for (const press of userFacing) {
+      // RN permite style como función (`({pressed}) => [...]`).
+      // La evaluamos si hace falta para llegar al array plano.
+      let styleRaw = press.props.style;
+      if (typeof styleRaw === 'function') {
+        try {
+          styleRaw = styleRaw({ pressed: false });
+        } catch {
+          styleRaw = undefined;
+        }
+      }
+      const estilo = StyleSheet.flatten(styleRaw as object | object[]) as {
+        minHeight?: number;
+        height?: number;
+      } | null;
+      const alto = estilo?.height ?? estilo?.minHeight ?? 0;
+      expect(alto).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  /**
+   * T-A11Y-2 — Todo `<Pressable>` user-facing debe tener
+   * `accessibilityLabel` O `accessibilityRole` definido. Sin un
+   * label/role, los usuarios de VoiceOver / TalkBack no pueden
+   * navegar la pantalla — esto es un blocker crítico de accesibilidad.
+   *
+   * Filtramos por Pressables con `accessibilityLabel` O `testID`
+   * (los explícitamente expuestos al operario). El `accessibilityRole`
+   * por default es inferido ('button' para Pressable con onPress), pero
+   * validamos que esté declarado cuando se expone un control custom.
+   */
+  it('T-A11Y-2: TODOS los Pressable user-facing tienen accessibilityLabel', () => {
+    const { UNSAFE_root } = renderMiPerfil();
+    const pressables = collectPressables(UNSAFE_root);
+    const userFacing = pressables.filter((p) => {
+      const label = p.props.accessibilityLabel;
+      const role = p.props.accessibilityRole;
+      const tieneLabel = typeof label === 'string' && label.length > 0;
+      const tieneRole = typeof role === 'string' && role.length > 0;
+      const tieneTestID = typeof p.testID === 'string' && p.testID.length > 0;
+      return tieneLabel || tieneRole || tieneTestID;
+    });
+    expect(userFacing.length).toBeGreaterThan(0);
+    for (const press of userFacing) {
+      const label = press.props.accessibilityLabel;
+      const role = press.props.accessibilityRole;
+      const tieneLabel =
+        typeof label === 'string' && label.length > 0;
+      const tieneRole = typeof role === 'string' && role.length > 0;
+      // Al menos uno debe estar presente (label O role).
+      expect(tieneLabel || tieneRole).toBe(true);
+    }
+  });
+});
+
+describe('MiPerfil — Integración (datos reales + jerarquía visual)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  /**
+   * T-INTEG-1 — Verifica que la estructura jerárquica del árbol
+   * respeta el orden visual esperado:
+   *   avatar → información personal → prestador actual → cerrar sesión
+   *
+   * Esto es un guard contra regresiones donde alguien reorganiza las
+   * secciones y rompe el flujo de lectura del operario (la pantalla
+   * debe guiarlo de lo más identitario (avatar) a la acción final
+   * (cerrar sesión)).
+   */
+  it('T-INTEG-1: estructura jerárquica avatar→info→prestador→cerrar-sesion', () => {
+    const { UNSAFE_root } = renderMiPerfil();
+    const todosLosTestIds = collectTestIds(UNSAFE_root);
+
+    const idxAvatar = todosLosTestIds.indexOf('avatar');
+    const idxCedula = todosLosTestIds.indexOf('fila-cedula');
+    const idxPrestador = todosLosTestIds.indexOf('fila-prestador-nombre');
+    const idxCerrarSesion = todosLosTestIds.indexOf('boton-cerrar-sesion');
+
+    // Todos los testIDs clave deben existir en el árbol.
+    expect(idxAvatar).toBeGreaterThanOrEqual(0);
+    expect(idxCedula).toBeGreaterThanOrEqual(0);
+    expect(idxPrestador).toBeGreaterThanOrEqual(0);
+    expect(idxCerrarSesion).toBeGreaterThanOrEqual(0);
+    // Y respetar el orden esperado.
+    expect(idxAvatar).toBeLessThan(idxCedula);
+    expect(idxCedula).toBeLessThan(idxPrestador);
+    expect(idxPrestador).toBeLessThan(idxCerrarSesion);
+  });
+
+  /**
+   * T-INTEG-2 — Con sesión cargada y prestador activo, las 3 filas
+   * con datos sensibles (cédula del operario, ID operario, código del
+   * prestador) deben estar pobladas con sus valores reales y ser
+   * identificables vía testID para que el operario pueda copiarlas
+   * (selección nativa de texto en RN).
+   *
+   * NOTA: la prop `selectable=true` en RN es un enhancement opcional —
+   * verificamos que los testIDs existen y los textos se renderizan.
+   * Si en Task 5+ se quiere copiar al clipboard, agregar `<Text
+   * selectable>` es trivial.
+   */
+  it('T-INTEG-2: campos copiables (cédula, ID, código prestador) se renderizan con valores reales', async () => {
+    mockedGetItem.mockImplementation(async (key: string) => {
+      if (key === '@sistema_epc:sesion') {
+        return JSON.stringify(
+          crearSesionValida({ cedula: '1234567', idOperario: 42 }),
+        );
+      }
+      return null;
+    });
+    setupMocksConPrestador();
+
+    const { getByTestId } = renderMiPerfil();
+
+    await waitFor(() => {
+      const cedulaEl = getByTestId('fila-cedula-valor');
+      const idEl = getByTestId('fila-id-operario-valor');
+      const codigoEl = getByTestId('fila-prestador-codigo-valor');
+      expect(cedulaEl).toBeTruthy();
+      expect(idEl).toBeTruthy();
+      expect(codigoEl).toBeTruthy();
+      // Valores reales (no placeholders "—").
+      expect((cedulaEl.props.children as string)).toBe('1234567');
+      expect((idEl.props.children as string)).toBe('#42');
+      expect((codigoEl.props.children as string)).toBe('P042');
+    });
+  });
+
+  /**
+   * T-INTEG-3 — Avatar muestra iniciales correctas cuando hay sesión
+   * (p.ej. "JP" para "Juan Pérez") y cae al placeholder "OP" cuando
+   * no hay sesión. Este test es la versión consolidada de T-MP-DATA-1
+   * + T-MP-DATA-2, ahora agrupada bajo el describe 'Integración' para
+   * el flujo de regresión del avatar.
+   */
+  it('T-INTEG-3a: avatar muestra "JP" cuando sesión es "Juan Pérez"', async () => {
+    mockedGetItem.mockImplementation(async (key: string) => {
+      if (key === '@sistema_epc:sesion') {
+        return JSON.stringify(crearSesionValida({ nombre: 'Juan Pérez' }));
+      }
+      return null;
+    });
+
+    const { getByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByText('JP')).toBeTruthy();
+    });
+  });
+
+  it('T-INTEG-3b: avatar muestra "OP" cuando no hay sesión activa', async () => {
+    // Default: mockedGetItem devuelve null (sin sesión).
+    const { getByText } = renderMiPerfil();
+
+    await waitFor(() => {
+      expect(getByText('OP')).toBeTruthy();
+    });
   });
 });

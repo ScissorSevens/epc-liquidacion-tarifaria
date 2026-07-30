@@ -225,8 +225,13 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
               <MaterialIcons name="notifications" size={20} color={COLORS.primary} />
               <Text style={estilos.filaConfigTexto}>Notificaciones</Text>
             </Pressable>
-            {/* Toggle visual estático — funcionalidad futura */}
-            <Pressable onPress={mostrarToast} accessibilityLabel="Activar notificaciones">
+            {/* Toggle visual estático — funcionalidad futura.
+                hit-area ≥ 44px (WCAG 2.5.5) vía wrapper. */}
+            <Pressable
+              onPress={mostrarToast}
+              accessibilityLabel="Activar notificaciones"
+              style={estilos.toggleWrapper}
+            >
               <View style={estilos.toggleOff}>
                 <View style={estilos.toggleThumb} />
               </View>
@@ -377,6 +382,10 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm + 4,
+    // WCAG 2.5.5: touch target >= 44px. La fila entera (icon + texto)
+    // debe ser tappable, no solo el icono. Sin esto, el Pressable
+    // colapsa al alto del contenido (~36px) y falla el criterio.
+    minHeight: 44,
   },
   filaConfigTexto: {
     ...TYPOGRAPHY.bodyMd,
@@ -389,6 +398,13 @@ const estilos = StyleSheet.create({
     backgroundColor: COLORS.surfaceDim,
     justifyContent: 'center',
     paddingHorizontal: 4,
+  },
+  // Wrapper del toggle visual: lo eleva a 44px touch target aunque
+  // el switch en sí mide 24px (WCAG 2.5.5). Sin esto, el toggle es
+  // técnicamente tappable pero su hit-area es de ~24px.
+  toggleWrapper: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   toggleThumb: {
     width: 16,
