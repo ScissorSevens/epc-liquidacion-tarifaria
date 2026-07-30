@@ -38,7 +38,8 @@
           "cameraPermission": "AquaServices necesita la camara para registrar la evidencia fotografica del medidor.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-router"
     ],
     "extra": {
       "eas": {
