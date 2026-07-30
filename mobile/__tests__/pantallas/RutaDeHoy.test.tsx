@@ -1,8 +1,10 @@
 import './__mocks__/use-focus-effect-mock';
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { COLORS } from '../../src/theme/skeletal-tokens';
+import RutaDeHoy, { styles } from '../../src/pantallas/RutaDeHoy';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import RutaDeHoy from '../../src/pantallas/RutaDeHoy';
 import { crearNavMock } from './__mocks__/nav';
 import { getBootstrap } from '../../src/composition/get-bootstrap';
 import { useWorkspace } from '../../src/composicion/useWorkspace';
@@ -470,9 +472,46 @@ describe('RutaDeHoy', () => {
       expect(card.style.elevation).toBeUndefined();
     }
   });
-});
+  it('T-CRAFT-1: topBarBtn tiene minHeight >= 44', () => {
+    const style = StyleSheet.flatten(styles.topBarBtn);
+    expect(Math.max(style.minHeight ?? 0, style.height ?? 0)).toBeGreaterThanOrEqual(44);
+  });
 
-/** Helper: aplana arrays de style a un solo objeto. */
+  it('T-CRAFT-2: card de suscriptor tiene minHeight >= 64', () => {
+    expect(StyleSheet.flatten(styles.card).minHeight).toBeGreaterThanOrEqual(64);
+  });
+
+  it('T-CRAFT-3: contraste WCAG AA en progresoNumero', () => {
+    const hex = StyleSheet.flatten(styles.progresoNumero).color as string;
+    const luminance = (value: string) => {
+      const rgb = value.slice(1).match(/.{2}/g)!.map((part) => parseInt(part, 16) / 255);
+      const linear = rgb.map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+    };
+    const ratio = (luminance(COLORS.background) + 0.05) / (luminance(hex) + 0.05);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('T-CRAFT-4: topBarBtnPressed usa token, no rgba hardcoded', () => {
+    expect(StyleSheet.flatten(styles.topBarBtnPressed).backgroundColor).toBe(COLORS.surfaceContainer);
+  });
+
+  it('T-CRAFT-5: no hay ghost-cards con border + shadow', () => {
+    for (const key of ['card', 'identidadCard', 'identidadVaciaCard', 'progresoCard']) {
+      const style = StyleSheet.flatten(styles[key as keyof typeof styles]);
+      expect(style.shadowRadius ?? 0).toBeLessThan(8);
+      expect(style.elevation ?? 0).toBe(0);
+    }
+  });
+
+  it('T-CRAFT-6: border-radius consistente, cards <= 16 y modal = 24', () => {
+    expect(StyleSheet.flatten(styles.card).borderRadius).toBeLessThanOrEqual(16);
+    expect(StyleSheet.flatten(styles.identidadCard).borderRadius).toBeLessThanOrEqual(16);
+    expect(StyleSheet.flatten(styles.identidadVaciaCard).borderRadius).toBeLessThanOrEqual(16);
+    expect(StyleSheet.flatten(styles.bottomSheet).borderTopLeftRadius).toBe(24);
+    expect(StyleSheet.flatten(styles.bottomSheet).borderTopRightRadius).toBe(24);
+  });
+
 function flattenStyle(style: unknown): Record<string, unknown> {
   if (Array.isArray(style)) {
     return Object.assign({}, ...style.map((s) => flattenStyle(s)));
@@ -602,3 +641,4 @@ function collectViewsWithFullRadius(
   visit(node);
   return out;
 }
+});

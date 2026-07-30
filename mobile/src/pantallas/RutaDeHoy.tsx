@@ -467,7 +467,7 @@ export default function RutaDeHoy({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -489,14 +489,14 @@ const styles = StyleSheet.create({
 
   // ── TopAppBar (accionDerecha) ──────────────────────────────────────────────
   topBarBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.full,
   },
   topBarBtnPressed: {
-    backgroundColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: COLORS.surfaceContainer,
   },
 
   // ── ScrollView ────────────────────────────────────────────────────────────
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   identidadCard: {
     position: 'relative',
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 20, // RADIUS.lg + 4 — sin pasar RADIUS.xl (24)
+    borderRadius: RADIUS.lg, // ≤ 16 (RADIUS.lg)
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     padding: SPACING.lg, // padding generoso
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   identidadVaciaCard: {
     position: 'relative',
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 20,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     padding: SPACING.lg,
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
   },
   progresoNumero: {
-    color: COLORS.primary,
+    color: COLORS.onSurface,
   },
   progresoTotal: {
     color: COLORS.onSurfaceVariant,
