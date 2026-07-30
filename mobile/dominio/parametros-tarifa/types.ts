@@ -182,4 +182,7 @@ export const MENSAJES_ERROR_PARAMETROS = {
   FECHA_DESDE_REQUERIDA: 'vigente_desde requerida',
   FECHA_HASTA_REQUERIDA: 'vigente_hasta requerida',
   DUPLICADO_MISMO_PERIODO: 'ya existen Parametros vigentes para ese prestador/periodo',
+  // Res CRA 825/2017 Art. 15: el CMA no puede ser menor al mínimo
+  // normativo del servicio. Cambio `param-tarifa-res-825-compliance-phase1`.
+  CMA_BAJO_MINIMO: 'CMA no puede ser menor al mínimo normativo de la Res CRA 825 Art. 15',
 } as const;
