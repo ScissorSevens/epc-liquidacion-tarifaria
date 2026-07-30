@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,9 +12,11 @@ import {
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 
 import type { Medidor } from '@dominio/medidores/types';
+import type { Prestador } from '@dominio/prestadores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
 import type { InicioStackScreenProps } from '../navegacion/types';
@@ -53,6 +58,14 @@ export default function RutaDeHoy({ navigation }: Props) {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [medidoresSelector, setMedidoresSelector] = useState<Medidor[]>([]);
   const [suscriptorSelector, setSuscriptorSelector] = useState<{ id: number; nombre: string } | null>(null);
+
+  // ── Smart reload: no recargar si el día y el prestador no cambiaron.
+  // Antes: useFocusEffect siempre llamaba `cargar(false)` al volver a la
+  // tab. Esto disparaba 4 queries SQLite innecesarias en cada focus.
+  // Ahora: trackeamos la última combinacion (id_prestador, YYYY-MM-DD) y
+  // hacemos skip si coincide. Se sigue recargando al cambiar de día o
+  // cuando el operario cambia de prestador.
+  const ultimoReloadRef = useRef<{ prestadorId: number; dia: string } | null>(null);
 
   // PER-05: selectores específicos en useWorkspace. Cambios en otros
   // campos (acuerdo_vigente, parametros_vigentes, cargando) NO disparan
@@ -151,11 +164,28 @@ export default function RutaDeHoy({ navigation }: Props) {
 
   // Primera carga al montar
   useEffect(() => { void cargar(true); }, [cargar]);
-  // Re-carga silenciosa al enfocar tab
-  useFocusEffect(useCallback(() => { void cargar(false); }, [cargar]));
+  // Re-carga silenciosa al enfocar tab — solo si cambió dia o prestador.
+  useFocusEffect(
+    useCallback(() => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const clave = { prestadorId: id_prestador_activo, dia: hoy };
+      const previa = ultimoReloadRef.current;
+      if (
+        previa &&
+        previa.prestadorId === clave.prestadorId &&
+        previa.dia === clave.dia
+      ) {
+        return;
+      }
+      ultimoReloadRef.current = clave;
+      void cargar(false);
+    }, [cargar, id_prestador_activo]),
+  );
 
   const navegarACapturar = useCallback(async (item: Suscriptor) => {
     try {
+      // Haptics de selección al TAP — feedback táctil inmediato.
+      await Haptics.selectionAsync();
       const { repos: { medidorRepo } } = await getBootstrap();
       const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
       if (medidores.length === 0) return;
@@ -163,6 +193,8 @@ export default function RutaDeHoy({ navigation }: Props) {
         navigation.navigate('CapturarLectura', {
           id_medidor: medidores[0].id_medidor, id_suscriptor: item.id_suscriptor,
         });
+        // Haptics de éxito después de navegar — confirmación post-acción.
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         setMedidoresSelector(medidores);
         setSuscriptorSelector({ id: item.id_suscriptor, nombre: item.nombre_apellidos });
@@ -225,7 +257,14 @@ export default function RutaDeHoy({ navigation }: Props) {
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
             onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
           >
-            <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
+            {Platform.OS === 'ios' ? (
+              <Image
+                source={'sf:person.crop.circle' as any}
+                style={{ width: 24, height: 24, tintColor: COLORS.onPrimary }}
+              />
+            ) : (
+              <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
+            )}
           </Pressable>
         }
       />
@@ -233,68 +272,15 @@ export default function RutaDeHoy({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
       >
-        {/* Banner de identidad (estilo Nequi) o estado vacío con CTA.
-            Si NO hay prestador en uso (id=0, repo=null, etc.), mostramos un
-            card claro con CTA "Configurar prestador" en vez del fallback
-            histórico "Sin prestador asignado". */}
+        {/* Banner de identidad (estilo Nequi) o estado vacío con CTA. */}
         {prestador ? (
-          <View
-            style={styles.identidadCard}
-            accessibilityRole="summary"
-            accessibilityLabel={`Prestador ${prestador.nombre}, NIT ${prestador.nit}, segmento ${prestador.segmento}, ${totalSuscriptoresPrestador} suscriptores, ${porcentaje} por ciento capturado del mes`}
-          >
-            {/* Forma geométrica: círculo decorativo de marca (Nequi-like)
-                en la esquina superior derecha del banner. */}
-            <View style={styles.identidadDecorCircle} pointerEvents="none" />
-
-            <View style={styles.identidadFilaIcono}>
-              <View style={styles.identidadIconCircle}>
-                <MaterialIcons name="business" size={24} color={COLORS.onSecondaryContainer} />
-              </View>
-              <View style={styles.identidadTitulos}>
-                <Text
-                  style={styles.identidadNombre}
-                  numberOfLines={1}
-                >
-                  {prestador.nombre}
-                </Text>
-                <Text style={styles.identidadMetaTexto} numberOfLines={1}>
-                  NIT {prestador.nit} · Segmento {prestador.segmento}{' '}
-                  {prestador.segmento === 1 ? 'urbano' : 'rural'}
-                </Text>
-              </View>
-            </View>
-
-            {/* 2 stat columns: total suscriptores + % capturado */}
-            <View style={styles.identidadStats}>
-              <View style={styles.identidadStat}>
-                <Text style={styles.identidadStatNumero}>
-                  {totalSuscriptoresPrestador}
-                </Text>
-                <Text style={styles.identidadStatLabel}>
-                  suscriptores
-                </Text>
-              </View>
-              <View style={styles.identidadStatDerecha}>
-                <Text style={styles.identidadStatNumeroMd}>
-                  {porcentaje}%
-                </Text>
-                <Text style={styles.identidadStatLabel}>
-                  lecturas del mes
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.identidadBarraContainer}>
-              <View
-                style={[
-                  styles.identidadBarraFill,
-                  { width: `${porcentaje}%` as `${number}%` },
-                ]}
-              />
-            </View>
-          </View>
+          <IdentidadCardMemo
+            prestador={prestador}
+            totalSuscriptores={totalSuscriptoresPrestador}
+            porcentaje={porcentaje}
+          />
         ) : (
           <View
             style={styles.identidadVaciaCard}
@@ -322,18 +308,7 @@ export default function RutaDeHoy({ navigation }: Props) {
         )}
 
         {/* Sección de progreso */}
-        <View style={styles.progresoCard}>
-          <View style={styles.progresoRow}>
-            <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>Lecturas del mes</Text>
-            <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNumero]}>
-              {capturasHoy}{' '}
-              <Text style={[TYPOGRAPHY.bodySm, styles.progresoTotal]}>/ {suscriptores.length}</Text>
-            </Text>
-          </View>
-          <View style={styles.barraContainer}>
-            <View style={[styles.barraFill, { width: `${porcentaje}%` as `${number}%` }]} />
-          </View>
-        </View>
+        <ProgresoCardMemo capturas={capturasHoy} total={suscriptores.length} porcentaje={porcentaje} />
 
         {/* Lista de suscriptores (un solo grupo sin sector en datos reales) */}
         {suscriptores.length === 0 ? (
@@ -349,69 +324,22 @@ export default function RutaDeHoy({ navigation }: Props) {
               <View style={styles.grupoDivisor} />
             </View>
 
-            {suscriptores.map((item) => {
-              const capturado = capturadosHoy.get(item.id_suscriptor) === true;
-              return (
-                <Pressable
-                  key={item.id_suscriptor}
-                  style={({ pressed }) => [
-                    styles.card,
-                    capturado && styles.cardCapturada,
-                    pressed && !capturado && styles.cardPressed,
-                  ]}
-                  onPress={() => { void navegarACapturar(item); }}
-                  disabled={capturado}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${capturado ? 'Capturado' : 'Pendiente'}: suscriptor ${item.codigo} ${item.nombre_apellidos}`}
-                >
-                  <View style={styles.cardContent}>
-                    <View style={styles.cardInfo}>
-                      {/* Fila 1: ID + estado (mismo renglón, distribute=space-between
-                          se logra con el slot del icono derecho arriba) */}
-                      <View style={styles.cardFilaMeta}>
-                        <Text style={[TYPOGRAPHY.labelMd, styles.cardCodigo]}>
-                          {item.codigo}
-                        </Text>
-                        {capturado ? (
-                          <View style={styles.statusRow}>
-                            <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
-                            <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
-                              Capturado este mes
-                            </Text>
-                          </View>
-                        ) : (
-                          <View style={styles.statusRow}>
-                            <MaterialIcons name="schedule" size={14} color={COLORS.onSurfaceVariant} />
-                            <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>
-                              Lectura pendiente
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      {/* Fila 2: nombre prominente (headlineSm) */}
-                      <Text
-                        style={[
-                          TYPOGRAPHY.headlineSm,
-                          capturado ? styles.cardNombreCapturado : styles.cardNombre,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.nombre_apellidos}
-                      </Text>
-                    </View>
-
-                    {/* Icono derecho (chevron si pendiente, círculo con check si capturado) */}
-                    {capturado ? (
-                      <View style={styles.iconCircleCheck}>
-                        <MaterialIcons name="task-alt" size={22} color={COLORS.secondary} />
-                      </View>
-                    ) : (
-                      <MaterialIcons name="chevron-right" size={24} color={COLORS.onSurfaceVariant} />
-                    )}
-                  </View>
-                </Pressable>
-              );
-            })}
+            {(
+              <FlatList
+                data={suscriptores}
+                keyExtractor={(item) => String(item.id_suscriptor)}
+                renderItem={({ item }) => (
+                  <SuscriptorCardMemo
+                    item={item}
+                    capturado={capturadosHoy.get(item.id_suscriptor) === true}
+                    onPress={() => { void navegarACapturar(item); }}
+                  />
+                )}
+                scrollEnabled={false}
+                initialNumToRender={10}
+                removeClippedSubviews={false}
+              />
+            )}
           </View>
         )}
 
@@ -466,6 +394,145 @@ export default function RutaDeHoy({ navigation }: Props) {
     </View>
   );
 }
+
+// ── Subcomponentes memoizados ────────────────────────────────────────────────
+// Separar el card de suscriptor y los banners en componentes con React.memo
+// reduce re-renders cuando SOLO cambia el campo `capturado` de un item o
+// cuando el workspace cambia `cargando` sin afectar la lista. Sin memo,
+// cada cambio de state rerenderiza TODA la lista.
+
+interface SuscriptorCardProps {
+  item: Suscriptor;
+  capturado: boolean;
+  onPress: () => void;
+}
+
+const SuscriptorCard = ({ item, capturado, onPress }: SuscriptorCardProps) => (
+  <Pressable
+    style={({ pressed }) => [
+      styles.card,
+      capturado && styles.cardCapturada,
+      pressed && !capturado && styles.cardPressed,
+    ]}
+    onPress={onPress}
+    disabled={capturado}
+    accessibilityRole="button"
+    accessibilityLabel={`${capturado ? 'Capturado' : 'Pendiente'}: suscriptor ${item.codigo} ${item.nombre_apellidos}`}
+  >
+    <View style={styles.cardContent}>
+      <View style={styles.cardInfo}>
+        <View style={styles.cardFilaMeta}>
+          <Text style={[TYPOGRAPHY.labelMd, styles.cardCodigo]}>
+            {item.codigo}
+          </Text>
+          {capturado ? (
+            <View style={styles.statusRow}>
+              <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
+              <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
+                Capturado este mes
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.statusRow}>
+              <MaterialIcons name="schedule" size={14} color={COLORS.onSurfaceVariant} />
+              <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>
+                Lectura pendiente
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text
+          style={[
+            TYPOGRAPHY.headlineSm,
+            capturado ? styles.cardNombreCapturado : styles.cardNombre,
+          ]}
+          numberOfLines={1}
+        >
+          {item.nombre_apellidos}
+        </Text>
+      </View>
+      {capturado ? (
+        <View style={styles.iconCircleCheck}>
+          <MaterialIcons name="task-alt" size={22} color={COLORS.secondary} />
+        </View>
+      ) : (
+        <MaterialIcons name="chevron-right" size={24} color={COLORS.onSurfaceVariant} />
+      )}
+    </View>
+  </Pressable>
+);
+
+const SuscriptorCardMemo = memo(SuscriptorCard);
+
+interface IdentidadCardProps {
+  prestador: Prestador;
+  totalSuscriptores: number;
+  porcentaje: number;
+}
+
+const IdentidadCard = ({ prestador, totalSuscriptores, porcentaje }: IdentidadCardProps) => (
+  <View
+    style={styles.identidadCard}
+    accessibilityRole="summary"
+    accessibilityLabel={`Prestador ${prestador.nombre}, NIT ${prestador.nit}, segmento ${prestador.segmento}, ${totalSuscriptores} suscriptores, ${porcentaje} por ciento capturado del mes`}
+  >
+    <View style={styles.identidadDecorCircle} pointerEvents="none" />
+    <View style={styles.identidadFilaIcono}>
+      <View style={styles.identidadIconCircle}>
+        <MaterialIcons name="business" size={24} color={COLORS.onSecondaryContainer} />
+      </View>
+      <View style={styles.identidadTitulos}>
+        <Text style={styles.identidadNombre} numberOfLines={1}>
+          {prestador.nombre}
+        </Text>
+        <Text style={styles.identidadMetaTexto} numberOfLines={1}>
+          NIT {prestador.nit} · Segmento {prestador.segmento}{' '}
+          {prestador.segmento === 1 ? 'urbano' : 'rural'}
+        </Text>
+      </View>
+    </View>
+    <View style={styles.identidadStats}>
+      <View style={styles.identidadStat}>
+        <Text style={styles.identidadStatNumero}>{totalSuscriptores}</Text>
+        <Text style={styles.identidadStatLabel}>suscriptores</Text>
+      </View>
+      <View style={styles.identidadStatDerecha}>
+        <Text style={styles.identidadStatNumeroMd}>{porcentaje}%</Text>
+        <Text style={styles.identidadStatLabel}>lecturas del mes</Text>
+      </View>
+    </View>
+    <View style={styles.identidadBarraContainer}>
+      <View
+        style={[styles.identidadBarraFill, { width: `${porcentaje}%` as `${number}%` }]}
+      />
+    </View>
+  </View>
+);
+
+const IdentidadCardMemo = memo(IdentidadCard);
+
+interface ProgresoCardProps {
+  capturas: number;
+  total: number;
+  porcentaje: number;
+}
+
+const ProgresoCard = ({ capturas, total, porcentaje }: ProgresoCardProps) => (
+  <View style={styles.progresoCard}>
+    <View style={styles.progresoRow}>
+      <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>Lecturas del mes</Text>
+      <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNumero]}>
+        {capturas}{' '}
+        <Text style={[TYPOGRAPHY.bodySm, styles.progresoTotal]}>/ {total}</Text>
+      </Text>
+    </View>
+    <View style={styles.barraContainer}>
+      <View style={[styles.barraFill, { width: `${porcentaje}%` as `${number}%` }]} />
+    </View>
+  </View>
+);
+
+const ProgresoCardMemo = memo(ProgresoCard);
 
 export const styles = StyleSheet.create({
   container: {
