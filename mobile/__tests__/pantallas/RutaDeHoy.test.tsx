@@ -701,6 +701,205 @@ describe('RutaDeHoy', () => {
     expect(source).toMatch(/const\s+SuscriptorCardMemo\s*=\s*memo\(SuscriptorCard\)/);
   });
 
+  it('T-INTEG-1: render con 3 estados de suscriptor (capturado, pendiente, sin medidor)', async () => {
+    configurarBootstrap({
+      lecturas: [
+        // Suscriptor 1 capturado este mes (medidor 10).
+        {
+          id: 1,
+          id_medidor: 10,
+          id_periodo: 'P01',
+          id_operario: 99,
+          lectura_anterior: 100,
+          lectura_actual: 115,
+          timestamp_captura: TIMESTAMP_HOY,
+        },
+      ],
+      medidores: [
+        { id_medidor: 10, id_suscriptor: 1, serial: 'M001' },
+        { id_medidor: 30, id_suscriptor: 3, serial: 'M003' },
+        // Suscriptor 2 sin medidores → estado sin-medidor (igual
+        // visualmente a pendiente, pero NO navega al tap).
+      ],
+    });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText('Capturado este mes')).toBeTruthy();
+    // Suscriptores 2 y 3 (sin lectura) muestran "Lectura pendiente".
+    const pendientes = screen.getAllByText('Lectura pendiente');
+    expect(pendientes.length).toBe(2);
+    // Suscriptor 2 (sin medidor) sigue mostrando "Lectura pendiente"
+    // visualmente pero NO debe navegar al tap (navegación retorna early).
+  });
+
+  it('T-INTEG-2: tap suscriptor con 1 medidor navega directo (CapturarLectura)', async () => {
+    configurarBootstrap({
+      lecturas: [],
+      medidores: [
+        { id_medidor: 10, id_suscriptor: 1, serial: 'M001' },
+        { id_medidor: 20, id_suscriptor: 2, serial: 'M002' },
+        { id_medidor: 30, id_suscriptor: 3, serial: 'M003' },
+      ],
+    });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    const carlos = await screen.findByText('Carlos López');
+    fireEvent.press(carlos);
+    await waitFor(() => {
+      expect(nav.navigate).toHaveBeenCalledWith('CapturarLectura', {
+        id_medidor: 20,
+        id_suscriptor: 2,
+      });
+    });
+  });
+
+  it('T-INTEG-3: tap suscriptor con 2+ medidores abre modal selector', async () => {
+    const nav = crearNavMock();
+    configurarBootstrap({
+      lecturas: [],
+      medidores: [
+        { id_medidor: 10, id_suscriptor: 1, serial: 'M001' },
+        { id_medidor: 11, id_suscriptor: 1, serial: 'M001B' }, // 2do medidor para Ana
+        { id_medidor: 30, id_suscriptor: 3, serial: 'M003' },
+      ],
+    });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    // Ana está capturada → usar Carlos (con 1 medidor) NO abre modal. Probemos
+    // agregando 2 medidores a Carlos:
+    configurarBootstrap({
+      lecturas: [],
+      medidores: [
+        { id_medidor: 10, id_suscriptor: 1, serial: 'M001' },
+        { id_medidor: 20, id_suscriptor: 2, serial: 'M002' },
+        { id_medidor: 21, id_suscriptor: 2, serial: 'M002B' },
+        { id_medidor: 30, id_suscriptor: 3, serial: 'M003' },
+      ],
+    });
+    const carlos = await screen.findByText('Carlos López');
+    fireEvent.press(carlos);
+    await waitFor(() => {
+      expect(screen.getByText('Seleccionar medidor')).toBeTruthy();
+    });
+    expect(screen.getByText('Medidor #20')).toBeTruthy();
+    expect(screen.getByText('Medidor #21')).toBeTruthy();
+    // El navigation.navigate directo NO debe haberse llamado todavía
+    // (se llama cuando el usuario elige en el modal).
+    expect(nav.navigate).not.toHaveBeenCalled();
+  });
+
+  it('T-LOGIC-1: progreso calculado correctamente (5/10 = 50%)', async () => {
+    const subs = Array.from({ length: 10 }, (_, i) => ({
+      id_suscriptor: i + 1,
+      codigo: `S${String(i + 1).padStart(3, '0')}`,
+      nombre_apellidos: `Suscriptor ${i + 1}`,
+      direccion: '',
+      estrato: 1,
+    }));
+    const meds = subs.map((s) => ({
+      id_medidor: s.id_suscriptor,
+      id_suscriptor: s.id_suscriptor,
+      serial: `M${s.id_suscriptor}`,
+    }));
+    // 5 lecturas de hoy (suscripciones 1..5).
+    const lects = meds.slice(0, 5).map((m, i) => ({
+      id: i + 1,
+      id_medidor: m.id_medidor,
+      id_periodo: 'P01',
+      id_operario: 99,
+      lectura_anterior: 100,
+      lectura_actual: 110 + i,
+      timestamp_captura: TIMESTAMP_HOY,
+    }));
+    configurarBootstrap({ suscriptores: subs, lecturas: lects, medidores: meds });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText('Lecturas del mes')).toBeTruthy();
+    // 5/10 = 50% capturado.
+    expect(screen.getByText('50%')).toBeTruthy();
+  });
+
+  it('T-LOGIC-2: banner de identidad muestra NIT, segmento, total suscriptores y %', async () => {
+    configurarBootstrap();
+    const { getByText, getAllByText } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    await screen.findByText('Ana García');
+    // NIT visible en el banner.
+    expect(getByText(/900123456-7/)).toBeTruthy();
+    // Segmento 2 rural.
+    expect(getByText(/segmento 2/i)).toBeTruthy();
+    // Total suscriptores = urbanos + rurales = 40 + 110 = 150.
+    expect(getByText('150')).toBeTruthy();
+    // Porcentaje capturado (1/3 = 33%).
+    expect(getAllByText(/33%/)).toBeTruthy();
+  });
+
+  it('T-INTEG-4: estado vacío con CTA "Configurar prestador" cuando id_prestador_activo=0', async () => {
+    useWorkspace.setState({
+      id_prestador_activo: 0,
+      prestador: null,
+      prestadores_disponibles: [],
+      acuerdo_vigente: null,
+      parametros_vigentes: null,
+      cargando: false,
+    });
+    const prestadorPorId = jest.fn().mockResolvedValue(null);
+    configurarBootstrap({ prestadorPorId });
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText('Configurá tu prestador')).toBeTruthy();
+    // El CTA apunta a la pantalla de Config.
+    const cta = await screen.findByText('Configurar prestador');
+    fireEvent.press(cta);
+    await waitFor(() => {
+      expect(nav.navigate).toHaveBeenCalledWith('Config', { screen: 'Configuracion' });
+    });
+  });
+
+  it('T-INTEG-5: estado de loading con ActivityIndicator y "Cargando ruta…"', async () => {
+    // Bootstrap que nunca resuelve → loading permanece true.
+    mockGetBootstrap.mockReturnValue(new Promise(() => { /* pending */ }) as any);
+    const { UNSAFE_root } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    expect(await screen.findByText('Cargando ruta…')).toBeTruthy();
+    const { ActivityIndicator } = require('react-native');
+    const indicators = UNSAFE_root.findAllByType(ActivityIndicator);
+    expect(indicators.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('T-INTEG-6: estado de error con botón Reintentar', async () => {
+    mockGetBootstrap.mockRejectedValue(new Error('fallo de red'));
+    renderConProviders(<RutaDeHoy navigation={nav as any} route={{} as any} />);
+    expect(await screen.findByText('Reintentar')).toBeTruthy();
+    expect(screen.getByText(/Error al cargar: fallo de red/)).toBeTruthy();
+  });
+
+  it('T-PERF-1: FlatList con 100 suscriptores tiene initialNumToRender=10', async () => {
+    const subs = Array.from({ length: 100 }, (_, i) => ({
+      id_suscriptor: i + 1,
+      codigo: `S${String(i + 1).padStart(3, '0')}`,
+      nombre_apellidos: `Suscriptor ${i + 1}`,
+      direccion: '',
+      estrato: 1,
+    }));
+    const meds = subs.map((s) => ({
+      id_medidor: s.id_suscriptor,
+      id_suscriptor: s.id_suscriptor,
+      serial: `M${s.id_suscriptor}`,
+    }));
+    configurarBootstrap({ suscriptores: subs, lecturas: [], medidores: meds });
+    const { UNSAFE_root } = renderConProviders(
+      <RutaDeHoy navigation={nav as any} route={{} as any} />,
+    );
+    expect(await screen.findByText('Suscriptor 1')).toBeTruthy();
+    const { FlatList } = require('react-native');
+    const flatLists = UNSAFE_root.findAllByType(FlatList);
+    expect(flatLists.length).toBeGreaterThanOrEqual(1);
+    const fl = flatLists[0];
+    // La lista NO renderiza los 100 de una — solo los primeros 10.
+    expect(fl.props.initialNumToRender).toBe(10);
+    // La cantidad total de datos sigue siendo 100 (la lista está
+    // disponible, solo se renderiza en chunks via virtualización).
+    expect(fl.props.data.length).toBe(100);
+  });
+
 function flattenStyle(style: unknown): Record<string, unknown> {
   if (Array.isArray(style)) {
     return Object.assign({}, ...style.map((s) => flattenStyle(s)));
