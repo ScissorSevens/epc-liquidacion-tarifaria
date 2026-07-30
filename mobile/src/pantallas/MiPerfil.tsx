@@ -19,6 +19,7 @@
  */
 import { useEffect, useState } from 'react';
 import {
+  Dimensions,
   Modal,
   ScrollView,
   StyleSheet,
@@ -57,6 +58,25 @@ type Props = ConfigStackScreenProps<'MiPerfil'> & {
 
 /** Placeholder honesto cuando no hay dato real cargado todavía. */
 const PLACEHOLDER = '—';
+
+/**
+ * H1 clamp del nombre del operario.
+ *
+ * Simula `clamp(2rem, 5vw, 3.25rem)` de CSS en runtime React Native.
+ * Rango efectivo: 32 px (2rem) a 52 px (3.25rem). El preferred 5vw se
+ * computa contra el ancho de pantalla — al envoltorio de tests con
+ * `frame.width: 320` y al frame default de RN 0x0 en jest, el clamp
+ * cae en el piso (32 px) sin overflow.
+ *
+ * mi-perfil-redesign Task 1 — impeccable craft typography.
+ */
+const NOMBRE_FONT_SIZE_CLAMP = ((): number => {
+  const { width } = Dimensions.get('window');
+  const minimo = 32; // 2rem
+  const maximo = 52; // 3.25rem
+  const preferido = width * 0.05; // 5vw
+  return Math.min(Math.max(minimo, preferido), maximo);
+})();
 
 /** Iniciales (hasta 2 letras) derivadas del nombre. Vacío si no hay nombre. */
 function obtenerIniciales(nombre: string | undefined): string {
@@ -911,8 +931,11 @@ const estilos = StyleSheet.create({
     paddingHorizontal: SPACING.margin,
   },
   avatar: {
-    width: 96,
-    height: 96,
+    // mi-perfil-redesign Task 1: 96 → 120 px para mejorar jerarquía
+    // visual y presencia del operario (impeccable: el avatar es el
+    // anchor emocional de la pantalla).
+    width: 120,
+    height: 120,
     borderRadius: RADIUS.full,
     backgroundColor: COLORS.brandAzulOscuro,
     borderWidth: 1,
@@ -926,7 +949,11 @@ const estilos = StyleSheet.create({
     color: COLORS.onPrimary,
   },
   nombre: {
-    ...TYPOGRAPHY.headlineMd,
+    // H1 clamp: rango efectivo [32, 52] px — simula el clamp(2rem, 5vw,
+    // 3.25rem) de web. el `...TYPOGRAPHY.headlineLg` aporta fontWeight
+    // y lineHeight; el fontSize queda overridden por la clamp.
+    ...TYPOGRAPHY.headlineLg,
+    fontSize: NOMBRE_FONT_SIZE_CLAMP,
     color: COLORS.primary,
     marginBottom: SPACING.xs,
   },

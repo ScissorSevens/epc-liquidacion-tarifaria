@@ -16,7 +16,7 @@
 //     explote si se llega a invocar.
 
 import { render, waitFor, fireEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { ComponentProps, ReactElement } from 'react';
 
@@ -235,6 +235,127 @@ describe('MiPerfil — paleta institucional EPC', () => {
       backgroundColor?: string;
     };
     expect(estilo.backgroundColor).toBe('#093C5D');
+  });
+
+  //====================================================================
+  // mi-perfil-redesign — Task 1 (impeccable craft)
+  // Verificaciones programaticas de typography, layout, hierarchy y
+  // touch targets. Companion tests al commit `refactor(mi-perfil):
+  // apply impeccable craft`.
+  //====================================================================
+
+  /** Convierte un hex color (#RRGGBB) a [R, G, B] en 0..1. */
+  function hexARgb01(hex: string): [number, number, number] {
+    const limpio = hex.replace('#', '');
+    const r = parseInt(limpio.slice(0, 2), 16) / 255;
+    const g = parseInt(limpio.slice(2, 4), 16) / 255;
+    const b = parseInt(limpio.slice(4, 6), 16) / 255;
+    return [r, g, b];
+  }
+
+  /** Calcula la luminancia relativa sRGB (WCAG 2.x). */
+  function luminanciaRelativa(hex: string): number {
+    const [r, g, b] = hexARgb01(hex);
+    const linear = (c: number): number =>
+      c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+  }
+
+  /** Ratio de contraste WCAG entre dos hex colors. */
+  function contrasteWcag(hexA: string, hexB: string): number {
+    const lA = luminanciaRelativa(hexA);
+    const lB = luminanciaRelativa(hexB);
+    const claro = Math.max(lA, lB);
+    const oscuro = Math.min(lA, lB);
+    return (claro + 0.05) / (oscuro + 0.05);
+  }
+
+  /**
+   * T-CRAFT-1 — El avatar debe medir 120px (no 96px) tras el rediseño.
+   * Antes del refactor el avatar era 96px; ahora es 120px para mejor
+   * jerarquía visual.
+   */
+  it('T-CRAFT-1 avatar mide 120px (no 96px)', () => {
+    const { getByTestId } = renderMiPerfil();
+    const avatar = getByTestId('avatar');
+    const estilo = StyleSheet.flatten(avatar.props.style) as {
+      width?: number;
+      height?: number;
+    };
+    expect(estilo.width).toBe(120);
+    expect(estilo.height).toBe(120);
+  });
+
+  /**
+   * T-CRAFT-2 — El nombre del operario usa H1 con fontSize dentro del
+   * rango de clamp permitido (≥ 24px, ≤ 96px). El valor exacto
+   * depende del viewport (responsive clamp), pero debe caer dentro
+   * del rango [24, 96] en el frame default de test (320x568).
+   */
+  it('T-CRAFT-2 nombre usa H1 con fontSize en rango [24, 96]', () => {
+    const { getByTestId } = renderMiPerfil();
+    const nombre = getByTestId('perfil-nombre');
+    const estilo = StyleSheet.flatten(nombre.props.style) as {
+      fontSize?: number;
+    };
+    expect(estilo.fontSize).toBeGreaterThanOrEqual(24);
+    expect(estilo.fontSize).toBeLessThanOrEqual(96);
+  });
+
+  /**
+   * T-CRAFT-3 — El botón "Cerrar sesión" tiene touch target ≥ 44px
+   * (WCAG 2.5.5). Verificamos el minHeight efectivo del Pressable.
+   * BotonPrimario.tamanoNormal ya tiene height: 56 — el assert es
+   * una salvaguarda para futuros refactors.
+   */
+  it('T-CRAFT-3 botón cerrar-sesion tiene minHeight >= 44px', () => {
+    const { getByTestId } = renderMiPerfil();
+    const boton = getByTestId('boton-cerrar-sesion');
+    const estilo = StyleSheet.flatten(boton.props.style) as {
+      minHeight?: number;
+      height?: number;
+    };
+    const alto = estilo.height ?? estilo.minHeight ?? 0;
+    expect(alto).toBeGreaterThanOrEqual(44);
+  });
+
+  /**
+   * T-CRAFT-4 — Contraste WCAG AA en el nombre del operario contra
+   * el fondo de la surface. brandAzulOscuro (#093C5D) sobre
+   * surfaceContainerLowest (#FFFFFF) da ~11.4:1 — muy por encima del
+   * umbral 4.5:1 de body text en WCAG AA.
+   */
+  it('T-CRAFT-4 contraste WCAG AA: nombre del operario vs fondo', () => {
+    const { getByTestId } = renderMiPerfil();
+    const nombre = getByTestId('perfil-nombre');
+    const estilo = StyleSheet.flatten(nombre.props.style) as {
+      color?: string;
+    };
+    const colorTexto = estilo.color ?? '#000000';
+    const contraste = contrasteWcag(colorTexto, '#FFFFFF');
+    expect(contraste).toBeGreaterThanOrEqual(4.5);
+  });
+
+  /**
+   * T-CRAFT-5 — Ningún label de sección en MiPerfil debe tener
+   * `textTransform: 'uppercase'`. Verificamos todos los nodos
+   * `<Text>` del árbol renderizado y nos aseguramos de que ninguno
+   * tenga ese estilo. La regla "ALL CAPS ban" de impeccable v1
+   * lo deja explícito.
+   */
+  it('T-CRAFT-5 ningún Text renderizado tiene textTransform uppercase', () => {
+    const { UNSAFE_queryAllByType } = renderMiPerfil();
+    const textos = UNSAFE_queryAllByType(Text);
+    expect(textos.length).toBeGreaterThan(0);
+    for (const nodo of textos) {
+      // StyleSheet.flatten(undefined) devuelve {} sin romper; los nodos
+      // sin style quedan con textTransform undefined => no es 'uppercase'.
+      const estilo = StyleSheet.flatten(nodo.props.style) as {
+        textTransform?: string;
+      } | null;
+      const transform = estilo?.textTransform;
+      expect(transform).not.toBe('uppercase');
+    }
   });
 
   it('MP-2 el texto del avatar (iniciales) usa onPrimary (blanco) para contraste AAA', () => {
