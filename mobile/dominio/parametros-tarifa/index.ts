@@ -6,3 +6,4 @@ export { calcularCargos, COMPONENTES_TARIFARIOS } from './calcular';
 export type { CargosResultantes, ComponenteTarifa } from './calcular';
 export { validarCmaMinimo, CMA_MINIMO_ACUEDUCTO, CMA_MINIMO_ALCANTARILLADO } from './validaciones';
 export type { Servicio } from './validaciones';
+export { calcularFactorIpc, IPC_VALORES } from './ipc';
