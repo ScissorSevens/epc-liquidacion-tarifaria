@@ -38,6 +38,8 @@ interface ParametrosRow {
   readonly vigente_desde: string;
   readonly vigente_hasta: string;
   readonly created_at: string;
+  readonly anio_base: number;
+  readonly factor_indexacion_ipc: number;
 }
 
 interface MinimoVitalRow {
@@ -106,6 +108,8 @@ function fromRow(row: ParametrosRow, minimoVital: MinimoVital | null): Parametro
     vigente_desde: row.vigente_desde,
     vigente_hasta: row.vigente_hasta,
     created_at: row.created_at,
+    anio_base: row.anio_base,
+    factor_indexacion_ipc: row.factor_indexacion_ipc,
   };
 }
 
@@ -136,8 +140,8 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
           aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
           cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
-          vigente_desde, vigente_hasta
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
@@ -145,6 +149,7 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         data.ipuf_indice, data.cargo_fijo_resultante, data.cargo_consumo_resultante,
         JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
+        data.anio_base, data.factor_indexacion_ipc,
       );
       const id = Number(result.lastInsertRowId);
       const row = await db.getFirstAsync<ParametrosRow>(
@@ -258,8 +263,8 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
           aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
           cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
-          vigente_desde, vigente_hasta
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id_prestador, periodo, vigente_desde) DO UPDATE SET
           id_acuerdo = excluded.id_acuerdo,
           cma = excluded.cma,
@@ -277,7 +282,9 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           cargo_fijo_resultante = excluded.cargo_fijo_resultante,
           cargo_consumo_resultante = excluded.cargo_consumo_resultante,
           componentes_aplicables = excluded.componentes_aplicables,
-          vigente_hasta = excluded.vigente_hasta`,
+          vigente_hasta = excluded.vigente_hasta,
+          anio_base = excluded.anio_base,
+          factor_indexacion_ipc = excluded.factor_indexacion_ipc`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
@@ -285,6 +292,7 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         data.ipuf_indice, data.cargo_fijo_resultante, data.cargo_consumo_resultante,
         JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
+        data.anio_base, data.factor_indexacion_ipc,
       );
       const row = await db.getFirstAsync<ParametrosRow>(
         `SELECT * FROM parametros_tarifa

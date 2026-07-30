@@ -56,6 +56,8 @@ function buildRow(overrides: Partial<ParametrosTarifaRow> = {}): ParametrosTarif
     vigente_desde: '2025-01-01',
     vigente_hasta: '2029-12-31',
     created_at: '2026-07-28T00:00:00.000Z',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
     ...overrides,
   };
 }
@@ -83,6 +85,8 @@ interface ParametrosTarifaRow {
   readonly vigente_desde: string;
   readonly vigente_hasta: string;
   readonly created_at: string;
+  readonly anio_base: number;
+  readonly factor_indexacion_ipc: number;
 }
 
 interface DbFakes {
@@ -131,6 +135,8 @@ function buildBorrador(overrides: Partial<ParametrosTarifaBorrador> = {}): Param
     minimo_vital: null,
     vigente_desde: '2025-01-01',
     vigente_hasta: '2029-12-31',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
     ...overrides,
   };
 }
@@ -263,6 +269,32 @@ describe('crearParametrosTarifaRepositoryExpoSqlite.guardar() — UPSERT', () =>
     expect(sql).toMatch(/cargo_consumo_resultante\s*=\s*excluded\.cargo_consumo_resultante/i);
   });
 
+  it('T-GUARDAR-6: persiste anio_base y factor_indexacion_ipc', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(33, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 33,
+      anio_base: 2020,
+      factor_indexacion_ipc: 1.5,
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(
+      buildBorrador({ anio_base: 2020, factor_indexacion_ipc: 1.5 }),
+    );
+
+    expect(resultado.anio_base).toBe(2020);
+    expect(resultado.factor_indexacion_ipc).toBe(1.5);
+    const sql: string = runAsync.mock.calls[0][0];
+    // El INSERT incluye anio_base y factor_indexacion_ipc.
+    expect(sql).toMatch(/anio_base/i);
+    expect(sql).toMatch(/factor_indexacion_ipc/i);
+    // El DO UPDATE SET los propaga.
+    expect(sql).toMatch(/anio_base\s*=\s*excluded\.anio_base/i);
+    expect(sql).toMatch(/factor_indexacion_ipc\s*=\s*excluded\.factor_indexacion_ipc/i);
+  });
+
   it('T-GUARDAR-5: rechaza cuando el row post-UPSERT no existe (defensiva)', async () => {
     const runAsync = mockearRunAsyncQueHaceUpsert(1, 1);
     const getFirstAsync = jest.fn().mockResolvedValue(null);
@@ -270,5 +302,31 @@ describe('crearParametrosTarifaRepositoryExpoSqlite.guardar() — UPSERT', () =>
     const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
 
     await expect(repo.guardar(buildBorrador())).rejects.toThrow(/guardar/);
+  });
+
+  it('T-GUARDAR-6: persiste anio_base y factor_indexacion_ipc', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(33, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 33,
+      anio_base: 2020,
+      factor_indexacion_ipc: 1.5,
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(
+      buildBorrador({ anio_base: 2020, factor_indexacion_ipc: 1.5 }),
+    );
+
+    expect(resultado.anio_base).toBe(2020);
+    expect(resultado.factor_indexacion_ipc).toBe(1.5);
+    const sql: string = runAsync.mock.calls[0][0];
+    // El INSERT incluye anio_base y factor_indexacion_ipc.
+    expect(sql).toMatch(/anio_base/i);
+    expect(sql).toMatch(/factor_indexacion_ipc/i);
+    // El DO UPDATE SET los propaga.
+    expect(sql).toMatch(/anio_base\s*=\s*excluded\.anio_base/i);
+    expect(sql).toMatch(/factor_indexacion_ipc\s*=\s*excluded\.factor_indexacion_ipc/i);
   });
 });

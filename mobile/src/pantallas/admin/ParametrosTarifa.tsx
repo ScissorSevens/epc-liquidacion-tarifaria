@@ -25,7 +25,10 @@ import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
 import {
   COMPONENTES_TARIFARIOS,
+  CMA_MINIMO_ACUEDUCTO,
+  CMA_MINIMO_ALCANTARILLADO,
   calcularCargos,
+  validarCmaMinimo,
   type ParametrosTarifa,
   type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
@@ -139,6 +142,8 @@ export default function ParametrosTarifaForm({
   }, [repo, id_prestador, parametrosProp]);
 
   const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
+  // anio_base: Res CRA 825/2017 Art. 7. Default 2016 (normativo).
+  const [anioBase, setAnioBase] = useState(String(parametrosActuales?.anio_base ?? 2016));
   const [cma, setCma] = useState(String(parametrosActuales?.cma ?? 0));
   const [cmo, setCmo] = useState(String(parametrosActuales?.cmo ?? 0));
   const [cmi, setCmi] = useState(String(parametrosActuales?.cmi ?? 0));
@@ -168,6 +173,7 @@ export default function ParametrosTarifaForm({
     if (parametrosActuales === null) return;
     if (yaSincronizadoRef.current) return;
     setPeriodo(String(parametrosActuales.periodo));
+    setAnioBase(String(parametrosActuales.anio_base));
     setCma(String(parametrosActuales.cma));
     setCmo(String(parametrosActuales.cmo));
     setCmi(String(parametrosActuales.cmi));
@@ -233,6 +239,9 @@ export default function ParametrosTarifaForm({
         vigente_hasta: vigenteHasta,
         cargo_fijo_resultante: 0,
         cargo_consumo_resultante: 0,
+        // Res CRA 825/2017 Art. 7 (anio_base) + Art. 11 (factor IPC).
+        anio_base: entero(anioBase),
+        factor_indexacion_ipc: 1.0,
       };
       const cargos = calcularCargos(borradorCargos as ParametrosTarifa);
       await repo.guardar({
@@ -284,6 +293,17 @@ export default function ParametrosTarifaForm({
       </View>
       <View style={estilos.campo}>
         <FormField
+          label="Anio base IPC (Res CRA 825 Art. 7, default 2016)"
+          value={anioBase}
+          onChangeText={setAnioBase}
+          keyboardType="numeric"
+          editable={!guardando && !cargandoInputs}
+          helperText="Norma CRA 825: anio_base=2016 (default). Override posible."
+          testID="param-anio-base"
+        />
+      </View>
+      <View style={estilos.campo}>
+        <FormField
           label="Vigente desde (YYYY-MM-DD)"
           value={vigenteDesde}
           onChangeText={setVigenteDesde}
@@ -315,6 +335,11 @@ export default function ParametrosTarifaForm({
           testID="param-cma"
         />
       </View>
+      {num(cma) < CMA_MINIMO_ACUEDUCTO && (
+        <Text style={estilos.warningCma} testID="param-cma-warning">
+          CMA bajo el minimo normativo (Res CRA 825 Art. 15): minimo acueducto = ${CMA_MINIMO_ACUEDUCTO}, alcantarillado = ${CMA_MINIMO_ALCANTARILLADO}. Recomendamos ajustar antes de guardar.
+        </Text>
+      )}
       <View style={estilos.campo}>
         <FormField
           label="CMO · Costo Medio Operación ($/m³)"
@@ -468,6 +493,16 @@ const estilos = StyleSheet.create({
   },
   // Mantenemos 'input' por si se agrega algun campo no-FormField en el
   // futuro. Los FormField tienen su propio style interno.
+  warningCma: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.error,
+    backgroundColor: COLORS.errorContainer ?? COLORS.surfaceContainerLow,
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+    minHeight: 44,
+  },
   input: {
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurface,

@@ -462,6 +462,24 @@ CREATE INDEX idx_minimo_vital_prestador_vigencia
   ON minimo_vital (id_prestador, vigente_desde, vigente_hasta);
 `;
 
+/**
+ * Migration 023_parametros_tarifa_anio_base. Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/023_parametros_tarifa_anio_base.sql`.
+ *
+ * Cambia `param-tarifa-res-825-compliance-phase1` (fase 1). Res CRA
+ * 825/2017 Art. 7 (año base) + Art. 11 (factor IPC persistido).
+ *
+ * Idempotente: simples ALTER ADD COLUMN. El runner controla via
+ * `__migraciones_aplicadas` (no se re-ejecuta si la version coincide).
+ */
+const MIGRACION_023_PARAMETROS_TARIFA_ANIO_BASE = `
+ALTER TABLE parametros_tarifa ADD COLUMN anio_base INTEGER NOT NULL DEFAULT 2016
+  CHECK (anio_base >= 1900);
+
+ALTER TABLE parametros_tarifa ADD COLUMN factor_indexacion_ipc REAL NOT NULL DEFAULT 1.0
+  CHECK (factor_indexacion_ipc >= 0);
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -484,6 +502,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 19, nombre: '019_parametros_tarifa_completo', sql: MIGRACION_019_PARAMETROS_TARIFA_COMPLETO },
   { version: 20, nombre: '020_factura_compliance_1038', sql: MIGRACION_020_FACTURA_COMPLIANCE_1038 },
   { version: 21, nombre: '021_concepto_otro_valor', sql: MIGRACION_021_CONCEPTO_OTRO_VALOR },
+  { version: 23, nombre: '023_parametros_tarifa_anio_base', sql: MIGRACION_023_PARAMETROS_TARIFA_ANIO_BASE },
 ];
 
 

@@ -56,6 +56,8 @@ interface ParametrosRow {
   readonly vigente_desde: string;
   readonly vigente_hasta: string;
   readonly created_at: string;
+  readonly anio_base: number;
+  readonly factor_indexacion_ipc: number;
 }
 
 interface MinimoVitalRow {
@@ -112,6 +114,8 @@ function fromRow(row: ParametrosRow, minimoVital: MinimoVital | null): Parametro
     vigente_desde: row.vigente_desde,
     vigente_hasta: row.vigente_hasta,
     created_at: row.created_at,
+    anio_base: row.anio_base,
+    factor_indexacion_ipc: row.factor_indexacion_ipc,
   };
 }
 
@@ -142,13 +146,13 @@ const SQL_INSERT = `
     agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
     aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
     cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
-    vigente_desde, vigente_hasta
+    vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc
   ) VALUES (
     @id_prestador, @id_acuerdo, @periodo, @cma, @cmo, @cmi, @cmt, @cmviaa, @aplica_cmviaa,
     @agua_suministrada_m3_anio, @ipuf_m3_suscriptor_mes, @suscriptores_promedio,
     @aplica_minimo_vital, @m3_gratis_minimo_vital, @ipuf_indice,
     @cargo_fijo_resultante, @cargo_consumo_resultante, @componentes_aplicables,
-    @vigente_desde, @vigente_hasta
+    @vigente_desde, @vigente_hasta, @anio_base, @factor_indexacion_ipc
   )
 `;
 
@@ -217,6 +221,8 @@ export function crearParametrosTarifaRepositorySqlite(
       componentes_aplicables: JSON.stringify([...p.componentes_aplicables]),
       vigente_desde: p.vigente_desde,
       vigente_hasta: p.vigente_hasta,
+      anio_base: p.anio_base,
+      factor_indexacion_ipc: p.factor_indexacion_ipc,
     };
   }
 

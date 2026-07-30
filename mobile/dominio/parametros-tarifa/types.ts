@@ -124,6 +124,25 @@ export interface ParametrosTarifa {
   readonly vigente_desde: string;
   readonly vigente_hasta: string;
   readonly created_at: string;
+  /**
+   * Año base para el cálculo del factor IPC (Res CRA 825/2017 Art. 7).
+   * Default 2016. Solo operativo si `factor_indexacion_ipc` se calcula
+   * automáticamente; un override manual del admin lo sustituye.
+   *
+   * Fase 1 (`param-tarifa-res-825-compliance-phase1`).
+   */
+  readonly anio_base: number;
+  /**
+   * Factor de indexación IPC persistido (Res CRA 825/2017 Art. 11).
+   * Default 1.0 (sin indexación). El admin puede override manual;
+   * si no, se calcula como `IPC_VALORES[anio_destino] / IPC_VALORES[anio_base]`.
+   *
+   * Metadato. NO es insumo del motor tarifario (no se usa en
+   * `emitirFactura` ni `liquidacion`).
+   *
+   * Fase 1 (`param-tarifa-res-825-compliance-phase1`).
+   */
+  readonly factor_indexacion_ipc: number;
 }
 
 export type ParametrosTarifaBorrador = Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>;
