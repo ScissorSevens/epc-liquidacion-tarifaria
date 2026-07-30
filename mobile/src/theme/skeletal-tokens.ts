@@ -77,6 +77,13 @@ export const COLORS = {
   warning: '#EF6C00',
   warningContainer: '#FFEDD5',
   onWarningContainer: '#5A3500',
+  // Estados de exito — Mapeado al brandVerde institucional.
+  // Agregado en admin-parametros-tarifa-redesign Task 2 para
+  // colorear feedback post-guardado y mensajes de "Parametros
+  // guardados correctamente" sin hardcodear hex.
+  success: '#76B718',
+  successContainer: '#E8F5D9',
+  onSuccessContainer: '#2E5A0A',
   // Estados de error — mapeado al brandRojo institucional.
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',

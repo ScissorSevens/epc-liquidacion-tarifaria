@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
@@ -46,6 +46,16 @@ interface BotonPrimarioProps {
   /** Icono Material a la izquierda (opcional). */
   readonly icono?: NombreIconoMaterial;
   /**
+   * iconoComponente — override completo del icono izquierdo.
+   *
+   * Use case: integracion expo-native-ui donde iOS usa un SF Symbol
+   * (`<Image source="sf:..." />` de expo-image) y Android usa
+   * MaterialIcons. Pasar este prop tiene prioridad sobre `icono`.
+   *
+   * Default: `undefined` (usa `icono` + MaterialIcons como antes).
+   */
+  readonly iconoComponente?: ReactNode;
+  /**
    * Tono semantico del fondo.
    * Default: 'azul' (CTAs de flujo principal).
    */
@@ -71,6 +81,7 @@ export function BotonPrimario({
   texto,
   onPress,
   icono,
+  iconoComponente,
   tono = 'azul',
   tamano = 'normal',
   disabled = false,
@@ -124,13 +135,17 @@ export function BotonPrimario({
         </View>
       ) : (
         <View style={styles.contenido}>
-          {icono !== undefined && (
-            <MaterialIcons
-              name={icono}
-              size={20}
-              color={colorIcono}
-              testID={testID !== undefined ? `${testID}-icon` : undefined}
-            />
+          {iconoComponente !== undefined ? (
+            iconoComponente
+          ) : (
+            icono !== undefined && (
+              <MaterialIcons
+                name={icono}
+                size={20}
+                color={colorIcono}
+                testID={testID !== undefined ? `${testID}-icon` : undefined}
+              />
+            )
           )}
           <Text style={[styles.texto, { color: colorTexto }]}>{texto}</Text>
         </View>

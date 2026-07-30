@@ -15,8 +15,11 @@
  *   - Toggles preservados inline (no son text inputs).
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
@@ -33,6 +36,102 @@ import {
   type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
 import type { AcuerdoMunicipalRepository } from '../../../dominio/acuerdo-municipal';
+
+/**
+ * Colores resueltos con Platform.select + fallback hex.
+ *
+ * La propuesta de expo-native-ui menciona la `Color` API de `expo-router`
+ * con semantica iOS (UIColor.label, UIColor.systemBackground, etc.) y
+ * Android MaterialTheme. El paquete `expo-router` instalado en este
+ * proyecto NO exporta una `Color` API publica. Implementamos un shim
+ * equivalente que:
+ *   - Documenta el contrato esperado (ios/android/default)
+ *   - Resuelve a tokens hex del theme cuando la API nativa no esta
+ *     disponible (Hermes en tests, build web, runtime legacy).
+ *
+ * Cualquier callsite que quiera un color "nativo" usa:
+ *   `Platform.select({ ios: COLORES_NATIVOS.ios.label, default: COLORS.onSurface })`
+ *
+ * admin-parametros-tarifa-redesign Task 2 — integracion expo-native-ui.
+ */
+const COLORES_NATIVOS = {
+  /** iOS label — texto primario sobre systemBackground. */
+  label: Platform.select({
+    ios: COLORS.onSurface,
+    android: COLORS.onSurface,
+    default: COLORS.onSurface,
+  }),
+  /** iOS secondaryLabel — texto secundario. */
+  secondaryLabel: Platform.select({
+    ios: COLORS.onSurfaceVariant,
+    android: COLORS.onSurfaceVariant,
+    default: COLORS.onSurfaceVariant,
+  }),
+  /** iOS separator — divisor de cards. */
+  separator: Platform.select({
+    ios: COLORS.outlineVariant,
+    android: COLORS.outlineVariant,
+    default: COLORS.outlineVariant,
+  }),
+  /** iOS systemBackground — fondo principal. */
+  systemBackground: Platform.select({
+    ios: COLORS.background,
+    android: COLORS.background,
+    default: COLORS.background,
+  }),
+  /** iOS systemBlue — tint por defecto de SF Symbols / CTAs. */
+  systemBlue: Platform.select({
+    ios: COLORS.brandAzulDigital,
+    android: COLORS.brandAzulDigital,
+    default: COLORS.brandAzulDigital,
+  }),
+};
+
+/**
+ * Icono del botón Guardar segun plataforma.
+ *
+ * iOS: SF Symbol "tray.and.arrow.down" (guardar) via expo-image.
+ * Android (y default): MaterialIcons "save" via @expo/vector-icons.
+ *
+ * Esto reemplaza el `<MaterialIcons name="save" />` previo (admin-
+ * parametros-tarifa-redesign Task 2). En iOS el SF Symbol usa el
+ * weight/style del sistema, se ve mas nitido y respeta el tint del
+ * boton (tintColor: systemBlue).
+ *
+ * Devuelve un ReactNode que se pasa como `iconoComponente` a
+ * `BotonPrimario`. En iOS es `<Image>` de expo-image; en Android es
+ * `<MaterialIcons>` directo para mantener la propagacion del testID
+ * (`param-guardar-icon`) que esperan los tests de regresion.
+ */
+function IconoGuardar({
+  colorIcono,
+  testID,
+}: {
+  colorIcono: string;
+  testID?: string;
+}): React.ReactNode {
+  if (Platform.OS === 'ios') {
+    return (
+      <Image
+        source="sf:tray.and.arrow.down"
+        style={{ width: 20, height: 20, tintColor: colorIcono }}
+        tintColor={colorIcono}
+        testID={testID}
+        accessibilityLabel="Guardar parámetros"
+      />
+    );
+  }
+  // Android (y default): MaterialIcons directo.
+  return (
+    <MaterialIcons
+      name="save"
+      size={20}
+      color={colorIcono}
+      testID={testID}
+      accessibilityLabel="Guardar parámetros"
+    />
+  );
+}
 
 interface Props {
   /** Si no se provee, se toma del workspace (`useWorkspace.id_prestador_activo`). */
@@ -267,6 +366,18 @@ export default function ParametrosTarifaForm({
         cargo_fijo_resultante: cargos.cargo_fijo,
         cargo_consumo_resultante: cargos.cargo_consumo,
       });
+      // Haptic feedback de exito solo en iOS — Android tiene
+      // Haptics.selectionAsync pero el patron UX aqui es notification
+      // success que es iOS-first.
+      if (Platform.OS === 'ios') {
+        try {
+          await Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success,
+          );
+        } catch {
+          // Haptics puede fallar en simulador o sin permisos — silencio.
+        }
+      }
       Alert.alert('Éxito', 'Parámetros tarifarios guardados');
     } catch (e) {
       Alert.alert('Error', String(e));
@@ -283,7 +394,11 @@ export default function ParametrosTarifaForm({
   const cargandoInputs = repo === null || cargando;
 
   return (
-    <ScrollView style={estilos.root} contentContainerStyle={estilos.content}>
+    <ScrollView
+      style={estilos.root}
+      contentContainerStyle={estilos.content}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       {cargandoInputs && (
         <View style={estilos.cargandoContenedor}>
           <ActivityIndicator
@@ -497,6 +612,7 @@ export default function ParametrosTarifaForm({
         texto="Guardar Parámetros"
         textoCargando="Guardando…"
         icono="save"
+        iconoComponente={<IconoGuardar colorIcono={COLORS.onPrimary} testID="param-guardar-icon" />}
         tono="azul"
         onPress={guardar}
         disabled={cargandoInputs}

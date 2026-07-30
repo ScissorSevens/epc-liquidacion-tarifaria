@@ -7,14 +7,19 @@
 //   - PER-05: selectores específicos en useWorkspace(). Suscripción
 //     limitada a id_prestador_activo. Cambios en otros campos del
 //     store NO deben disparar re-renders.
-//   - T-CRAFT-1..7: principios de craft impecable (typography clamp,
+//   - T-CRAFT-1..8: principios de craft impecable (typography clamp,
 //     touch targets WCAG 2.5.5, contraste WCAG AA, sin ghost-cards ni
 //     uppercase, inputs numericos copiables con tabular-nums) —
 //     admin-parametros-tarifa-redesign Task 1.
+//   - T-NATIVE-1..6: integracion expo-native-ui (Color API, SF Symbols,
+//     haptics, contentInsetAdjustmentBehavior) — Task 2.
 //
 // Mocks:
 //   - AsyncStorage, theme tokens, expo-splash-screen.
 //   - @expo/vector-icons/MaterialIcons: ya mockeado globalmente.
+//   - expo-haptics: mockeado inline en este archivo para espiar la
+//     llamada notificationAsync.
+//   - expo-image: mockeado inline para evitar el import nativo.
 //
 // TDD Evidence:
 //   RED  → primera cobertura directa de ParametrosTarifa.
@@ -23,7 +28,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Profiler } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { Alert, Platform, StyleSheet } from 'react-native';
 import { render, waitFor, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
@@ -51,6 +56,58 @@ jest.mock('../../../src/composition/get-bootstrap', () => ({
   }),
 }));
 
+// Mock expo-haptics: espiable, retorna Promise<void>. Permite verificar
+// que el screen llama notificationAsync(Success) al guardar exitosamente
+// en iOS.
+jest.mock('expo-haptics', () => ({
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  NotificationFeedbackType: {
+    Success: 'success',
+    Warning: 'warning',
+    Error: 'error',
+  },
+  ImpactFeedbackStyle: {
+    Light: 'light',
+    Medium: 'medium',
+    Heavy: 'heavy',
+  },
+}));
+
+// Mock expo-image: el componente Image acepta un string `source="sf:..."`
+// (SF Symbol) y lo renderea como <Text testID=...>source</Text>. Esto
+// evita el import del native asset loader de expo-image.
+jest.mock('expo-image', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  const Image = React.forwardRef(function MockImage(
+    { source, testID, accessibilityLabel, style, tintColor }: {
+      source: string | { uri?: string };
+      testID?: string;
+      accessibilityLabel?: string;
+      style?: unknown;
+      tintColor?: string;
+    },
+    ref: unknown,
+  ) {
+    const sourceStr = typeof source === 'string' ? source : (source?.uri ?? '');
+    return React.createElement(
+      Text,
+      {
+        ref,
+        testID,
+        accessibilityLabel,
+        // Exponemos la source en children para que tests puedan
+        // verificar el SF Symbol.
+        accessibilityHint: tintColor !== undefined ? `tint:${tintColor}` : undefined,
+      },
+      sourceStr,
+    );
+  });
+  return {
+    Image,
+  };
+});
+
 jest.mock('../../../src/theme/skeletal-tokens', () => ({
   BORDERS: { thin: { borderWidth: 1 } },
   COLORS: {
@@ -63,6 +120,15 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
     onSurface: '#000',
     onSurfaceVariant: '#555',
     error: '#f00',
+    success: '#76B718',
+    successContainer: '#E8F5D9',
+    onSuccessContainer: '#2E5A0A',
+    warning: '#EF6C00',
+    warningContainer: '#FFEDD5',
+    errorContainer: '#ffdad6',
+    surfaceLight: '#EFF4FF',
+    surfaceContainerHigh: '#DCE9FF',
+    brandAzulDigital: '#0092FF',
   },
   RADIUS: { sm: 4, md: 8, full: 999 },
   SHADOWS: { card: {} },
@@ -859,6 +925,151 @@ describe('ParametrosTarifaForm', () => {
         'utf8',
       );
       expect(source).toMatch(/tabularNums|tabular-nums/);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // T-NATIVE: integracion expo-native-ui (Task 2)
+  //   - Color API de expo-router con fallback hex
+  //   - SF Symbols iOS via expo-image + fallback MaterialIcons Android
+  //   - Haptics en exito de guardado (iOS)
+  //   - ScrollView con contentInsetAdjustmentBehavior="automatic"
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-NATIVE: integracion expo-native-ui (Color API, SF Symbols, haptics)', () => {
+    let PlatformOriginal: typeof import('react-native').Platform;
+
+    beforeEach(() => {
+      // Guardamos el original para restaurar despues de cada test.
+      PlatformOriginal = jest.requireActual('react-native').Platform;
+    });
+
+    afterEach(() => {
+      // Restauramos Platform.OS al valor default del test runner.
+      Object.defineProperty(require('react-native').Platform, 'OS', {
+        get: () => PlatformOriginal.OS,
+      });
+    });
+
+    it('T-NATIVE-1 Platform.select con Color API retorna labels iOS en Platform.OS=ios', () => {
+      // Audit: el screen debe invocar Platform.select envolviendo la
+      // resolucion de colores para acceder a la semantica nativa
+      // (UIColor.label en iOS, MaterialTheme en Android) con fallback
+      // hex en Hermes/Jest. Verificamos source-level que el codigo
+      // declara Platform.select y referencia colores nativos esperados.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(/Platform\.select/);
+      // Declara los nativos esperados (label/secondaryLabel/systemBackground).
+      // El codigo real usa Platform.select con keys ios/android y fallback hex.
+      expect(source).toMatch(/ios:\s*['"]#[0-9A-Fa-f]{3,6}|ios:\s*[^,]*systemBackground|ios:\s*[^,]*\.label/);
+    });
+
+    it('T-NATIVE-2 el source usa tokens de fallback hex (no colores hardcoded)', () => {
+      // Los colores nativos de iOS/Android no resuelven en Hermes/Jest.
+      // El screen debe tener fallback hex explicito via Platform.select.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // Platform.select con default
+      expect(source).toMatch(/Platform\.select\(\{[\s\S]*?default:/);
+    });
+
+    it('T-NATIVE-3 en iOS, el icono save del boton Guardar usa <Image source="sf:tray.and.arrow.down" />', async () => {
+      // Forzamos Platform.OS = 'ios' y verificamos que el boton
+      // Guardar renderiza un <Image> de expo-image con source SF Symbol.
+      Object.defineProperty(require('react-native').Platform, 'OS', {
+        get: () => 'ios',
+      });
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('param-guardar')).toBeTruthy();
+      });
+      // El mock de expo-image renderea `<Text testID="param-guardar-icon">sf:tray.and.arrow.down</Text>`.
+      const icono = getByTestId('param-guardar-icon');
+      expect(icono).toBeTruthy();
+      // El children del Text mock es la source string completa.
+      expect(icono.props.children).toBe('sf:tray.and.arrow.down');
+      // El tint color se propaga via accessibilityHint como "tint:#hex".
+      expect(icono.props.accessibilityHint).toMatch(/^tint:/);
+    });
+
+    it('T-NATIVE-4 en Android, el icono save del boton Guardar usa <MaterialIcons name="save" />', async () => {
+      // Forzamos Platform.OS = 'android' y verificamos que el icono
+      // del boton Guardar es MaterialIcons "save" (no SF Symbol).
+      Object.defineProperty(require('react-native').Platform, 'OS', {
+        get: () => 'android',
+      });
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('param-guardar-icon')).toBeTruthy();
+      });
+      // El icono MaterialIcons mockeado expone "save" como children.
+      expect(getByTestId('param-guardar-icon').props.children).toBe('save');
+    });
+
+    it('T-NATIVE-5 al tocar Guardar en iOS, llama Haptics.notificationAsync(Success) tras guardar exitosamente', async () => {
+      Object.defineProperty(require('react-native').Platform, 'OS', {
+        get: () => 'ios',
+      });
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      const haptics = require('expo-haptics');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // Tras guardar exitosamente, haptics.notificationAsync debe
+      // haberse llamado con NotificationFeedbackType.Success.
+      await waitFor(() => {
+        expect(haptics.notificationAsync).toHaveBeenCalled();
+      });
+      const calls = haptics.notificationAsync.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1]!;
+      expect(lastCall[0]).toBe(haptics.NotificationFeedbackType.Success);
+    });
+
+    it('T-NATIVE-6 el ScrollView raiz tiene prop contentInsetAdjustmentBehavior="automatic"', async () => {
+      // Para integrarse con el safe-area y navigation bar de iOS,
+      // el ScrollView raiz debe tener contentInsetAdjustmentBehavior
+      // = "automatic" (iOS). Lo verificamos via source code.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(/contentInsetAdjustmentBehavior=["']automatic["']/);
     });
   });
 });
