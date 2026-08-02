@@ -563,9 +563,14 @@ describe('MiPerfil — T-REMOVE: sección Parámetros Tarifarios removida', () =
 
   // T-REMOVE-1: el texto "Parámetros tarifarios" (header de sección)
   // no debe existir en el árbol.
-  it('T-REMOVE-1: no contiene texto "Parámetros tarifarios"', () => {
-    const { queryByText } = renderMiPerfil();
-    expect(queryByText(/Parámetros tarifarios/i)).toBeNull();
+  it('T-REMOVE-1: NO contiene los inputs de edición de parámetros (param-cma, etc.)', () => {
+    // Tras la adición del card de navegación, "Parámetros tarifarios"
+    // aparece como label en el card — esto es discovery, no edición.
+    // Lo que verifica este test es que NO está la UI de edición.
+    const { queryByTestId } = renderMiPerfil();
+    expect(queryByTestId('param-cma')).toBeNull();
+    expect(queryByTestId('param-periodo')).toBeNull();
+    expect(queryByTestId('param-cmo')).toBeNull();
   });
 
   // T-REMOVE-2: el botón "Editar parámetros" (testID boton-editar-parametros)
@@ -592,6 +597,82 @@ describe('MiPerfil — T-REMOVE: sección Parámetros Tarifarios removida', () =
     const { queryByTestId } = renderMiPerfil();
     expect(queryByTestId('param-cma')).toBeNull();
     expect(queryByTestId('param-periodo')).toBeNull();
+  });
+});
+
+// =====================================================================
+// Post mi-perfil-redesign — navegación a Parámetros Tarifarios.
+//
+// Tras la refactorización mi-perfil-redesign, la edición de parámetros
+// tarifarios vive exclusivamente en admin/ParametrosTarifa.tsx. Este card
+// en Mi Perfil hace discoverable esa entrada sin duplicar la lógica de
+// edición (no se reintroduce el modal ni los inputs en Mi Perfil).
+// =====================================================================
+describe('MiPerfil — Navegación a Parámetros Tarifarios (card de descubrimiento)', () => {
+  function renderMiPerfilConNavSpy() {
+    const nav = { navigate: jest.fn(), goBack: jest.fn() };
+    const route = { key: 'MiPerfil', name: 'MiPerfil' as const, params: undefined };
+    const ret = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 320, height: 568 },
+          insets: { top: 0, left: 0, right: 0, bottom: 0 },
+        }}
+      >
+        <MiPerfil navigation={nav as never} route={route} onLogoutRequested={jest.fn()} />
+      </SafeAreaProvider>,
+    );
+    return { ...ret, nav };
+  }
+
+  it('T-NAV-1: el card "Ir a parámetros tarifarios" está visible en Mi Perfil', () => {
+    const { getByTestId } = renderMiPerfil();
+    expect(getByTestId('boton-ir-parametros-tarifarios')).toBeTruthy();
+  });
+
+  it('T-NAV-2: tap en el card navega a Config → ParametrosTarifa', () => {
+    const { getByTestId, nav } = renderMiPerfilConNavSpy();
+    fireEvent.press(getByTestId('boton-ir-parametros-tarifarios'));
+    expect(nav.navigate).toHaveBeenCalledWith(
+      'Config',
+      expect.objectContaining({
+        screen: 'ParametrosTarifa',
+        params: expect.objectContaining({ id_prestador: expect.any(Number) }),
+      }),
+    );
+  });
+
+  it('T-NAV-3: la navegación pasa el id_prestador_activo del workspace', () => {
+    // Mockear id_prestador_activo = 42 en useWorkspace para verificar que
+    // la navegación usa ese id.
+    const { useWorkspace } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({ id_prestador_activo: 42, prestador: null }),
+    );
+    const { getByTestId, nav } = renderMiPerfilConNavSpy();
+    fireEvent.press(getByTestId('boton-ir-parametros-tarifarios'));
+    expect(nav.navigate).toHaveBeenCalledWith(
+      'Config',
+      expect.objectContaining({
+        params: { id_prestador: 42 },
+      }),
+    );
+  });
+
+  it('T-NAV-4: el card tiene accessibilityLabel "Ir a parámetros tarifarios"', () => {
+    const { getByTestId } = renderMiPerfil();
+    const card = getByTestId('boton-ir-parametros-tarifarios');
+    expect(card.props.accessibilityLabel).toBe('Ir a parámetros tarifarios');
+    expect(card.props.accessibilityRole).toBe('button');
+  });
+
+  it('T-NAV-5: el card tiene minHeight ≥ 44px (WCAG 2.5.5)', () => {
+    const { getByTestId } = renderMiPerfil();
+    const card = getByTestId('boton-ir-parametros-tarifarios');
+    const flat = StyleSheet.flatten(card.props.style);
+    expect(flat.minHeight).toBeGreaterThanOrEqual(44);
   });
 });
 

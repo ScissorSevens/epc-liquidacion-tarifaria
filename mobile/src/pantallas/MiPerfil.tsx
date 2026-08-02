@@ -89,6 +89,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   // Cambios en prestadores_disponibles / cargando / acuerdo_vigente /
   // parametros_vigentes NO causan re-render — el panel de parámetros
   // ya no vive en esta pantalla (ver admin/ParametrosTarifa.tsx).
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
   const prestador = useWorkspace((s) => s.prestador);
 
   // Cargar sesión al mount. La sesión vive en AsyncStorage bajo
@@ -220,6 +221,26 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         {/* Configuración */}
         <Text style={estilos.seccionTitulo}>Configuración</Text>
         <View style={estilos.listaCard}>
+          {/* Navegación a Parámetros Tarifarios (admin screen). Tras la
+              refactorización mi-perfil-redesign, la edición de parámetros
+              vive exclusivamente en admin/ParametrosTarifa.tsx. Este
+              card hace discoverable esa entrada desde Mi Perfil sin
+              duplicar la lógica de edición. */}
+          <Pressable
+            style={estilos.filaConfig}
+            onPress={() => navigation.navigate('Config', { screen: 'ParametrosTarifa', params: { id_prestador: id_prestador_activo } })}
+            accessibilityRole="button"
+            accessibilityLabel="Ir a parámetros tarifarios"
+            testID="boton-ir-parametros-tarifarios"
+          >
+            <View style={estilos.filaConfigIzq}>
+              <MaterialIcons name="tune" size={20} color={COLORS.primary} />
+              <Text style={estilos.filaConfigTexto}>Parámetros tarifarios</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={COLORS.outlineVariant} />
+          </Pressable>
+          {/* Divisor entre filas para legibilidad (per impeccable: vary spacing). */}
+          <View style={estilos.filaConfigDivisor} />
           <View style={estilos.filaConfig}>
             <Pressable style={estilos.filaConfigIzq} onPress={mostrarToast} accessibilityLabel="Notificaciones — próximamente">
               <MaterialIcons name="notifications" size={20} color={COLORS.primary} />
@@ -377,6 +398,8 @@ const estilos = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
+    // WCAG 2.5.5: touch target >= 44px en toda la fila (no solo el icono).
+    minHeight: 44,
   },
   filaConfigIzq: {
     flexDirection: 'row',
@@ -390,6 +413,14 @@ const estilos = StyleSheet.create({
   filaConfigTexto: {
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.primary,
+  },
+  // Divisor de 1px entre filas de la listaCard de Configuración.
+  // Color con baja opacidad para legibilidad sin gritar "soy borde".
+  filaConfigDivisor: {
+    height: 1,
+    backgroundColor: COLORS.outlineVariant,
+    opacity: 0.5,
+    marginHorizontal: SPACING.md,
   },
   toggleOff: {
     width: 44,
