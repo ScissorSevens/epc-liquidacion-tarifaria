@@ -1,7 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import AltaSuscriptor from '../../pantallas/AltaSuscriptor';
-import Configuracion from '../../pantallas/Configuracion';
 import ImportarCsv from '../../pantallas/ImportarCsv';
 import MiPerfil from '../../pantallas/MiPerfil';
 import Admin from '../../pantallas/admin/Admin';
@@ -17,19 +16,16 @@ interface Props {
   readonly onLogoutRequested: () => void;
 }
 
+/**
+ * ConfigStack — entry-point del tab "Perfil".
+ *
+ * mi-perfil-unification-and-param-persistence — el screen "MiPerfil" es
+ * la ruta inicial de este stack (antes lo era "Configuracion", que fue
+ * absorbido en MiPerfil y eliminado).
+ */
 export default function ConfigStack({ onLogoutRequested }: Props) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Configuracion">
-        {(props) => (
-          <Configuracion
-            {...props}
-            onLogoutRequested={onLogoutRequested}
-          />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />
-      <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
       <Stack.Screen name="MiPerfil">
         {(props) => (
           <MiPerfil
@@ -38,6 +34,8 @@ export default function ConfigStack({ onLogoutRequested }: Props) {
           />
         )}
       </Stack.Screen>
+      <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />
+      <Stack.Screen name="ImportarCsv" component={ImportarCsv} />
       <Stack.Screen name="Admin" component={Admin} />
       <Stack.Screen name="GestionPrestadores" component={GestionPrestadores} />
       <Stack.Screen name="AcuerdoMunicipal" component={AcuerdoMunicipal} />

@@ -848,7 +848,7 @@ describe('RutaDeHoy', () => {
     const cta = await screen.findByText('Configurar prestador');
     fireEvent.press(cta);
     await waitFor(() => {
-      expect(nav.navigate).toHaveBeenCalledWith('Config', { screen: 'Configuracion' });
+      expect(nav.navigate).toHaveBeenCalledWith('Config', { screen: 'MiPerfil' });
     });
   });
 

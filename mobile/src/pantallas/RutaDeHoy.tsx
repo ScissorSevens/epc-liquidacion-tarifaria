@@ -255,7 +255,7 @@ export default function RutaDeHoy({ navigation }: Props) {
         accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
+            onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
           >
             {Platform.OS === 'ios' ? (
               <Image
@@ -302,7 +302,7 @@ export default function RutaDeHoy({ navigation }: Props) {
               icono="arrow-forward"
               tono="azul"
               tamano="compacto"
-              onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
+              onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
             />
           </View>
         )}

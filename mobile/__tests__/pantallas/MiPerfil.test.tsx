@@ -15,6 +15,7 @@
 //   - getBootstrap stub para evitar que composition/constantes.limpiarSesion
 //     explote si se llega a invocar.
 
+import { Alert } from 'react-native';
 import { render, waitFor, fireEvent } from '@testing-library/react-native';
 import { StyleSheet, Text, Pressable } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -338,17 +339,21 @@ describe('MiPerfil — Avatar & Paleta institucional EPC', () => {
   });
 
   it('MP-3 el botón "Cerrar sesión" usa brandRojo (#D5212A) como fondo (CTA destructivo filled)', () => {
-    const { getByText, getByTestId } = renderMiPerfil();
+    const { getAllByText, getByTestId } = renderMiPerfil();
     const boton = getByTestId('boton-cerrar-sesion');
     const estilo = StyleSheet.flatten(boton.props.style) as {
       backgroundColor?: string;
     };
     expect(estilo.backgroundColor).toBe('#D5212A');
-    const textoBoton = getByText('Cerrar sesión');
-    const estiloTexto = StyleSheet.flatten(textoBoton.props.style) as {
-      color?: string;
-    };
-    expect(estiloTexto.color).toBe('#fff');
+    // mi-perfil-unification: ahora hay 2 elementos con "Cerrar sesión"
+    // (BotonPrimario con texto blanco + item de Gestión con texto rojo).
+    // Buscamos el texto blanco (color #fff) — debe ser el del BotonPrimario.
+    const textosBoton = getAllByText('Cerrar sesión');
+    const textoBlanco = textosBoton.find((t) => {
+      const estiloT = StyleSheet.flatten(t.props.style) as { color?: string };
+      return estiloT.color === '#fff';
+    });
+    expect(textoBlanco).toBeTruthy();
   });
 });
 
@@ -1010,5 +1015,199 @@ describe('MiPerfil — Integración (datos reales + jerarquía visual)', () => {
     await waitFor(() => {
       expect(getByText('OP')).toBeTruthy();
     });
+  });
+});
+
+// =====================================================================
+// mi-perfil-unification-and-param-persistence — Commit 1 (T-UNIFY-*).
+//
+// Tras absorber Configuracion.tsx en MiPerfil.tsx, esta pantalla debe:
+//   - Exponer una sección "Gestión" con 4 items: Agregar suscriptor,
+//     Importar desde CSV, Versión, Cerrar sesión.
+//   - NO contener la tarjeta "Última sincronización".
+//   - Tab "Perfil" debe apuntar directamente a MiPerfil (initial route
+//     de ConfigStack). En ConfigStack.tsx el screen "MiPerfil" es el
+//     entry-point tras la unificación.
+//   - "Cerrar sesión" muestra Alert.alert de confirmación con botón
+//     destructivo.
+//   - "Agregar suscriptor" navega a AltaSuscriptor.
+//   - "Importar desde CSV" navega a ImportarCsv.
+// =====================================================================
+
+describe('MiPerfil — Unificación con Configuracion (T-UNIFY-1..8)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  // T-UNIFY-1: renderiza sección Gestión con 4 items correctos.
+  it('T-UNIFY-1 renderiza sección Gestión con 4 items: Agregar suscriptor, Importar desde CSV, Versión, Cerrar sesión', async () => {
+    const { getByText, getByTestId } = renderMiPerfil();
+    await waitFor(() => {
+      // 4 items requeridos por el spec — usamos queryAllByText para
+      // tolerar duplicados entre Gestión item + BotonPrimario legacy.
+      const alta = getByTestId('item-alta-suscriptor');
+      const csv = getByTestId('item-importar-csv');
+      const ver = getByTestId('item-version');
+      const cerrar = getByTestId('item-cerrar-sesion');
+      expect(alta).toBeTruthy();
+      expect(csv).toBeTruthy();
+      expect(ver).toBeTruthy();
+      expect(cerrar).toBeTruthy();
+      // Verificamos también que los textos asociados están presentes.
+      expect(alta.props.accessibilityLabel).toMatch(/Agregar suscriptor/i);
+      expect(csv.props.accessibilityLabel).toMatch(/Importar desde CSV/i);
+      expect(ver.props.accessibilityLabel).toMatch(/Versión/i);
+      expect(cerrar.props.accessibilityLabel).toMatch(/Cerrar sesión/i);
+      // Versión muestra "1.0.0" — verificamos el texto informativo.
+      expect(getByText('1.0.0')).toBeTruthy();
+    });
+  });
+
+  // T-UNIFY-2: no contiene "Última sincronización" (eliminada en esta change).
+  it('T-UNIFY-2 no contiene la tarjeta "Última sincronización"', () => {
+    const { queryByText, queryByTestId } = renderMiPerfil();
+    expect(queryByText(/Última sincronización/i)).toBeNull();
+    expect(queryByTestId('tarjeta-ultima-sincro')).toBeNull();
+  });
+
+  // T-UNIFY-3: ConfigStack navega a MiPerfil directamente (initial route).
+  // El test verifica source-level: ConfigStack.tsx debe tener el screen
+  // MiPerfil con component={MiPerfil} y NO tener screen "Configuracion".
+  it('T-UNIFY-3 ConfigStack initial route es MiPerfil (no Configuracion)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.join(__dirname, '../../src/navegacion/stacks/ConfigStack.tsx'),
+      'utf8',
+    );
+    // Debe tener el screen MiPerfil (initial route tras unificación).
+    expect(source).toMatch(/Stack\.Screen\s+name="MiPerfil"/);
+    // NO debe haber screen "Configuracion" en ConfigStack.
+    expect(source).not.toMatch(/Stack\.Screen\s+name="Configuracion"/);
+    // NO debe importar Configuracion.
+    expect(source).not.toMatch(/import\s+Configuracion\s+from/);
+  });
+
+  // T-UNIFY-4: Versión muestra literal "1.0.0".
+  it('T-UNIFY-4 Versión muestra el literal "1.0.0"', async () => {
+    const { getByText } = renderMiPerfil();
+    await waitFor(() => {
+      expect(getByText('1.0.0')).toBeTruthy();
+    });
+  });
+
+  // T-UNIFY-5: confirmar Alert de cerrar-sesion invoca onLogoutRequested
+  // y limpia la sesión. Verificamos el wiring del callback destructivo
+  // (onPress del botón "Cerrar sesión" del Alert).
+  it('T-UNIFY-5 confirmar Alert de cerrar-sesion invoca onLogoutRequested y limpiarSesion', async () => {
+    const onLogoutRequested = jest.fn();
+    const nav = { navigate: jest.fn(), goBack: jest.fn() };
+    const route = { key: 'miperfil', name: 'MiPerfil' as const, params: undefined };
+    let capturedButtons: Array<{ text?: string; onPress?: () => void }> | undefined;
+    const alertSpy = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(((_title: string, _msg: string, buttons?: unknown) => {
+        capturedButtons = buttons as Array<{ text?: string; onPress?: () => void }>;
+      }) as never);
+
+    const { getByTestId } = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 320, height: 568 },
+          insets: { top: 0, left: 0, right: 0, bottom: 0 },
+        }}
+      >
+        <MiPerfil navigation={nav as never} route={route} onLogoutRequested={onLogoutRequested} />
+      </SafeAreaProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('item-cerrar-sesion')).toBeTruthy();
+    });
+    fireEvent.press(getByTestId('item-cerrar-sesion'));
+
+    expect(alertSpy).toHaveBeenCalled();
+    expect(capturedButtons).toBeDefined();
+    const botones = capturedButtons ?? [];
+    const confirmar = botones.find((b) => b.text === 'Cerrar sesión');
+    expect(confirmar).toBeDefined();
+    // Ejecutar callback de confirmación.
+    await confirmar?.onPress?.();
+    // Verificamos que onLogoutRequested fue invocado al confirmar el alert.
+    expect(onLogoutRequested).toHaveBeenCalledTimes(1);
+    alertSpy.mockRestore();
+  });
+
+  // T-UNIFY-6: Cerrar sesión muestra Alert.alert con botón destructivo.
+  it('T-UNIFY-6 Cerrar sesión muestra Alert.alert con botón destructivo', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const { getByTestId } = renderMiPerfil();
+    await waitFor(() => {
+      expect(getByTestId('item-cerrar-sesion')).toBeTruthy();
+    });
+    fireEvent.press(getByTestId('item-cerrar-sesion'));
+    expect(alertSpy).toHaveBeenCalled();
+    const buttons = alertSpy.mock.calls[0]?.[2] as Array<{ text?: string; style?: string }> | undefined;
+    expect(buttons).toBeDefined();
+    const destructive = (buttons ?? []).find((b) => b.style === 'destructive');
+    expect(destructive).toBeDefined();
+    alertSpy.mockRestore();
+  });
+
+  // T-UNIFY-7: Agregar suscriptor navega a AltaSuscriptor.
+  it('T-UNIFY-7 tap en "Agregar suscriptor" navega a AltaSuscriptor', async () => {
+    const nav = { navigate: jest.fn(), goBack: jest.fn() };
+    const route = { key: 'miperfil', name: 'MiPerfil' as const, params: undefined };
+    const { getByTestId } = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 320, height: 568 },
+          insets: { top: 0, left: 0, right: 0, bottom: 0 },
+        }}
+      >
+        <MiPerfil navigation={nav as never} route={route} onLogoutRequested={jest.fn()} />
+      </SafeAreaProvider>,
+    );
+    await waitFor(() => {
+      expect(getByTestId('item-alta-suscriptor')).toBeTruthy();
+    });
+    fireEvent.press(getByTestId('item-alta-suscriptor'));
+    expect(nav.navigate).toHaveBeenCalledWith('AltaSuscriptor');
+  });
+
+  // T-UNIFY-8: Importar CSV navega a ImportarCsv.
+  it('T-UNIFY-8 tap en "Importar desde CSV" navega a ImportarCsv', async () => {
+    const nav = { navigate: jest.fn(), goBack: jest.fn() };
+    const route = { key: 'miperfil', name: 'MiPerfil' as const, params: undefined };
+    const { getByTestId } = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 320, height: 568 },
+          insets: { top: 0, left: 0, right: 0, bottom: 0 },
+        }}
+      >
+        <MiPerfil navigation={nav as never} route={route} onLogoutRequested={jest.fn()} />
+      </SafeAreaProvider>,
+    );
+    await waitFor(() => {
+      expect(getByTestId('item-importar-csv')).toBeTruthy();
+    });
+    fireEvent.press(getByTestId('item-importar-csv'));
+    expect(nav.navigate).toHaveBeenCalledWith('ImportarCsv');
   });
 });

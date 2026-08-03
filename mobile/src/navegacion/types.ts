@@ -66,10 +66,16 @@ export type SyncStackParamList = {
 };
 
 export type ConfigStackParamList = {
-  Configuracion: undefined;
+  /**
+   * mi-perfil-unification-and-param-persistence — "MiPerfil" es ahora
+   * el entry-point del tab "Perfil". Antes el initial route era
+   * "Configuracion" (eliminado). La Pantalla MiPerfil absorbe toda la
+   * info del operario + Gestión (AltaSuscriptor, ImportarCsv, Versión,
+   * Cerrar sesión con Alert.alert).
+   */
+  MiPerfil: undefined;
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
-  MiPerfil: undefined;
   Admin: undefined;
   GestionPrestadores: undefined;
   AcuerdoMunicipal: { id_prestador: number };

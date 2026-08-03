@@ -137,7 +137,7 @@ export default function ListaSuscriptores({ navigation }: Props) {
         accionDerecha={
           <Pressable
             style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
-            onPress={() => navigation.navigate('Config', { screen: 'Configuracion' })}
+            onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
           >
             <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
           </Pressable>

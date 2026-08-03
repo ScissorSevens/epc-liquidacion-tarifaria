@@ -1,25 +1,31 @@
 /**
  * Pantalla Mi Perfil — datos reales del operario + prestador activo.
  *
- * mi-perfil-redesign Task 3 — la sección "Parámetros tarifarios" y su
- * modal de edición fueron REMOVIDOS de esta pantalla. El hogar canónico
- * para gestionar parámetros tarifarios del prestador activo es
- * `mobile/src/pantallas/admin/ParametrosTarifa.tsx` (fuera de scope de
- * este change). Tener dos flujos de edición distintos para la misma
- * entidad generaba confusión sobre cuál era el camino válido para el
- * operario.
+ * mi-perfil-unification-and-param-persistence — esta pantalla absorbe
+ * la funcionalidad de `Configuracion.tsx` (eliminado) y consolida:
+ *   1. Datos del operario desde Sesion (AsyncStorage via `cargarSesion()`).
+ *   2. Datos del prestador activo desde `useWorkspace.prestador`.
+ *   3. Tarjeta de descubrimiento "Parámetros tarifarios" (navega a
+ *      admin/ParametrosTarifa.tsx — el hogar canónico de edición).
+ *   4. Sección "Gestión" con 4 items: Agregar suscriptor (AltaSuscriptor),
+ *      Importar desde CSV (ImportarCsv), Versión (1.0.0), Cerrar sesión.
+ *   5. Cerrar sesión con Alert.alert de confirmación (destructive button).
+ *
+ * La tarjeta "Última sincronización" fue eliminada en este change — no
+ * aporta información accionable para el operario (solo repite el último
+ * sync decorativo).
  *
  * Fuentes de datos:
  *   - Sesion (AsyncStorage via `cargarSesion()`): cedula, nombre,
  *     idOperario. La sesión NO trae email ni teléfono — esos campos se
  *     muestran como "—" hasta que se agregue un flujo de edición de
- *     perfil del operario. (Operario.email existe en dominio pero requiere
- *     fetch via operarioRepo, fuera de scope.)
+ *     perfil del operario.
  *   - useWorkspace.prestador: nombre, municipio, codigo del prestador
  *     activo. Se popula vía WorkspaceSwitcher / cambiarPrestadorYCargarContexto.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import {
+  Alert,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -29,10 +35,10 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
 import { TarjetaMetrica } from '../componentes/TarjetaMetrica';
 import { TopBar } from '../componentes/TopBar';
+import { BotonPrimario } from '../componentes/BotonPrimario';
 import { limpiarSesion, cargarSesion, type Sesion } from '../composition/constantes';
 import { useWorkspace } from '../composicion/useWorkspace';
 import {
@@ -110,6 +116,53 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
     setTimeout(() => setToastVisible(false), 2500);
   }
 
+  /**
+   * Confirma el cierre de sesión con Alert.alert destructivo.
+   *
+   * mi-perfil-unification-and-param-persistence — antes esta lógica vivía
+   * en `Configuracion.tsx` (eliminado). Ahora vive acá, integrada con el
+   * resto del flujo de MiPerfil.
+   *
+   * Flujo:
+   *   1. Alert.alert con dos botones: Cancelar (cancel) y Cerrar sesión
+   *      (destructive).
+   *   2. Al confirmar: `limpiarSesion()` borra la sesión en AsyncStorage.
+   *   3. `useWorkspace.getState().limpiarWorkspace()` limpia contexto
+   *      multi-tenant.
+   *   4. `onLogoutRequested()` delega al caller (AppNavigator) la
+   *      transición al stack de Login.
+   */
+  function handleCerrarSesion(): void {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Seguro que querés cerrar sesión? Vas a tener que volver a ingresar tu cédula y contraseña.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            await limpiarSesion();
+            try {
+              // useWorkspace expone limpiarWorkspace en getState() — en runtime
+              // real, useWorkspace.getState() devuelve el state Zustand actual.
+              // Los tests pueden omitir esta invocación sin error.
+              const state = (useWorkspace as unknown as {
+                getState?: () => { limpiarWorkspace?: () => Promise<void> };
+              }).getState?.();
+              if (state?.limpiarWorkspace !== undefined) {
+                await state.limpiarWorkspace();
+              }
+            } catch {
+              // Workspace cleanup es best-effort — la sesión ya se limpió.
+            }
+            await onLogoutRequested();
+          },
+        },
+      ],
+    );
+  }
+
   // ── Valores derivados ─────────────────────────────────────────────────────
   const nombre = sesion?.nombre ?? PLACEHOLDER;
   const idOperarioNum = sesion?.idOperario;
@@ -158,13 +211,6 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             valor={PLACEHOLDER}
             variante="normal"
             testID="tarjeta-lecturas"
-          />
-          <TarjetaMetrica
-            icono="sync"
-            etiqueta="Última sincronización"
-            valor={PLACEHOLDER}
-            variante="normal"
-            testID="tarjeta-ultima-sincro"
           />
         </View>
 
@@ -260,15 +306,53 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           </View>
         </View>
 
-        {/* Cerrar sesión */}
+        {/* Gestión — sección consolidada (mi-perfil-unification).
+            Antes esta sección vivía en Configuracion.tsx; ahora vive acá
+            como única entrada del tab "Perfil". */}
+        <Text style={estilos.seccionTitulo}>Gestión</Text>
+        <View style={estilos.listaCard}>
+          <ItemGestion
+            icono="person-add"
+            etiqueta="Agregar suscriptor"
+            onPress={() => navigation.navigate('AltaSuscriptor')}
+            testID="item-alta-suscriptor"
+            destructive={false}
+          />
+          <View style={estilos.filaConfigDivisor} />
+          <ItemGestion
+            icono="upload-file"
+            etiqueta="Importar desde CSV"
+            onPress={() => navigation.navigate('ImportarCsv')}
+            testID="item-importar-csv"
+            destructive={false}
+          />
+          <View style={estilos.filaConfigDivisor} />
+          <ItemGestion
+            icono="info"
+            etiqueta="Versión"
+            valor="1.0.0"
+            testID="item-version"
+            destructive={false}
+          />
+          <View style={estilos.filaConfigDivisor} />
+          <ItemGestion
+            icono="logout"
+            etiqueta="Cerrar sesión"
+            onPress={handleCerrarSesion}
+            testID="item-cerrar-sesion"
+            destructive
+          />
+        </View>
+
+        {/* Botón rojo de cerrar-sesión (legacy CTA — preservado por T-MP-3
+            + B1.x de Configuracion. MiPerfil.tsx mantiene AMBOS: el item
+            Alert.alert dentro de Gestión Y este botón rojo como atajo
+            visible. Ambos llaman handleCerrarSesion. */}
         <BotonPrimario
           texto="Cerrar sesión"
           tono="rojo"
           icono="logout"
-          onPress={async () => {
-            await limpiarSesion();
-            onLogoutRequested();
-          }}
+          onPress={handleCerrarSesion}
           testID="boton-cerrar-sesion"
         />
 
@@ -305,6 +389,77 @@ function FilaInfo({
         {valor}
       </Text>
     </View>
+  );
+}
+
+/**
+ * ItemGestion — fila tappable de la sección Gestión (mi-perfil-unification).
+ *
+ * Estructura:
+ *   [icono] etiqueta ............ [valor?] [chevron?]
+ *
+ * Variantes:
+ *   - onPress + sin valor → fila navegable (chevron-right al final).
+ *   - valor definido → fila informativa (sin chevron).
+ *   - destructive → texto en COLORS.error (icono + texto).
+ *
+ * Hit-area: 56 px (WCAG 2.5.5 ≥ 44 px) — ver `estilos.itemGestion`.
+ */
+function ItemGestion({
+  icono,
+  etiqueta,
+  valor,
+  onPress,
+  testID,
+  destructive = false,
+}: {
+  icono: 'person-add' | 'upload-file' | 'info' | 'logout';
+  etiqueta: string;
+  valor?: string;
+  onPress?: () => void;
+  testID?: string;
+  destructive?: boolean;
+}): ReactElement {
+  const color = destructive ? COLORS.error : COLORS.primary;
+  const contenido = (
+    <View style={estilos.itemGestion}>
+      <View style={estilos.itemGestionIzq}>
+        <MaterialIcons name={icono} size={22} color={color} />
+        <Text
+          style={[
+            estilos.itemGestionTexto,
+            destructive ? estilos.itemGestionTextoDestructivo : null,
+          ]}
+        >
+          {etiqueta}
+        </Text>
+      </View>
+      {valor !== undefined ? (
+        <Text style={estilos.itemGestionValor}>{valor}</Text>
+      ) : onPress !== undefined ? (
+        <MaterialIcons name="chevron-right" size={22} color={COLORS.outline} />
+      ) : null}
+    </View>
+  );
+
+  if (onPress === undefined) {
+    return (
+      <View testID={testID} accessible accessibilityLabel={etiqueta}>
+        {contenido}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={etiqueta}
+      testID={testID}
+      style={estilos.itemGestion}
+    >
+      {contenido}
+    </Pressable>
   );
 }
 
@@ -458,5 +613,31 @@ const estilos = StyleSheet.create({
     color: COLORS.onPrimary,
     fontSize: 13,
     fontWeight: '500',
+  },
+  // mi-perfil-unification — estilos de ItemGestion.
+  itemGestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    // WCAG 2.5.5: touch target >= 44px. 56 da margen sobre el icono + label.
+    minHeight: 56,
+  },
+  itemGestionIzq: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    flexShrink: 1,
+  },
+  itemGestionTexto: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.primary,
+  },
+  itemGestionTextoDestructivo: {
+    color: COLORS.error,
+  },
+  itemGestionValor: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurfaceVariant,
   },
 });
