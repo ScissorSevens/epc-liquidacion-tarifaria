@@ -16,7 +16,7 @@
  * porque `dominio/impresion/esc-pos.ts` aun no existe.
  */
 
-import type { Factura } from '../factura/types';
+import type { Factura, OtroValor } from '../../factura/types';
 import {
   armarTicketEscPos,
   envolverLinea,
@@ -37,7 +37,7 @@ interface CrearFacturaEjemploOverrides {
   readonly numero_factura?: string;
   readonly hash?: string;
   readonly suscriptor_nombre?: string;
-  readonly otros_valores?: readonly { concepto: string; valor: number }[];
+  readonly otros_valores?: readonly OtroValor[];
   readonly saldo_anterior?: number;
 }
 
@@ -298,10 +298,11 @@ describe('envolverLinea', () => {
 });
 
 describe('centrarLinea', () => {
-  it('centra un texto agregando padding izquierdo', () => {
+  it('centra un texto agregando padding a izquierda y derecha', () => {
     const linea = centrarLinea('Hola', 10);
     expect(linea.length).toBe(10);
-    expect(linea.endsWith('Hola')).toBe(true);
+    // Padding total = 6; izq = 3, der = 3 → "   Hola   "
+    expect(linea).toBe('   Hola   ');
   });
 });
 
