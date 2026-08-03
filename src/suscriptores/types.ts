@@ -81,7 +81,7 @@ export interface SuscriptorRepository {
  */
 export const MENSAJES_ERROR_SUSCRIPTOR = {
   CODIGO_INVALIDO: 'codigo debe tener entre 1 y 10 dígitos',
-  NOMBRE_VACIO: 'nombre_apellidos no puede estar vacío',
+  NOMBRE_VACIO: 'nombre_apellidos no puede estar vacío ni contener solo espacios',
   NOMBRE_LARGO: 'nombre_apellidos no puede superar 150 caracteres',
   DIRECCION_VACIA: 'direccion no puede estar vacía',
   DIRECCION_LARGA: 'direccion no puede superar 200 caracteres',
@@ -89,9 +89,9 @@ export const MENSAJES_ERROR_SUSCRIPTOR = {
   MATRICULA_LARGA: 'matricula_inmobiliaria no puede superar 50 caracteres',
   CATASTRAL_LARGA: 'numero_catastral no puede superar 50 caracteres',
   ESTADO_INVALIDO: "estado debe ser 'activo', 'inactivo' o 'suspendido'",
-  CEDULA_VACIA: 'cedula no puede estar vacía',
+  CEDULA_VACIA: 'cedula no puede estar vacía ni contener solo espacios',
   CEDULA_INVALIDA: 'cedula debe tener entre 6 y 12 dígitos numéricos',
-  MUNICIPIO_VACIO: 'municipio no puede estar vacío',
+  MUNICIPIO_VACIO: 'municipio no puede estar vacío ni contener solo espacios',
   MUNICIPIO_LARGO: 'municipio no puede superar 100 caracteres',
   SECTOR_LARGO: 'sector no puede superar 100 caracteres',
 } as const;

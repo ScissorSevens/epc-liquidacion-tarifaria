@@ -84,6 +84,14 @@ describe('crearSuscriptor — nombre_apellidos y direccion', () => {
     ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_LARGO);
   });
 
+  it('elimina espacios alrededor de nombre_apellidos', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      nombre_apellidos: '  Juan Pérez  ',
+    });
+    expect(resultado.nombre_apellidos).toBe('Juan Pérez');
+  });
+
   it('rechaza direccion vacía', () => {
     expect(() => crearSuscriptor({ ...inputValido, direccion: '' })).toThrow(
       MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_VACIA,

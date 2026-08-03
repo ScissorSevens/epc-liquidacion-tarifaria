@@ -17,14 +17,19 @@ const ESTADOS_VALIDOS: ReadonlySet<EstadoSuscriptor> = new Set([
   'suspendido',
 ]);
 
-function validarEntrada(input: CrearSuscriptorInput): void {
+function validarEntrada(
+  input: CrearSuscriptorInput,
+  nombreTrimmed: string,
+  cedula: string,
+  municipio: string,
+): void {
   if (!REGEX_CODIGO.test(input.codigo)) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.CODIGO_INVALIDO);
   }
-  if (input.nombre_apellidos.length === 0) {
+  if (nombreTrimmed.length === 0) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_VACIO);
   }
-  if (input.nombre_apellidos.length > 150) {
+  if (nombreTrimmed.length > 150) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_LARGO);
   }
   if (input.direccion.length === 0) {
@@ -55,14 +60,12 @@ function validarEntrada(input: CrearSuscriptorInput): void {
   if (input.estado !== undefined && !ESTADOS_VALIDOS.has(input.estado)) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.ESTADO_INVALIDO);
   }
-  const cedula = input.cedula?.trim() ?? '';
   if (cedula.length === 0) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA);
   }
   if (!REGEX_CEDULA.test(cedula)) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA);
   }
-  const municipio = input.municipio?.trim() ?? '';
   if (municipio.length === 0) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_VACIO);
   }
@@ -86,17 +89,24 @@ function validarEntrada(input: CrearSuscriptorInput): void {
  * defaults legacy (id_prestador=0, categoria_uso='residencial') para
  * mantener compatibilidad con datos anteriores al change
  * motor-tarifario-cra-825-2017-multitenant.
+ *
+ * Aplica `trim` a `nombre_apellidos`, `cedula` y `municipio` antes de
+ * validar y antes de propagar, de modo que el SuscriptorBorrador NUNCA
+ * persiste con espacios al inicio/final.
  */
 export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador {
-  validarEntrada(input);
+  const nombreTrimmed = input.nombre_apellidos.trim();
+  const cedula = input.cedula.trim();
+  const municipio = input.municipio.trim();
+  validarEntrada(input, nombreTrimmed, cedula, municipio);
 
   return {
     codigo: input.codigo,
-    nombre_apellidos: input.nombre_apellidos,
-    cedula: input.cedula.trim(),
+    nombre_apellidos: nombreTrimmed,
+    cedula,
     email: input.email,
     telefono: input.telefono,
-    municipio: input.municipio.trim(),
+    municipio,
     ...(input.sector !== undefined && { sector: input.sector }),
     direccion: input.direccion,
     estrato: input.estrato,
