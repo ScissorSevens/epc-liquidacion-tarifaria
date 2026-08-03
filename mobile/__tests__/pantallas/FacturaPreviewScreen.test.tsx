@@ -440,6 +440,58 @@ describe('FacturaPreviewScreen — actions', () => {
     });
   });
 
+  it('tap btn-imprimir con preferida emparejada imprime directo sin abrir selector', async () => {
+    const preferencias = require('../../src/persistencia/impresoras-preferencias');
+    const factory = require('../../src/adapters/impresion/factory');
+    const adapter = {
+      id: 'ble-plx',
+      transporte: 'BLE',
+      conectar: jest.fn().mockResolvedValue(undefined),
+      imprimir: jest.fn().mockResolvedValue(undefined),
+    };
+    preferencias.obtenerUltimaImpresora.mockResolvedValue({
+      id: 'ble-plx',
+      nombre: 'Termica BLE',
+      transporte: 'BLE',
+      direccion: 'AA:BB',
+      anchoPapel: '58mm',
+      estado: 'emparejada',
+    });
+    factory.obtenerAdaptadores.mockResolvedValue([
+      { adapter, cargaLazyOk: true },
+    ]);
+
+    renderConProviders(
+      <FacturaPreviewScreen
+        navigation={nav as any}
+        route={crearRutaMock() as any}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-imprimir')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('btn-imprimir'));
+    });
+
+    expect(adapter.conectar).toHaveBeenCalledWith('AA:BB');
+    expect(adapter.imprimir).toHaveBeenCalledWith(expect.any(Array));
+    expect(nav.navigate).not.toHaveBeenCalledWith(
+      'SeleccionarImpresora',
+      expect.anything(),
+    );
+    const haptics = jest.requireMock('expo-haptics') as {
+      notificationAsync: jest.Mock;
+    };
+    expect(haptics.notificationAsync).toHaveBeenCalledWith('success');
+
+    // Restaurar los seams para que los tests siguientes no hereden esta
+    // preferencia.
+    preferencias.obtenerUltimaImpresora.mockResolvedValue(null);
+    factory.obtenerAdaptadores.mockResolvedValue([]);
+  });
+
   it('tap btn-compartir invoca compartirFactura', async () => {
     const compartirMod = require('../../src/hooks/compartir-factura');
     const spy = jest.spyOn(compartirMod, 'compartirFactura');
