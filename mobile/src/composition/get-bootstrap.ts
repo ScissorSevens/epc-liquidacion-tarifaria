@@ -36,3 +36,9 @@ export function getBootstrap(): Promise<BootstrapApp> {
   }
   return cached;
 }
+
+// Test seam: permite a los tests resetear el cache entre casos.
+export function __resetearCacheBootstrap(): void {
+  cached = null;
+  cachedUrl = null;
+}

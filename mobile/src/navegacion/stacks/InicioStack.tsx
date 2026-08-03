@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import CapturarFoto from '../../pantallas/CapturarFoto';
 import CapturarLectura from '../../pantallas/CapturarLectura';
 import EditarSuscriptor from '../../pantallas/EditarSuscriptor';
-import FacturaPreviewScreenPlaceholder from '../../pantallas/FacturaPreviewScreenPlaceholder';
+import FacturaPreviewScreen from '../../pantallas/FacturaPreviewScreen';
 import ResultadoCalculo from '../../pantallas/ResultadoCalculo';
 import RutaDeHoy from '../../pantallas/RutaDeHoy';
 import SeleccionarImpresoraPlaceholder from '../../pantallas/SeleccionarImpresoraPlaceholder';
@@ -20,7 +20,7 @@ export default function InicioStack() {
       <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
       <Stack.Screen
         name="FacturaPreview"
-        component={FacturaPreviewScreenPlaceholder}
+        component={FacturaPreviewScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

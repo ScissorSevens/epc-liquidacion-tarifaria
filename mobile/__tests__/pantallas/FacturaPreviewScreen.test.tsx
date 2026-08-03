@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import FacturaPreviewScreen from '../../src/pantallas/FacturaPreviewScreen';
@@ -160,6 +160,22 @@ function renderConProviders(ui: React.ReactElement) {
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  impactAsync: jest.fn().mockResolvedValue(undefined),
+  NotificationFeedbackType: {
+    Success: 'success',
+    Warning: 'warning',
+    Error: 'error',
+  },
+  ImpactFeedbackStyle: {
+    Light: 'light',
+    Medium: 'medium',
+    Heavy: 'heavy',
+  },
+}));
+
 // Factura inline para evitar hoisting de jest.mock
 const mockFactura = {
   id: 'factura-test-id-1234',
@@ -270,17 +286,21 @@ const mockFactura = {
 };
 
 // Mock del bootstrap que retorna la factura completa
-jest.mock('../../src/composition/get-bootstrap', () => ({
-  getBootstrap: jest.fn().mockResolvedValue({
-    repos: {
-      facturaRepo: {
-        buscarPorId: jest.fn().mockResolvedValue(mockFactura),
+jest.mock('../../src/composition/get-bootstrap', () => {
+  const mockBuscar = jest.fn().mockImplementation(async () => mockFactura);
+  return {
+    getBootstrap: jest.fn().mockResolvedValue({
+      repos: {
+        facturaRepo: {
+          buscarPorId: mockBuscar,
+        },
       },
-    },
-    services: {},
-    adapters: {},
-  }),
-}));
+      services: {},
+      adapters: {},
+    }),
+    __resetearCacheBootstrap: jest.fn(),
+  };
+});
 
 // Mock del modulo de preferencias: 58mm default
 jest.mock('../../src/persistencia/impresoras-preferencias', () => ({
@@ -329,7 +349,10 @@ describe('FacturaPreviewScreen — render', () => {
       />,
     );
     // Esperar a que se resuelva la promesa de carga
-    const codigoVerif = await screen.findByTestId('codigo-verificacion');
+    await waitFor(() => {
+      expect(screen.getByTestId('codigo-verificacion')).toBeTruthy();
+    });
+    const codigoVerif = screen.getByTestId('codigo-verificacion');
     expect(codigoVerif.props.children).toBe('ABCD1234EF');
     expect(screen.getByTestId('referencia-pago').props.children).toBe(
       '1-202601-99-A1B2',
@@ -343,7 +366,10 @@ describe('FacturaPreviewScreen — render', () => {
         route={crearRutaMock() as any}
       />,
     );
-    const codigoVerif = await screen.findByTestId('codigo-verificacion');
+    await waitFor(() => {
+      expect(screen.getByTestId('codigo-verificacion')).toBeTruthy();
+    });
+    const codigoVerif = screen.getByTestId('codigo-verificacion');
     expect(codigoVerif.props.selectable).toBe(true);
   });
 
@@ -354,7 +380,10 @@ describe('FacturaPreviewScreen — render', () => {
         route={crearRutaMock() as any}
       />,
     );
-    const refPago = await screen.findByTestId('referencia-pago');
+    await waitFor(() => {
+      expect(screen.getByTestId('referencia-pago')).toBeTruthy();
+    });
+    const refPago = screen.getByTestId('referencia-pago');
     expect(refPago.props.selectable).toBe(true);
   });
 
@@ -365,7 +394,9 @@ describe('FacturaPreviewScreen — render', () => {
         route={crearRutaMock() as any}
       />,
     );
-    expect(await screen.findByTestId('btn-imprimir')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-imprimir')).toBeTruthy();
+    });
   });
 
   it('renderiza el CTA Compartir', async () => {
@@ -375,7 +406,9 @@ describe('FacturaPreviewScreen — render', () => {
         route={crearRutaMock() as any}
       />,
     );
-    expect(await screen.findByTestId('btn-compartir')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-compartir')).toBeTruthy();
+    });
   });
 });
 
@@ -394,7 +427,10 @@ describe('FacturaPreviewScreen — actions', () => {
         route={crearRutaMock() as any}
       />,
     );
-    const btn = await screen.findByTestId('btn-imprimir');
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-imprimir')).toBeTruthy();
+    });
+    const btn = screen.getByTestId('btn-imprimir');
     await act(async () => {
       fireEvent.press(btn);
     });
@@ -414,7 +450,10 @@ describe('FacturaPreviewScreen — actions', () => {
         route={crearRutaMock() as any}
       />,
     );
-    const btn = await screen.findByTestId('btn-compartir');
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-compartir')).toBeTruthy();
+    });
+    const btn = screen.getByTestId('btn-compartir');
     await act(async () => {
       fireEvent.press(btn);
     });

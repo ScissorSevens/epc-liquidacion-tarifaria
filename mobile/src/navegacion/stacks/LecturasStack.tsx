@@ -5,7 +5,7 @@ import CapturarFoto from '../../pantallas/CapturarFoto';
 import CapturarLectura from '../../pantallas/CapturarLectura';
 import DetalleSuscriptor from '../../pantallas/DetalleSuscriptor';
 import EditarSuscriptor from '../../pantallas/EditarSuscriptor';
-import FacturaPreviewScreenPlaceholder from '../../pantallas/FacturaPreviewScreenPlaceholder';
+import FacturaPreviewScreen from '../../pantallas/FacturaPreviewScreen';
 import Historial from '../../pantallas/Historial';
 import ImportarCsv from '../../pantallas/ImportarCsv';
 import ListaSuscriptores from '../../pantallas/ListaSuscriptores';
@@ -26,7 +26,7 @@ export default function LecturasStack() {
       <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
       <Stack.Screen
         name="FacturaPreview"
-        component={FacturaPreviewScreenPlaceholder}
+        component={FacturaPreviewScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
