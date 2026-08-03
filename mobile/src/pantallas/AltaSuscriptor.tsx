@@ -59,7 +59,6 @@ interface FormState {
   telefono: string;
   municipio: string;
   sector: string;
-  calle: string;
   direccion: string;
   estrato: EstratoStr;
   aplica_subsidio: boolean;
@@ -87,7 +86,6 @@ const ESTADO_INICIAL: FormState = {
   telefono: '',
   municipio: '',
   sector: '',
-  calle: '',
   direccion: '',
   estrato: '',
   aplica_subsidio: true,
@@ -142,10 +140,6 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
 
     case 'sector':
       if (v.trim().length > 100) return MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO;
-      return undefined;
-
-    case 'calle':
-      if (v.trim().length > 100) return MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA;
       return undefined;
 
     case 'direccion': {
@@ -298,7 +292,6 @@ export default function AltaSuscriptor({ navigation }: Props) {
         telefono: form.telefono.trim() || undefined,
         municipio: form.municipio.trim(),
         sector: form.sector.trim() || undefined,
-        calle: form.calle.trim() || undefined,
         direccion: form.direccion.trim(),
         estrato: estratoNum,
         aplica_subsidio: form.aplica_subsidio,
@@ -592,19 +585,6 @@ export default function AltaSuscriptor({ navigation }: Props) {
               editable={!enviando}
               placeholder="Ej: Centro, Zona Industrial"
               testID="alta-sector"
-            />
-
-            <FormField
-              ref={getRef('calle')}
-              label="Calle (opcional)"
-              value={form.calle}
-              onChangeText={(v) => setCampo('calle', v)}
-              onBlur={() => onBlur('calle')}
-              error={errores.calle}
-              maxLength={100}
-              editable={!enviando}
-              placeholder="Ej: Cra 50 #20-30"
-              testID="alta-calle"
             />
           </View>
 

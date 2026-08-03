@@ -26,7 +26,6 @@ export interface FilaCSV {
   readonly telefono?: string;
   readonly municipio?: string;        // opcional: se completará manualmente si no viene en CSV
   readonly sector?: string;
-  readonly calle?: string;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria?: string;

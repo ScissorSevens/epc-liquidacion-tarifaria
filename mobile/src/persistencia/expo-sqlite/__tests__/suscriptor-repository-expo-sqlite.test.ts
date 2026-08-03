@@ -21,7 +21,6 @@ interface SuscriptorRowFixture {
   readonly telefono: string | null;
   readonly municipio: string;
   readonly sector: string | null;
-  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
@@ -43,7 +42,6 @@ function buildRow(overrides: Partial<SuscriptorRowFixture> = {}): SuscriptorRowF
     telefono: null,
     municipio: 'Cáqueza',
     sector: 'Centro',
-    calle: 'Cra 1',
     direccion: 'Cra 1 # 2-03',
     estrato: 3,
     matricula_inmobiliaria: 'MAT-7',
@@ -67,7 +65,6 @@ function expectedSuscriptor(row: SuscriptorRowFixture): Suscriptor {
     telefono: row.telefono ?? undefined,
     municipio: row.municipio,
     sector: row.sector ?? undefined,
-    calle: row.calle ?? undefined,
     direccion: row.direccion,
     estrato: row.estrato as Suscriptor['estrato'],
     matricula_inmobiliaria: row.matricula_inmobiliaria ?? undefined,
@@ -175,19 +172,6 @@ describe('crearSuscriptorRepositoryExpoSqlite.actualizar()', () => {
 
     expect(actualizado.id_prestador).toBe(5);
     expect(actualizado.categoria_uso).toBe(original.categoria_uso);
-  });
-
-  it('T-UPD-5: actualiza calle explícitamente', async () => {
-    const original = buildRow({ calle: 'Cra 1' });
-    const { db } = buildDb(original);
-    const repo = crearSuscriptorRepositoryExpoSqlite(db);
-
-    const actualizado = await repo.actualizar(original.id_suscriptor, {
-      calle: 'Cra 5',
-    });
-
-    expect(actualizado.calle).toBe('Cra 5');
-    expect(actualizado.direccion).toBe(original.direccion);
   });
 
   it('T-UPD-6: input vacío no ejecuta UPDATE y retorna la fila actual', async () => {

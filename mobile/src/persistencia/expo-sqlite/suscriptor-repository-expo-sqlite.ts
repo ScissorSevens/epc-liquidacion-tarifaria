@@ -43,7 +43,6 @@ interface SuscriptorRow {
   readonly telefono: string | null;
   readonly municipio: string;
   readonly sector: string | null;
-  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
@@ -72,7 +71,6 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     ...(row.email !== null && { email: row.email }),
     ...(row.telefono !== null && { telefono: row.telefono }),
     ...(row.sector !== null && { sector: row.sector }),
-    ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
       matricula_inmobiliaria: row.matricula_inmobiliaria,
     }),
@@ -87,8 +85,8 @@ const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
     matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio,
-    cedula, email, telefono, municipio, sector, calle
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    cedula, email, telefono, municipio, sector
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
@@ -112,7 +110,6 @@ const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof SuscriptorRow> = [
   'telefono',
   'municipio',
   'sector',
-  'calle',
   'direccion',
   'estrato',
   'matricula_inmobiliaria',
@@ -175,7 +172,6 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.telefono ?? null,
           data.municipio,
           data.sector ?? null,
-          data.calle ?? null,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });

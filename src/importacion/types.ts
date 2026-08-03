@@ -24,7 +24,6 @@ export interface FilaCSV {
   readonly cedula?: string;           // opcional: se completará manualmente si no viene en CSV
   readonly municipio?: string;        // opcional: se completará manualmente si no viene en CSV
   readonly sector?: string;
-  readonly calle?: string;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria?: string;

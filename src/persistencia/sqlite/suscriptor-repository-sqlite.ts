@@ -39,7 +39,6 @@ interface SuscriptorRow {
   readonly cedula: string;
   readonly municipio: string;
   readonly sector: string | null;
-  readonly calle: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
@@ -66,7 +65,6 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     id_prestador: row.id_prestador,
     categoria_uso: row.categoria_uso as Suscriptor['categoria_uso'],
     ...(row.sector !== null && { sector: row.sector }),
-    ...(row.calle !== null && { calle: row.calle }),
     ...(row.matricula_inmobiliaria !== null && {
       matricula_inmobiliaria: row.matricula_inmobiliaria,
     }),
@@ -79,11 +77,11 @@ function fromRow(row: SuscriptorRow): Suscriptor {
 
 const SQL_INSERT = `
   INSERT INTO suscriptor (
-    codigo, nombre_apellidos, cedula, municipio, sector, calle,
+    codigo, nombre_apellidos, cedula, municipio, sector,
     direccion, estrato, matricula_inmobiliaria, numero_catastral,
     aplica_subsidio, estado, id_prestador, categoria_uso
   ) VALUES (
-    @codigo, @nombre_apellidos, @cedula, @municipio, @sector, @calle,
+    @codigo, @nombre_apellidos, @cedula, @municipio, @sector,
     @direccion, @estrato, @matricula_inmobiliaria, @numero_catastral,
     @aplica_subsidio, @estado, @id_prestador, @categoria_uso
   )
@@ -128,7 +126,6 @@ export function crearSuscriptorRepositorySqlite(
       cedula: s.cedula,
       municipio: s.municipio,
       sector: s.sector ?? null,
-      calle: s.calle ?? null,
       direccion: s.direccion,
       estrato: s.estrato,
       matricula_inmobiliaria: s.matricula_inmobiliaria ?? null,

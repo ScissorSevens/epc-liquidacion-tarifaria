@@ -24,7 +24,6 @@ export interface Suscriptor {
   readonly telefono?: string;
   readonly municipio: string;
   readonly sector?: string;
-  readonly calle?: string;
   readonly direccion: string;
   readonly estrato: 1 | 2 | 3 | 4 | 5 | 6;
   readonly matricula_inmobiliaria?: string;
@@ -66,7 +65,6 @@ export type ActualizarSuscriptorInput = Partial<
     | 'telefono'
     | 'municipio'
     | 'sector'
-    | 'calle'
     | 'aplica_subsidio'
     | 'id_prestador'
     | 'categoria_uso'
@@ -114,7 +112,6 @@ export const MENSAJES_ERROR_SUSCRIPTOR = {
   MUNICIPIO_VACIO: 'municipio no puede estar vacío',
   MUNICIPIO_LARGO: 'municipio no puede superar 100 caracteres',
   SECTOR_LARGO: 'sector no puede superar 100 caracteres',
-  CALLE_LARGA: 'calle no puede superar 100 caracteres',
   EMAIL_INVALIDO: 'email debe tener un formato válido',
   TELEFONO_INVALIDO: 'telefono debe tener entre 7 y 20 dígitos numéricos',
 } as const;

@@ -492,7 +492,29 @@ ALTER TABLE parametros_tarifa ADD COLUMN factor_indexacion_ipc REAL NOT NULL DEF
  * `__migraciones_aplicadas` (no se re-ejecuta si la version coincide).
  */
 const MIGRACION_022_PRESTADOR_APS = `
-ALTER TABLE prestador ADD COLUMN aps TEXT NULL DEFAULT NULL;
+  ALTER TABLE prestador ADD COLUMN aps TEXT NULL DEFAULT NULL;
+`;
+
+/**
+ * Migration 024_no_op_calle_drop. Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/024_no_op_calle_drop.sql`.
+ *
+ * Cambia `refactor-suscriptor-eliminar-calle` (commit 1/3). El campo
+ * `calle` se quitó del modelo `Suscriptor` por redundancia con
+ * `direccion`.
+ *
+ * NO-OP intencional: la columna `calle` PERMANECE en la DB para
+ * preservar datos históricos y compatibilidad con devices ya
+ * desplegados. El adapter SQLite deja de leerla/escribirla en code-level.
+ * No es necesario DROP COLUMN: ver SQL original para la justificacion
+ * completa (expo-sqlite SDK 54 trae SQLite < 3.35 sin soporte DROP COLUMN).
+ */
+const MIGRACION_024_NO_OP_CALLE_DROP = `
+-- Migration 024: campo calle eliminado del modelo.
+-- Cambio logico al modelo de Suscriptor (sin alterar schema SQLite).
+-- La columna \`calle\` ya existe en la tabla \`suscriptor\` desde la
+-- migration 008; queda como evidencia historica para auditoria.
+-- El adapter expo-sqlite correspondiente dejara de mapearla.
 `;
 
 const MIGRACIONES: readonly Migracion[] = [
@@ -519,6 +541,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 21, nombre: '021_concepto_otro_valor', sql: MIGRACION_021_CONCEPTO_OTRO_VALOR },
   { version: 22, nombre: '022_prestador_aps', sql: MIGRACION_022_PRESTADOR_APS },
   { version: 23, nombre: '023_parametros_tarifa_anio_base', sql: MIGRACION_023_PARAMETROS_TARIFA_ANIO_BASE },
+  { version: 24, nombre: '024_no_op_calle_drop', sql: MIGRACION_024_NO_OP_CALLE_DROP },
 ];
 
 

@@ -240,20 +240,47 @@ describe('crearSuscriptor — sector y calle (opcionales)', () => {
     const resultado = crearSuscriptor(inputValido);
     expect(resultado).not.toHaveProperty('sector');
   });
+});
 
-  it('rechaza calle de 101 caracteres', () => {
+describe('crearSuscriptor — direccion (requerida)', () => {
+  it('acepta dirección válida con caracteres especiales (tildes, ñ, #, comas, puntos)', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      direccion: 'Cra 50 #20-30, Apto 5B, Mz 4',
+    });
+    expect(resultado.direccion).toBe('Cra 50 #20-30, Apto 5B, Mz 4');
+  });
+
+  it('rechaza dirección vacía', () => {
+    expect(() => crearSuscriptor({ ...inputValido, direccion: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_VACIA,
+    );
+  });
+
+  it('rechaza dirección de 201 caracteres', () => {
     expect(() =>
-      crearSuscriptor({ ...inputValido, calle: 'a'.repeat(101) }),
-    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA);
+      crearSuscriptor({ ...inputValido, direccion: 'a'.repeat(201) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_LARGA);
   });
 
-  it('acepta calle de 100 caracteres (límite)', () => {
-    const resultado = crearSuscriptor({ ...inputValido, calle: 'a'.repeat(100) });
-    expect(resultado.calle).toHaveLength(100);
+  it('acepta dirección de 200 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, direccion: 'a'.repeat(200) });
+    expect(resultado.direccion).toHaveLength(200);
   });
 
-  it('acepta sin calle (campo opcional)', () => {
-    const resultado = crearSuscriptor(inputValido);
+  it('NO incluye campo calle en el Suscriptor retornado (verifica que result.calle es undefined)', () => {
+    // El campo calle fue eliminado del modelo Suscriptor. Aun si el caller
+    // intenta enviarlo (cast forzado para probar el contrato), la factory
+    // lo ignora y NO propaga la propiedad al resultado.
+    const inputConCalle = {
+      ...inputValido,
+      calle: 'Cra 50',
+    } as unknown as CrearSuscriptorInput;
+    const resultado = crearSuscriptor(inputConCalle);
+    // Cast a Record<string, unknown> para verificar la AUSENCIA de la
+    // propiedad sin que el compilador se queje del type (calle no existe
+    // mas en SuscriptorBorrador).
+    expect((resultado as Record<string, unknown>).calle).toBeUndefined();
     expect(resultado).not.toHaveProperty('calle');
   });
 });

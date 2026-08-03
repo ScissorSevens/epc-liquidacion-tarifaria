@@ -75,7 +75,6 @@ export async function importarSuscriptoresYMedidores(
           ...(fila.telefono !== undefined && { telefono: fila.telefono }),
           municipio: fila.municipio ?? '',
           ...(fila.sector !== undefined && { sector: fila.sector }),
-          ...(fila.calle !== undefined && { calle: fila.calle }),
           direccion: fila.direccion,
           estrato: fila.estrato as Suscriptor['estrato'],
           aplica_subsidio: fila.aplica_subsidio ?? false,

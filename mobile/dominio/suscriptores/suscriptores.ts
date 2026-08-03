@@ -72,9 +72,6 @@ function validarEntrada(input: CrearSuscriptorInput): void {
   if (input.sector !== undefined && input.sector.length > 100) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO);
   }
-  if (input.calle !== undefined && input.calle.length > 100) {
-    throw new Error(MENSAJES_ERROR_SUSCRIPTOR.CALLE_LARGA);
-  }
   if (input.email !== undefined && !REGEX_EMAIL.test(input.email)) {
     throw new Error(MENSAJES_ERROR_SUSCRIPTOR.EMAIL_INVALIDO);
   }
@@ -101,7 +98,6 @@ export function crearSuscriptor(input: CrearSuscriptorInput): SuscriptorBorrador
     telefono: input.telefono,
     municipio: input.municipio.trim(),
     ...(input.sector !== undefined && { sector: input.sector }),
-    ...(input.calle !== undefined && { calle: input.calle }),
     direccion: input.direccion,
     estrato: input.estrato,
     matricula_inmobiliaria: input.matricula_inmobiliaria,

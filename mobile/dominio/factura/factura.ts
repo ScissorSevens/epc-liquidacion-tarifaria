@@ -398,7 +398,13 @@ function emitirFacturaSync(
     telefono: nullIfEmpty(input.suscriptor.telefono),
     municipio: input.suscriptor.municipio,
     sector: nullIfEmpty(input.suscriptor.sector),
-    calle: nullIfEmpty(input.suscriptor.calle),
+    // calle: el campo `calle` se elimino del modelo Suscriptor (era
+    // redundante con `direccion`). El snapshot normativo de la
+    // factura (Res CRA 1038/2026 §3) SIGUE declarando `calle: string
+    // | null` para mantener la compatibilidad del contrato con
+    // auditores / sistemas externos. La fuente ya no aporta ese
+    // dato, asi que se persiste como `null` explicito.
+    calle: null,
     direccion: input.suscriptor.direccion,
     estrato: input.suscriptor.estrato,
     estado: input.suscriptor.estado,

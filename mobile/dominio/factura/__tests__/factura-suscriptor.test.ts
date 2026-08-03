@@ -65,7 +65,6 @@ function suscriptorBase(): Suscriptor {
     telefono: '3001234567',
     municipio: 'Bogotá',
     sector: 'Centro',
-    calle: 'Calle 5',
     direccion: 'Calle 5 #2-10',
     estrato: 2,
     matricula_inmobiliaria: 'MAT-001',
@@ -215,7 +214,8 @@ describe('FacturaSnapshotSuscriptor — expansion v2', () => {
       telefono: '3001234567',
       municipio: 'Bogotá',
       sector: 'Centro',
-      calle: 'Calle 5',
+      // calle: null explicito (campo eliminado del modelo Suscriptor).
+      calle: null,
       direccion: 'Calle 5 #2-10',
       estrato: 2,
       estado: 'activo',
@@ -307,15 +307,6 @@ describe('FacturaSnapshotSuscriptor — expansion v2', () => {
     const a = emitirFactura(inputBase(), hasher);
     const b = emitirFactura(
       inputBase({ suscriptor: { ...suscriptorBase(), sector: 'Norte' } }),
-      hasher,
-    );
-    expect(a.hash).not.toBe(b.hash);
-  });
-
-  it('cambiar el calle del suscriptor cambia el hash', () => {
-    const a = emitirFactura(inputBase(), hasher);
-    const b = emitirFactura(
-      inputBase({ suscriptor: { ...suscriptorBase(), calle: 'Calle 99' } }),
       hasher,
     );
     expect(a.hash).not.toBe(b.hash);
