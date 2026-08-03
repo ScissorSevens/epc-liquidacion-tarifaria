@@ -36,9 +36,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { FooterApp } from '../componentes/FooterApp';
-import { TarjetaMetrica } from '../componentes/TarjetaMetrica';
 import { TopBar } from '../componentes/TopBar';
-import { BotonPrimario } from '../componentes/BotonPrimario';
 import { limpiarSesion, cargarSesion, type Sesion } from '../composition/constantes';
 import { useWorkspace } from '../composicion/useWorkspace';
 import {
@@ -143,16 +141,11 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           style: 'destructive',
           onPress: async () => {
             await limpiarSesion();
+            // useWorkspace expone limpiarWorkspace en getState() — tipado
+            // estructural directo sin cast inseguro (la interface expone
+            // el método y zustand tipa getState() automáticamente).
             try {
-              // useWorkspace expone limpiarWorkspace en getState() — en runtime
-              // real, useWorkspace.getState() devuelve el state Zustand actual.
-              // Los tests pueden omitir esta invocación sin error.
-              const state = (useWorkspace as unknown as {
-                getState?: () => { limpiarWorkspace?: () => Promise<void> };
-              }).getState?.();
-              if (state?.limpiarWorkspace !== undefined) {
-                await state.limpiarWorkspace();
-              }
+              useWorkspace.getState().limpiarWorkspace();
             } catch {
               // Workspace cleanup es best-effort — la sesión ya se limpió.
             }
@@ -164,6 +157,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   }
 
   // ── Valores derivados ─────────────────────────────────────────────────────
+
   const nombre = sesion?.nombre ?? PLACEHOLDER;
   const idOperarioNum = sesion?.idOperario;
   const cedula = sesion?.cedula ?? PLACEHOLDER;
@@ -193,7 +187,9 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
       />
 
       <ScrollView contentContainerStyle={estilos.scroll}>
-        {/* Avatar */}
+        {/* Avatar — reducido de 120 → 80 px para tono más sobrio y coherente
+            con el resto de los screens (impeccable: el avatar es anchor
+            emocional, no un elemento dominante). */}
         <View style={estilos.avatarSeccion}>
           <View style={estilos.avatar} testID="avatar">
             <Text style={estilos.avatarTexto}>{iniciales}</Text>
@@ -202,19 +198,8 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           <Text style={estilos.rol} testID="perfil-rol">{rol}</Text>
         </View>
 
-        {/* Actividad Reciente */}
-        <Text style={estilos.seccionTitulo}>Actividad reciente</Text>
-        <View style={estilos.gridFila}>
-          <TarjetaMetrica
-            icono="edit-note"
-            etiqueta="Lecturas"
-            valor={PLACEHOLDER}
-            variante="normal"
-            testID="tarjeta-lecturas"
-          />
-        </View>
-
-        {/* Información Personal */}
+        {/* Información Personal — eliminada sección "Actividad reciente"
+            que mostraba "—" sin información accionable. */}
         <Text style={estilos.seccionTitulo}>Información personal</Text>
         <View style={estilos.listaCard}>
           <FilaInfo
@@ -264,14 +249,11 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           />
         </View>
 
-        {/* Configuración */}
+        {/* Configuración — simplificada: solo "Parámetros tarifarios" como
+            entry. La sección "Notificaciones" con toggle está eliminada
+            (era placeholder sin implementación real). */}
         <Text style={estilos.seccionTitulo}>Configuración</Text>
         <View style={estilos.listaCard}>
-          {/* Navegación a Parámetros Tarifarios (admin screen). Tras la
-              refactorización mi-perfil-redesign, la edición de parámetros
-              vive exclusivamente en admin/ParametrosTarifa.tsx. Este
-              card hace discoverable esa entrada desde Mi Perfil sin
-              duplicar la lógica de edición. */}
           <Pressable
             style={estilos.filaConfig}
             onPress={() => navigation.navigate('Config', { screen: 'ParametrosTarifa', params: { id_prestador: id_prestador_activo } })}
@@ -285,30 +267,11 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             </View>
             <MaterialIcons name="chevron-right" size={22} color={COLORS.outlineVariant} />
           </Pressable>
-          {/* Divisor entre filas para legibilidad (per impeccable: vary spacing). */}
-          <View style={estilos.filaConfigDivisor} />
-          <View style={estilos.filaConfig}>
-            <Pressable style={estilos.filaConfigIzq} onPress={mostrarToast} accessibilityLabel="Notificaciones — próximamente">
-              <MaterialIcons name="notifications" size={20} color={COLORS.primary} />
-              <Text style={estilos.filaConfigTexto}>Notificaciones</Text>
-            </Pressable>
-            {/* Toggle visual estático — funcionalidad futura.
-                hit-area ≥ 44px (WCAG 2.5.5) vía wrapper. */}
-            <Pressable
-              onPress={mostrarToast}
-              accessibilityLabel="Activar notificaciones"
-              style={estilos.toggleWrapper}
-            >
-              <View style={estilos.toggleOff}>
-                <View style={estilos.toggleThumb} />
-              </View>
-            </Pressable>
-          </View>
         </View>
 
-        {/* Gestión — sección consolidada (mi-perfil-unification).
-            Antes esta sección vivía en Configuracion.tsx; ahora vive acá
-            como única entrada del tab "Perfil". */}
+        {/* Gestión — única entry del tab Perfil. Ahora "Cerrar sesión"
+            vive SOLO acá (no duplicado). El botón rojo BotonPrimario se
+            eliminó para no repetir el patrón con el item de Gestión. */}
         <Text style={estilos.seccionTitulo}>Gestión</Text>
         <View style={estilos.listaCard}>
           <ItemGestion
@@ -343,18 +306,6 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             destructive
           />
         </View>
-
-        {/* Botón rojo de cerrar-sesión (legacy CTA — preservado por T-MP-3
-            + B1.x de Configuracion. MiPerfil.tsx mantiene AMBOS: el item
-            Alert.alert dentro de Gestión Y este botón rojo como atajo
-            visible. Ambos llaman handleCerrarSesion. */}
-        <BotonPrimario
-          texto="Cerrar sesión"
-          tono="rojo"
-          icono="logout"
-          onPress={handleCerrarSesion}
-          testID="boton-cerrar-sesion"
-        />
 
         <FooterApp />
       </ScrollView>
@@ -478,11 +429,10 @@ const estilos = StyleSheet.create({
     paddingHorizontal: SPACING.margin,
   },
   avatar: {
-    // mi-perfil-redesign Task 1: 96 → 120 px para mejorar jerarquía
-    // visual y presencia del operario (impeccable: el avatar es el
-    // anchor emocional de la pantalla).
-    width: 120,
-    height: 120,
+    // 80 px — tono sobrio coherente con el resto de los screens
+    // (impeccable: el avatar es anchor emocional, no elemento dominante).
+    width: 80,
+    height: 80,
     borderRadius: RADIUS.full,
     backgroundColor: COLORS.brandAzulOscuro,
     borderWidth: 1,
@@ -492,7 +442,7 @@ const estilos = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   avatarTexto: {
-    ...TYPOGRAPHY.headlineLg,
+    ...TYPOGRAPHY.headlineMd,
     color: COLORS.onPrimary,
   },
   nombre: {

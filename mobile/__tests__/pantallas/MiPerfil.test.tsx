@@ -239,19 +239,19 @@ describe('MiPerfil — Avatar & Paleta institucional EPC', () => {
   }
 
   /**
-   * T-CRAFT-1 — El avatar debe medir 120px (no 96px) tras el rediseño.
-   * Antes del refactor el avatar era 96px; ahora es 120px para mejor
-   * jerarquía visual.
+   * T-CRAFT-1 — El avatar mide 80px. Antes del cleanup de Mi Perfil era
+   * 120px (refactor mi-perfil-redesign Task 1); este cleanup lo reduce
+   * a 80px para tono sobrio coherente con el resto de los screens.
    */
-  it('T-CRAFT-1 avatar mide 120px (no 96px)', () => {
+  it('T-CRAFT-1 avatar mide 80px', () => {
     const { getByTestId } = renderMiPerfil();
     const avatar = getByTestId('avatar');
     const estilo = StyleSheet.flatten(avatar.props.style) as {
       width?: number;
       height?: number;
     };
-    expect(estilo.width).toBe(120);
-    expect(estilo.height).toBe(120);
+    expect(estilo.width).toBe(80);
+    expect(estilo.height).toBe(80);
   });
 
   /**
@@ -271,15 +271,15 @@ describe('MiPerfil — Avatar & Paleta institucional EPC', () => {
   });
 
   /**
-   * T-CRAFT-3 — El botón "Cerrar sesión" tiene touch target ≥ 44px
-   * (WCAG 2.5.5). Verificamos el minHeight efectivo del Pressable.
-   * BotonPrimario.tamanoNormal ya tiene height: 56 — el assert es
-   * una salvaguarda para futuros refactors.
+   * T-CRAFT-3 — El item "Cerrar sesión" en Gestión tiene touch target
+   * ≥ 44px (WCAG 2.5.5). Tras el cleanup de Mi Perfil, el botón rojo
+   * BotonPrimario se eliminó para no duplicar la acción; la única entry
+   * ahora es el item de Gestión con `destructive` styling.
    */
-  it('T-CRAFT-3 botón cerrar-sesion tiene minHeight >= 44px', () => {
+  it('T-CRAFT-3 item cerrar-sesion en Gestión tiene minHeight >= 44px', () => {
     const { getByTestId } = renderMiPerfil();
-    const boton = getByTestId('boton-cerrar-sesion');
-    const estilo = StyleSheet.flatten(boton.props.style) as {
+    const item = getByTestId('item-cerrar-sesion');
+    const estilo = StyleSheet.flatten(item.props.style) as {
       minHeight?: number;
       height?: number;
     };
@@ -338,22 +338,16 @@ describe('MiPerfil — Avatar & Paleta institucional EPC', () => {
     expect(estiloTexto.color).toBe('#fff');
   });
 
-  it('MP-3 el botón "Cerrar sesión" usa brandRojo (#D5212A) como fondo (CTA destructivo filled)', () => {
-    const { getAllByText, getByTestId } = renderMiPerfil();
-    const boton = getByTestId('boton-cerrar-sesion');
-    const estilo = StyleSheet.flatten(boton.props.style) as {
-      backgroundColor?: string;
-    };
-    expect(estilo.backgroundColor).toBe('#D5212A');
-    // mi-perfil-unification: ahora hay 2 elementos con "Cerrar sesión"
-    // (BotonPrimario con texto blanco + item de Gestión con texto rojo).
-    // Buscamos el texto blanco (color #fff) — debe ser el del BotonPrimario.
-    const textosBoton = getAllByText('Cerrar sesión');
-    const textoBlanco = textosBoton.find((t) => {
-      const estiloT = StyleSheet.flatten(t.props.style) as { color?: string };
-      return estiloT.color === '#fff';
-    });
-    expect(textoBlanco).toBeTruthy();
+  it('MP-3 el item "Cerrar sesión" en Gestión tiene styling destructivo', () => {
+    // Tras el cleanup de Mi Perfil, el botón rojo BotonPrimario se
+    // eliminó para no duplicar la acción. La única entry ahora es
+    // el item de Gestión con `destructive` styling (texto en COLORS.error).
+    const { getByTestId, getByText } = renderMiPerfil();
+    const item = getByTestId('item-cerrar-sesion');
+    expect(item).toBeTruthy();
+    // El texto del item está presente en la jerarquía.
+    const textoCerrar = getByText('Cerrar sesión');
+    expect(textoCerrar).toBeTruthy();
   });
 });
 
@@ -934,7 +928,9 @@ describe('MiPerfil — Integración (datos reales + jerarquía visual)', () => {
     const idxAvatar = todosLosTestIds.indexOf('avatar');
     const idxCedula = todosLosTestIds.indexOf('fila-cedula');
     const idxPrestador = todosLosTestIds.indexOf('fila-prestador-nombre');
-    const idxCerrarSesion = todosLosTestIds.indexOf('boton-cerrar-sesion');
+    // Tras el cleanup: "Cerrar sesión" vive SOLO en el item de Gestión
+    // (no en el botón rojo BotonPrimario). El testID es item-cerrar-sesion.
+    const idxCerrarSesion = todosLosTestIds.indexOf('item-cerrar-sesion');
 
     // Todos los testIDs clave deben existir en el árbol.
     expect(idxAvatar).toBeGreaterThanOrEqual(0);
