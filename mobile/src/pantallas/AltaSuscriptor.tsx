@@ -444,21 +444,6 @@ export default function AltaSuscriptor({ navigation }: Props) {
               testID="alta-telefono"
             />
 
-            <FormField
-              ref={getRef('direccion')}
-              label="Dirección"
-              required
-              value={form.direccion}
-              onChangeText={(v) => setCampo('direccion', v)}
-              onBlur={() => onBlur('direccion')}
-              error={errores.direccion}
-              maxLength={200}
-              editable={!enviando}
-              placeholder="Calle, Carrera, Vereda o Sector"
-              accessibilityHint="Ingrese la dirección completa del predio"
-              testID="alta-direccion"
-            />
-
             {/* Estrato */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>
@@ -557,7 +542,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
           <View style={[styles.seccion, styles.seccionLow]}>
             <View style={styles.seccionHeader}>
               <MaterialIcons name="location-on" size={20} color={COLORS.primary} />
-              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Ubicación</Text>
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Ubicación del Predio</Text>
             </View>
 
             <FormField
@@ -585,6 +570,21 @@ export default function AltaSuscriptor({ navigation }: Props) {
               editable={!enviando}
               placeholder="Ej: Centro, Zona Industrial"
               testID="alta-sector"
+            />
+
+            <FormField
+              ref={getRef('direccion')}
+              label="Dirección"
+              required
+              value={form.direccion}
+              onChangeText={(v) => setCampo('direccion', v)}
+              onBlur={() => onBlur('direccion')}
+              error={errores.direccion}
+              maxLength={200}
+              editable={!enviando}
+              placeholder="Calle, Carrera, Vereda o Sector"
+              accessibilityHint="Ingrese la dirección completa del predio"
+              testID="alta-direccion"
             />
           </View>
 
