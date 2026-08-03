@@ -75,12 +75,17 @@ interface FacturaRepositoryCompatible extends Partial<FacturaRepository> {
 
 interface BootstrapReposFactura {
   readonly facturaRepo: FacturaRepositoryCompatible;
-  readonly lecturaRepo?: { buscarPorId(id: number): Promise<Lectura | null> };
+  readonly lecturaRepo?: {
+    buscarPorId?: (id: number) => Promise<Lectura | null>;
+    obtenerPorId?: (id: number) => Promise<Lectura | null>;
+  };
   readonly suscriptorRepo: { buscarPorId(id: number): Promise<Suscriptor | null> };
   readonly medidorRepo: { buscarPorId(id: number): Promise<Medidor | null> };
   readonly periodoRepo: { buscarPorId(id: string): Promise<Periodo | null> };
   readonly liquidacionRepo: { buscarPorId(id: string): Promise<Liquidacion | null> };
-  readonly operarioRepo: { buscarPorId(id: number): Promise<Operario | null> };
+  readonly operarioRepo: {
+    buscarPorId(id: number): Promise<unknown>;
+  };
   readonly consumoHistoricoRepo: {
     listarPorSuscriptor(id: number): Promise<readonly ConsumoHistorico[]>;
   };
@@ -188,9 +193,11 @@ async function hidratarDesdeBootstrap(
 ): Promise<EmitirFacturaInput> {
   const lectura =
     snapshot.lectura ??
-    (snapshot.id_lectura !== undefined && bootstrap.repos.lecturaRepo !== undefined
-      ? await bootstrap.repos.lecturaRepo.buscarPorId(snapshot.id_lectura)
-      : null);
+    (await (snapshot.id_lectura !== undefined && bootstrap.repos.lecturaRepo !== undefined
+      ? bootstrap.repos.lecturaRepo.buscarPorId?.(snapshot.id_lectura) ??
+        bootstrap.repos.lecturaRepo.obtenerPorId?.(snapshot.id_lectura) ??
+        null
+      : null));
   if (!lectura) {
     throw errorEntidad('EMITIR_FACTURA_LECTURA_NO_ENCONTRADA', 'la lectura no existe');
   }
@@ -219,7 +226,8 @@ async function hidratarDesdeBootstrap(
   if (!periodo) {
     throw errorEntidad('EMITIR_FACTURA_PERIODO_NO_ENCONTRADO', lectura.id_periodo);
   }
-  const operario = operarioRepoValue ?? snapshot.operario;
+  const operarioValue = operarioRepoValue ?? snapshot.operario;
+  const operario = operarioValue as Operario | undefined;
   if (!operario) {
     throw errorEntidad('EMITIR_FACTURA_OPERARIO_NO_ENCONTRADO', String(lectura.id_operario));
   }

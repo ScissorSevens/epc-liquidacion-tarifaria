@@ -5,15 +5,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ResultadoCalculo from '../../src/pantallas/ResultadoCalculo';
 import { crearNavMock } from './__mocks__/nav';
 
-const mockGetBootstrap = jest.fn();
-const mockEmitirFacturaMovil = jest.fn();
-
 jest.mock('../../src/composition/get-bootstrap', () => ({
-  getBootstrap: mockGetBootstrap,
+  getBootstrap: jest.fn(),
 }));
 jest.mock('../../dominio/factura/emitir-factura-movil', () => ({
-  emitirFacturaMovil: mockEmitirFacturaMovil,
+  emitirFacturaMovil: jest.fn(),
 }));
+
+const mockGetBootstrap = require('../../src/composition/get-bootstrap').getBootstrap as jest.Mock;
+const mockEmitirFacturaMovil = require('../../dominio/factura/emitir-factura-movil').emitirFacturaMovil as jest.Mock;
 
 function renderConProviders(ui: React.ReactElement) {
   return render(
