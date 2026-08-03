@@ -3,18 +3,25 @@
     "allowJs": true,
     "esModuleInterop": true,
     "jsx": "react-native",
-    "lib": ["DOM", "ESNext"],
+    "lib": [
+      "DOM",
+      "ESNext"
+    ],
     "module": "ESNext",
     "moduleDetection": "force",
     "moduleResolution": "bundler",
-    "customConditions": ["react-native"],
+    "customConditions": [
+      "react-native"
+    ],
     "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "target": "ESNext",
     "strict": true,
     "paths": {
-      "@dominio/*": ["./dominio/*"]
+      "@dominio/*": [
+        "./dominio/*"
+      ]
     }
   },
   "include": [
@@ -26,5 +33,6 @@
     ".expo",
     "dist",
     "web-build"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
