@@ -50,56 +50,6 @@ import {
 } from './parametros-tarifa-build-borrador';
 
 /**
- * Colores resueltos con Platform.select + fallback hex.
- *
- * La propuesta de expo-native-ui menciona la `Color` API de `expo-router`
- * con semantica iOS (UIColor.label, UIColor.systemBackground, etc.) y
- * Android MaterialTheme. El paquete `expo-router` instalado en este
- * proyecto NO exporta una `Color` API publica. Implementamos un shim
- * equivalente que:
- *   - Documenta el contrato esperado (ios/android/default)
- *   - Resuelve a tokens hex del theme cuando la API nativa no esta
- *     disponible (Hermes en tests, build web, runtime legacy).
- *
- * Cualquier callsite que quiera un color "nativo" usa:
- *   `Platform.select({ ios: COLORES_NATIVOS.ios.label, default: COLORS.onSurface })`
- *
- * admin-parametros-tarifa-redesign Task 2 — integracion expo-native-ui.
- */
-const COLORES_NATIVOS = {
-  /** iOS label — texto primario sobre systemBackground. */
-  label: Platform.select({
-    ios: COLORS.onSurface,
-    android: COLORS.onSurface,
-    default: COLORS.onSurface,
-  }),
-  /** iOS secondaryLabel — texto secundario. */
-  secondaryLabel: Platform.select({
-    ios: COLORS.onSurfaceVariant,
-    android: COLORS.onSurfaceVariant,
-    default: COLORS.onSurfaceVariant,
-  }),
-  /** iOS separator — divisor de cards. */
-  separator: Platform.select({
-    ios: COLORS.outlineVariant,
-    android: COLORS.outlineVariant,
-    default: COLORS.outlineVariant,
-  }),
-  /** iOS systemBackground — fondo principal. */
-  systemBackground: Platform.select({
-    ios: COLORS.background,
-    android: COLORS.background,
-    default: COLORS.background,
-  }),
-  /** iOS systemBlue — tint por defecto de SF Symbols / CTAs. */
-  systemBlue: Platform.select({
-    ios: COLORS.brandAzulDigital,
-    android: COLORS.brandAzulDigital,
-    default: COLORS.brandAzulDigital,
-  }),
-};
-
-/**
  * Icono del botón Guardar segun plataforma.
  *
  * iOS: SF Symbol "tray.and.arrow.down" (guardar) via expo-image.
@@ -440,14 +390,22 @@ export default function ParametrosTarifaForm({
       // setter se invoca via getState() para garantizar que la UI refleja
       // lo que realmente persiste el repo, no lo que el form dice.
       useWorkspace.getState().setParametrosVigentes(persisted);
-      // Haptic feedback de exito solo en iOS — Android tiene
-      // Haptics.selectionAsync pero el patron UX aqui es notification
-      // success que es iOS-first.
+      // Haptic feedback de exito:
+      //   iOS: notificationAsync(Success) (T-NATIVE-5 existente).
+      //   Android: selectionAsync (D5 — feedback sutil, sin notification
+      //   que es iOS-first).
+      //   Web: no-op (Platform.OS === 'web' filtrado abajo).
       if (Platform.OS === 'ios') {
         try {
           await Haptics.notificationAsync(
             Haptics.NotificationFeedbackType.Success,
           );
+        } catch {
+          // Haptics puede fallar en simulador o sin permisos — silencio.
+        }
+      } else if (Platform.OS === 'android') {
+        try {
+          await Haptics.selectionAsync();
         } catch {
           // Haptics puede fallar en simulador o sin permisos — silencio.
         }
@@ -635,7 +593,14 @@ export default function ParametrosTarifaForm({
           </View>
           <Switch
             value={aplicaCmviaa}
-            onValueChange={setAplicaCmviaa}
+            onValueChange={(v) => {
+              // D5 (Commit 4): Haptics.selectionAsync en onValueChange de
+              // switches (feedback sutil para iOS + Android).
+              if (Platform.OS !== 'web') {
+                void Haptics.selectionAsync();
+              }
+              setAplicaCmviaa(v);
+            }}
             disabled={guardando || cargandoInputs}
             accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
             testID="switch-cmviaa"
@@ -716,7 +681,14 @@ export default function ParametrosTarifaForm({
           </View>
           <Switch
             value={aplicaMinimoVital}
-            onValueChange={setAplicaMinimoVital}
+            onValueChange={(v) => {
+              // D5 (Commit 4): Haptics.selectionAsync en onValueChange de
+              // switches (feedback sutil para iOS + Android).
+              if (Platform.OS !== 'web') {
+                void Haptics.selectionAsync();
+              }
+              setAplicaMinimoVital(v);
+            }}
             disabled={guardando || cargandoInputs}
             accessibilityLabel="Aplicar mínimo vital"
             testID="switch-minimo-vital"
@@ -797,26 +769,5 @@ const estilos = StyleSheet.create({
   cargandoTexto: {
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurfaceVariant,
-  },
-  // Mantenemos 'input' por si se agrega algun campo no-FormField en el
-  // futuro. Los FormField tienen su propio style interno.
-  warningCma: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.error,
-    backgroundColor: COLORS.errorContainer ?? COLORS.surfaceContainerLow,
-    padding: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.error,
-    minHeight: 44,
-  },
-  input: {
-    ...TYPOGRAPHY.bodyMd,
-    color: COLORS.onSurface,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
   },
 });
