@@ -110,8 +110,8 @@ function crearEntidades() {
     nit: '800.123.456-7',
     municipio: 'Bogota',
     departamento: 'Cundinamarca',
-    representante_legal: null,
-    representante_legal_cedula: null,
+    representante_legal: '',
+    representante_legal_cedula: '',
     segmento: 2 as const,
     num_suscriptores_urbanos: 1,
     num_suscriptores_rurales: 1,
@@ -203,7 +203,7 @@ describe('emitirFacturaMovil con BootstrapApp', () => {
     expect(factura.id_factura).toBe('factura-id-1');
     expect(factura.snapshot.suscriptor.nombre_apellidos).toBe('Maria Lopez');
     expect(factura.snapshot.consumosHistoricos).toHaveLength(1);
-    await expect(bootstrap.repos.facturaRepo.buscarPorId(factura.id)).resolves.toMatchObject({
+    await expect(bootstrap.repos.facturaRepo.buscarPorId!(factura.id)).resolves.toMatchObject({
       id: 'factura-id-1',
       estado: 'EMITIDA',
     });

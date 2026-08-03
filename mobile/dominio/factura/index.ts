@@ -43,6 +43,16 @@ export { extraerSnapshotLectura } from './types';
 // `factura-compliance-cleanup` Task 5.
 export { MENSAJES_ERROR_FACTURA } from './types';
 export { crearBootstrapFacturaSqlite } from './bootstrap';
+export {
+  emitirFacturaMovil,
+  ErrorEmisionFacturaMovil,
+} from './emitir-factura-movil';
+export type {
+  FacturaPersistida,
+  SnapshotFacturaMovil,
+  BootstrapFacturaEmision,
+  CodigoErrorEmisionMovil,
+} from './emitir-factura-movil';
 export type {
   BootstrapFacturaSqlite,
   BootstrapFacturaSqliteOpciones,
