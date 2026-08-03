@@ -3,8 +3,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import CapturarFoto from '../../pantallas/CapturarFoto';
 import CapturarLectura from '../../pantallas/CapturarLectura';
 import EditarSuscriptor from '../../pantallas/EditarSuscriptor';
+import FacturaPreviewScreenPlaceholder from '../../pantallas/FacturaPreviewScreenPlaceholder';
 import ResultadoCalculo from '../../pantallas/ResultadoCalculo';
 import RutaDeHoy from '../../pantallas/RutaDeHoy';
+import SeleccionarImpresoraPlaceholder from '../../pantallas/SeleccionarImpresoraPlaceholder';
 import type { InicioStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<InicioStackParamList>();
@@ -16,6 +18,16 @@ export default function InicioStack() {
       <Stack.Screen name="CapturarLectura" component={CapturarLectura} />
       <Stack.Screen name="CapturarFoto" component={CapturarFoto} />
       <Stack.Screen name="ResultadoCalculo" component={ResultadoCalculo} />
+      <Stack.Screen
+        name="FacturaPreview"
+        component={FacturaPreviewScreenPlaceholder}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SeleccionarImpresora"
+        component={SeleccionarImpresoraPlaceholder}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="EditarSuscriptor" component={EditarSuscriptor} />
     </Stack.Navigator>
   );

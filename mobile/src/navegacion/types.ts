@@ -48,6 +48,21 @@ export type InicioStackParamList = {
     otros_valores?: readonly OtroValor[];
     saldo_anterior?: number;
   };
+  /**
+   * `factura-preview-print-bluetooth` D9: pantalla de preview del
+   * tiquete de factura, post-emision. Recibe el id de la Factura
+   * persistida y carga la entidad via `bootstrap.facturaRepo.buscarPorId`.
+   */
+  FacturaPreview: { id_factura: string };
+  /**
+   * Pantalla de seleccion/cambio de impresora Bluetooth (BLE + SPP).
+   * `modo`: 'inicial' = primera vez; 'cambio' = re-seleccion
+   * persistida.
+   */
+  SeleccionarImpresora: {
+    id_factura: string;
+    modo: 'inicial' | 'cambio';
+  };
   EditarSuscriptor: { suscriptor: Suscriptor };
 };
 
@@ -71,6 +86,17 @@ export type LecturasStackParamList = {
      */
     otros_valores?: readonly OtroValor[];
     saldo_anterior?: number;
+  };
+  /**
+   * `factura-preview-print-bluetooth` D9: registrado en ambos stacks
+   * para soportar `Inicio → CapturarLectura → ResultadoCalculo →
+   * FacturaPreview` y `ListaSuscriptores → CapturarLectura →
+   * ResultadoCalculo → FacturaPreview`.
+   */
+  FacturaPreview: { id_factura: string };
+  SeleccionarImpresora: {
+    id_factura: string;
+    modo: 'inicial' | 'cambio';
   };
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
