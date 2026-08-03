@@ -90,7 +90,13 @@ jest.mock('react-native-ble-plx', () => ({
     requestConnection() {
       return Promise.resolve({});
     }
+    connectToDevice() {
+      return Promise.resolve({});
+    }
     discoverAllServicesAndCharacteristics() {
+      return Promise.resolve({});
+    }
+    writeCharacteristicWithResponseForDevice() {
       return Promise.resolve({});
     }
     writeCharacteristicWithResponse() {

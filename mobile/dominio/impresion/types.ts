@@ -79,6 +79,7 @@ export type ErrorImpresion =
   | { codigo: 'IMPRESORA_OCUPADA'; direccion: string; mensaje: string }
   | { codigo: 'TIMEOUT'; operacion: string; mensaje: string }
   | { codigo: 'NO_ENCONTRADA'; direccion: string; mensaje: string }
+  | { codigo: 'IMPRESION_FALLIDA'; direccion: string; mensaje: string; cause?: unknown }
   | { codigo: 'DESCONOCIDO'; mensaje: string; cause?: unknown };
 
 export class ExcepcionImpresora extends Error {
