@@ -73,16 +73,20 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.sm + 4,
   },
 
-  // ── Variante raíz: fondo brandAzulOscuro, título blanco, sin flecha ──────
-  // Usamos COLORS.brandAzulOscuro (identidad institucional explicita) en vez
-  // de COLORS.primary (semantico generico). Ambos resuelven al mismo #093C5D
-  // pero el token brand hace visible la intencion institucional — principio
-  // de color con proposito semantico de impecable.
+  // ── Variante raíz: fondo claro + border-bottom (coherente con
+  // topBarDetalle y con el resto de los screens). El "rango" principal
+  // es el tamaño del título: más grande y bold (headlineSm) que detail
+  // (bodyLg regular). Sin flecha de back. ─────────────────────────────
   topBarRaiz: {
-    backgroundColor: COLORS.brandAzulOscuro,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
 
-  // ── Variante detalle: fondo claro, título oscuro, con flecha ─────────────
+  // ── Variante detalle: mismo fondo claro, mismo border, título más
+  // pequeño. Con flecha de back. Distinción visual con raíz = tipografía
+  // y el ícono de back, no el color de fondo (sin inconsistencias
+  // visuales entre variantes). ─────────────────────────────────────────
   topBarDetalle: {
     backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
@@ -107,14 +111,20 @@ const styles = StyleSheet.create({
     gap: 1,
   },
 
-  // ── Título raíz: grande, blanco ───────────────────────────────────────────
+  // ── Título raíz: grande, bold, brand (jerarquía principal) ─────────────
+  // usa el token brand explicito (no primary generico) para hacer
+  // visible la intención institucional — principio de color con
+  // propósito semántico de impeccable. Modern feel via:
+  //   - fontWeight 700 (sin bold en otros títulos)
+  //   - letterSpacing -0.3 (tracking apretado, premium)
   tituloRaiz: {
     ...TYPOGRAPHY.headlineSm,
-    color: COLORS.onPrimary,
+    fontWeight: '700' as const,
+    color: COLORS.brandAzulOscuro,
     letterSpacing: -0.3,
   },
 
-  // ── Título detalle: mediano, oscuro ───────────────────────────────────────
+  // ── Título detalle: mediano, semibold, brand (jerarquía secundaria) ───
   tituloDetalle: {
     ...TYPOGRAPHY.bodyLg,
     fontWeight: '600' as const,
@@ -122,9 +132,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
+  // ── Subtítulo: tonalidad media, tracking sutil (modern / refined) ─────
   subtitulo: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.onSurfaceVariant,
+    letterSpacing: 0.2,
   },
 
   // ── Boton de icono: WCAG 2.5.5 touch target >= 44x44 ────────────────────
