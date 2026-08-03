@@ -53,7 +53,19 @@ export type {
   BootstrapFacturaEmision,
   CodigoErrorEmisionMovil,
 } from './emitir-factura-movil';
+export {
+  armarTextoCompartir,
+  compartirFactura,
+  ErrorCompartirFactura,
+} from './compartir-factura';
 export type {
   BootstrapFacturaSqlite,
   BootstrapFacturaSqliteOpciones,
 } from './bootstrap';
+export type {
+  CodigoErrorCompartir,
+  FileSystemSharePort,
+  OpcionesTextoCompartir,
+  SharingSharePort,
+} from './compartir-factura';
+

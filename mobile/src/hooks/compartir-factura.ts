@@ -1,11 +1,15 @@
 /**
- * Stub del wrapper de `compartirFactura` (expo-sharing + expo-file-system).
- * Implementacion real llega en commit 8.
+ * Boundary de UI para compartir facturas. La transformación normativa vive en
+ * dominio y los módulos Expo se cargan de forma lazy dentro del servicio.
  */
-
-export async function compartirFactura(
-  _ticket: readonly string[],
-  _factura: unknown,
-): Promise<boolean> {
-  return true;
-}
+export {
+  armarTextoCompartir,
+  compartirFactura,
+  ErrorCompartirFactura,
+} from '../../dominio/factura/compartir-factura';
+export type {
+  CodigoErrorCompartir,
+  FileSystemSharePort,
+  OpcionesTextoCompartir,
+  SharingSharePort,
+} from '../../dominio/factura/compartir-factura';
