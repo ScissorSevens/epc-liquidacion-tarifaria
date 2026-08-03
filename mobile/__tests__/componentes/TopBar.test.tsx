@@ -3,26 +3,21 @@
 // Tests contractuales de la TopBar — refactor de craft segun principios
 // de la skill impecable (registro product, RN).
 //
-// TopBar tiene 2 variantes que comparten fondo claro + border-bottom
-// (diseño coherente con el resto de los screens, no inconsistencias de
-// color entre variantes raíz/detail):
-//   - topBarRaiz    : fondo surfaceContainerLowest, title brandAzulOscuro
-//                     bold + headlineSm, sin flecha. Mayor jerarquía.
-//   - topBarDetalle : mismo fondo, title brandAzulOscuro semibold +
-//                     bodyLg, con flecha back. Menor jerarquía.
+// TopBar tiene 2 variantes:
+//   - topBarRaiz    : fondo brandAzulOscuro, titulo blanco, sin flecha.
+//   - topBarDetalle : fondo surfaceContainerLowest, titulo dark, con flecha.
 //
 // Cobertura de principios impeccable:
-//   T-TOPBAR-1  topBarRaiz usa COLORS.surfaceContainerLowest (consistente
-//               con topBarDetalle). Antes usaba brandAzulOscuro — el refactor
-//               lo unifica con el resto de los screens.
+//   T-TOPBAR-1  brandAzulOscuro explicito en topBarRaiz (no COLORS.primary
+//               generico). Ambos resuelven al mismo #093C5D pero el token
+//               explicito deja claro que es la identidad institucional.
 //   T-TOPBAR-2  topBarDetalle usa COLORS.surfaceContainerLowest (M3 neutral).
 //   T-TOPBAR-3  Botones de icono (back) >= 44x44 px (WCAG 2.5.5 + PRODUCT.md
 //               non-negotiable). Actual: 36x36 -> fail a11y audit.
 //   T-TOPBAR-4  Ningun bloque combina borderWidth >= 1 con elevation
 //               (ghost-card anti-pattern de impecable v1).
 //   T-TOPBAR-5  Sin textTransform: 'uppercase' (ALL CAPS ban).
-//   T-TOPBAR-6  Contraste brandAzulOscuro/surfaceContainerLowest >= 4.5:1
-//               (WCAG AA). Antes era onPrimary/brandAzulOscuro.
+//   T-TOPBAR-6  Contraste onPrimary/brandAzulOscuro >= 4.5:1 (WCAG AA).
 //
 // Mocks:
 //   - @expo/vector-icons/MaterialIcons: ya mockeado globalmente via
@@ -99,23 +94,20 @@ function contrasteWCAG(hex1: string, hex2: string): number {
 }
 
 describe('TopBar — principios impeccable', () => {
-  // ── T-TOPBAR-1: topBarRaiz usa COLORS.surfaceContainerLowest (consistente
-  // con el resto de los screens) ─────────────────────────────────────────
-  describe('T-TOPBAR-1: topBarRaiz usa COLORS.surfaceContainerLowest', () => {
-    it('el bloque topBarRaiz referencia COLORS.surfaceContainerLowest', () => {
+  // ── T-TOPBAR-1: brandAzulOscuro explicito en topBarRaiz ──────────────────
+  describe('T-TOPBAR-1: topBarRaiz usa COLORS.brandAzulOscuro explicito', () => {
+    it('el bloque topBarRaiz referencia COLORS.brandAzulOscuro', () => {
       const match = topBarSource.match(/topBarRaiz:\s*\{([\s\S]*?)\}/);
       expect(match).not.toBeNull();
       const body = match![1];
-      expect(body).toContain('COLORS.surfaceContainerLowest');
+      expect(body).toContain('COLORS.brandAzulOscuro');
     });
 
-    it('el bloque topBarRaiz NO referencia COLORS.brandAzulOscuro como backgroundColor (eso es del título)', () => {
+    it('el bloque topBarRaiz NO referencia COLORS.primary generico', () => {
       const match = topBarSource.match(/topBarRaiz:\s*\{([\s\S]*?)\}/);
       expect(match).not.toBeNull();
       const body = match![1];
-      // El background es surfaceContainerLowest. brandAzulOscuro vive en
-      // el estilo del TITULO, no del wrapper topBarRaiz.
-      expect(body).not.toMatch(/backgroundColor:\s*COLORS\.brandAzulOscuro/);
+      expect(body).not.toMatch(/\bCOLORS\.primary\b/);
     });
   });
 
@@ -194,20 +186,18 @@ describe('TopBar — principios impeccable', () => {
   });
 
   // ── T-TOPBAR-6: contraste WCAG AA ────────────────────────────────────────
-  describe('T-TOPBAR-6: contraste brandAzulOscuro/surfaceContainerLowest >= 4.5:1', () => {
-    it('el ratio entre #093C5D (brandAzulOscuro, title) y #FAFCFE (surfaceContainerLowest, bg) es >= 4.5', () => {
-      // El brandAzulOscuro es oscuro (luminancia ~0.03) y surfaceContainerLowest
-      // es muy claro (luminancia ~0.96). El ratio es ~10.5:1 — bien por encima
-      // del minimo WCAG AA (4.5:1 para body text).
-      const ratio = contrasteWCAG('#093C5D', '#FAFCFE');
+  describe('T-TOPBAR-6: contraste onPrimary/brandAzulOscuro >= 4.5:1', () => {
+    it('el ratio entre #FFFFFF (onPrimary) y #093C5D (brandAzulOscuro) es >= 4.5', () => {
+      const ratio = contrasteWCAG('#FFFFFF', '#093C5D');
+      // El valor calculado es ~11.4:1 — muy por encima del minimo WCAG AA.
       expect(ratio).toBeGreaterThanOrEqual(4.5);
     });
 
-    it('el titulo raiz (sobre fondo surfaceContainerLowest) usa COLORS.brandAzulOscuro', () => {
+    it('el titulo raiz (sobre el fondo brandAzulOscuro) usa COLORS.onPrimary', () => {
       renderConSafeArea(<TopBar titulo="Inicio" />);
       const titulo = screen.getByText('Inicio');
       const flat = flattenStyle(titulo.props.style);
-      expect(flat.color).toBe('#093C5D');
+      expect(flat.color).toBe('#FFFFFF');
     });
   });
 
