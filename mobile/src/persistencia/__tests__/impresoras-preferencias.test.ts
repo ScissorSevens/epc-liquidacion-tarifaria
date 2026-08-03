@@ -24,7 +24,7 @@ import {
   invalidarPreferencias,
   obtenerPapelDefault,
   guardarPapelDefault,
-} from '../../src/persistencia/impresoras-preferencias';
+} from '../impresoras-preferencias';
 
 beforeEach(async () => {
   await AsyncStorage.clear();
@@ -51,6 +51,7 @@ describe('obtenerUltimaImpresora', () => {
         transporte: 'BLE',
         direccion: 'AA:BB:CC:DD:EE:FF',
         anchoPapel: '58mm',
+        estado: 'emparejada',
       },
       papel_default: '58mm',
     };
@@ -65,6 +66,7 @@ describe('obtenerUltimaImpresora', () => {
       transporte: 'BLE',
       direccion: 'AA:BB:CC:DD:EE:FF',
       anchoPapel: '58mm',
+      estado: 'emparejada',
     });
   });
 
@@ -104,6 +106,7 @@ describe('guardarUltimaImpresora', () => {
       transporte: 'BLE',
       direccion: 'AA:BB:CC:DD:EE:FF',
       anchoPapel: '58mm',
+      estado: 'emparejada',
     });
     const raw = await AsyncStorage.getItem(KEY_PREFERENCIAS_IMPRESION);
     expect(raw).toBeTruthy();
@@ -124,6 +127,7 @@ describe('guardarUltimaImpresora', () => {
         transporte: 'BLE',
         direccion: 'AA:BB',
         anchoPapel: '12cm' as '58mm',
+        estado: 'emparejada',
       }),
     ).rejects.toThrow(/AnchoPapel invalido/);
     const raw = await AsyncStorage.getItem(KEY_PREFERENCIAS_IMPRESION);
@@ -141,6 +145,7 @@ describe('guardarUltimaImpresora', () => {
       transporte: 'BLE',
       direccion: 'AA:BB',
       anchoPapel: '58mm',
+      estado: 'emparejada',
     });
     const parsed = JSON.parse(
       (await AsyncStorage.getItem(KEY_PREFERENCIAS_IMPRESION))!,
@@ -192,6 +197,7 @@ describe('guardarPapelDefault', () => {
           transporte: 'BLE',
           direccion: 'AA',
           anchoPapel: '58mm',
+          estado: 'emparejada',
         },
         papel_default: '58mm',
       }),
