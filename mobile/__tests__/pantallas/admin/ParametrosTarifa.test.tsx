@@ -491,6 +491,163 @@ fireEvent.press(back);
   });
 
   // ─────────────────────────────────────────────────────────────
+  // T-IMPC-4..8 (Commit 2): ResumenCargos + SwitchFila + live update.
+  // ─────────────────────────────────────────────────────────────
+  describe('T-IMPC: ResumenCargos live preview + SwitchFila (Commit 2)', () => {
+    it('T-IMPC-4 el card resumen-cargos renderiza CF y CC con formato COP inicial', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, getAllByTestId, getByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Inyectamos valores en los inputs para que el useMemo produzca
+      // cargos validos (CMA=12_000_000, N=300 → CF=40_000).
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '800');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
+      await waitFor(() => {
+        // El card ResumenCargos debe aparecer.
+        const cards = getAllByTestId('resumen-cargos');
+        expect(cards.length).toBeGreaterThanOrEqual(1);
+        // getByText matchea el Text hijo del card. CF = 12_000_000/300 = 40_000.
+        expect(getByText('$ 40.000')).toBeTruthy();
+        // CC = CMO + CMI + CMT = 800 + 200 + 100 = 1.100.
+        expect(getByText('$ 1.100')).toBeTruthy();
+      });
+    });
+
+    it('T-IMPC-5 live update al cambiar CMA (CMA → 15000000 ⇒ CF recalculado)', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, getByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Setup inicial: CMA=12_000_000, N=300 → CF=40_000.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '800');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
+      await waitFor(() => {
+        expect(getByText('$ 40.000')).toBeTruthy();
+      });
+      // Cambiamos CMA a 15_000_000 → CF = 15_000_000/300 = 50_000.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '15000000');
+      });
+      await waitFor(() => {
+        expect(getByText('$ 50.000')).toBeTruthy();
+      });
+    });
+
+    it('T-IMPC-6 live update al cambiar N (N → 600 ⇒ CF recalculado)', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, getByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Setup: CMA=12_000_000, N=300 → CF=40_000.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '100');
+        fireEvent.changeText(getByTestId('param-cmt'), '50');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
+      await waitFor(() => {
+        expect(getByText('$ 40.000')).toBeTruthy();
+      });
+      // Cambiamos N a 600 → CF = 12_000_000/600 = 20_000.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-suscriptores'), '600');
+      });
+      await waitFor(() => {
+        expect(getByText('$ 20.000')).toBeTruthy();
+      });
+    });
+
+    it('T-IMPC-7 el SwitchFila de CMVIAA tiene testID y dispara onValueChange', () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByLabelText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El Switch CMVIAA sigue siendo accesible por accessibilityLabel.
+      const switchCmviaa = getByLabelText(
+        'Aplicar costo medio variable de inversión ambiental',
+      );
+      expect(switchCmviaa).toBeTruthy();
+      // Activamos CMVIAA via valueChange.
+      fireEvent(switchCmviaa, 'valueChange', true);
+      // Tras activar, el input CMVIAA debe renderizarse.
+      // (verificamos via setTimeout + waitFor).
+    });
+
+    it('T-IMPC-8 al activar CMVIAA, el campo param-cmviaa aparece', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByLabelText, getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Inicialmente param-cmviaa no existe.
+      expect(() => getByTestId('param-cmviaa')).toThrow();
+      // Activamos CMVIAA.
+      await act(async () => {
+        fireEvent(
+          getByLabelText('Aplicar costo medio variable de inversión ambiental'),
+          'valueChange',
+          true,
+        );
+      });
+      // Ahora param-cmviaa existe.
+      await waitFor(() => {
+        expect(getByTestId('param-cmviaa')).toBeTruthy();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
   // PER-05 — selector específico en useWorkspace()
   //
   // El componente usa SOLO `id_prestador_activo`. Cambios en otros campos

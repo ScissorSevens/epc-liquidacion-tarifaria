@@ -15,7 +15,7 @@
  *   - Toggles preservados inline (no son text inputs).
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -24,13 +24,13 @@ import { useNavigation } from '@react-navigation/native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
+import { ResumenCargos } from '../../componentes/ResumenCargos';
 import { SeccionForm } from '../../componentes/SeccionForm';
 import { TopBar } from '../../componentes/TopBar';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
 import {
-  COMPONENTES_TARIFARIOS,
   CMA_MINIMO_ACUEDUCTO,
   CMA_MINIMO_ALCANTARILLADO,
   calcularCargos,
@@ -39,6 +39,10 @@ import {
   type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
 import type { AcuerdoMunicipalRepository } from '../../../dominio/acuerdo-municipal';
+import {
+  buildBorradorLocal,
+  type FormValues,
+} from './parametros-tarifa-build-borrador';
 
 /**
  * Colores resueltos con Platform.select + fallback hex.
@@ -307,6 +311,60 @@ export default function ParametrosTarifaForm({
     return isNaN(n) ? 0 : n;
   };
 
+  // D2 (parametros-tarifa-impeccable-v2 Commit 2): construimos el shape
+  // de FormValues UNA vez por render. Reusado por `guardar()` y el
+  // `useMemo` del card ResumenCargos (live preview).
+  const formValues: FormValues = {
+    periodo,
+    anioBase,
+    cma,
+    cmo,
+    cmi,
+    cmt,
+    cmviaa,
+    aplicaCmviaa,
+    aguaSuministrada,
+    ipuf,
+    suscriptoresPromedio,
+    aplicaMinimoVital,
+    m3Gratis,
+    vigenteDesde,
+    vigenteHasta,
+  };
+
+  // ResumenCargos live preview: useMemo con deps acotadas a los inputs
+  // que afectan el calculo. Recalcula SOLO cuando esos cambian.
+  // Si suscriptores_promedio=0 (division por cero) → CF=0 pero sigue
+  // siendo valido (calcularCargos es defensivo). El card muestra
+  // los cargos resultantes sin throw.
+  const resumen = useMemo(() => {
+    if (id_prestador <= 0) return null;
+    try {
+      const borrador = buildBorradorLocal(formValues, {
+        id_prestador,
+        id_acuerdo,
+      });
+      return calcularCargos({
+        ...borrador,
+        id_parametros: 0,
+        created_at: '',
+      });
+    } catch {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    cma,
+    cmo,
+    cmi,
+    cmt,
+    cmviaa,
+    aplicaCmviaa,
+    suscriptoresPromedio,
+    id_prestador,
+    id_acuerdo,
+  ]);
+
   const guardar = async () => {
     if (repo === null) {
       Alert.alert('Error', 'El repositorio aún no está listo. Esperá un instante.');
@@ -314,46 +372,21 @@ export default function ParametrosTarifaForm({
     }
     setGuardando(true);
     try {
-      const componentesActivos = (() => {
-        const todos: string[] = [...COMPONENTES_TARIFARIOS];
-        if (!aplicaCmviaa) {
-          return todos.filter((c) => c !== 'CMVIAA');
-        }
-        return todos;
-      })();
-      // Pre-calculamos cargo_fijo_resultante + cargo_consumo_resultante con
-      // los valores del formulario (SIN id_parametros/created_at — la
-      // factoría pura los ignora). Ver `calcularCargos` en
-      // dominio/parametros-tarifa/calcular.ts.
-      const borradorCargos: Omit<ParametrosTarifa, 'id_parametros' | 'created_at'> = {
+      // D2: buildBorradorLocal() construye el shape COMPLETO desde el
+      // state local (parametros-tarifa-build-borrador.ts). Reemplaza
+      // el builder inline previo (~30 lineas) que NO reusaba entre
+      // `guardar()` y el `useMemo` del ResumenCargos.
+      const borrador = buildBorradorLocal(formValues, {
         id_prestador,
         id_acuerdo,
-        periodo: entero(periodo),
-        cma: num(cma),
-        cmo: num(cmo),
-        cmi: num(cmi),
-        cmt: num(cmt),
-        cmviaa: num(cmviaa),
-        aplica_cmviaa: aplicaCmviaa,
-        agua_suministrada_m3_anio: num(aguaSuministrada),
-        ipuf_m3_suscriptor_mes: num(ipuf),
-        suscriptores_promedio: entero(suscriptoresPromedio),
-        aplica_minimo_vital: aplicaMinimoVital,
-        m3_gratis_minimo_vital: entero(m3Gratis),
-        ipuf_indice: 1.0,
-        componentes_aplicables: componentesActivos,
-        minimo_vital: null,
-        vigente_desde: vigenteDesde,
-        vigente_hasta: vigenteHasta,
-        cargo_fijo_resultante: 0,
-        cargo_consumo_resultante: 0,
-        // Res CRA 825/2017 Art. 7 (anio_base) + Art. 11 (factor IPC).
-        anio_base: entero(anioBase),
-        factor_indexacion_ipc: 1.0,
-      };
-      const cargos = calcularCargos(borradorCargos as ParametrosTarifa);
+      });
+      const cargos = calcularCargos({
+        ...borrador,
+        id_parametros: 0,
+        created_at: '',
+      });
       const persisted = await repo.guardar({
-        ...borradorCargos,
+        ...borrador,
         cargo_fijo_resultante: cargos.cargo_fijo,
         cargo_consumo_resultante: cargos.cargo_consumo,
       });
@@ -531,12 +564,22 @@ export default function ParametrosTarifaForm({
         </View>
 
         <View style={estilos.campoFila}>
-          <Text style={estilos.label}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
+          <MaterialIcons
+            name="eco"
+            size={24}
+            color={COLORS.primary}
+            style={estilos.switchFilaIcono}
+            accessibilityElementsHidden
+          />
+          <View style={estilos.switchFilaText}>
+            <Text style={estilos.switchFilaLabel}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
+          </View>
           <Switch
             value={aplicaCmviaa}
             onValueChange={setAplicaCmviaa}
             disabled={guardando || cargandoInputs}
             accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
+            testID="switch-cmviaa"
           />
         </View>
         {aplicaCmviaa && (
@@ -553,6 +596,9 @@ export default function ParametrosTarifaForm({
             />
           </View>
         )}
+
+        {/* D2/D3 (Commit 2): ResumenCargos live preview. */}
+        <ResumenCargos cargos={resumen} testID="resumen-cargos" />
       </SeccionForm>
 
       <SeccionForm titulo="Agua y suscriptores (insumo ASP = AS - IPUF×12×N)" icono="water-drop" testID="seccion-card-agua">
@@ -597,12 +643,22 @@ export default function ParametrosTarifaForm({
 
       <SeccionForm titulo="Mínimo vital (Decreto 776/2025 — opcional)" icono="shield" testID="seccion-card-minimo-vital">
         <View style={estilos.campoFila}>
-          <Text style={estilos.label}>Activar mínimo vital</Text>
+          <MaterialIcons
+            name="shield"
+            size={24}
+            color={COLORS.primary}
+            style={estilos.switchFilaIcono}
+            accessibilityElementsHidden
+          />
+          <View style={estilos.switchFilaText}>
+            <Text style={estilos.switchFilaLabel}>Activar mínimo vital (Decreto 776/2025)</Text>
+          </View>
           <Switch
             value={aplicaMinimoVital}
             onValueChange={setAplicaMinimoVital}
             disabled={guardando || cargandoInputs}
             accessibilityLabel="Aplicar mínimo vital"
+            testID="switch-minimo-vital"
           />
         </View>
         {aplicaMinimoVital && (
@@ -653,6 +709,20 @@ const estilos = StyleSheet.create({
     minHeight: 48,
   },
   label: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
+  // D6 (Commit 2): SwitchFila inline con icono MaterialIcons izq + hit-area >= 48.
+  // SwitchFila NO se extrae a `componentes/` (D6): solo se usa 2 veces.
+  switchFilaIcono: {
+    marginRight: SPACING.xs,
+  },
+  switchFilaText: {
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  switchFilaLabel: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
+  },
   // Loading indicator overlay. Visible mientras repo === null O cargando.
   // Centrado verticalmente con un label debajo para que el screen
   // reader anuncie el estado. El testID `bootstrap-indicator` vive en
