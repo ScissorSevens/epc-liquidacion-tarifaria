@@ -17,6 +17,7 @@ import type {
 } from '@dominio/motor-tarifario/types';
 import type { Prestador } from '@dominio/prestadores';
 import type { Suscriptor } from '@dominio/suscriptores/types';
+import type { OtroValor } from '@dominio/factura/types';
 
 // ── Stacks ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,15 @@ export type InicioStackParamList = {
     id_suscriptor: number;
     nombre_suscriptor: string;
     prestador: Prestador;
+    /**
+     * `factura-preview-print-bluetooth` R8: el total normativo mostrado
+     * en esta pantalla es `liquidacion.total + sum(otros_valores) +
+     * saldo_anterior`. Si la pantalla que invoca ResultadoCalculo los
+     * conoce (post-emision), los pasa aca. Si no, default a `[]` y `0`
+     * respectivamente — caso legacy pre-emision movi.
+     */
+    otros_valores?: readonly OtroValor[];
+    saldo_anterior?: number;
   };
   EditarSuscriptor: { suscriptor: Suscriptor };
 };
@@ -55,6 +65,12 @@ export type LecturasStackParamList = {
     id_suscriptor: number;
     nombre_suscriptor: string;
     prestador: Prestador;
+    /**
+     * `factura-preview-print-bluetooth` R8: total normativo. Ver
+     * InicioStack.ResultadoCalculo para semantica completa.
+     */
+    otros_valores?: readonly OtroValor[];
+    saldo_anterior?: number;
   };
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;

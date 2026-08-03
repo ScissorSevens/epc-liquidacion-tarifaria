@@ -20,6 +20,7 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+import { calcularTotalComponentes } from '@dominio/factura/pagos';
 
 type Props = LecturasStackScreenProps<'ResultadoCalculo'>;
 
@@ -91,8 +92,26 @@ function formatearFecha(iso: string): string {
  *   placeholder "— (sin evidencia foto)".
  */
 export default function ResultadoCalculo({ navigation, route }: Props) {
-  const { lectura, resultado, parametros, estrato, id_suscriptor, nombre_suscriptor, prestador } =
-    route.params;
+  const {
+    lectura,
+    resultado,
+    parametros,
+    estrato,
+    id_suscriptor,
+    nombre_suscriptor,
+    prestador,
+    otros_valores,
+    saldo_anterior,
+  } = route.params;
+
+  // `factura-preview-print-bluetooth` R8: el total normativo incluye
+  // `liquidacion.total + sum(otros_valores) + saldo_anterior`. Si los
+  // callers legacy no los pasan (pre-emision), default a 0 / [].
+  const totalNormativo = calcularTotalComponentes(
+    resultado.total,
+    otros_valores ?? [],
+    saldo_anterior ?? 0,
+  );
 
   const [detalleAbierto, setDetalleAbierto] = useState(true);
 
@@ -139,7 +158,12 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         {/* Bento grid: total + anterior/actual + consumo */}
         <View style={[styles.bentoColFull, styles.bentoColFullTotal]}>
           <Text style={[styles.bentoLabel, styles.bentoLabelTotal]}>Monto total</Text>
-          <Text style={[styles.bentoTotal, styles.bentoTotalBlanco]}>{formatearCOP(resultado.total)}</Text>
+          <Text
+            testID="total-factura"
+            style={[styles.bentoTotal, styles.bentoTotalBlanco]}
+          >
+            {formatearCOP(totalNormativo)}
+          </Text>
         </View>
         <View style={styles.bentoRow}>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>

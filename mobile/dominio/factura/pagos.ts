@@ -15,7 +15,7 @@
  * Todos los helpers son PUROS. No mutan la factura, no tocan persistencia.
  */
 
-import type { Factura } from './types';
+import type { Factura, OtroValor } from './types';
 import type { Hasher, IdGenerator } from '../shared/ports';
 import {
   CODIGO_VERIFICACION_LONGITUD,
@@ -132,12 +132,11 @@ export function generarReferenciaPago(
  * → mismo QR.
  */
 export function generarQrPago(factura: Factura): string {
-  const liquidacionTotal = factura.snapshot.liquidacion.resultado.total;
-  const otrosValoresSum = factura.snapshot.otros_valores.reduce(
-    (acc, ov) => acc + ov.valor,
-    0,
+  const valorTotal = calcularTotalComponentes(
+    factura.snapshot.liquidacion.resultado.total,
+    factura.snapshot.otros_valores,
+    factura.snapshot.saldo_anterior,
   );
-  const valorTotal = liquidacionTotal + otrosValoresSum + factura.snapshot.saldo_anterior;
   const payload = {
     codigo_verificacion: factura.codigo_verificacion,
     valor_total: valorTotal,
@@ -145,6 +144,29 @@ export function generarQrPago(factura: Factura): string {
     referencia_pago: factura.referencia_pago ?? '',
   };
   return JSON.stringify(payload);
+}
+
+/**
+ * Total normativo a partir de los 3 componentes: `liquidacionTotal +
+ * sum(otros_valores) + saldo_anterior`. Es la version anterior-a-emitir
+ * de `calcularTotalFactura(factura)` — usable en pantallas que tienen
+ * los componentes en mano pero todavia no emitieron la Factura (ej:
+ * `ResultadoCalculo` antes de navegar al preview).
+ *
+ * Pura. NO muta. NO valida — solo suma y devuelve. La validacion de
+ * `total >= 0` vive en `calcularTotalFactura(factura)` para facturas
+ * ya emitidas.
+ */
+export function calcularTotalComponentes(
+  liquidacionTotal: number,
+  otrosValores: readonly OtroValor[],
+  saldoAnterior: number,
+): number {
+  const otrosValoresSum = otrosValores.reduce(
+    (acc, ov) => acc + ov.valor,
+    0,
+  );
+  return liquidacionTotal + otrosValoresSum + saldoAnterior;
 }
 
 // Re-export Hasher for callers that want to use it consistently.
