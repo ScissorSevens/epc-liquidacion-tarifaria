@@ -277,7 +277,7 @@ describe('crearSuscriptor — email y telefono opcionales', () => {
   );
 });
 
-describe('crearSuscriptor — sector y calle (opcionales)', () => {
+describe('crearSuscriptor — sector (opcional)', () => {
   it('rechaza sector de 101 caracteres', () => {
     expect(() =>
       crearSuscriptor({ ...inputValido, sector: 'a'.repeat(101) }),
