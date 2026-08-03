@@ -361,11 +361,18 @@ export default function ParametrosTarifaForm({
         factor_indexacion_ipc: 1.0,
       };
       const cargos = calcularCargos(borradorCargos as ParametrosTarifa);
-      await repo.guardar({
+      const persisted = await repo.guardar({
         ...borradorCargos,
         cargo_fijo_resultante: cargos.cargo_fijo,
         cargo_consumo_resultante: cargos.cargo_consumo,
       });
+      // mi-perfil-unification-and-param-persistence Commit 2 (T-PERSIST-*):
+      // sincroniza el store Zustand con el payload que el repo aceptó. Sin
+      // esta línea, `parametros_vigentes` queda stale y la liquidación usa
+      // los valores anteriores aunque el form haya sido actualizado. El
+      // setter se invoca via getState() para garantizar que la UI refleja
+      // lo que realmente persiste el repo, no lo que el form dice.
+      useWorkspace.getState().setParametrosVigentes(persisted);
       // Haptic feedback de exito solo en iOS — Android tiene
       // Haptics.selectionAsync pero el patron UX aqui es notification
       // success que es iOS-first.

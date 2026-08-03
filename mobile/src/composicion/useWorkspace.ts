@@ -23,13 +23,19 @@ interface WorkspaceState {
   readonly cargando: boolean;
   setPrestadores: (prestadores: readonly Prestador[]) => void;
   /**
-   * Actualiza `parametros_vigentes` en el store localmente. La
-   * persistencia real a SQLite queda fuera de scope de este setter —
-   * el repo `parametrosTarifaRepo` no expone `actualizar` (solo
-   * `crear`/`buscarVigente`/etc.; ver
-   * parametros-tarifa-repository-expo-sqlite.ts). Este setter permite
-   * que la UI del MiPerfil refleje la edición inmediatamente sin
-   * recargar todo el contexto via `cambiarPrestadorYCargarContexto`.
+   * Actualiza `parametros_vigentes` en el store localmente.
+   *
+   * mi-perfil-unification-and-param-persistence Commit 2 — el setter
+   * refleja el cache local del workspace Zustand. La persistencia real
+   * a SQLite la hace `parametrosTarifaRepo.guardar()`. El screen
+   * `admin/ParametrosTarifa.tsx` orquesta ambos: `await repo.guardar()`
+   * PRIMERO persiste; luego `useWorkspace.getState().setParametrosVigentes(p)`
+   * sincroniza el cache para que la liquidación use los valores nuevos.
+   *
+   * Contrato:
+   *   - Caller: `admin/ParametrosTarifa.tsx guardar()` (tras `repo.guardar`).
+   *   - Reads: `dominio/captura-lecturas/liquidar.ts` consume
+   *     `parametros_vigentes` para calcular cargos.
    *
    * Acepta `null` para limpiar el slot (caso edge: edición cancelada
    * o reseteo manual). NO toca `prestador` ni `acuerdo_vigente` —

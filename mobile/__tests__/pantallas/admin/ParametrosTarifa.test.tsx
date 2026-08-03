@@ -1085,6 +1085,204 @@ describe('ParametrosTarifaForm', () => {
   // < 44 px o labels faltantes — siguiendo el patron de mi-perfil
   // Task 4 (que descubrio 2 gaps reales via T-A11Y-1).
   // ─────────────────────────────────────────────────────────────────
+  describe('T-PERSIST: sincronización del store tras repo.guardar (mi-perfil-unification Commit 2)', () => {
+    /**
+     * T-PERSIST-1 — Al guardar, repo.guardar se llama UNA vez.
+     * Refuerza el contrato de la TAREA 11 (bug `repo.guardar is not a
+     * function`). El screen debe llamar repo.guardar UNA vez por click
+     * en "Guardar Parámetros".
+     */
+    it('T-PERSIST-1: al guardar, repo.guardar se llama UNA vez', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    /**
+     * T-PERSIST-2 — Tras guardar, setParametrosVigentes se invoca con el
+     * payload devuelto por repo.guardar. Este test verifica el BUG FIX
+     * crítico: antes el store quedaba stale porque el screen solo
+     * pre-calculaba localmente y nunca sincronizaba el store Zustand.
+     */
+    it('T-PERSIST-2: tras guardar, setParametrosVigentes se invoca con payload del repo', async () => {
+      const repo = crearRepoFake();
+      const payloadGuardado: ParametrosTarifa = {
+        ...parametrosFixture,
+        cma: 99_999_999,
+        cargo_fijo_resultante: 99_999_999 / 350,
+      };
+      repo.guardar.mockResolvedValueOnce(payloadGuardado);
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const setParametrosVigentes = jest.fn();
+      // El screen usa `useWorkspace.getState().setParametrosVigentes(p)`.
+      // Mockeamos getState para que retorne la acción espiada.
+      const stateSpy = jest
+        .spyOn(useWorkspace, 'getState')
+        .mockReturnValue({ setParametrosVigentes } as never);
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(setParametrosVigentes).toHaveBeenCalled();
+      });
+      // El payload pasado al setter debe ser el mismo que retornó repo.guardar.
+      const arg = setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
+      expect(arg).toBe(payloadGuardado);
+      expect(arg.cma).toBe(99_999_999);
+      stateSpy.mockRestore();
+    });
+
+    /**
+     * T-PERSIST-3 — Si repo.guardar rechaza (falla), el setter NO se
+     * invoca. La promesa rechazada debe propagarse al Alert.alert
+     * "Error" y NO tocar el store.
+     */
+    it('T-PERSIST-3: si repo.guardar falla, NO se invoca setParametrosVigentes', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      repo.guardar.mockRejectedValueOnce(new Error('boom'));
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const setParametrosVigentes = jest.fn();
+      const stateSpy = jest
+        .spyOn(useWorkspace, 'getState')
+        .mockReturnValue({ setParametrosVigentes } as never);
+      const alertSpy = jest
+        .spyOn(Alert, 'alert')
+        .mockImplementation(() => undefined);
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // Esperar a que Alert.alert se haya llamado.
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+      // El setter NO debe haberse invocado.
+      expect(setParametrosVigentes).not.toHaveBeenCalled();
+      stateSpy.mockRestore();
+      alertSpy.mockRestore();
+    });
+
+    /**
+     * T-PERSIST-4 — Tras guardar, el repo acepta el payload completo
+     * (incluye los cargos pre-calculados). El setter del store se
+     * invoca con el payload que el repo devolvió, garantizando que el
+     * cache local refleja exactamente lo persistido.
+     */
+    it('T-PERSIST-4: tras guardar, setParametrosVigentes recibe payload con cargos pre-calculados', async () => {
+      const repo = crearRepoFake();
+      const nuevosParams: ParametrosTarifa = {
+        ...parametrosFixture,
+        cma: 77_777_777,
+        suscriptores_promedio: 350,
+        cargo_fijo_resultante: 77_777_777 / 350,
+        cargo_consumo_resultante: 450 + 120 + 80,
+      };
+      repo.guardar.mockResolvedValueOnce(nuevosParams);
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const setParametrosVigentes = jest.fn();
+      const stateSpy = jest
+        .spyOn(useWorkspace, 'getState')
+        .mockReturnValue({ setParametrosVigentes } as never);
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(setParametrosVigentes).toHaveBeenCalledWith(nuevosParams);
+      });
+      const arg = setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
+      // El payload guardado incluye los cargos pre-calculados.
+      expect(arg.cargo_fijo_resultante).toBe(77_777_777 / 350);
+      expect(arg.cargo_consumo_resultante).toBe(450 + 120 + 80);
+      expect(arg.cma).toBe(77_777_777);
+      stateSpy.mockRestore();
+    });
+
+    /**
+     * T-PERSIST-5 — Tras guardar, el store refleja los nuevos parámetros
+     * vía setParametrosVigentes. Esto es la integración end-to-end:
+     * el setter es la ÚNICA vía que la liquidación usa para leer
+     * parámetros tarifarios en runtime.
+     */
+    it('T-PERSIST-5: tras guardar, setParametrosVigentes actualiza el store Zustand', async () => {
+      const repo = crearRepoFake();
+      const nuevosParams: ParametrosTarifa = {
+        ...parametrosFixture,
+        cma: 55_555_555,
+      };
+      repo.guardar.mockResolvedValueOnce(nuevosParams);
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const setParametrosVigentes = jest.fn();
+      const stateSpy = jest
+        .spyOn(useWorkspace, 'getState')
+        .mockReturnValue({ setParametrosVigentes } as never);
+      const { getByTestId } = render(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalled();
+      });
+      // Verificamos que el store se sincronizó con el payload devuelto.
+      expect(setParametrosVigentes).toHaveBeenCalledTimes(1);
+      const arg = setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
+      expect(arg.cma).toBe(55_555_555);
+      stateSpy.mockRestore();
+    });
+  });
+
   describe('T-INTEG: integracion con datos reales del repo', () => {
     it('T-INTEG-1 renderizado completo con parametrosActuales hidrata cada FormField con el valor correcto', async () => {
       const repo = crearRepoFake();
