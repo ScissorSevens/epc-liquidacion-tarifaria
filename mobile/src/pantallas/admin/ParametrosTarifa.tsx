@@ -25,6 +25,11 @@ import { useNavigation } from '@react-navigation/native';
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
 import { ResumenCargos } from '../../componentes/ResumenCargos';
+import {
+  scrollToFirstError,
+  useFormFieldRefs,
+  type FormErrors,
+} from '../../componentes/scroll-to-first-error';
 import { SeccionForm } from '../../componentes/SeccionForm';
 import { TopBar } from '../../componentes/TopBar';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
@@ -311,6 +316,34 @@ export default function ParametrosTarifaForm({
     return isNaN(n) ? 0 : n;
   };
 
+  // D4 (Commit 3): `validarTodo()` invoca `validarCmaMinimo()` del dominio
+  // via try/catch (la funcion THROWS, no retorna string — D4 hallazgo
+  // critico del design). Tambien valida reglas locales (suscriptores > 0
+  // defensa anti division por cero, fechas invertidas).
+  const validarTodo = (): FormErrors => {
+    const errors: FormErrors = {};
+    const cmaNum = num(cma);
+    // Res CRA 825/2017 Art. 15: validarCmaMinimo THROWs si CMA < minimo.
+    try {
+      validarCmaMinimo(cmaNum, 'acueducto');
+    } catch (e) {
+      errors.cma = (e as Error).message;
+    }
+    // Suscriptores debe ser > 0 (defensa anti division por cero).
+    if (entero(suscriptoresPromedio) <= 0) {
+      errors.suscriptores = 'Suscriptores debe ser > 0';
+    }
+    // Vigente desde NO puede ser posterior a vigente hasta.
+    if (
+      vigenteDesde !== '' &&
+      vigenteHasta !== '' &&
+      vigenteDesde > vigenteHasta
+    ) {
+      errors.vigenteHasta = 'Vigente hasta debe ser posterior a vigente desde';
+    }
+    return errors;
+  };
+
   // D2 (parametros-tarifa-impeccable-v2 Commit 2): construimos el shape
   // de FormValues UNA vez por render. Reusado por `guardar()` y el
   // `useMemo` del card ResumenCargos (live preview).
@@ -368,6 +401,16 @@ export default function ParametrosTarifaForm({
   const guardar = async () => {
     if (repo === null) {
       Alert.alert('Error', 'El repositorio aún no está listo. Esperá un instante.');
+      return;
+    }
+    // D4 (Commit 3): validación inline ANTES de persistir.
+    // Si hay errores, NO se llama repo.guardar; el state `errores`
+    // se setea para que los FormFields los muestren inline.
+    const errors = validarTodo();
+    setErrores(errors);
+    if (Object.keys(errors).length > 0) {
+      // D8: scroll al primer error en orden jerarquico.
+      scrollToFirstError(scrollRef, errors, getRef);
       return;
     }
     setGuardando(true);
@@ -428,6 +471,17 @@ export default function ParametrosTarifaForm({
   // (no en cada render). useNavigation de @react-navigation/native
   // retorna un objeto estable mientras la pantalla este montada.
   const navigation = useNavigation();
+
+  // D8 (Commit 3): scroll-to-first-error. Map de refs por campo.
+  // Cada FormField con error potencial recibe `ref={getRef(key)}` para
+  // que `scrollToFirstError` pueda scrollear al primero.
+  type CampoConError = 'cma' | 'suscriptores' | 'vigenteHasta';
+  const { getRef } = useFormFieldRefs<CampoConError>();
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Estado de errores de validación inline. Cada FormField con error
+  // potencial consume `errores.cma | suscriptores | vigenteHasta`.
+  const [errores, setErrores] = useState<FormErrors>({});
 
   return (
     <ScrollView
@@ -502,6 +556,8 @@ export default function ParametrosTarifaForm({
             selectable
             tabularNums
             accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
+            error={errores.vigenteHasta}
+            ref={getRef('vigenteHasta')}
             testID="param-vigente-hasta"
           />
         </View>
@@ -518,14 +574,17 @@ export default function ParametrosTarifaForm({
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
+            error={errores.cma}
+            ref={getRef('cma')}
             testID="param-cma"
           />
         </View>
-        {num(cma) < CMA_MINIMO_ACUEDUCTO && (
-          <Text style={estilos.warningCma} testID="param-cma-warning">
-            CMA bajo el minimo normativo (Res CRA 825 Art. 15): minimo acueducto = ${CMA_MINIMO_ACUEDUCTO}, alcantarillado = ${CMA_MINIMO_ALCANTARILLADO}. Recomendamos ajustar antes de guardar.
-          </Text>
-        )}
+        {/* El warning inline `param-cma-warning` se elimino en Commit 3.
+            Ahora el error de CMA bajo el minimo normativo aparece
+            inline en el FormField via `error={errores.cma}` (FormField
+            propaga su `error` a un TextInput con border rojo y texto
+            debajo del campo). Migrar este test si rompe: T-DESIGN-3 o
+            tests viejos que busquen `param-cma-warning` ya no aplican. */}
         <View style={estilos.campo}>
           <FormField
             label="CMO · Costo Medio Operación ($/m³)"
@@ -636,6 +695,8 @@ export default function ParametrosTarifaForm({
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
+            error={errores.suscriptores}
+            ref={getRef('suscriptores')}
             testID="param-suscriptores"
           />
         </View>

@@ -491,6 +491,146 @@ fireEvent.press(back);
   });
 
   // ─────────────────────────────────────────────────────────────
+  // T-IMPC-9..13 (Commit 3): validación inline + scroll-to-first-error.
+  // ─────────────────────────────────────────────────────────────
+  describe('T-IMPC: validación inline pre-save + scroll-to-first-error (Commit 3)', () => {
+    it('T-IMPC-9 CMA bajo mínimo normativo bloquea guardar con error inline + scroll-to-first', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, queryByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // CMA=2000 < minimo 2890 (acueducto) → validarCmaMinimo throws.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '2000');
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // El repo NO se invoca.
+      expect(repo.guardar).not.toHaveBeenCalled();
+      // El mensaje de error de CMA aparece en el árbol (proveniente del
+      // `validarCmaMinimo` throw — contiene "CMA" + "normativo" + "mínimo").
+      await waitFor(() => {
+        expect(queryByText(/CMA.*normativo/i)).toBeTruthy();
+      });
+    });
+
+    it('T-IMPC-10 suscriptores=0 bloquea guardar con error inline', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // suscriptores=0 → division por cero. La validación debe bloquear.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '0');
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      expect(repo.guardar).not.toHaveBeenCalled();
+    });
+
+    it('T-IMPC-11 vigente_desde > vigente_hasta bloquea guardar con error inline', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId, queryByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Fechas invertidas + CMA valido.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+        fireEvent.changeText(getByTestId('param-vigente-desde'), '2030-01-01');
+        fireEvent.changeText(getByTestId('param-vigente-hasta'), '2025-01-01');
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      expect(repo.guardar).not.toHaveBeenCalled();
+      // El mensaje de error de fechas invertidas aparece en el árbol.
+      await waitFor(() => {
+        expect(queryByText(/Vigente hasta debe ser posterior/i)).toBeTruthy();
+      });
+    });
+
+    it('T-IMPC-12 inputs válidos permiten guardar (repo.guardar invocado 1 vez + Alert.exito)', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+      expect(alertSpy).toHaveBeenCalled();
+      const titulo = (alertSpy.mock.calls[0]?.[0] as string) ?? '';
+      expect(titulo).toBe('Éxito');
+      alertSpy.mockRestore();
+    });
+
+    it('T-IMPC-13 validarCmaMinimo del dominio se invoca (no bypass inline)', () => {
+      // El screen debe importar y usar `validarCmaMinimo()` del dominio
+      // para validar el CMA, NO una comparación inline `num(cma) < 2890`.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // Importación del dominio.
+      expect(source).toMatch(/validarCmaMinimo/);
+      // Invocación dentro de un try/catch (D4 hallazgo critico).
+      expect(source).toMatch(/try\s*\{[^}]*validarCmaMinimo/s);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
   // T-IMPC-4..8 (Commit 2): ResumenCargos + SwitchFila + live update.
   // ─────────────────────────────────────────────────────────────
   describe('T-IMPC: ResumenCargos live preview + SwitchFila (Commit 2)', () => {
@@ -778,6 +918,17 @@ fireEvent.press(back);
         />,
       );
 
+      // Commit 3 (parametros-tarifa-impeccable-v2): validación inline
+      // pre-save requiere CMA >= 2890 (acueducto) y N > 0. Inyectamos
+      // valores válidos para que `guardar()` llegue a `repo.guardar`.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
+
       // El BotonPrimario recibe testID='param-guardar' en su Pressable.
       const boton = getByTestId('param-guardar');
       await act(async () => {
@@ -785,7 +936,9 @@ fireEvent.press(back);
       });
 
       // Una sola llamada a repo.guardar.
-      expect(repo.guardar).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('T-PT-GUARDAR-2 el payload a repo.guardar incluye los cargos pre-calculados (cargo_fijo_resultante, cargo_consumo_resultante)', async () => {
@@ -843,7 +996,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
-
+      // Commit 3: validación inline requiere inputs válidos.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
@@ -871,7 +1031,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
-
+      // Commit 3: validación inline requiere inputs válidos.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
@@ -1610,6 +1777,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
+      // Commit 3: validación inline requiere CMA >= 2890 + N > 0.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
@@ -1649,6 +1824,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
+      // Commit 3: validación inline requiere inputs válidos.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
@@ -1688,6 +1871,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
+      // Commit 3: validación inline requiere inputs válidos.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
@@ -1732,6 +1923,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
+      // Commit 3: validación inline requiere inputs válidos.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
@@ -1774,6 +1973,14 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
+      // Commit 3: validación inline requiere inputs válidos.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+      });
       await act(async () => {
         fireEvent.press(getByTestId('param-guardar'));
       });
