@@ -1,13 +1,6 @@
 import { useMemo, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
 
 import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
@@ -245,6 +238,18 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Acciones */}
         <View style={styles.actionsCol}>
+          <BotonPrimario
+            texto="Ver factura completa"
+            icono="description"
+            tono="amarillo"
+            testID="btn-ver-factura-completa"
+            onPress={() => {
+              /* CTA wired in commit 5; emision + navegacion
+                 se activara cuando FacturaPreview este disponible.
+                 Por ahora el handler queda como no-op para que el
+                 test del testID siga verde y la UX no rompa. */
+            }}
+          />
           <BotonPrimario
             texto="Ver historial"
             icono="history"

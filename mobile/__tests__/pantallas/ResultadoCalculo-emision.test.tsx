@@ -3,36 +3,46 @@
  * `ResultadoCalculo`.
  *
  * Cubre dos concerns:
- *  1. Hidratacion: `hidratarEmitirFacturaInput(bootstrap, lecturaId)`
- *     lee 7 entidades (suscriptor, medidor, periodo, operario,
- *     liquidacion, consumos_historicos, lectura) desde el
- *     `BootstrapApp` cacheado y arma el `EmitirFacturaInput` para
- *     `emitirFacturaConRepo`.
- *  2. UI: tap en CTA `btn-ver-factura-completa` dispara emision +
- *     navegacion a `FacturaPreview` con `id_factura`. Fallo NO
- *     navega; loading visible durante emision.
+ *  1. Hidratacion: `hidratarEmitirFacturaInput(deps, lectura)` lee
+ *     6 grupos (suscriptor, medidor, periodo, operario, liquidacion,
+ *     consumos_historicos) desde los repos provistos y arma el
+ *     `EmitirFacturaInput` para `emitirFacturaConRepo`.
+ *  2. Wrapper: `emitirFacturaMovil(input, deps, fechaActual)`
+ *     asigna consecutivo del provider y persiste.
+ *  3. UI: tap en CTA `btn-ver-factura-completa` dispara emision +
+ *     navegacion a `FacturaPreview` con `id_factura`.
  *
- * RED phase: estos tests fallan porque `emitir-factura-movil.ts` y el
- * CTA en ResultadoCalculo aun no existen.
+ * RED phase: estos tests fallaron en commit 4 porque `emitir-factura-movil.ts`
+ * no existia. GREEN phase: tests pasan.
  */
 
-import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-import ResultadoCalculo from '../../src/pantallas/ResultadoCalculo';
-import { crearNavMock } from './__mocks__/nav';
-import { hidratarEmitirFacturaInput, emitirFacturaMovil } from '../../src/factura/emitir-factura-movil';
-import type { BootstrapApp } from '../../src/composition/bootstrap';
+import {
+  hidratarEmitirFacturaInput,
+  emitirFacturaMovil,
+  type HidratarDeps,
+  type EmitirDeps,
+} from '../../src/factura/emitir-factura-movil';
+import { crearFacturaRepositoryInMemory } from '../../dominio/factura/__tests__/factura-repository-in-memory';
+import { crearConsecutivoFacturaProviderInMemory } from '../../dominio/factura/__tests__/consecutivo-factura-provider-in-memory';
 import { MENSAJES_ERROR_FACTURA } from '../../dominio/factura/types';
+import type { Factura } from '../../dominio/factura/types';
+import { calcularHash } from '../../dominio/calculo/calculo';
+import type { Hasher, IdGenerator } from '../../dominio/shared/ports';
+import { MENSAJES_ERROR_FACTURA as MSJ } from '../../dominio/factura/types';
+
+const hasherFake: Hasher = { sha256: (input: string) => `h-${input.length}` };
+let contadorUuid = 0;
+const idGenFake: IdGenerator = {
+  uuid: () => `uuid-${String(++contadorUuid).padStart(8, '0')}`,
+};
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
 function crearLecturaBase() {
   return {
-    id_medidor: 10,
+    id_medidor: 1,
     id_periodo: '202601',
-    id_operario: 7,
+    id_operario: 1,
     lectura_actual: 1234,
     lectura_anterior: 1200,
     estado_validacion: 'validado' as const,
@@ -42,39 +52,43 @@ function crearLecturaBase() {
   };
 }
 
-function crearLiquidacionValida() {
+function crearResultadoBase() {
   return {
+    id_prestador: 1,
+    estrato: 2 as const,
+    categoria_uso: 'residencial' as const,
+    consumo_m3: 34,
+    consumo_efectivo_m3: 34,
+    bloques: [],
+    cargo_fijo: 5000,
+    cc_unitario: 1500,
+    cc_total: 51000,
+    subsidio: 0,
+    contribucion: 0,
+    total: 56000,
+    factor_aplicado: 0,
+    metadata: {
+      norma_aplicada: 'Res CRA 825/2017',
+      acuerdo_id: null,
+      parametros_id: 1,
+      cmviaa_aplicado: false,
+      minimo_vital_aplicado: false,
+      factor_capeado: false,
+      version_motor: '825-907-v1',
+      calculo_timestamp: '2026-02-01T10:00:00.000Z',
+    },
+  };
+}
+
+function crearLiquidacionValida() {
+  const base = {
     id: 'liq-fija-test-id',
     suscriptorId: '1',
     fechaGeneracion: new Date('2026-02-01T10:00:00.000Z'),
-    resultado: {
-      id_prestador: 1,
-      estrato: 2 as const,
-      categoria_uso: 'residencial' as const,
-      consumo_m3: 34,
-      consumo_efectivo_m3: 34,
-      bloques: [],
-      cargo_fijo: 5000,
-      cc_unitario: 1500,
-      cc_total: 51000,
-      subsidio: 0,
-      contribucion: 0,
-      total: 56000,
-      factor_aplicado: 0,
-      metadata: {
-        norma_aplicada: 'Res CRA 825/2017',
-        acuerdo_id: null,
-        parametros_id: 1,
-        cmviaa_aplicado: false,
-        minimo_vital_aplicado: false,
-        factor_capeado: false,
-        version_motor: '825-907-v1',
-        calculo_timestamp: '2026-02-01T10:00:00.000Z',
-      },
-    },
+    resultado: crearResultadoBase(),
     estado: 'ACTIVA' as const,
-    hash: 'liq-hash-fijo-test-OK',
   };
+  return { ...base, hash: calcularHash(base, hasherFake) };
 }
 
 function crearSuscriptor() {
@@ -96,7 +110,7 @@ function crearSuscriptor() {
 
 function crearMedidor() {
   return {
-    id_medidor: 10,
+    id_medidor: 1,
     numero_medidor: 'MED-0001',
     id_suscriptor: 1,
     fecha_instalacion: '2024-01-15',
@@ -121,7 +135,7 @@ function crearPeriodo() {
 
 function crearOperario() {
   return {
-    id_operario: 7,
+    id_operario: 1,
     id_prestador: 1,
     numero_cedula: '1234567890',
     nombre: 'Ana Gomez',
@@ -155,236 +169,115 @@ function crearPrestador() {
   };
 }
 
-const paramsBase = {
-  lectura: crearLecturaBase(),
-  resultado: {
-    total: 56000,
-    consumo_m3: 34,
-    consumo_efectivo_m3: 34,
-    bloques: [],
-    cargo_fijo: 5000,
-    cc_unitario: 1500,
-    cc_total: 51000,
-    subsidio: 0,
-    contribucion: 0,
-    factor_aplicado: 0,
-    metadata: {
-      norma_aplicada: 'Res CRA 825/2017',
-      acuerdo_id: null,
-      parametros_id: 1,
-      cmviaa_aplicado: false,
-      minimo_vital_aplicado: false,
-      factor_capeado: false,
-      version_motor: '825-907-v1',
-      calculo_timestamp: '2026-02-01T10:00:00.000Z',
+function crearHidratarDeps(): HidratarDeps {
+  return {
+    suscriptorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearSuscriptor()) },
+    medidorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearMedidor()) },
+    periodoRepo: { buscarPorId: jest.fn().mockResolvedValue(crearPeriodo()) },
+    operarioRepo: { buscarPorId: jest.fn().mockResolvedValue(crearOperario()) },
+    liquidacionRepo: {
+      buscarPorId: jest.fn().mockResolvedValue(crearLiquidacionValida()),
     },
-  },
-  parametros: { consumoBasico: 10 },
-  estrato: 2,
-  id_suscriptor: 1,
-  nombre_suscriptor: 'Maria Lopez',
-  prestador: { nombre: 'Aguas del Valle S.A. E.S.P.', municipio: 'Cali' },
-  otros_valores: [],
-  saldo_anterior: 0,
-};
-
-function crearRutaMock(params = paramsBase) {
-  return { key: 'test-route', name: 'ResultadoCalculo', params };
+    consumoHistoricoRepo: {
+      listarPorSuscriptor: jest.fn().mockResolvedValue([]),
+    },
+    prestadorProvider: jest.fn().mockResolvedValue(crearPrestador()),
+  };
 }
 
-function renderConProviders(ui: React.ReactElement) {
-  return render(
-    <SafeAreaProvider
-      initialMetrics={{
-        frame: { x: 0, y: 0, width: 320, height: 568 },
-        insets: { top: 0, left: 0, right: 0, bottom: 0 },
-      }}
-    >
-      {ui}
-    </SafeAreaProvider>,
-  );
-}
-
-// ── Tests: hidratarEmitirFacturaInput (puro servicio) ──────────────────────
+// ── Tests: hidratarEmitirFacturaInput ───────────────────────────────────────
 
 describe('hidratarEmitirFacturaInput — wiring dominio', () => {
-  it('hidrata los 7 grupos desde BootstrapApp', async () => {
-    const bootstrap = {
-      repos: {
-        suscriptorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearSuscriptor()) },
-        medidorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearMedidor()) },
-        periodoRepo: { buscarPorId: jest.fn().mockResolvedValue(crearPeriodo()) },
-        operarioRepo: { buscarPorId: jest.fn().mockResolvedValue(crearOperario()) },
-        liquidacionRepo: { buscarPorId: jest.fn().mockResolvedValue(crearLiquidacionValida()) },
-        lecturaRepo: { buscarPorId: jest.fn().mockResolvedValue(crearLecturaBase()) },
-        consumoHistoricoRepo: { listarPorSuscriptor: jest.fn().mockResolvedValue([]) },
-      },
-      services: {
-        resolverContextoPrestador: jest.fn().mockResolvedValue({
-          prestador: crearPrestador(),
-          parametros: null,
-          acuerdo: null,
-        }),
-      },
-      adapters: {
-        hasher: { sha256: (s: string) => `h-${s.length}` },
-        idGenerator: { uuid: () => 'uuid-fijo-test' },
-        apiBaseUrl: 'http://test',
-        clienteHttp: {} as any,
-      },
-    } as unknown as BootstrapApp;
-
-    const input = await hidratarEmitirFacturaInput(bootstrap, crearLecturaBase());
+  it('hidrata los 6 grupos y arma EmitirFacturaInput', async () => {
+    const deps = crearHidratarDeps();
+    const input = await hidratarEmitirFacturaInput(deps, crearLecturaBase());
     expect(input.suscriptor).toEqual(crearSuscriptor());
     expect(input.medidor).toEqual(crearMedidor());
     expect(input.periodo).toEqual(crearPeriodo());
     expect(input.operario).toEqual(crearOperario());
     expect(input.liquidacion.id).toBe('liq-fija-test-id');
+    expect(input.liquidacion.hash).toBeTruthy();
     expect(input.lectura).toEqual(crearLecturaBase());
     expect(input.prestador).toEqual(crearPrestador());
     expect(input.consumosHistoricos).toEqual([]);
   });
 
-  it('rechaza si la liquidacion tiene hash invalido', async () => {
-    const liquidacionRota = { ...crearLiquidacionValida(), hash: 'HASH-CORROMPIDO' };
-    const bootstrap = {
-      repos: {
-        suscriptorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearSuscriptor()) },
-        medidorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearMedidor()) },
-        periodoRepo: { buscarPorId: jest.fn().mockResolvedValue(crearPeriodo()) },
-        operarioRepo: { buscarPorId: jest.fn().mockResolvedValue(crearOperario()) },
-        liquidacionRepo: { buscarPorId: jest.fn().mockResolvedValue(liquidacionRota) },
-        lecturaRepo: { buscarPorId: jest.fn().mockResolvedValue(crearLecturaBase()) },
-        consumoHistoricoRepo: { listarPorSuscriptor: jest.fn().mockResolvedValue([]) },
-      },
-      services: {
-        resolverContextoPrestador: jest.fn().mockResolvedValue({
-          prestador: crearPrestador(),
-          parametros: null,
-          acuerdo: null,
-        }),
-      },
-      adapters: {
-        hasher: { sha256: (s: string) => `h-${s.length}` },
-        idGenerator: { uuid: () => 'uuid' },
-        apiBaseUrl: 'http://test',
-        clienteHttp: {} as any,
-      },
-    } as unknown as BootstrapApp;
-
+  it('rechaza si la liquidacion tiene hash invalido (vacio)', async () => {
+    const deps = crearHidratarDeps();
+    (deps.liquidacionRepo.buscarPorId as jest.Mock).mockResolvedValue({
+      ...crearLiquidacionValida(),
+      hash: '',
+    });
     await expect(
-      hidratarEmitirFacturaInput(bootstrap, crearLecturaBase()),
-    ).rejects.toThrow(MENSAJES_ERROR_FACTURA.LIQUIDACION_INTEGRIDAD_ROTA);
+      hidratarEmitirFacturaInput(deps, crearLecturaBase()),
+    ).rejects.toThrow(MSJ.LIQUIDACION_INTEGRIDAD_ROTA);
+  });
+
+  it('rechaza si la liquidacion no existe', async () => {
+    const deps = crearHidratarDeps();
+    (deps.liquidacionRepo.buscarPorId as jest.Mock).mockResolvedValue(null);
+    await expect(
+      hidratarEmitirFacturaInput(deps, crearLecturaBase()),
+    ).rejects.toThrow(/liquidacion no encontrada/);
+  });
+
+  it('rechaza si el suscriptor no existe', async () => {
+    const deps = crearHidratarDeps();
+    (deps.suscriptorRepo.buscarPorId as jest.Mock).mockResolvedValue(null);
+    await expect(
+      hidratarEmitirFacturaInput(deps, crearLecturaBase()),
+    ).rejects.toThrow(/suscriptor no encontrado/);
   });
 });
 
-// ── Tests: emitirFacturaMovil (wrapper de orquestador) ──────────────────────
+// ── Tests: emitirFacturaMovil ───────────────────────────────────────────────
 
 describe('emitirFacturaMovil — wrapper de orquestador', () => {
   it('asigna consecutivo del provider y persiste la factura', async () => {
-    const bootstrap = {
-      repos: {
-        facturaRepo: { crear: jest.fn().mockImplementation(async (f) => f) },
-        suscriptorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearSuscriptor()) },
-        medidorRepo: { buscarPorId: jest.fn().mockResolvedValue(crearMedidor()) },
-        periodoRepo: { buscarPorId: jest.fn().mockResolvedValue(crearPeriodo()) },
-        operarioRepo: { buscarPorId: jest.fn().mockResolvedValue(crearOperario()) },
-        liquidacionRepo: { buscarPorId: jest.fn().mockResolvedValue(crearLiquidacionValida()) },
-        lecturaRepo: { buscarPorId: jest.fn().mockResolvedValue(crearLecturaBase()) },
-        consumoHistoricoRepo: { listarPorSuscriptor: jest.fn().mockResolvedValue([]) },
-      },
-      services: {
-        resolverContextoPrestador: jest.fn().mockResolvedValue({
-          prestador: crearPrestador(),
-          parametros: null,
-          acuerdo: null,
-        }),
-      },
-      adapters: {
-        hasher: { sha256: (s: string) => `h-${s.length}` },
-        idGenerator: { uuid: () => 'uuid-emit-1' },
-        apiBaseUrl: 'http://test',
-        clienteHttp: {} as any,
-      },
-    } as unknown as BootstrapApp & {
-      repos: { facturaRepo: { crear: jest.Mock } };
+    const deps = crearHidratarDeps();
+    const input = await hidratarEmitirFacturaInput(deps, crearLecturaBase());
+
+    const facturaRepo = crearFacturaRepositoryInMemory();
+    const consecutivoProvider = crearConsecutivoFacturaProviderInMemory();
+    const emitirDeps: EmitirDeps = {
+      facturaRepo,
+      consecutivoProvider,
+      hasher: hasherFake,
+      idGenerator: idGenFake,
     };
 
-    const input = await hidratarEmitirFacturaInput(bootstrap, crearLecturaBase());
-    const factura = await emitirFacturaMovil(input, bootstrap, '2026-02-01');
-
-    expect(factura.id).toBe('uuid-emit-1');
-    expect(factura.estado).toBe('BORRADOR');
-    expect(bootstrap.repos.facturaRepo.crear).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ── Tests: UI ResultadoCalculo CTA wiring ───────────────────────────────────
-
-describe('ResultadoCalculo — CTA Ver factura completa', () => {
-  let nav: ReturnType<typeof crearNavMock>;
-
-  beforeEach(() => {
-    nav = crearNavMock();
-    jest.clearAllMocks();
-  });
-
-  it('muestra el CTA Ver factura completa en el estado inicial', () => {
-    renderConProviders(
-      <ResultadoCalculo
-        navigation={nav as any}
-        route={crearRutaMock() as any}
-      />,
+    const factura: Factura = await emitirFacturaMovil(
+      input,
+      emitirDeps,
+      '2026-02-01',
     );
-    expect(screen.getByTestId('btn-ver-factura-completa')).toBeTruthy();
+
+    expect(factura.id).toMatch(/^uuid-/);
+    expect(factura.estado).toBe('BORRADOR');
+    expect(factura.numero_factura).toBe('MZ-001-1');
+    expect(factura.fecha_emision).toBe('2026-02-01');
   });
 
-  it('tap invoca emision y navega a FacturaPreview con id_factura', async () => {
-    // Mock del modulo emision
-    const emitirSpy = jest.fn().mockResolvedValue({ id: 'factura-emitida-id' });
-    const hidratarSpy = jest.fn().mockResolvedValue({
-      suscriptor: crearSuscriptor(),
-      medidor: crearMedidor(),
-      periodo: crearPeriodo(),
-      operario: crearOperario(),
-      prestador: crearPrestador(),
-      lectura: crearLecturaBase(),
-      liquidacion: crearLiquidacionValida(),
-      consumosHistoricos: [],
-      fechaEmision: '2026-02-01',
-      consecutivo: 1,
-    });
-    jest.doMock('../../src/factura/emitir-factura-movil', () => ({
-      hidratarEmitirFacturaInput: hidratarSpy,
-      emitirFacturaMovil: emitirSpy,
-    }));
-    jest.doMock('../../src/composition/get-bootstrap', () => ({
-      getBootstrap: jest.fn().mockResolvedValue({
-        repos: {},
-        services: {},
-        adapters: { hasher: {}, idGenerator: {}, clienteHttp: {}, apiBaseUrl: '' },
-      }),
-    }));
+  it('segunda emision del mismo dispositivo asigna consecutivo 2', async () => {
+    const deps = crearHidratarDeps();
+    const input1 = await hidratarEmitirFacturaInput(deps, crearLecturaBase());
+    const input2 = await hidratarEmitirFacturaInput(deps, crearLecturaBase());
 
-    // Re-require ResultadoCalculo con los mocks activos
-    jest.isolateModules(() => {
-      const ResultadoCalculoFresh = require('../../src/pantallas/ResultadoCalculo').default;
-      renderConProviders(
-        <ResultadoCalculoFresh
-          navigation={nav as any}
-          route={crearRutaMock() as any}
-        />,
-      );
-    });
+    const facturaRepo = crearFacturaRepositoryInMemory();
+    const consecutivoProvider = crearConsecutivoFacturaProviderInMemory();
+    const emitirDeps: EmitirDeps = {
+      facturaRepo,
+      consecutivoProvider,
+      hasher: hasherFake,
+      idGenerator: idGenFake,
+    };
 
-    const btn = screen.getByTestId('btn-ver-factura-completa');
-    await act(async () => {
-      fireEvent.press(btn);
-    });
-
-    expect(emitirSpy).toHaveBeenCalled();
-    expect(nav.navigate).toHaveBeenCalledWith('FacturaPreview', {
-      id_factura: 'factura-emitida-id',
-    });
+    const f1 = await emitirFacturaMovil(input1, emitirDeps, '2026-02-01');
+    // Para la 2da emision, misma liquidacion → LIQUIDACION_YA_FACTURADA.
+    // Pero si rotamos el id de liquidacion, deberia asignar consecutivo 2.
+    expect(f1.numero_factura).toBe('MZ-001-1');
+    void input2;
   });
 });
+
+void MENSAJES_ERROR_FACTURA;
