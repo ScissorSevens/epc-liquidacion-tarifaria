@@ -65,31 +65,56 @@ function renderConProviders(ui: React.ReactElement) {
 
 // ── Adapter mock ───────────────────────────────────────────────────────────
 
-const mockAdapter = {
-  id: 'mock-adapter',
-  transporte: 'BLE' as const,
-  estado: jest.fn(() => 'lista' as const),
-  escanear: jest.fn().mockResolvedValue([impresoraBle, impresoraSpp]),
-  emparejar: jest.fn().mockResolvedValue(undefined),
-  conectar: jest.fn().mockResolvedValue(undefined),
-  imprimir: jest.fn().mockResolvedValue(undefined),
-  obtenerCapacidades: jest.fn().mockResolvedValue({
-    soportaCorte: false,
-    soportaCodigoBarras: false,
-    soportaDobleAncho: true,
-    anchoMaximo: 32,
-    codePage: 'PC437',
-  }),
-  desconectar: jest.fn().mockResolvedValue(undefined),
-};
-
-jest.mock('../../src/adapters/impresion/factory', () => ({
-  obtenerAdaptadores: jest.fn().mockResolvedValue([
-    { adapter: mockAdapter, cargaLazyOk: true },
-  ]),
-  __setearAdaptadoresPrueba: jest.fn(),
-  __resetearAdaptadoresPrueba: jest.fn(),
-}));
+jest.mock('../../src/adapters/impresion/factory', () => {
+  const mockEscanear = jest.fn().mockResolvedValue([
+    {
+      id: 'AA:BB:CC:DD:EE:FF',
+      nombre: 'EPSON T58',
+      transporte: 'BLE',
+      direccion: 'AA:BB:CC:DD:EE:FF',
+      anchoPapel: '58mm',
+      estado: 'disponible',
+    },
+    {
+      id: '00:11:22:33:44:55',
+      nombre: 'Xprinter XP-58',
+      transporte: 'SPP',
+      direccion: '00:11:22:33:44:55',
+      anchoPapel: '58mm',
+      estado: 'disponible',
+    },
+  ]);
+  const mockEmparejar = jest.fn().mockResolvedValue(undefined);
+  const mockConectar = jest.fn().mockResolvedValue(undefined);
+  const mockAdapter = {
+    id: 'mock-adapter',
+    transporte: 'BLE' as const,
+    estado: jest.fn(() => 'lista' as const),
+    escanear: mockEscanear,
+    emparejar: mockEmparejar,
+    conectar: mockConectar,
+    imprimir: jest.fn().mockResolvedValue(undefined),
+    obtenerCapacidades: jest.fn().mockResolvedValue({
+      soportaCorte: false,
+      soportaCodigoBarras: false,
+      soportaDobleAncho: true,
+      anchoMaximo: 32,
+      codePage: 'PC437',
+    }),
+    desconectar: jest.fn().mockResolvedValue(undefined),
+  };
+  return {
+    obtenerAdaptadores: jest.fn().mockResolvedValue([
+      { adapter: mockAdapter, cargaLazyOk: true },
+    ]),
+    __setearAdaptadoresPrueba: jest.fn(),
+    __resetearAdaptadoresPrueba: jest.fn(),
+    // Test seams para spy
+    __mockEscanear: mockEscanear,
+    __mockEmparejar: mockEmparejar,
+    __mockConectar: mockConectar,
+  };
+});
 
 jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn().mockResolvedValue(undefined),
@@ -105,14 +130,21 @@ jest.mock('../../src/persistencia/impresoras-preferencias', () => ({
   invalidarPreferencias: jest.fn().mockResolvedValue(undefined),
 }));
 
-// ── Tests ──────────────────────────────────────────────────────────────────
+beforeEach(() => {
+  jest.clearAllMocks();
+  // Restaurar comportamiento default del mock factory (los jest.fn
+  // creados en jest.mock son compartidos entre tests).
+  const factoryMod = require('../../src/adapters/impresion/factory');
+  factoryMod.__mockEscanear.mockResolvedValue([impresoraBle, impresoraSpp]);
+  factoryMod.__mockEmparejar.mockResolvedValue(undefined);
+  factoryMod.__mockConectar.mockResolvedValue(undefined);
+});
 
 describe('SeleccionarImpresora — scan', () => {
   let nav: ReturnType<typeof crearNavMock>;
 
   beforeEach(() => {
     nav = crearNavMock();
-    jest.clearAllMocks();
   });
 
   it('estado inicial muestra dispositivos encontrados del adapter', async () => {
@@ -152,7 +184,6 @@ describe('SeleccionarImpresora — pair + connect', () => {
 
   beforeEach(() => {
     nav = crearNavMock();
-    jest.clearAllMocks();
   });
 
   it('tap en dispositivo invoca emparejar + conectar + persistir + goBack', async () => {
@@ -165,17 +196,19 @@ describe('SeleccionarImpresora — pair + connect', () => {
     await waitFor(() => {
       expect(screen.getByTestId(`dispositivo-${impresoraBle.id}`)).toBeTruthy();
     });
+    const factoryMod = require('../../src/adapters/impresion/factory');
     const item = screen.getByTestId(`dispositivo-${impresoraBle.id}`);
     await act(async () => {
       fireEvent.press(item);
     });
-    expect(mockAdapter.emparejar).toHaveBeenCalledWith(impresoraBle);
-    expect(mockAdapter.conectar).toHaveBeenCalledWith(impresoraBle.direccion);
+    expect(factoryMod.__mockEmparejar).toHaveBeenCalledWith(impresoraBle);
+    expect(factoryMod.__mockConectar).toHaveBeenCalledWith(impresoraBle.direccion);
     expect(nav.goBack).toHaveBeenCalled();
   });
 
   it('conexion fallida muestra mensaje y NO navega', async () => {
-    mockAdapter.conectar.mockRejectedValueOnce(
+    const factoryMod = require('../../src/adapters/impresion/factory');
+    factoryMod.__mockConectar.mockRejectedValueOnce(
       new ExcepcionImpresora({
         codigo: 'CONEXION_FALLIDA',
         direccion: impresoraBle.direccion,
@@ -206,11 +239,11 @@ describe('SeleccionarImpresora — permisos', () => {
 
   beforeEach(() => {
     nav = crearNavMock();
-    jest.clearAllMocks();
   });
 
   it('si adapter rechaza con PERMISO_DENEGADO muestra CTA Configurar permisos', async () => {
-    mockAdapter.escanear.mockRejectedValueOnce(
+    const factoryMod = require('../../src/adapters/impresion/factory');
+    factoryMod.__mockEscanear.mockRejectedValue(
       new ExcepcionImpresora({
         codigo: 'PERMISO_DENEGADO',
         transporte: 'BLE',

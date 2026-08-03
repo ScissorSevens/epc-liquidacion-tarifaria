@@ -10,7 +10,7 @@ import Historial from '../../pantallas/Historial';
 import ImportarCsv from '../../pantallas/ImportarCsv';
 import ListaSuscriptores from '../../pantallas/ListaSuscriptores';
 import ResultadoCalculo from '../../pantallas/ResultadoCalculo';
-import SeleccionarImpresoraPlaceholder from '../../pantallas/SeleccionarImpresoraPlaceholder';
+import SeleccionarImpresora from '../../pantallas/SeleccionarImpresora';
 import type { LecturasStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<LecturasStackParamList>();
@@ -31,7 +31,7 @@ export default function LecturasStack() {
       />
       <Stack.Screen
         name="SeleccionarImpresora"
-        component={SeleccionarImpresoraPlaceholder}
+        component={SeleccionarImpresora}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="AltaSuscriptor" component={AltaSuscriptor} />

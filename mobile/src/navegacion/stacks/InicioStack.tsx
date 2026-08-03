@@ -6,7 +6,7 @@ import EditarSuscriptor from '../../pantallas/EditarSuscriptor';
 import FacturaPreviewScreen from '../../pantallas/FacturaPreviewScreen';
 import ResultadoCalculo from '../../pantallas/ResultadoCalculo';
 import RutaDeHoy from '../../pantallas/RutaDeHoy';
-import SeleccionarImpresoraPlaceholder from '../../pantallas/SeleccionarImpresoraPlaceholder';
+import SeleccionarImpresora from '../../pantallas/SeleccionarImpresora';
 import type { InicioStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<InicioStackParamList>();
@@ -25,7 +25,7 @@ export default function InicioStack() {
       />
       <Stack.Screen
         name="SeleccionarImpresora"
-        component={SeleccionarImpresoraPlaceholder}
+        component={SeleccionarImpresora}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="EditarSuscriptor" component={EditarSuscriptor} />
