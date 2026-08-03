@@ -55,6 +55,11 @@ import {
   crearConceptoOtroValorRepositoryExpoSqlite,
   type ConceptoOtroValorRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/concepto-otro-valor-repository-expo-sqlite';
+import {
+  crearRepositoriosEmision,
+  type RepositoriosEmision,
+} from './emision-repositories';
+import type { ConsecutivoFacturaProvider } from '../../dominio/factura/types';
 import type { Prestador } from '../../dominio/prestadores';
 import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal';
 import type { ParametrosTarifa } from '../../dominio/parametros-tarifa';
@@ -114,6 +119,12 @@ export interface BootstrapRepos {
   // de verdad para la UI `OtrosValoresFactura`. Inyectado via
   // `getBootstrap().conceptoOtroValorRepo.listar(true)` desde la pantalla.
   readonly conceptoOtroValorRepo: ConceptoOtroValorRepositoryExpoSqlite;
+  // Contexto de emisión móvil. Estos repos mantienen el período, la
+  // liquidación y los consumos que se calculan en la sesión actual hasta que
+  // exista una tabla SQLite dedicada para cada aggregate.
+  readonly periodoRepo: RepositoriosEmision['periodoRepo'];
+  readonly liquidacionRepo: RepositoriosEmision['liquidacionRepo'];
+  readonly consumoHistoricoRepo: RepositoriosEmision['consumoHistoricoRepo'];
 }
 
 export interface BootstrapAdapters {
@@ -130,6 +141,8 @@ export interface BootstrapServices {
    */
   readonly procesadorCola: () => Promise<ResultadoSync>;
   readonly smoke: ResultadoSmokeDominio;
+  /** Provider de consecutivos por dispositivo para emisión offline. */
+  readonly consecutivoProvider?: ConsecutivoFacturaProvider;
   /**
    * Resuelve el contexto multi-tenant del prestador en uso:
    * ParametrosTarifa + AcuerdoMunicipal vigentes. Usado por la UI
@@ -145,6 +158,10 @@ export interface BootstrapServices {
 export interface BootstrapApp {
   readonly db: SQLite.SQLiteDatabase;
   readonly repos: BootstrapRepos;
+  /** Alias directos para los repos de emisión; `repos` sigue siendo la API principal. */
+  readonly periodoRepo: BootstrapRepos['periodoRepo'];
+  readonly liquidacionRepo: BootstrapRepos['liquidacionRepo'];
+  readonly consumoHistoricoRepo: BootstrapRepos['consumoHistoricoRepo'];
   readonly adapters: BootstrapAdapters;
   readonly services: BootstrapServices;
 }
@@ -174,6 +191,15 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const operarioRepo = crearOperarioRepositoryExpoSqlite(db);
   await operarioRepo.inicializar();
   const conceptoOtroValorRepo = crearConceptoOtroValorRepositoryExpoSqlite(db);
+  const reposEmision = crearRepositoriosEmision();
+  const consecutivos = new Map<string, number>();
+  const consecutivoProvider: ConsecutivoFacturaProvider = {
+    async proximo(dispositivoId: string): Promise<number> {
+      const siguiente = (consecutivos.get(dispositivoId) ?? 0) + 1;
+      consecutivos.set(dispositivoId, siguiente);
+      return siguiente;
+    },
+  };
 
   // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
   // de crypto.getRandomValues importado al tope del archivo). Cualquier
@@ -247,7 +273,13 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
       parametrosTarifaRepo,
       operarioRepo,
       conceptoOtroValorRepo,
+      periodoRepo: reposEmision.periodoRepo,
+      liquidacionRepo: reposEmision.liquidacionRepo,
+      consumoHistoricoRepo: reposEmision.consumoHistoricoRepo,
     },
+    periodoRepo: reposEmision.periodoRepo,
+    liquidacionRepo: reposEmision.liquidacionRepo,
+    consumoHistoricoRepo: reposEmision.consumoHistoricoRepo,
     adapters: {
       hasher,
       idGenerator,
@@ -257,6 +289,7 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
     services: {
       procesadorCola,
       smoke,
+      consecutivoProvider,
       resolverContextoPrestador,
     },
   };

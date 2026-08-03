@@ -37,6 +37,9 @@ export function getBootstrap(): Promise<BootstrapApp> {
   return cached;
 }
 
+/** Alias semántico usado por los servicios de aplicación móviles. */
+export const obtenerBootstrap = getBootstrap;
+
 // Test seam: permite a los tests resetear el cache entre casos.
 export function __resetearCacheBootstrap(): void {
   cached = null;
