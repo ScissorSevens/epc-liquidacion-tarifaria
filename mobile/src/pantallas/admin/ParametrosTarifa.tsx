@@ -443,6 +443,7 @@ export default function ParametrosTarifaForm({
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={estilos.root}
       contentContainerStyle={estilos.content}
       contentInsetAdjustmentBehavior="automatic"
