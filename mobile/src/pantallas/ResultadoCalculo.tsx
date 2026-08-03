@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   Platform,
   Pressable,
@@ -8,6 +9,9 @@ import {
   View,
 } from 'react-native';
 
+import { BotonPrimario } from '../componentes/BotonPrimario';
+import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -87,14 +91,17 @@ function formatearFecha(iso: string): string {
  *   placeholder "— (sin evidencia foto)".
  */
 export default function ResultadoCalculo({ navigation, route }: Props) {
-  const { lectura, resultado, parametros, estrato, id_suscriptor } =
+  const { lectura, resultado, parametros, estrato, id_suscriptor, nombre_suscriptor, prestador } =
     route.params;
 
   const [detalleAbierto, setDetalleAbierto] = useState(true);
 
   const subsidioMostrar = resultado.subsidio > 0;
   const contribMostrar = resultado.contribucion > 0;
-  const excedenteMostrar = resultado.consumoExcedente > 0;
+  // En el motor multi-tenant, el "consumo excedente" no se desglosa por bloque.
+  // Mostramos un mensaje informativo cuando el consumo efectivo es > 0
+  // (consumo_efectivo_m3 = consumo_m3 si no aplica mínimo vital).
+  const excedenteMostrar = resultado.consumo_efectivo_m3 > 0;
 
   const fechaTxt = formatearFecha(lectura.timestamp_captura);
   const hashTxt =
@@ -104,44 +111,23 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
   const subtitulo = useMemo(
     () =>
-      `Suscriptor #${id_suscriptor} — Medidor #${lectura.id_medidor} — Periodo ${lectura.id_periodo}`,
-    [id_suscriptor, lectura.id_medidor, lectura.id_periodo],
+      `${prestador?.nombre ?? '—'} (${prestador?.municipio ?? '—'}) — Suscriptor #${id_suscriptor} — Medidor #${lectura.id_medidor} — ${lectura.id_periodo}`,
+    [prestador?.nombre, prestador?.municipio, id_suscriptor, lectura.id_medidor, lectura.id_periodo],
   );
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.popToTop()}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Volver"
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>FACTURA CALCULADA</Text>
-        <Pressable
-          onPress={() => {
-            // Perfil: requiere módulo de autenticación.
-          }}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Cuenta"
-        >
-          <Text style={styles.headerIcon}>◉</Text>
-        </Pressable>
-      </View>
+      {/* Header */}
+      <TopBar
+        titulo="Factura calculada"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Status: círculo + título + subtítulo */}
         <View style={styles.statusBlock}>
-          <View style={styles.checkCircle}>
-            <Text style={styles.checkMark}>✓</Text>
+          <View style={styles.checkCircleContainer}>
+            <MaterialIcons name="check-circle" size={56} color={COLORS.onPrimary} />
           </View>
           <Text style={styles.statusTitle}>Lectura registrada</Text>
           <Text style={styles.statusSub}>
@@ -151,20 +137,20 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         </View>
 
         {/* Bento grid: total + anterior/actual + consumo */}
-        <View style={styles.bentoColFull}>
-          <Text style={styles.bentoLabel}>MONTO TOTAL</Text>
-          <Text style={styles.bentoTotal}>{formatearCOP(resultado.total)}</Text>
+        <View style={[styles.bentoColFull, styles.bentoColFullTotal]}>
+          <Text style={[styles.bentoLabel, styles.bentoLabelTotal]}>Monto total</Text>
+          <Text style={[styles.bentoTotal, styles.bentoTotalBlanco]}>{formatearCOP(resultado.total)}</Text>
         </View>
         <View style={styles.bentoRow}>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>
-            <Text style={styles.bentoLabelSm}>ANTERIOR</Text>
+            <Text style={styles.bentoLabelSm}>Anterior</Text>
             <Text style={styles.bentoMid}>
               {lectura.lectura_anterior}{' '}
               <Text style={styles.bentoUnit}>m³</Text>
             </Text>
           </View>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>
-            <Text style={styles.bentoLabelSm}>ACTUAL</Text>
+            <Text style={styles.bentoLabelSm}>Actual</Text>
             <Text style={styles.bentoMid}>
               {lectura.lectura_actual}{' '}
               <Text style={styles.bentoUnit}>m³</Text>
@@ -173,10 +159,12 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         </View>
         <View style={styles.bentoColFullWhite}>
           <View style={styles.bentoConsumoLeft}>
-            <Text style={styles.bentoConsumoIcon}>◷</Text>
+            <View style={styles.bentoConsumoIconBox}>
+              <MaterialIcons name="speed" size={22} color={COLORS.onSurface} />
+            </View>
             <Text style={styles.bentoConsumoLabel}>Consumo del Periodo</Text>
           </View>
-          <Text style={styles.bentoConsumoVal}>{resultado.consumo} m³</Text>
+            <Text style={styles.bentoConsumoVal}>{resultado.consumo_m3} m³</Text>
         </View>
 
         {/* Detalle colapsable */}
@@ -189,26 +177,22 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             ]}
           >
             <Text style={styles.detalleTitulo}>Detalle de cálculo</Text>
-            <Text style={styles.detalleChevron}>
-              {detalleAbierto ? '▲' : '▼'}
-            </Text>
+            <MaterialIcons
+              name={detalleAbierto ? 'expand-less' : 'expand-more'}
+              size={20}
+              color={COLORS.primary}
+            />
           </Pressable>
           {detalleAbierto && (
             <View style={styles.detalleBody}>
               <FilaDetalle
-                label="Cargo Fijo"
-                valor={formatearCOP(resultado.cargoFijo)}
+                label={`Cargo Fijo (CF = CMA/N)`}
+                valor={formatearCOP(resultado.cargo_fijo)}
               />
               <FilaDetalle
-                label={`Cargo Consumo Básico (${resultado.consumoBasico}m³)`}
-                valor={formatearCOP(resultado.cargoConsumo)}
+                label={`Cargo Consumo (CC unit ${formatearCOP(resultado.cc_unitario)}/m³ × ${resultado.consumo_efectivo_m3}m³)`}
+                valor={formatearCOP(resultado.cc_total)}
               />
-              {excedenteMostrar && (
-                <FilaDetalle
-                  label={`Cargo Excedente (${resultado.consumoExcedente}m³)`}
-                  valor={formatearCOP(resultado.cargoExcedente)}
-                />
-              )}
               {subsidioMostrar && (
                 <FilaDetalle
                   label={`Subsidio (estrato ${estrato})`}
@@ -222,8 +206,13 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
                 />
               )}
               <FilaDetalle
-                label="Umbral básico aplicado"
-                valor={`${parametros.consumoBasico} m³`}
+                label="Norma aplicada"
+                valor={resultado.metadata.norma_aplicada}
+                meta
+              />
+              <FilaDetalle
+                label="Versión motor"
+                valor={resultado.metadata.version_motor}
                 meta
               />
             </View>
@@ -232,57 +221,66 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Acciones */}
         <View style={styles.actionsCol}>
+          <BotonPrimario
+            texto="Ver historial"
+            icono="history"
+            tono="azul"
+            onPress={() => navigation.navigate('Historial', {
+              id_suscriptor,
+              nombre: nombre_suscriptor,
+            })}
+          />
           <Pressable
-            onPress={() => navigation.navigate('Inicio', { screen: 'RutaDeHoy' })}
+            onPress={() =>
+              navigation.replace('CapturarLectura', {
+                id_medidor: lectura.id_medidor,
+                id_suscriptor,
+              })
+            }
             style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
           >
-            <Text style={styles.btnSecondaryText}>VOLVER A LA RUTA</Text>
+            <MaterialIcons name="map" size={20} color={COLORS.primary} />
+            <Text style={styles.btnSecondaryText}>Volver a la ruta</Text>
           </Pressable>
         </View>
 
         {/* Metadata footer */}
         <View style={styles.metaWrap}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>FECHA</Text>
+            <Text style={styles.metaLabel}>Fecha</Text>
             <Text style={styles.metaVal}>{fechaTxt}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>OPERADOR</Text>
+            <Text style={styles.metaLabel}>Prestador</Text>
+            <Text style={styles.metaVal} numberOfLines={1}>
+              {prestador?.nombre ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Municipio</Text>
+            <Text style={styles.metaVal} numberOfLines={1}>
+              {prestador?.municipio ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Operador</Text>
             <Text style={styles.metaVal}>
               Operador #{lectura.id_operario}
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>ESTRATO</Text>
+            <Text style={styles.metaLabel}>Estrato</Text>
             <Text style={styles.metaVal}>{estrato}</Text>
           </View>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>HASH DE VERIFICACIÓN</Text>
+            <Text style={styles.metaLabel}>Hash de verificación</Text>
             <Text style={styles.metaHash}>{hashTxt}</Text>
           </View>
         </View>
       </ScrollView>
 
       {/* Footer fijo */}
-      <View style={styles.footer}>
-        <Text style={styles.footerBrand}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
-        <View style={styles.footerLinks}>
-          <Pressable
-            onPress={() => {
-              // Soporte: pendiente de implementación.
-            }}
-          >
-            <Text style={styles.footerLink}>SOPORTE</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              // Cerrar sesión: requiere módulo de autenticación.
-            }}
-          >
-            <Text style={styles.footerLink}>CERRAR SESIÓN</Text>
-          </Pressable>
-        </View>
-      </View>
+      <FooterApp />
     </View>
   );
 }
@@ -309,41 +307,12 @@ function FilaDetalle({
   );
 }
 
-const HEADER_HEIGHT = 56;
 const FOOTER_HEIGHT = 48;
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-
-  // Header
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
   },
 
   // Scroll
@@ -360,21 +329,17 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg,
     gap: SPACING.xs,
   },
-  checkCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    ...BORDERS.thick,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+  checkCircleIcon: {
     marginBottom: SPACING.sm,
   },
-  checkMark: {
-    fontSize: 32,
-    color: COLORS.primary,
-    fontWeight: '700',
-    lineHeight: 36,
+  checkCircleContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.secondaryContainer,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
   },
   statusTitle: {
     ...TYPOGRAPHY.headlineMd,
@@ -389,8 +354,6 @@ const styles = StyleSheet.create({
   subtituloMeta: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
     textAlign: 'center',
     marginTop: SPACING.sm,
   },
@@ -406,19 +369,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 120,
   },
+  bentoColFullTotal: {
+    backgroundColor: COLORS.primaryContainer,
+    borderColor: COLORS.primaryContainer,
+  },
   bentoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
     marginBottom: SPACING.xs,
   },
+  bentoLabelTotal: {
+    color: COLORS.onPrimaryContainer,
+  },
   bentoTotal: {
-    fontSize: 40,
-    fontWeight: '900',
+    ...TYPOGRAPHY.displayLg,
     color: COLORS.primary,
-    letterSpacing: -1.5,
-    lineHeight: 44,
+  },
+  bentoTotalBlanco: {
+    color: COLORS.onPrimary,
   },
   bentoRow: {
     flexDirection: 'row',
@@ -426,9 +394,10 @@ const styles = StyleSheet.create({
   },
   bentoColHalf: {
     flex: 1,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: 'rgba(197,198,206,0.3)',
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
     minHeight: 80,
   },
@@ -436,9 +405,7 @@ const styles = StyleSheet.create({
   bentoLabelSm: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
     marginBottom: SPACING.xs,
-    letterSpacing: 1,
   },
   bentoMid: {
     ...TYPOGRAPHY.headlineSm,
@@ -452,9 +419,10 @@ const styles = StyleSheet.create({
   },
   bentoColFullWhite: {
     width: '100%',
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -465,24 +433,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  bentoConsumoIcon: {
-    fontSize: 20,
-    color: COLORS.primary,
+  bentoConsumoIconBox: {
+    backgroundColor: COLORS.surfaceContainerHigh,
+    borderRadius: RADIUS.default,
+    padding: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bentoConsumoLabel: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
+    fontWeight: '600',
   },
   bentoConsumoVal: {
     ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
+    color: COLORS.secondary,
     fontWeight: '700',
   },
 
   // Detalle colapsable
   detalleWrap: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     overflow: 'hidden',
     backgroundColor: COLORS.surfaceLight,
     marginTop: SPACING.sm,
@@ -492,18 +465,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: SPACING.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerHigh,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
+    borderBottomColor: COLORS.outlineVariant,
   },
   detalleTitulo: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
     fontWeight: '700',
-  },
-  detalleChevron: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
   },
   detalleBody: {
     padding: SPACING.md,
@@ -515,16 +484,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.xs,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    borderBottomColor: 'rgba(197,198,206,0.4)',
   },
   filaDetalleLabel: {
     ...TYPOGRAPHY.bodySm,
-    color: COLORS.primary,
+    color: COLORS.onSurfaceVariant,
     flex: 1,
   },
   filaDetalleValor: {
     ...TYPOGRAPHY.bodySm,
-    color: COLORS.primary,
+    color: COLORS.onSurface,
+    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   filaMeta: {
@@ -537,48 +507,36 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginTop: SPACING.lg,
   },
-  btnPrimary: {
-    width: '100%',
-    height: 48,
-    backgroundColor: COLORS.primary,
-    ...BORDERS.thin,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnPrimaryText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
   btnSecondary: {
     width: '100%',
-    height: 48,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
+    height: 56,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: 'rgba(3,22,50,0.2)', // primary/20
+    borderRadius: RADIUS.default,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING.sm,
   },
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnDisabled: {
     opacity: 0.5,
   },
   errorBox: {
     padding: SPACING.sm,
-    backgroundColor: '#FEE',
+    backgroundColor: COLORS.errorContainer,
     borderWidth: 1,
-    borderColor: '#C33',
+    borderColor: COLORS.error,
     borderRadius: RADIUS.sm,
     marginBottom: SPACING.xs,
   },
   errorText: {
     ...TYPOGRAPHY.bodySm,
-    color: '#900',
+    color: COLORS.error,
   },
 
   // Metadata
@@ -586,7 +544,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
     paddingTop: SPACING.lg,
     borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
+    borderTopColor: COLORS.outlineVariant,
     gap: SPACING.xs,
   },
   metaRow: {
@@ -596,14 +554,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   metaLabel: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.onSurfaceVariant,
   },
   metaVal: {
-    ...TYPOGRAPHY.labelSm,
-    color: COLORS.primary,
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurface,
     fontWeight: '700',
   },
   metaCol: {
@@ -613,50 +570,16 @@ const styles = StyleSheet.create({
   },
   metaHash: {
     fontSize: 10,
-    lineHeight: 14,
-    color: COLORS.primary,
-    // Fuente monoespaciada por plataforma. iOS = Menlo (sistema), Android =
-    // 'monospace' (alias garantizado de Roboto Mono / Droid Sans Mono).
+    lineHeight: 16,
+    color: COLORS.onSurfaceVariant,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    backgroundColor: COLORS.surfaceMuted2,
+    backgroundColor: 'rgba(203,219,245,0.4)', // surface-dim/40
     padding: SPACING.sm,
-    ...BORDERS.dashed,
-  },
-
-  // Footer
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: FOOTER_HEIGHT,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.surfaceMuted,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  footerBrand: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    marginTop: 2,
-  },
-  footerLink: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    borderRadius: RADIUS.default,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: COLORS.outline,
+    letterSpacing: 0.3,
   },
 
   // Pressed states

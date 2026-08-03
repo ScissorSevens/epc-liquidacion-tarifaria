@@ -8,12 +8,207 @@ import {
   Text,
   View,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import type { Medidor } from '@dominio/medidores/types';
+import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
+import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import { BORDERS, COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+
+// ─── Constantes de historial ────────────────────────────────────────────────
+
+const HISTORIAL_PERIODOS_VISIBLES = 2;
+
+function calcularPeriodos() {
+  const ahora = new Date();
+  const year = ahora.getFullYear();
+  const month = ahora.getMonth();
+  const actual = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const prevDate = month === 0 ? new Date(year - 1, 11) : new Date(year, month - 1);
+  const anterior = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+  return { actual, anterior };
+}
+
+// ─── Componente interno: HistorialLecturas ───────────────────────────────────
+
+interface HistorialLecturasProps {
+  lecturas: Lectura[];
+  periodoActual: string;   // 'YYYY-MM'
+  periodoAnterior: string; // 'YYYY-MM'
+  loading: boolean;
+}
+
+function badgeColorSync(estado: string): { bg: string; text: string } {
+  switch (estado) {
+    case 'sincronizado':
+      return { bg: COLORS.primaryContainer, text: COLORS.onPrimaryContainer };
+    case 'error':
+      return { bg: COLORS.errorContainer, text: COLORS.onErrorContainer };
+    default: // pendiente
+      return { bg: COLORS.secondary, text: COLORS.onPrimary };
+  }
+}
+
+function HistorialLecturas({ lecturas, periodoActual, periodoAnterior, loading }: HistorialLecturasProps) {
+  const [expandido, setExpandido] = useState(true);
+
+  const lPeriodos = [periodoActual, periodoAnterior].slice(0, HISTORIAL_PERIODOS_VISIBLES);
+  const tieneActual = lecturas.some((l) => l.id_periodo === periodoActual);
+
+  if (loading) {
+    return (
+      <View style={stylesHistorial.container}>
+        <ActivityIndicator size="small" color={COLORS.secondary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={stylesHistorial.container}>
+      {/* Header con toggle */}
+      <Pressable
+        onPress={() => setExpandido((v) => !v)}
+        style={stylesHistorial.headerRow}
+      >
+        <View style={stylesHistorial.headerLeft}>
+          <Text style={stylesHistorial.titulo}>Historial</Text>
+          {tieneActual && (
+            <View style={stylesHistorial.badgeActual}>
+              <Text style={stylesHistorial.badgeActualText}>mes actual</Text>
+            </View>
+          )}
+        </View>
+        <MaterialIcons
+          name={expandido ? 'expand-less' : 'expand-more'}
+          size={20}
+          color={COLORS.secondary}
+        />
+      </Pressable>
+
+      {expandido && (
+        <View style={stylesHistorial.body}>
+          {lPeriodos.map((periodo) => {
+            const lectura = lecturas.find((l) => l.id_periodo === periodo);
+            return (
+              <View key={periodo} style={stylesHistorial.fila}>
+                <View style={stylesHistorial.filaDatos}>
+                  <Text style={stylesHistorial.filaPeriodo}>{periodo}</Text>
+                  {lectura ? (
+                    <>
+                      <Text style={stylesHistorial.filaValor}>
+                        {lectura.lectura_actual} m³
+                      </Text>
+                      <Text style={stylesHistorial.filaFecha}>
+                        {new Date(lectura.timestamp_captura).toLocaleDateString('es-CO', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={stylesHistorial.sinRegistro}>Sin registro</Text>
+                  )}
+                </View>
+                {lectura && (
+                  <View style={[stylesHistorial.badgeSync, { backgroundColor: badgeColorSync(lectura.estado_sync).bg }]}>
+                    <Text style={[stylesHistorial.badgeSyncText, { color: badgeColorSync(lectura.estado_sync).text }]}>
+                      {titleCase(lectura.estado_sync)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const stylesHistorial = StyleSheet.create({
+  container: {
+    marginTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    paddingTop: SPACING.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  titulo: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.secondary,
+    fontWeight: '600',
+  },
+  badgeActual: {
+    backgroundColor: COLORS.secondaryContainer,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+  },
+  badgeActualText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSecondaryContainer,
+    fontSize: 9,
+  },
+  body: {
+    gap: SPACING.xs,
+    paddingTop: SPACING.xs,
+  },
+  fila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  filaDatos: {
+    flex: 1,
+    gap: 2,
+  },
+  filaPeriodo: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
+  },
+  filaValor: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurface,
+    fontWeight: '600',
+  },
+  filaFecha: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+  },
+  sinRegistro: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  badgeSync: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+    marginLeft: SPACING.sm,
+  },
+  badgeSyncText: {
+    ...TYPOGRAPHY.labelSm,
+  },
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 
 type Props = LecturasStackScreenProps<'DetalleSuscriptor'>;
 
@@ -21,10 +216,19 @@ type Props = LecturasStackScreenProps<'DetalleSuscriptor'>;
 function Campo({ label, valor }: { label: string; valor: string }) {
   return (
     <View style={styles.campo}>
-      <Text style={styles.campoLabel}>{label.toUpperCase()}</Text>
+      <Text style={styles.campoLabel}>{label}</Text>
       <Text style={styles.campoValor}>{valor}</Text>
     </View>
   );
+}
+
+/** Capitaliza la primera letra de cada palabra ('sin_registro' -> 'Sin registro'). */
+function titleCase(s: string): string {
+  return s
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map((w) => (w.length === 0 ? w : w[0]!.toUpperCase() + w.slice(1).toLowerCase()))
+    .join(' ');
 }
 
 /**
@@ -42,18 +246,22 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
   const [medidores, setMedidores] = useState<Medidor[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [guardandoSubsidio, setGuardandoSubsidio] = useState(false);
+  const [historialMap, setHistorialMap] = useState<Map<number, Lectura[]>>(new Map());
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { suscriptorRepo, medidorRepo } = await getBootstrap();
+      const { repos: { suscriptorRepo, medidorRepo } } = await getBootstrap();
       const [s, m] = await Promise.all([
         suscriptorRepo.buscarPorId(id_suscriptor),
         medidorRepo.listarPorSuscriptor(id_suscriptor),
       ]);
       setSuscriptor(s);
       setMedidores(m);
+      // Cargar historial de lecturas para cada medidor
+      void cargarHistorialDeMedidores(m);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[DetalleSuscriptor] error al cargar:', e);
@@ -63,6 +271,27 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
     }
   }, [id_suscriptor]);
 
+  const cargarHistorial = useCallback(async (idMedidor: number) => {
+    try {
+      const { repos: { lecturaRepo } } = await getBootstrap();
+      const lecturas = await lecturaRepo.listarPorMedidor(idMedidor);
+      setHistorialMap(prev => new Map(prev).set(idMedidor, lecturas));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[DetalleSuscriptor] error al cargar historial:', e);
+    }
+  }, []);
+
+  const cargarHistorialDeMedidores = useCallback(async (lista: Medidor[]) => {
+    if (lista.length === 0) return;
+    setLoadingHistorial(true);
+    try {
+      await Promise.all(lista.map((m) => cargarHistorial(m.id_medidor)));
+    } finally {
+      setLoadingHistorial(false);
+    }
+  }, [cargarHistorial]);
+
   useEffect(() => {
     void cargar();
   }, [cargar]);
@@ -71,7 +300,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
     if (suscriptor === null || guardandoSubsidio) return;
     setGuardandoSubsidio(true);
     try {
-      const { suscriptorRepo } = await getBootstrap();
+      const { repos: { suscriptorRepo } } = await getBootstrap();
       // El repo expo-sqlite expone toggleSubsidio; lo casteamos para no
       // tocar el interface de dominio que todavia tiene actualizar como stub.
       const repo = suscriptorRepo as unknown as {
@@ -89,17 +318,11 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* ── Header brutalist ── */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>DETALLE SUSCRIPTOR</Text>
-        <View style={styles.headerBtn} />
-      </View>
+      {/* ── TopAppBar ── */}
+      <TopBar
+        titulo="Detalle Suscriptor"
+        onBack={() => navigation.goBack()}
+      />
 
       {/* ── Snack inline de error ── */}
       {error !== null && (
@@ -112,7 +335,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             onPress={() => void cargar()}
             style={styles.snackRetry}
           >
-            <Text style={styles.snackRetryText}>REINTENTAR</Text>
+            <Text style={styles.snackRetryText}>Reintentar</Text>
           </Pressable>
           <Text style={styles.snackClose}>×</Text>
         </Pressable>
@@ -125,13 +348,12 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
         </View>
       ) : suscriptor === null ? (
         <View style={styles.center}>
-          <Text style={styles.notFoundText}>SUSCRIPTOR NO ENCONTRADO</Text>
-          <Pressable
+          <Text style={styles.notFoundText}>Suscriptor no encontrado</Text>
+          <BotonPrimario
+            texto="Volver"
+            tono="azul"
             onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-          >
-            <Text style={styles.btnPrimaryText}>VOLVER</Text>
-          </Pressable>
+          />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
@@ -139,14 +361,14 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           <View style={styles.card}>
             {/* Cabecera de la card con badge de estado y chip de estrato */}
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>DATOS DEL SUSCRIPTOR</Text>
+              <Text style={styles.cardTitle}>Datos del suscriptor</Text>
               <View style={styles.cardHeaderBadges}>
                 <View style={styles.chipEstrato}>
                   <Text style={styles.chipEstratoText}>E{suscriptor.estrato}</Text>
                 </View>
                 <View style={styles.badgeEstado}>
                   <Text style={styles.badgeEstadoText}>
-                    {suscriptor.estado.toUpperCase()}
+                    {titleCase(suscriptor.estado)}
                   </Text>
                 </View>
               </View>
@@ -157,7 +379,17 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             <View style={styles.divider} />
             <Campo label="Nombre y apellidos" valor={suscriptor.nombre_apellidos} />
             <View style={styles.divider} />
+            <Campo label="Cédula" valor={suscriptor.cedula} />
+            <View style={styles.divider} />
+            <Campo label="Email" valor={suscriptor.email ?? '—'} />
+            <View style={styles.divider} />
+            <Campo label="Teléfono" valor={suscriptor.telefono ?? '—'} />
+            <View style={styles.divider} />
             <Campo label="Dirección" valor={suscriptor.direccion} />
+            <View style={styles.divider} />
+            <Campo label="Municipio" valor={suscriptor.municipio} />
+            <View style={styles.divider} />
+            <Campo label="Sector" valor={suscriptor.sector ?? '—'} />
             <View style={styles.divider} />
             <Campo
               label="Matrícula inmobiliaria"
@@ -175,7 +407,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             {/* Toggle subsidio */}
             <View style={styles.subsidioRow}>
               <View style={styles.subsidioInfo}>
-                <Text style={styles.campoLabel}>SUBSIDIO TARIFARIO</Text>
+                <Text style={styles.campoLabel}>Subsidio tarifario</Text>
                 <Text style={styles.subsidioDesc}>
                   {suscriptor.aplica_subsidio ? 'Aplica subsidio' : 'No aplica subsidio'}
                 </Text>
@@ -184,8 +416,8 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                 value={suscriptor.aplica_subsidio}
                 onValueChange={(v) => { void onToggleSubsidio(v); }}
                 disabled={guardandoSubsidio}
-                trackColor={{ false: COLORS.outline, true: COLORS.primary }}
-                thumbColor={COLORS.onPrimary}
+                trackColor={{ false: COLORS.surfaceVariant, true: COLORS.secondaryContainer }}
+                thumbColor={COLORS.surfaceContainerLowest}
               />
             </View>
           </View>
@@ -193,7 +425,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           {/* Card 2 — Medidores asociados */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>MEDIDORES ASOCIADOS</Text>
+              <Text style={styles.cardTitle}>Medidores asociados</Text>
               <View style={styles.badgeEstado}>
                 <Text style={styles.badgeEstadoText}>{medidores.length}</Text>
               </View>
@@ -201,7 +433,7 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
             <View style={styles.divider} />
 
             {medidores.length === 0 ? (
-              <Text style={styles.sinMedidores}>SIN MEDIDORES ASOCIADOS</Text>
+              <Text style={styles.sinMedidores}>Sin medidores asociados</Text>
             ) : (
               medidores.map((m, idx) => (
                 <View key={m.id_medidor}>
@@ -212,10 +444,10 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                     <Campo label="Fecha instalación" valor={m.fecha_instalacion} />
                     <View style={styles.divider} />
                     <View style={styles.medidorEstadoRow}>
-                      <Text style={styles.campoLabel}>ESTADO</Text>
+                      <Text style={styles.campoLabel}>Estado</Text>
                       <View style={styles.badgeEstado}>
                         <Text style={styles.badgeEstadoText}>
-                          {m.estado.toUpperCase()}
+                          {titleCase(m.estado)}
                         </Text>
                       </View>
                     </View>
@@ -225,19 +457,32 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
                         <Campo label="Observaciones" valor={m.observaciones} />
                       </>
                     )}
-                    <Pressable
+                    <BotonPrimario
+                      texto="Capturar lectura"
+                      tono="azul"
                       onPress={() =>
                         navigation.navigate('CapturarLectura', {
                           id_medidor: m.id_medidor,
                           id_suscriptor,
                         })
                       }
+                    />
+                    {/* Botón historial completo */}
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate('Historial', {
+                          id_suscriptor,
+                          nombre: suscriptor?.nombre_apellidos ?? '',
+                        })
+                      }
                       style={({ pressed }) => [
-                        styles.btnCapturar,
-                        pressed && styles.pressedDark,
+                        styles.btnHistorial,
+                        pressed && styles.pressedLight,
                       ]}
                     >
-                      <Text style={styles.btnCapturarText}>CAPTURAR LECTURA</Text>
+                      <MaterialIcons name="history" size={18} color={COLORS.primary} />
+                      <Text style={styles.btnHistorialText}>Ver historial completo</Text>
+                      <MaterialIcons name="chevron-right" size={18} color={COLORS.onSurfaceVariant} />
                     </Pressable>
                   </View>
                 </View>
@@ -246,21 +491,31 @@ export default function DetalleSuscriptor({ navigation, route }: Props) {
           </View>
 
           {/* Brand footer */}
-          <Text style={styles.brandFooter}>
-            MEDIAPP V1.0.4 - MODO OFFLINE
-          </Text>
+          <FooterApp />
         </ScrollView>
       )}
 
       {/* ── Bottom bar fijo ── */}
       {!loading && (
-        <View style={styles.bottomBar}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.btnVolver, pressed && styles.pressedLight]}
-          >
-            <Text style={styles.btnVolverText}>VOLVER</Text>
-          </Pressable>
+        <View style={[styles.bottomBar, styles.bottomBarRow]}>
+          <View style={styles.btnHalf}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={({ pressed }) => [styles.btnVolver, pressed && styles.pressedLight]}
+            >
+              <Text style={styles.btnVolverText}>Volver</Text>
+            </Pressable>
+          </View>
+          {suscriptor !== null && (
+            <View style={styles.btnHalf}>
+              <BotonPrimario
+                texto="Editar suscriptor"
+                icono="edit"
+                tono="azul"
+                onPress={() => navigation.navigate('EditarSuscriptor', { suscriptor })}
+              />
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -274,36 +529,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  /* ── Header ── */
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineLg,
-    color: COLORS.primary,
-    lineHeight: 36,
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    letterSpacing: 2,
-  },
-
   /* ── Scroll ── */
   center: {
     flex: 1,
@@ -315,28 +540,29 @@ const styles = StyleSheet.create({
   notFoundText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 1.5,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   scroll: {
-    padding: SPACING.gutter,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.gutter,
     paddingBottom: 100,
     gap: SPACING.gutter,
   },
 
   /* ── Cards ── */
   card: {
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   cardHeaderBadges: {
     flexDirection: 'row',
@@ -344,10 +570,8 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   cardTitle: {
-    ...TYPOGRAPHY.labelMd,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    letterSpacing: 1.5,
-    fontWeight: '600',
   },
 
   /* ── Badge estado ── */
@@ -355,18 +579,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
   },
   badgeEstadoText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.onPrimary,
-    letterSpacing: 1,
   },
 
   /* ── Chip estrato ── */
   chipEstrato: {
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.sm,
@@ -374,8 +597,7 @@ const styles = StyleSheet.create({
   chipEstratoText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.primary,
-    letterSpacing: 1,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   /* ── Toggle subsidio ── */
@@ -402,7 +624,6 @@ const styles = StyleSheet.create({
   campoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 1.5,
     marginBottom: 2,
   },
   campoValor: {
@@ -413,8 +634,8 @@ const styles = StyleSheet.create({
   /* ── Dividers ── */
   divider: {
     height: 1,
-    backgroundColor: COLORS.outline,
-    opacity: 0.12,
+    backgroundColor: COLORS.outlineVariant,
+    opacity: 0.6,
   },
   medidorSeparator: {
     height: 1,
@@ -435,60 +656,46 @@ const styles = StyleSheet.create({
   sinMedidores: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    letterSpacing: 1.5,
     paddingVertical: SPACING.sm,
     textAlign: 'center',
   },
 
   /* ── Botón capturar lectura (primario full-width) ── */
-  btnCapturar: {
-    marginTop: SPACING.md,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
-    alignItems: 'center',
-  },
-  btnCapturarText: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-    letterSpacing: 2,
-  },
-
-  /* ── Botón primario genérico ── */
-  btnPrimary: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    alignItems: 'center',
-  },
-  btnPrimaryText: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
-    letterSpacing: 2,
-  },
+  // "Capturar lectura" se renderiza via <BotonPrimario> extraído.
 
   /* ── Bottom bar ── */
   bottomBar: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+    paddingHorizontal: SPACING.margin,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  bottomBarRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  btnHalf: {
+    flex: 1,
   },
   btnVolver: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primaryContainer,
+    borderRadius: RADIUS.full,
+    paddingVertical: SPACING.md,
     alignItems: 'center',
+    minHeight: 48,
   },
   btnVolverText: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.primary,
-    letterSpacing: 2,
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primaryContainer,
   },
+  // "Editar suscriptor" se renderiza via <BotonPrimario> extraído.
 
   /* ── Pressed states ── */
   pressedDark: {
@@ -524,7 +731,6 @@ const styles = StyleSheet.create({
   snackRetryText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.errorContainer,
-    letterSpacing: 1,
   },
   snackClose: {
     ...TYPOGRAPHY.labelLg,
@@ -537,8 +743,24 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     fontSize: 8,
     color: COLORS.textTertiary,
-    letterSpacing: 2,
     textAlign: 'center',
     paddingTop: SPACING.sm,
+  },
+
+  /* ── Botón historial completo ── */
+  btnHistorial: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm + 4,
+    paddingHorizontal: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+  },
+  btnHistorialText: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+    flex: 1,
   },
 });

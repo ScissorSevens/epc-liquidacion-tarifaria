@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "MediApp",
+    "slug": "mediapp",
+    "android": {
+      "package": "com.ikhthys.mediapp"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c3075f06-b9f1-45e2-8a8a-8e4825dcd7c0"
+      }
+    }
+  }
+}

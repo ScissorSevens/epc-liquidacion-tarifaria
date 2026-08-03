@@ -1,8 +1,13 @@
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
 
 namespace MediApp.Api.Features.Liquidaciones;
 
-/// <summary>Mapeos payload mobile ↔ entidad EF para Liquidación.</summary>
+/// <summary>
+/// Mapeos payload mobile ↔ entidad EF para Liquidación.
+/// Multi-tenant: propaga id_prestador del payload al campo denormalizado
+/// de la entidad (Q8 spec). El id FK de la Lectura lo resuelve el
+/// endpoint via sync_registros.
+/// </summary>
 public static class LiquidacionMapper
 {
     /// <param name="idLectura">Id server de la Lectura ya resuelto por el endpoint.</param>
@@ -17,7 +22,8 @@ public static class LiquidacionMapper
         Contribucion = p.Contribucion,
         Total = p.Total,
         Estrato = p.Estrato,
-        IdCliente = p.IdCliente
+        IdCliente = p.IdCliente,
+        IdPrestador = p.IdPrestador,
     };
 
     public static void AplicarPayload(LiquidacionPayload p, Liquidacion entidad, int idLectura)
@@ -32,5 +38,7 @@ public static class LiquidacionMapper
         entidad.Total = p.Total;
         entidad.Estrato = p.Estrato;
         // IdCliente NO se cambia: identidad lógica.
+        // IdPrestador tampoco: se conserva el prestador original de la liquidación
+        // (no se reasigna aunque cambien los defaults del caller).
     }
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FechaPicker from '../components/FechaPicker';
 import {
   ActivityIndicator,
@@ -7,18 +8,31 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { crearSuscriptor } from '@dominio/suscriptores';
+import { crearSuscriptor, MENSAJES_ERROR_SUSCRIPTOR } from '@dominio/suscriptores';
+import {
+  CATEGORIAS_USO,
+  ETIQUETAS_CATEGORIA_USO,
+  type CategoriaUso,
+} from '@dominio/categorias-uso';
+import { logger } from '../composicion/logger';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
+import { FormField } from '../componentes/FormField';
+import {
+  scrollToFirstError,
+  useFormFieldRefs,
+} from '../componentes/scroll-to-first-error';
+import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
@@ -40,9 +54,15 @@ type EstratoStr = '' | '1' | '2' | '3' | '4' | '5' | '6';
 
 interface FormState {
   nombre_apellidos: string;
+  cedula: string;
+  email: string;
+  telefono: string;
+  municipio: string;
+  sector: string;
   direccion: string;
   estrato: EstratoStr;
   aplica_subsidio: boolean;
+  categoria_uso: CategoriaUso;
   matricula_inmobiliaria: string;
   numero_catastral: string;
   fecha_instalacion: string;
@@ -61,9 +81,15 @@ interface SnackState {
 
 const ESTADO_INICIAL: FormState = {
   nombre_apellidos: '',
+  cedula: '',
+  email: '',
+  telefono: '',
+  municipio: '',
+  sector: '',
   direccion: '',
   estrato: '',
   aplica_subsidio: true,
+  categoria_uso: 'residencial',
   matricula_inmobiliaria: '',
   numero_catastral: '',
   fecha_instalacion: '',
@@ -72,8 +98,7 @@ const ESTADO_INICIAL: FormState = {
 
 const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-const HEADER_HEIGHT = 56;
-const BOTTOM_HEIGHT = 88;
+const BOTTOM_HEIGHT = 80;
 
 function validarCampo(nombre: CampoForm, valor: string | boolean): string | undefined {
   if (nombre === 'aplica_subsidio') return undefined;
@@ -86,6 +111,36 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
       if (t.length > 150) return 'Nombre no puede superar 150 caracteres';
       return undefined;
     }
+
+    case 'cedula': {
+      const t = v.trim();
+      if (t.length === 0) return MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA;
+      if (!/^\d{6,12}$/.test(t)) return MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA;
+      return undefined;
+    }
+
+    case 'email':
+      if (v.length > 0 && !/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(v)) {
+        return MENSAJES_ERROR_SUSCRIPTOR.EMAIL_INVALIDO;
+      }
+      return undefined;
+
+    case 'telefono':
+      if (v.length > 0 && !/^\d{7,20}$/.test(v)) {
+        return MENSAJES_ERROR_SUSCRIPTOR.TELEFONO_INVALIDO;
+      }
+      return undefined;
+
+    case 'municipio': {
+      const t = v.trim();
+      if (t.length === 0) return MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_VACIO;
+      if (t.length > 100) return MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_LARGO;
+      return undefined;
+    }
+
+    case 'sector':
+      if (v.trim().length > 100) return MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO;
+      return undefined;
 
     case 'direccion': {
       const t = v.trim();
@@ -136,10 +191,22 @@ function validarCampo(nombre: CampoForm, valor: string | boolean): string | unde
  * suscriptor, intentamos compensar con `eliminar()` - hoy stubeado, asi
  * que dejamos huerfano y avisamos al usuario.
  *
+ * Migracion a FormField (Commit 2 — impeccable craft):
+ *   - 9 inputs de texto migrados al componente FormField (label
+ *     visible, required asterisk, error inline con icono, helperText,
+ *     accessibilityLabel/Hint).
+ *   - Chips de estrato + categoria_uso + toggle subsidio + FechaPicker
+ *     se mantienen inline (no son FormField; son widgets de seleccion).
+ *   - Touch target >= 44px enforced via FormField (minHeight 48).
+ *   - Validacion progresiva via onBlur (manda error al FormField).
+ *
  * No hay TDD para esta pantalla (excepcion explicita para UI mobile, ver
  * AGENTS.md). Validacion manual: ver checklist al final del PR.
  */
 export default function AltaSuscriptor({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const { getRef } = useFormFieldRefs<CampoForm>();
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
   const [errores, setErrores] = useState<Errores>({});
   const [enviando, setEnviando] = useState(false);
@@ -181,12 +248,30 @@ export default function AltaSuscriptor({ navigation }: Props) {
     return Object.keys(next).length === 0;
   }
 
+  /**
+   * Wrapper que valida y, si hay errores, scrollea al primero. Asi el
+   * operario ve el problema sin scrollear manualmente.
+   */
+  function validarYScroll(): boolean {
+    const next: Errores = {};
+    (Object.keys(form) as CampoForm[]).forEach((c) => {
+      const msg = validarCampo(c, form[c] as string);
+      if (msg !== undefined) next[c] = msg;
+    });
+    setErrores(next);
+    if (Object.keys(next).length > 0) {
+      // Scroll al primer campo con error (UX: el operario no busca).
+      scrollToFirstError(scrollRef, next, getRef);
+    }
+    return Object.keys(next).length === 0;
+  }
+
   function mostrarSnack(mensaje: string, tipo: SnackTipo) {
     setSnack({ visible: true, mensaje, tipo });
   }
 
   async function onSubmit() {
-    if (!validarTodo()) {
+    if (!validarYScroll()) {
       mostrarSnack('Revisá los campos marcados', 'error');
       return;
     }
@@ -194,7 +279,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
     try {
       const bs = await getBootstrap();
 
-      const codigoGenerado = siguienteCodigo(await bs.suscriptorRepo.maxCodigo());
+      const codigoGenerado = siguienteCodigo(await bs.repos.suscriptorRepo.maxCodigo());
       const numeroMedidorGenerado = codigoANumeroMedidor(codigoGenerado);
 
       const estratoNum = Number.parseInt(form.estrato, 10) as 1 | 2 | 3 | 4 | 5 | 6;
@@ -202,9 +287,16 @@ export default function AltaSuscriptor({ navigation }: Props) {
       const borradorSus = crearSuscriptor({
         codigo: codigoGenerado,
         nombre_apellidos: form.nombre_apellidos.trim(),
+        cedula: form.cedula.trim(),
+        email: form.email.trim() || undefined,
+        telefono: form.telefono.trim() || undefined,
+        municipio: form.municipio.trim(),
+        sector: form.sector.trim() || undefined,
         direccion: form.direccion.trim(),
         estrato: estratoNum,
         aplica_subsidio: form.aplica_subsidio,
+        id_prestador: 0,
+        categoria_uso: form.categoria_uso,
         matricula_inmobiliaria:
           form.matricula_inmobiliaria.trim() === ''
             ? undefined
@@ -230,11 +322,11 @@ export default function AltaSuscriptor({ navigation }: Props) {
           const out = await persistirYEncolarAltaSuscriptor({
             borradorSuscriptor: borradorSus,
             borradorMedidor: borradorMedSinSus,
-            suscriptorRepo: bs.suscriptorRepo,
-            medidorRepo: bs.medidorRepo,
-            colaRepo: bs.colaRepo,
-            idGenerator: bs.idGenerator,
-            hasher: bs.hasher,
+            suscriptorRepo: bs.repos.suscriptorRepo,
+            medidorRepo: bs.repos.medidorRepo,
+            colaRepo: bs.repos.colaRepo,
+            idGenerator: bs.adapters.idGenerator,
+            hasher: bs.adapters.hasher,
           });
           return out.suscriptor;
         } catch (errAlta) {
@@ -252,8 +344,7 @@ export default function AltaSuscriptor({ navigation }: Props) {
       }, 800);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
-      console.warn('[AltaSuscriptor] error inesperado:', err);
+      logger.warn('AltaSuscriptor', 'error inesperado', { err });
       mostrarSnack(`Error inesperado: ${msg}`, 'error');
     } finally {
       setEnviando(false);
@@ -262,189 +353,322 @@ export default function AltaSuscriptor({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          disabled={enviando}
-          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>NUEVO SUSCRIPTOR</Text>
-        <View style={styles.headerBtn} />
-      </View>
+      <TopBar titulo="Nuevo suscriptor" onBack={() => navigation.goBack()} />
 
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Sección 1 — Datos del Suscriptor */}
-          <Text style={styles.seccionTitulo}>DATOS DEL SUSCRIPTOR</Text>
+          {/* Intro */}
+          <View style={styles.intro}>
+            <Text style={[TYPOGRAPHY.headlineSm, styles.introTitulo]}>Registro de Usuario</Text>
+            <Text style={[TYPOGRAPHY.bodySm, styles.introSub]}>
+              Complete los datos requeridos para vincular un nuevo predio al sistema.
+            </Text>
+          </View>
 
-          <Text style={styles.autoGenInfo}>
-            Código y número de medidor se asignan automáticamente.
-          </Text>
+          {/* ── Sección 1: Información Personal ── */}
+          <View style={styles.seccion}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="person" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>
+                Información Personal
+              </Text>
+            </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>NOMBRE Y APELLIDOS *</Text>
-            <TextInput
-              style={[styles.input, errores.nombre_apellidos !== undefined && styles.inputError]}
+            <FormField
+              ref={getRef('nombre_apellidos')}
+              label="Nombre y apellidos"
+              required
               value={form.nombre_apellidos}
               onChangeText={(v) => setCampo('nombre_apellidos', v)}
               onBlur={() => onBlur('nombre_apellidos')}
+              error={errores.nombre_apellidos}
               maxLength={150}
               editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
+              placeholder="Ej: Juan Pérez"
+              accessibilityHint="Ingrese el nombre completo del suscriptor"
+              testID="alta-nombre"
             />
-            {errores.nombre_apellidos !== undefined && (
-              <Text style={styles.errorText}>{errores.nombre_apellidos}</Text>
-            )}
+
+            <FormField
+              ref={getRef('cedula')}
+              label="Cédula"
+              required
+              value={form.cedula}
+              onChangeText={(v) => setCampo('cedula', v)}
+              onBlur={() => onBlur('cedula')}
+              error={errores.cedula}
+              keyboardType="numeric"
+              maxLength={12}
+              editable={!enviando}
+              placeholder="6 a 12 dígitos"
+              accessibilityHint="Ingrese la cédula del suscriptor, 6 a 12 dígitos numéricos"
+              testID="alta-cedula"
+            />
+
+            <FormField
+              ref={getRef('email')}
+              label="Email (opcional)"
+              value={form.email}
+              onChangeText={(v) => setCampo('email', v)}
+              onBlur={() => onBlur('email')}
+              error={errores.email}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={!enviando}
+              placeholder="cliente@ejemplo.com"
+              testID="alta-email"
+            />
+
+            <FormField
+              ref={getRef('telefono')}
+              label="Teléfono (opcional)"
+              value={form.telefono}
+              onChangeText={(v) => setCampo('telefono', v)}
+              onBlur={() => onBlur('telefono')}
+              error={errores.telefono}
+              keyboardType="phone-pad"
+              maxLength={20}
+              editable={!enviando}
+              placeholder="7 a 20 dígitos"
+              testID="alta-telefono"
+            />
+
+            {/* Estrato */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Estrato <Text style={styles.requerido}>*</Text>
+              </Text>
+              <View style={styles.chipsRow}>
+                {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => {
+                      setCampo('estrato', e);
+                      setErrores((prev) => {
+                        const next = { ...prev };
+                        delete next.estrato;
+                        return next;
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      form.estrato === e && styles.chipSel,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Estrato ${e}`}
+                    accessibilityState={{ selected: form.estrato === e }}
+                    testID={`alta-estrato-${e}`}
+                  >
+                    <Text style={[styles.chipText, form.estrato === e && styles.chipTextSel]}>
+                      {e}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {errores.estrato !== undefined && (
+                <View style={styles.errorInline}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={16}
+                    color={COLORS.error}
+                    style={styles.errorIcon}
+                  />
+                  <Text style={styles.errorText}>{errores.estrato}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Toggle subsidio */}
+            <View style={styles.toggleRow}>
+              <Text style={[TYPOGRAPHY.bodyMd, styles.toggleLabel]}>¿Aplica subsidio?</Text>
+              <Switch
+                value={form.aplica_subsidio}
+                onValueChange={(v) => setCampo('aplica_subsidio', v)}
+                trackColor={{ false: COLORS.surfaceVariant, true: COLORS.secondaryContainer }}
+                thumbColor={COLORS.surfaceContainerLowest}
+                disabled={enviando}
+                accessibilityLabel="Aplica subsidio"
+              />
+            </View>
+
+            {/* Categoría de uso (multi-tenant Q10 spec) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Categoría de uso</Text>
+              <View style={styles.chipsRowCategoria}>
+                {CATEGORIAS_USO.map((cat) => (
+                  <Pressable
+                    key={cat}
+                    onPress={() => setCampo('categoria_uso', cat)}
+                    disabled={enviando}
+                    style={({ pressed }) => [
+                      styles.chipCategoria,
+                      form.categoria_uso === cat && styles.chipSel,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Categoría ${ETIQUETAS_CATEGORIA_USO[cat]}`}
+                    accessibilityState={{ selected: form.categoria_uso === cat }}
+                  >
+                    <Text
+                      style={[
+                        styles.chipTextSm,
+                        form.categoria_uso === cat && styles.chipTextSel,
+                      ]}
+                    >
+                      {ETIQUETAS_CATEGORIA_USO[cat]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.helperTextCategoria}>
+                Define cómo el motor tarifario aplica subsidios o contribuciones.
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>DIRECCIÓN *</Text>
-            <TextInput
-              style={[styles.input, errores.direccion !== undefined && styles.inputError]}
+          {/* ── Sección 2: Ubicación ── */}
+          <View style={[styles.seccion, styles.seccionLow]}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="location-on" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Ubicación del Predio</Text>
+            </View>
+
+            <FormField
+              ref={getRef('municipio')}
+              label="Municipio"
+              required
+              value={form.municipio}
+              onChangeText={(v) => setCampo('municipio', v)}
+              onBlur={() => onBlur('municipio')}
+              error={errores.municipio}
+              maxLength={100}
+              editable={!enviando}
+              placeholder="Ej: Bogotá"
+              testID="alta-municipio"
+            />
+
+            <FormField
+              ref={getRef('sector')}
+              label="Sector (opcional)"
+              value={form.sector}
+              onChangeText={(v) => setCampo('sector', v)}
+              onBlur={() => onBlur('sector')}
+              error={errores.sector}
+              maxLength={100}
+              editable={!enviando}
+              placeholder="Ej: Centro, Zona Industrial"
+              testID="alta-sector"
+            />
+
+            <FormField
+              ref={getRef('direccion')}
+              label="Dirección"
+              required
               value={form.direccion}
               onChangeText={(v) => setCampo('direccion', v)}
               onBlur={() => onBlur('direccion')}
+              error={errores.direccion}
               maxLength={200}
               editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
+              placeholder="Calle, Carrera, Vereda o Sector"
+              accessibilityHint="Ingrese la dirección completa del predio"
+              testID="alta-direccion"
             />
-            {errores.direccion !== undefined && (
-              <Text style={styles.errorText}>{errores.direccion}</Text>
-            )}
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>ESTRATO *</Text>
-            <View style={styles.chipsRow}>
-              {(['1', '2', '3', '4', '5', '6'] as EstratoStr[]).map((e) => (
-                <Pressable
-                  key={e}
-                  onPress={() => {
-                    setCampo('estrato', e);
-                    const msg = validarCampo('estrato', e);
-                    setErrores((prev) => {
-                      const next = { ...prev };
-                      if (msg === undefined) delete next.estrato;
-                      else next.estrato = msg;
-                      return next;
-                    });
-                  }}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    form.estrato === e && styles.chipSel,
-                    pressed && styles.pressedLight,
-                  ]}
-                >
-                  <Text style={[styles.chipText, form.estrato === e && styles.chipTextSel]}>
-                    {e}
-                  </Text>
-                </Pressable>
-              ))}
+          {/* ── Sección 3: Datos Legales ── */}
+          <View style={[styles.seccion, styles.seccionLow]}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="gavel" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>Datos Legales</Text>
             </View>
-            {errores.estrato !== undefined && (
-              <Text style={styles.errorText}>{errores.estrato}</Text>
-            )}
-          </View>
 
-          {/* Toggle aplica_subsidio */}
-          <Pressable
-            onPress={() => setCampo('aplica_subsidio', !form.aplica_subsidio)}
-            style={styles.toggleRow}
-          >
-            <View style={[styles.toggleBox, form.aplica_subsidio && styles.toggleBoxOn]}>
-              {form.aplica_subsidio && <Text style={styles.toggleCheck}>✓</Text>}
-            </View>
-            <View style={styles.toggleTexts}>
-              <Text style={styles.toggleLabel}>APLICA SUBSIDIO</Text>
-              <Text style={styles.toggleHint}>
-                El suscriptor se acoge al subsidio por estrato
-              </Text>
-            </View>
-          </Pressable>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>MATRÍCULA INMOBILIARIA</Text>
-            <TextInput
-              style={[styles.input, errores.matricula_inmobiliaria !== undefined && styles.inputError]}
+            <FormField
+              ref={getRef('matricula_inmobiliaria')}
+              label="Matrícula inmobiliaria (opcional)"
               value={form.matricula_inmobiliaria}
               onChangeText={(v) => setCampo('matricula_inmobiliaria', v)}
               onBlur={() => onBlur('matricula_inmobiliaria')}
+              error={errores.matricula_inmobiliaria}
               maxLength={50}
               editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
+              testID="alta-matricula"
             />
-            {errores.matricula_inmobiliaria !== undefined && (
-              <Text style={styles.errorText}>{errores.matricula_inmobiliaria}</Text>
-            )}
-          </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>NÚMERO CATASTRAL</Text>
-            <TextInput
-              style={[styles.input, errores.numero_catastral !== undefined && styles.inputError]}
+            <FormField
+              ref={getRef('numero_catastral')}
+              label="Número catastral (opcional)"
               value={form.numero_catastral}
               onChangeText={(v) => setCampo('numero_catastral', v)}
               onBlur={() => onBlur('numero_catastral')}
+              error={errores.numero_catastral}
               maxLength={50}
               editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
+              testID="alta-catastral"
             />
-            {errores.numero_catastral !== undefined && (
-              <Text style={styles.errorText}>{errores.numero_catastral}</Text>
-            )}
           </View>
 
-          <View style={styles.separador} />
+          {/* ── Sección 4: Información del Medidor ── */}
+          <View style={styles.seccion}>
+            <View style={styles.seccionHeader}>
+              <MaterialIcons name="speed" size={20} color={COLORS.primary} />
+              <Text style={[TYPOGRAPHY.headlineSm, styles.seccionTitulo]}>
+                Información del Medidor
+              </Text>
+            </View>
 
-          {/* Sección 2 — Datos del Medidor */}
-          <Text style={styles.seccionTitulo}>DATOS DEL MEDIDOR</Text>
+            {/* Fecha instalación (mantenemos FechaPicker — no es FormField) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Fecha de instalación <Text style={styles.requerido}>*</Text>
+              </Text>
+              <FechaPicker
+                value={form.fecha_instalacion}
+                onChange={(v) => setCampo('fecha_instalacion', v)}
+                disabled={enviando}
+                error={errores.fecha_instalacion !== undefined}
+                maxDate={new Date().toISOString().slice(0, 10)}
+              />
+              {errores.fecha_instalacion !== undefined && (
+                <View style={styles.errorInline}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={16}
+                    color={COLORS.error}
+                    style={styles.errorIcon}
+                  />
+                  <Text style={styles.errorText}>{errores.fecha_instalacion}</Text>
+                </View>
+              )}
+            </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>FECHA DE INSTALACIÓN *</Text>
-            <FechaPicker
-              value={form.fecha_instalacion}
-              onChange={(v) => setCampo('fecha_instalacion', v)}
-              disabled={enviando}
-              error={errores.fecha_instalacion !== undefined}
-              maxDate={new Date().toISOString().slice(0, 10)}
-            />
-            {errores.fecha_instalacion !== undefined && (
-              <Text style={styles.errorText}>{errores.fecha_instalacion}</Text>
-            )}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>OBSERVACIONES DEL MEDIDOR</Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.inputMultiline,
-                errores.observaciones_medidor !== undefined && styles.inputError,
-              ]}
+            <FormField
+              ref={getRef('observaciones_medidor')}
+              label="Observaciones del medidor (opcional)"
               value={form.observaciones_medidor}
               onChangeText={(v) => setCampo('observaciones_medidor', v)}
               onBlur={() => onBlur('observaciones_medidor')}
+              error={errores.observaciones_medidor}
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
               maxLength={500}
               editable={!enviando}
-              placeholderTextColor={COLORS.placeholder}
+              placeholder="Detalles técnicos, estado inicial o ubicación específica..."
+              helperText="Hasta 500 caracteres"
+              testID="alta-observaciones"
             />
-            {errores.observaciones_medidor !== undefined && (
-              <Text style={styles.errorText}>{errores.observaciones_medidor}</Text>
-            )}
           </View>
 
-          <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+          <FooterApp />
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -457,13 +681,12 @@ export default function AltaSuscriptor({ navigation }: Props) {
             snack.tipo === 'error'
               ? styles.snackError
               : snack.tipo === 'warning'
-                ? styles.snackWarning
-                : styles.snackOk,
+              ? styles.snackWarning
+              : styles.snackOk,
           ]}
+          accessibilityRole="alert"
         >
-          <Text
-            style={[styles.snackText, snack.tipo === 'error' && styles.snackTextError]}
-          >
+          <Text style={[styles.snackText, snack.tipo === 'error' && styles.snackTextError]}>
             {snack.mensaje}
           </Text>
           <Text style={styles.snackClose}>×</Text>
@@ -471,27 +694,35 @@ export default function AltaSuscriptor({ navigation }: Props) {
       )}
 
       {/* Bottom bar fijo */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom || SPACING.md }]}>
         <Pressable
           onPress={() => navigation.goBack()}
           disabled={enviando}
-          style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
+          style={({ pressed }) => [styles.btnCancelar, pressed && styles.pressed]}
+          accessibilityRole="button"
         >
-          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+          <Text style={styles.btnCancelarText}>Cancelar</Text>
         </Pressable>
         <Pressable
           onPress={() => void onSubmit()}
           disabled={enviando}
           style={({ pressed }) => [
-            styles.btnPrimary,
+            styles.btnGuardar,
             enviando && styles.btnDisabled,
-            pressed && styles.pressedDark,
+            pressed && styles.pressed,
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: enviando, busy: enviando }}
         >
           {enviando ? (
-            <ActivityIndicator color={COLORS.onPrimary} size="small" />
+            <>
+              <ActivityIndicator color={COLORS.onPrimary} size="small" />
+              <Text style={[styles.btnGuardarText, styles.btnGuardarTextLoading]}>
+                Guardando…
+              </Text>
+            </>
           ) : (
-            <Text style={styles.btnPrimaryText}>GUARDAR</Text>
+            <Text style={styles.btnGuardarText}>Guardar suscriptor</Text>
           )}
         </Pressable>
       </View>
@@ -500,184 +731,169 @@ export default function AltaSuscriptor({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
-  flex: { flex: 1 },
-
-  // Header
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...BORDERS.thick,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+  root: {
+    flex: 1,
     backgroundColor: COLORS.background,
   },
-  headerBtn: {
-    width: HEADER_HEIGHT,
-    height: HEADER_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineLg,
-    color: COLORS.primary,
-    lineHeight: HEADER_HEIGHT,
-  },
-  headerTitle: {
-    flex: 1,
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    textAlign: 'center',
-    letterSpacing: 2,
-  },
+  flex: { flex: 1 },
 
-  // Scroll
+  // ── Scroll ─────────────────────────────────────────────────────────────────
   scroll: {
-    padding: SPACING.md,
-    paddingBottom: BOTTOM_HEIGHT + SPACING.lg,
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.lg,
+    paddingBottom: BOTTOM_HEIGHT + SPACING.xl,
+    gap: SPACING.md,
   },
 
-  // Sección título
+  // ── Intro ──────────────────────────────────────────────────────────────────
+  intro: {
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  introTitulo: {
+    color: COLORS.primary,
+  },
+  introSub: {
+    color: COLORS.onSurfaceVariant,
+    lineHeight: 20,
+  },
+
+  // ── Secciones ──────────────────────────────────────────────────────────────
+  seccion: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    gap: SPACING.md,
+  },
+  seccionLow: {
+    backgroundColor: COLORS.surfaceLight, // surface-container-low
+  },
+  seccionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
   seccionTitulo: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.textSecondary,
-    letterSpacing: 2,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.lg,
+    color: COLORS.primary,
   },
 
-  // Separador
-  separador: {
-    height: 1,
-    backgroundColor: COLORS.outline,
-    marginVertical: SPACING.lg,
-  },
-
-  // Campos
-  fieldGroup: { marginBottom: SPACING.md },
-  autoGenInfo: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
+  // ── Campos (widgets inline que NO son FormField) ──────────────────────────
+  fieldGroup: {
+    gap: 6,
   },
   fieldLabel: {
     ...TYPOGRAPHY.labelMd,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-    letterSpacing: 1,
+    color: COLORS.onSurfaceVariant,
   },
-  input: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
-    padding: SPACING.sm,
-    ...TYPOGRAPHY.bodyMd,
-    color: COLORS.primary,
-    backgroundColor: COLORS.background,
+  requerido: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.error,
+    fontWeight: '700',
   },
-  inputMultiline: {
-    minHeight: 72,
-    textAlignVertical: 'top',
+  errorInline: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.xs,
+    marginTop: 2,
   },
-  inputError: {
-    borderColor: COLORS.error,
+  errorIcon: {
+    marginTop: 2,
   },
   errorText: {
+    flex: 1,
     ...TYPOGRAPHY.labelSm,
     color: COLORS.error,
-    marginTop: SPACING.xs,
   },
 
-  // Chips estrato
+  // ── Chips estrato ──────────────────────────────────────────────────────────
   chipsRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
   },
   chip: {
     flex: 1,
-    paddingVertical: SPACING.sm,
+    height: 44, // WCAG 2.5.5: >= 44px touch target
     alignItems: 'center',
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
-    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
   },
   chipSel: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondaryContainer,
+    borderColor: COLORS.secondaryContainer,
   },
   chipText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
   },
   chipTextSel: {
-    color: COLORS.onPrimary,
-  },
-
-  // Toggle
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  toggleBox: {
-    width: 24,
-    height: 24,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.background,
-  },
-  toggleBoxOn: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  toggleCheck: {
-    ...TYPOGRAPHY.labelMd,
-    color: COLORS.onPrimary,
+    color: COLORS.primary,
     fontWeight: '700',
   },
-  toggleTexts: { flex: 1 },
-  toggleLabel: {
-    ...TYPOGRAPHY.labelLg,
+
+  // ── Chips categoria de uso (Q10 spec, 5 opciones) ──────────────────────────
+  chipsRowCategoria: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+  },
+  chipCategoria: {
+    paddingHorizontal: SPACING.md,
+    height: 44, // WCAG 2.5.5
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+  },
+  chipTextSm: {
+    ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
   },
-  toggleHint: {
-    ...TYPOGRAPHY.bodySm,
-    color: COLORS.textSecondary,
+  helperTextCategoria: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.onSurfaceVariant,
+    fontStyle: 'italic',
     marginTop: 2,
   },
 
-  // Brand footer
-  brandFooter: {
-    ...TYPOGRAPHY.labelSm,
-    fontSize: 8,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: SPACING.lg,
+  // ── Toggle subsidio ────────────────────────────────────────────────────────
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  toggleLabel: {
+    color: COLORS.primary,
   },
 
-  // Snack inline
+  // ── Snack ──────────────────────────────────────────────────────────────────
   snackBox: {
     position: 'absolute',
     bottom: BOTTOM_HEIGHT + SPACING.md,
-    left: SPACING.md,
-    right: SPACING.md,
+    left: SPACING.margin,
+    right: SPACING.margin,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.sm,
-    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
     gap: SPACING.sm,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  snackOk: { backgroundColor: '#2e7d32' },
-  snackWarning: { backgroundColor: '#ef6c00' },
-  snackError: { backgroundColor: '#c62828' },
+  snackOk: { backgroundColor: COLORS.secondary },
+  snackWarning: { backgroundColor: COLORS.warning },
+  snackError: { backgroundColor: COLORS.error },
   snackText: {
     flex: 1,
     ...TYPOGRAPHY.bodySm,
@@ -689,48 +905,64 @@ const styles = StyleSheet.create({
     color: COLORS.onPrimary,
   },
 
-  // Bottom bar
+  // ── Bottom bar ─────────────────────────────────────────────────────────────
   bottomBar: {
-    height: BOTTOM_HEIGHT,
+    minHeight: BOTTOM_HEIGHT,
     flexDirection: 'row',
-    ...BORDERS.thick,
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    paddingHorizontal: SPACING.margin,
+    paddingTop: SPACING.sm,
     gap: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    alignItems: 'center',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
-  btnSecondary: {
+  btnCancelar: {
     flex: 1,
-    paddingVertical: SPACING.sm,
+    height: 48,
     alignItems: 'center',
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.md,
+    backgroundColor: 'transparent',
   },
-  btnSecondaryText: {
+  btnCancelarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    letterSpacing: 1,
   },
-  btnPrimary: {
-    flex: 2,
-    paddingVertical: SPACING.sm,
+  btnGuardar: {
+    flex: 1,
+    height: 48,
     alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.none,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primaryContainer,
+    borderRadius: RADIUS.md,
+    elevation: 4,
+    shadowColor: COLORS.primaryContainer,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  btnPrimaryText: {
+  btnGuardarText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    letterSpacing: 1,
+  },
+  btnGuardarTextLoading: {
+    marginLeft: SPACING.sm,
   },
   btnDisabled: {
-    backgroundColor: COLORS.textSecondary,
+    backgroundColor: COLORS.onSurfaceVariant,
+    opacity: 0.5,
+    elevation: 0,
   },
 
-  // Press states
-  pressedLight: { opacity: 0.6 },
-  pressedDark: { opacity: 0.75 },
+  pressed: { opacity: 0.7 },
 });

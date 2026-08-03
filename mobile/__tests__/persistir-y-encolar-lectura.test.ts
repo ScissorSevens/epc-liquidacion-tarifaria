@@ -23,6 +23,10 @@ import type { Lectura } from '@dominio/captura-lecturas/types';
 import type { Medidor } from '@dominio/medidores/types';
 import type { ItemCola } from '@dominio/sincronizacion/types';
 
+function transaccionPassthrough() {
+  return jest.fn(async (task: () => Promise<void>): Promise<void> => task());
+}
+
 describe('persistirYEncolarLectura', () => {
   it('persiste la lectura, encola un item LECTURA con el id asignado y devuelve ambos ids', async () => {
     // Arrange — lectura sin id_lectura (recién capturada en campo)
@@ -41,6 +45,7 @@ describe('persistirYEncolarLectura', () => {
     const lecturaPersistida: Lectura = { ...lecturaCapturada, id_lectura: 42 };
 
     const lecturaRepo = {
+      withTransactionAsync: transaccionPassthrough(),
       guardar: jest.fn(async (_l: Lectura) => lecturaPersistida),
     };
     const colaRepo = {
@@ -144,7 +149,10 @@ describe('persistirYEncolarLectura', () => {
     const cap = lecturaBase(50);
     const persistida: Lectura = { ...cap, id_lectura: 99 };
 
-    const lecturaRepo = { guardar: jest.fn(async () => persistida) };
+    const lecturaRepo = {
+      withTransactionAsync: transaccionPassthrough(),
+      guardar: jest.fn(async () => persistida),
+    };
     const colaRepo = {
       guardar: jest.fn(),
       // Hay un MEDIDOR PENDIENTE para id_medidor=50.
@@ -173,7 +181,10 @@ describe('persistirYEncolarLectura', () => {
     const cap = lecturaBase(60);
     const persistida: Lectura = { ...cap, id_lectura: 100 };
 
-    const lecturaRepo = { guardar: jest.fn(async () => persistida) };
+    const lecturaRepo = {
+      withTransactionAsync: transaccionPassthrough(),
+      guardar: jest.fn(async () => persistida),
+    };
     const colaRepo = {
       guardar: jest.fn(),
       // El medidor 60 ya tiene item EXITOSO → no bloquea.
@@ -194,5 +205,46 @@ describe('persistirYEncolarLectura', () => {
 
     const item = colaRepo.guardar.mock.calls[0][0] as ItemCola;
     expect(item.dependeDe).toBeUndefined();
+  });
+
+  it('T-TX-4 si encolar falla, SQLite revierte la lectura persistida', async () => {
+    const lecturaCapturada = lecturaBase(70);
+    const lecturaPersistida: Lectura = { ...lecturaCapturada, id_lectura: 101 };
+    const lecturas: Lectura[] = [];
+    const errorCola = new Error('cola write failed');
+
+    const withTransactionAsync = jest.fn(async (task: () => Promise<void>): Promise<void> => {
+      const snapshot = [...lecturas];
+      try {
+        await task();
+      } catch (error) {
+        lecturas.splice(0, lecturas.length, ...snapshot);
+        throw error;
+      }
+    });
+    const lecturaRepo = {
+      withTransactionAsync,
+      guardar: jest.fn(async () => {
+        lecturas.push(lecturaPersistida);
+        return lecturaPersistida;
+      }),
+    };
+    const colaRepo = {
+      listar: jest.fn(async () => [] as ItemCola[]),
+      guardar: jest.fn().mockRejectedValue(errorCola),
+    };
+
+    await expect(
+      persistirYEncolarLectura({
+        lectura: lecturaCapturada,
+        lecturaRepo,
+        colaRepo,
+        idGenerator: { uuid: () => 'item-lec-tx' },
+        hasher: { sha256: () => 'hash-tx' },
+      }),
+    ).rejects.toBe(errorCola);
+
+    expect(withTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(lecturas).toEqual([]);
   });
 });

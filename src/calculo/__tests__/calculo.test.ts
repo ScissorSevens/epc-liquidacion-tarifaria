@@ -23,10 +23,9 @@ const realIdGen = crearIdGeneratorUuid();
 
 describe('crearLiquidacion — inyección de ports (refactor crypto built-in)', () => {
   const resultadoMock: ResultadoCalculo = {
-    consumo: 15, consumoBasico: 15, consumoExcedente: 0,
-    cargoFijo: 5000, cargoConsumo: 12000, cargoExcedente: 0,
-    subsidio: 0, contribucion: 0, total: 17000,
-    periodo: { mes: 4, anio: 2026 },
+    id_prestador: 0, estrato: 4, categoria_uso: 'residencial', consumo_m3: 15, consumo_efectivo_m3: 15, bloques: [], cargo_fijo: 5000, cc_unitario: 800, cc_total: 12000,
+    subsidio: 0, contribucion: 0, total: 17000, factor_aplicado: 0, metadata: { norma_aplicada: 'X', acuerdo_id: null, parametros_id: 0, cmviaa_aplicado: false, minimo_vital_aplicado: false, factor_capeado: false, version_motor: 'X', calculo_timestamp: 'X' },
+    
   };
   it('usa el IdGenerator inyectado para el id (no crypto.randomUUID)', () => {
     const liq = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock }, hasher, idGen);
@@ -40,16 +39,20 @@ describe('crearLiquidacion — inyección de ports (refactor crypto built-in)', 
 
 describe('crearLiquidacion', () => {
   const resultadoMock: ResultadoCalculo = {
-    consumo: 15,
-    consumoBasico: 15,
-    consumoExcedente: 0,
-    cargoFijo: 5000,
-    cargoConsumo: 12000,
-    cargoExcedente: 0,
+    id_prestador: 0,
+    estrato: 4,
+    categoria_uso: 'residencial',
+    consumo_m3: 15,
+    consumo_efectivo_m3: 15,
+    bloques: [],
+    cargo_fijo: 5000,
+    cc_unitario: 800,
+    cc_total: 12000,
     subsidio: 0,
     contribucion: 0,
     total: 17000,
-    periodo: { mes: 4, anio: 2026 },
+    factor_aplicado: 0,
+    metadata: { norma_aplicada: 'X', acuerdo_id: null, parametros_id: 0, cmviaa_aplicado: false, minimo_vital_aplicado: false, factor_capeado: false, version_motor: 'X', calculo_timestamp: 'X' },
   };
 
   it('debería generar una Liquidación con id único, fechaGeneracion y los datos del cálculo', () => {
@@ -86,7 +89,7 @@ describe('crearLiquidacion', () => {
       const liquidacion = crearLiquidacion({ suscriptorId: 'SUSC-001', resultado: resultadoMock }, realHasher, realIdGen);
 
       expect(Object.isFrozen(liquidacion.resultado)).toBe(true);
-      expect(Object.isFrozen(liquidacion.resultado.periodo)).toBe(true);
+      expect(Object.isFrozen(liquidacion.resultado.metadata)).toBe(true);
     });
 
     it('debería lanzar error en strict mode al intentar modificar campos', () => {

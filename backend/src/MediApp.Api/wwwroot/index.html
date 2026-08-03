@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MediApp — Dashboard</title>
+  <title>AquaServices - Dashboard</title>
   <script src="/bcrypt.min.js"></script>
   <script>var bcrypt = dcodeIO.bcrypt;</script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -37,7 +37,7 @@
     <div class="max-w-screen-xl mx-auto px-6 h-14 flex items-center gap-3">
       <!-- Logo -->
       <span class="text-sm font-semibold tracking-tight text-[#fafafa] select-none">
-        MEDI<span class="text-[#0C5CAB]">APP</span>
+        AQUA<span class="text-[#0C5CAB]">SERVICES</span>
       </span>
       <div class="w-px h-4 bg-white/10"></div>
       <span class="text-xs text-white/40 font-light">Dashboard</span>
@@ -72,7 +72,7 @@
         <p class="text-xs text-white/40 uppercase tracking-wide font-medium mb-1">Lecturas</p>
         <p id="kpi-lec" class="text-2xl font-semibold tracking-tight text-[#fafafa]">—</p>
       </div>
-      <div class="glass rounded-xl p-4">
+      <div class="glass rounded-xl p-4" style="display:none">
         <p class="text-xs text-white/40 uppercase tracking-wide font-medium mb-1">Liquidaciones</p>
         <p id="kpi-liq" class="text-2xl font-semibold tracking-tight text-[#fafafa]">—</p>
       </div>
@@ -103,10 +103,10 @@
       <button class="tab-btn" data-tab="lecturas" role="tab" aria-selected="false">
         <i data-lucide="clipboard-list" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Lecturas
       </button>
-      <button class="tab-btn" data-tab="liquidaciones" role="tab" aria-selected="false">
+      <button class="tab-btn" data-tab="liquidaciones" role="tab" aria-selected="false" style="display:none">
         <i data-lucide="receipt" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Liquidaciones
       </button>
-      <button class="tab-btn" data-tab="operarios" role="tab" aria-selected="false">
+      <button class="tab-btn" data-tab="operarios" role="tab" aria-selected="false" style="display:none">
         <i data-lucide="hard-hat" class="w-3.5 h-3.5" style="stroke-width:1.5"></i> Operarios
       </button>
     </nav>

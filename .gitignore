@@ -20,3 +20,6 @@ docs/
 DOCUMENTACION_TECNICA.md
 MANUAL_DE_USUARIO.md
 
+# Claude Code session notes (ephemeral, per-session context)
+.claude/notes/
+

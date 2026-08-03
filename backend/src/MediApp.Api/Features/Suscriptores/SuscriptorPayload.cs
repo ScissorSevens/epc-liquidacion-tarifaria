@@ -37,4 +37,26 @@ public class SuscriptorPayload
     /// <summary>idCliente offline. Debe coincidir con el del sobre SyncRequest.</summary>
     [JsonPropertyName("idCliente")]
     public string IdCliente { get; set; } = string.Empty;
+
+    /// <summary>Cedula del suscriptor (opcional, hasta 20 chars). Nuevo campo extendido.</summary>
+    [JsonPropertyName("cedula")]
+    public string? Cedula { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("telefono")]
+    public string? Telefono { get; set; }
+
+    /// <summary>Municipio del suscriptor (opcional, hasta 100 chars). Nuevo campo extendido.</summary>
+    [JsonPropertyName("municipio")]
+    public string? Municipio { get; set; }
+
+    /// <summary>Sector del suscriptor (opcional, hasta 100 chars). Nuevo campo extendido.</summary>
+    [JsonPropertyName("sector")]
+    public string? Sector { get; set; }
+
+    /// <summary>Indica si aplica subsidio tarifario (opcional). Nuevo campo extendido.</summary>
+    [JsonPropertyName("aplicaSubsidio")]
+    public bool? AplicaSubsidio { get; set; }
 }

@@ -1,7 +1,4 @@
 import { useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Modal,
@@ -25,9 +22,10 @@ import type {
 } from '@dominio/importacion/types';
 import { persistirYEncolarImportacion } from '../adapters/persistir-y-encolar-importacion';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
+import { FooterApp } from '../componentes/FooterApp';
 import type { ConfigStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
@@ -36,9 +34,14 @@ import {
 
 type Props = ConfigStackScreenProps<'ImportarCsv'>;
 
-// Header nuevo (7 columnas) — codigo y numero_medidor se asignan automáticamente.
-const HEADER_ESPERADO_TXT =
-  'nombre_apellidos,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
+// Header nuevo (11 columnas) — `email` y `telefono` son opcionales.
+// `cedula` y `municipio` son requeridos por el dominio `crearSuscriptor`. La constante DEBE
+// coincidir token-a-token con `HEADER_NUEVO` en `parser-csv.ts`.
+// El test de contrato `__tests__/pantallas/importar-csv-header.test.ts`
+// enforce esa sincronía — si la UI promete un formato distinto al
+// que el parser acepta, el test rompe.
+export const HEADER_ESPERADO_TXT =
+  'nombre_apellidos,cedula,email,telefono,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
 
 // Umbral a partir del cual pedimos confirmacion al usuario antes de
 // procesar. RN no tiene workers triviales y el bucle es JS thread, asi
@@ -77,12 +80,18 @@ type Estado =
  * invalido devuelve `{ filas: [], errores: [{ linea: 1, ... }] }`. Lo
  * detectamos y vamos a fase `error` SIN llamar al importador con basura.
  *
+ * Contrato del header: la constante `HEADER_ESPERADO_TXT` (arriba) DEBE
+ * coincidir token-a-token con `HEADER_NUEVO` en `parser-csv.ts`. El test
+ * `__tests__/pantallas/importar-csv-header.test.ts` enforce esta sincronía.
+ * Si la UI promete un header distinto al que el parser espera, el test
+ * rompe (COR-09: bug histórico donde la UI mostraba "7 columnas" sin
+ * cédula/municipio pero el dominio las exigía).
+ *
  * Encoding: UTF-8 (default de `File.text()`). Si el CSV viene en
  * Windows-1252 o latin1 (Excel comun), se va a ver con caracteres raros
  * pero no rompe — deuda explicita, ver reporte del sub-agente.
  */
 export default function ImportarCsv({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
   const [estado, setEstado] = useState<Estado>({ fase: 'idle' });
   const [dialogFormatoVisible, setDialogFormatoVisible] = useState(false);
   const [dialogConfirmGrande, setDialogConfirmGrande] = useState<{
@@ -92,14 +101,7 @@ export default function ImportarCsv({ navigation }: Props) {
 
   function reset() {
     setEstado({ fase: 'idle' });
-    setDialogFormatoVisible(false);
-    setDialogConfirmGrande({ visible: false, archivo: null });
   }
-
-  // Resetea estado al perder foco — evita que quede pegada en fase resultado
-  useFocusEffect(useCallback(() => {
-    return () => { reset(); };
-  }, []));
 
   async function seleccionarArchivo() {
     setEstado({ fase: 'leyendo' });
@@ -176,11 +178,11 @@ export default function ImportarCsv({ navigation }: Props) {
       // quedaba vacia → el backend nunca veia los suscriptores nuevos.
       const { reporte } = await persistirYEncolarImportacion({
         filas: archivo.filas,
-        suscriptorRepo: bs.suscriptorRepo,
-        medidorRepo: bs.medidorRepo,
-        colaRepo: bs.colaRepo,
-        idGenerator: bs.idGenerator,
-        hasher: bs.hasher,
+        suscriptorRepo: bs.repos.suscriptorRepo,
+        medidorRepo: bs.repos.medidorRepo,
+        colaRepo: bs.repos.colaRepo,
+        idGenerator: bs.adapters.idGenerator,
+        hasher: bs.adapters.hasher,
       });
       setEstado({
         fase: 'resultado',
@@ -206,20 +208,23 @@ export default function ImportarCsv({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header brutalist */}
-      <View style={[styles.header, { paddingTop: insets.top, height: 56 + insets.top }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
-          style={({ pressed }) => [styles.headerBtn, pressed && styles.pressedDark]}
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>IMPORTAR CSV</Text>
-        <View style={styles.headerBtn} />
+      {/* Top App Bar */}
+      <View style={styles.header}>
+        <View style={styles.headerIzq}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            disabled={estado.fase === 'leyendo' || estado.fase === 'importando'}
+            hitSlop={8}
+            style={({ pressed }) => [pressed && styles.pressedDark]}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Importar CSV</Text>
+        </View>
+        <MaterialIcons name="account-circle" size={24} color={COLORS.primary} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 80 + 20 }]}>
+      <ScrollView contentContainerStyle={styles.scroll}>
         {estado.fase === 'idle' && (
           <RenderIdle
             onSeleccionar={() => void seleccionarArchivo()}
@@ -245,10 +250,7 @@ export default function ImportarCsv({ navigation }: Props) {
           <RenderResultado
             reporte={estado.reporte}
             archivoNombre={estado.archivoNombre}
-            onVolverInicio={() => {
-              navigation.popToTop();
-              navigation.navigate('Inicio', { screen: 'RutaDeHoy' });
-            }}
+            onVolverInicio={() => navigation.popToTop()}
             onImportarOtro={reset}
           />
         )}
@@ -257,7 +259,7 @@ export default function ImportarCsv({ navigation }: Props) {
           <RenderError mensaje={estado.mensaje} onReintentar={reset} />
         )}
 
-        <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+        <FooterApp />
       </ScrollView>
 
       {/* Dialog: formato esperado */}
@@ -269,26 +271,38 @@ export default function ImportarCsv({ navigation }: Props) {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setDialogFormatoVisible(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitulo}>FORMATO ESPERADO</Text>
-            <Text style={styles.modalBody}>
-              El archivo debe ser un CSV (separado por comas) con{'\n'}
-              <Text style={{ fontWeight: '700' }}>7 columnas</Text> en este orden:
-            </Text>
-            <Text style={styles.modalCode}>{HEADER_ESPERADO_TXT}</Text>
-            <Text style={styles.modalBody}>
-              • Código y número de medidor se asignan automáticamente.{'\n'}
-              • Encoding: UTF-8.{'\n'}
-              • Estrato: entero entre 1 y 6.{'\n'}
-              • Fecha de instalación: formato YYYY-MM-DD.{'\n'}
-              • Campos opcionales (matrícula, catastral, observaciones) pueden venir vacíos.{'\n'}
-              • También acepta el formato legado de 9 columnas con código y número de medidor.
-            </Text>
-            <Pressable
-              onPress={() => setDialogFormatoVisible(false)}
-              style={styles.modalBtn}
-            >
-              <Text style={styles.modalBtnText}>ENTENDIDO</Text>
-            </Pressable>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>Formato esperado</Text>
+              <Pressable onPress={() => setDialogFormatoVisible(false)} hitSlop={8}>
+                <MaterialIcons name="close" size={20} color={COLORS.primary} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalBody}>
+                El archivo debe ser un CSV (separado por comas) con{'\n'}
+                <Text style={{ fontWeight: '700' }}>9 columnas</Text> en este orden:
+              </Text>
+              <Text style={styles.modalCode}>{HEADER_ESPERADO_TXT}</Text>
+              <Text style={styles.modalBody}>
+                • Cédula y municipio son obligatorios (el dominio los exige NO vacíos).{'\n'}
+                • Cédula: entre 6 y 12 dígitos numéricos.{'\n'}
+                • Municipio: nombre real del municipio donde se presta el servicio.{'\n'}
+                • Código de suscriptor y número de medidor se asignan automáticamente.{'\n'}
+                • Encoding: UTF-8.{'\n'}
+                • Estrato: entero entre 1 y 6.{'\n'}
+                • Fecha de instalación: formato YYYY-MM-DD.{'\n'}
+                • Campos opcionales (matrícula, catastral, observaciones) pueden venir vacíos.{'\n'}
+                • También acepta el formato legado de 9 columnas con código y número de medidor (sin cédula/municipio).
+              </Text>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <Pressable
+                onPress={() => setDialogFormatoVisible(false)}
+                style={styles.modalBtn}
+              >
+                <Text style={styles.modalBtnText}>Entendido</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -305,7 +319,7 @@ export default function ImportarCsv({ navigation }: Props) {
           onPress={() => setDialogConfirmGrande({ visible: false, archivo: null })}
         >
           <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitulo}>ARCHIVO GRANDE</Text>
+            <Text style={styles.modalTitulo}>Archivo grande</Text>
             <Text style={styles.modalBody}>
               El archivo tiene {dialogConfirmGrande.archivo?.filas.length ?? 0} filas válidas.
               Procesarlas puede tardar varios segundos y la app puede sentirse lenta.
@@ -316,7 +330,7 @@ export default function ImportarCsv({ navigation }: Props) {
                 onPress={() => setDialogConfirmGrande({ visible: false, archivo: null })}
                 style={[styles.modalBtn, styles.modalBtnSecondary]}
               >
-                <Text style={styles.modalBtnSecondaryText}>CANCELAR</Text>
+                <Text style={styles.modalBtnSecondaryText}>Cancelar</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -326,7 +340,7 @@ export default function ImportarCsv({ navigation }: Props) {
                 }}
                 style={styles.modalBtn}
               >
-                <Text style={styles.modalBtnText}>CONTINUAR</Text>
+                <Text style={styles.modalBtnText}>Continuar</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -346,28 +360,36 @@ function RenderIdle({
   onVerFormato: () => void;
 }) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitulo}>IMPORTAR SUSCRIPTORES DESDE CSV</Text>
-      <Text style={styles.cardBody}>
-        Cargá un archivo .csv con tus suscriptores y medidores. El sistema
-        valida cada fila y reporta duplicados y errores sin abortar el lote.
-      </Text>
-      <Text style={styles.cardHint}>7 columnas separadas por coma · UTF-8</Text>
-      <View style={styles.separador} />
-      <Pressable
-        onPress={onSeleccionar}
-        style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDark]}
-      >
-        <MaterialIcons name="upload-file" size={20} color={COLORS.onPrimary} />
-        <Text style={styles.btnPrimaryText}>SELECCIONAR ARCHIVO CSV</Text>
-      </Pressable>
-      <Pressable
-        onPress={onVerFormato}
-        style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
-      >
-        <Text style={styles.btnSecondaryText}>VER FORMATO ESPERADO</Text>
-      </Pressable>
-    </View>
+    <>
+      <View style={styles.card}>
+        <Text style={styles.cardTitulo}>Importar suscriptores desde CSV</Text>
+        <Text style={styles.cardBody}>
+          Cargá un archivo .csv con tus suscriptores y medidores. El sistema
+          valida cada fila y reporta duplicados y errores sin abortar el lote.
+        </Text>
+        <View style={styles.cardHint}>
+          <MaterialIcons name="info" size={16} color={COLORS.secondary} />
+          <Text style={styles.cardHintTexto}>9 columnas separadas por coma · UTF-8</Text>
+        </View>
+        <BotonPrimario
+          texto="Seleccionar archivo CSV"
+          icono="upload-file"
+          tono="azul"
+          onPress={onSeleccionar}
+        />
+        <Pressable
+          onPress={onVerFormato}
+          style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
+        >
+          <Text style={styles.btnSecondaryText}>Ver formato esperado</Text>
+        </Pressable>
+      </View>
+      {/* Status placeholder */}
+      <View style={styles.statusPlaceholder}>
+        <MaterialIcons name="cloud-upload" size={40} color={COLORS.primary} />
+        <Text style={styles.statusPlaceholderTexto}>Esperando carga de datos...</Text>
+      </View>
+    </>
   );
 }
 
@@ -398,7 +420,7 @@ function RenderPreview({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitulo}>VISTA PREVIA</Text>
+      <Text style={styles.cardTitulo}>Vista previa</Text>
       <Text style={styles.cardBody}>
         Archivo: <Text style={styles.bold}>{archivo.nombre}</Text>
       </Text>
@@ -442,21 +464,17 @@ function RenderPreview({
           onPress={onCancelar}
           style={({ pressed }) => [styles.btnSecondary, styles.flex1, pressed && styles.pressedLight]}
         >
-          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+          <Text style={styles.btnSecondaryText}>Cancelar</Text>
         </Pressable>
-        <Pressable
-          onPress={onConfirmar}
-          disabled={archivo.filas.length === 0}
-          style={({ pressed }) => [
-            styles.btnPrimary,
-            styles.flex1,
-            archivo.filas.length === 0 && styles.btnDisabled,
-            pressed && styles.pressedDark,
-          ]}
-        >
-          <MaterialIcons name="cloud-upload" size={18} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>IMPORTAR</Text>
-        </Pressable>
+        <View style={styles.flex1}>
+          <BotonPrimario
+            texto="Importar suscriptores"
+            icono="cloud-upload"
+            tono="azul"
+            onPress={onConfirmar}
+            disabled={archivo.filas.length === 0}
+          />
+        </View>
       </View>
     </View>
   );
@@ -484,34 +502,34 @@ function RenderResultado({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitulo}>RESULTADO DE LA IMPORTACIÓN</Text>
+      <Text style={styles.cardTitulo}>Resultado de la importación</Text>
       <Text style={styles.cardHint}>{archivoNombre}</Text>
       <View style={styles.separador} />
 
       <View style={styles.metricRow}>
-        <Text style={styles.metricLabel}>SUSCRIPTORES CREADOS</Text>
+        <Text style={styles.metricLabel}>Suscriptores creados</Text>
         <Text style={styles.metricValorOk}>{reporte.suscriptoresCreados}</Text>
       </View>
       <View style={styles.metricRow}>
-        <Text style={styles.metricLabel}>MEDIDORES CREADOS</Text>
+        <Text style={styles.metricLabel}>Medidores creados</Text>
         <Text style={styles.metricValorOk}>{reporte.medidoresCreados}</Text>
       </View>
 
       {dupSus.length > 0 && (
         <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>SUSCRIPTORES DUPLICADOS</Text>
+          <Text style={styles.metricLabel}>Suscriptores duplicados</Text>
           <Text style={styles.metricValorWarn}>{dupSus.length}</Text>
         </View>
       )}
       {dupMed.length > 0 && (
         <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>MEDIDORES DUPLICADOS</Text>
+          <Text style={styles.metricLabel}>Medidores duplicados</Text>
           <Text style={styles.metricValorWarn}>{dupMed.length}</Text>
         </View>
       )}
       {reporte.errores.length > 0 && (
         <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>ERRORES</Text>
+          <Text style={styles.metricLabel}>Errores</Text>
           <Text style={styles.metricValorErr}>{reporte.errores.length}</Text>
         </View>
       )}
@@ -526,15 +544,16 @@ function RenderResultado({
           onPress={onImportarOtro}
           style={({ pressed }) => [styles.btnSecondary, styles.flex1, pressed && styles.pressedLight]}
         >
-          <Text style={styles.btnSecondaryText}>IMPORTAR OTRO</Text>
+          <Text style={styles.btnSecondaryText}>Importar otro</Text>
         </Pressable>
-        <Pressable
-          onPress={onVolverInicio}
-          style={({ pressed }) => [styles.btnPrimary, styles.flex1, pressed && styles.pressedDark]}
-        >
-          <MaterialIcons name="home" size={18} color={COLORS.onPrimary} />
-          <Text style={styles.btnPrimaryText}>INICIO</Text>
-        </Pressable>
+        <View style={styles.flex1}>
+          <BotonPrimario
+            texto="Ir al inicio"
+            icono="home"
+            tono="azul"
+            onPress={onVolverInicio}
+          />
+        </View>
       </View>
     </View>
   );
@@ -591,15 +610,14 @@ function RenderError({
 }) {
   return (
     <View style={styles.errorCard}>
-      <Text style={styles.errorTitulo}>✗ NO SE PUDO PROCESAR EL ARCHIVO</Text>
+      <Text style={styles.errorTitulo}>No se pudo procesar el archivo</Text>
       <Text style={styles.errorBody}>{mensaje}</Text>
-      <Pressable
+      <BotonPrimario
+        texto="Reintentar"
+        icono="refresh"
+        tono="azul"
         onPress={onReintentar}
-        style={({ pressed }) => [styles.btnPrimary, { marginTop: SPACING.md }, pressed && styles.pressedDark]}
-      >
-        <MaterialIcons name="refresh" size={18} color={COLORS.onPrimary} />
-        <Text style={styles.btnPrimaryText}>REINTENTAR</Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -609,22 +627,23 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    height: 56,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerLowest,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
+    borderBottomColor: COLORS.outlineVariant,
   },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerIcon: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
+  headerIzq: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
   headerTitle: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
   },
 
   // Scroll
@@ -632,21 +651,30 @@ const styles = StyleSheet.create({
 
   // Card
   card: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
     padding: SPACING.lg,
-    backgroundColor: COLORS.background,
     marginBottom: SPACING.md,
   },
   cardTitulo: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: SPACING.sm,
   },
-  cardBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.textSecondary, marginBottom: SPACING.sm },
-  cardHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, opacity: 0.7 },
+  cardBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.onSurfaceVariant, marginBottom: SPACING.sm },
+  cardHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  cardHintTexto: { ...TYPOGRAPHY.labelMd, color: COLORS.onSurfaceVariant },
   bold: { fontWeight: '700' },
   bigCount: {
     ...TYPOGRAPHY.headlineSm,
@@ -656,48 +684,43 @@ const styles = StyleSheet.create({
   },
 
   // Separador
-  separador: { height: 1, backgroundColor: COLORS.outline, marginVertical: SPACING.md },
+  separador: { height: 1, backgroundColor: COLORS.outlineVariant, marginVertical: SPACING.md },
 
   // Botones
-  btnPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
-    minHeight: 48,
-    marginTop: SPACING.md,
-  },
-  btnPrimaryText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
+  // El botón primario se renderiza via <BotonPrimario> extraído.
   btnSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    ...BORDERS.thin,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
+    borderRadius: RADIUS.lg,
     marginTop: SPACING.sm,
-    minHeight: 44,
+    minHeight: 48,
   },
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
-  btnDisabled: { backgroundColor: COLORS.textSecondary },
+  btnDisabled: { backgroundColor: COLORS.onSurfaceVariant, opacity: 0.4 },
   botonesRow: { flexDirection: 'row', gap: SPACING.sm },
   flex1: { flex: 1 },
+
+  // Status placeholder
+  statusPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
+    opacity: 0.4,
+    gap: SPACING.sm,
+  },
+  statusPlaceholderTexto: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.primary,
+  },
 
   // Loading
   center: {
@@ -710,21 +733,22 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...TYPOGRAPHY.bodyMd,
-    color: COLORS.textSecondary,
+    color: COLORS.onSurfaceVariant,
     textAlign: 'center',
     marginTop: SPACING.md,
   },
 
   // Warning box
   warningBox: {
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
     padding: SPACING.md,
     gap: SPACING.xs,
     marginVertical: SPACING.sm,
   },
-  warningText: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary },
+  warningText: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant },
 
   // Métricas
   metricRow: {
@@ -735,27 +759,24 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     ...TYPOGRAPHY.bodySm,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: COLORS.onSurfaceVariant,
   },
   metricValorOk: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
-  metricValorWarn: { ...TYPOGRAPHY.headlineSm, color: '#ef6c00' },
+  metricValorWarn: { ...TYPOGRAPHY.headlineSm, color: COLORS.warning },
   metricValorErr: { ...TYPOGRAPHY.headlineSm, color: COLORS.error },
 
   // Error card
   errorCard: {
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    borderRadius: RADIUS.xl,
     padding: SPACING.lg,
     backgroundColor: COLORS.errorContainer,
-    borderColor: COLORS.error,
     marginBottom: SPACING.md,
   },
   errorTitulo: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.error,
-    textTransform: 'uppercase',
     marginBottom: SPACING.sm,
   },
   errorBody: { ...TYPOGRAPHY.bodyMd, color: COLORS.error },
@@ -763,65 +784,71 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: SPACING.margin,
   },
   modalCard: {
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.xl * 2,
     width: '100%',
-    gap: SPACING.md,
+    overflow: 'hidden',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
   },
   modalTitulo: {
-    ...TYPOGRAPHY.labelLg,
+    ...TYPOGRAPHY.headlineSm,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
+  },
+  modalScroll: {
+    padding: SPACING.lg,
+    maxHeight: 320,
   },
   modalCode: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.primary,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.surfaceContainerLow,
     padding: SPACING.md,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
     fontFamily: 'monospace',
+    marginVertical: SPACING.md,
   },
-  modalBody: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, lineHeight: 20 },
+  modalBody: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, lineHeight: 20 },
+  modalFooter: {
+    padding: SPACING.md,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+  },
   modalBtn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.primaryContainer,
+    paddingVertical: SPACING.sm + 4,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
+    borderRadius: RADIUS.lg,
     alignItems: 'center',
-    marginTop: SPACING.sm,
     flex: 1,
   },
-  modalBtnText: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary, textTransform: 'uppercase' },
+  modalBtnText: { ...TYPOGRAPHY.labelLg, color: COLORS.onPrimary },
   modalBtnSecondary: {
     backgroundColor: 'transparent',
-    ...BORDERS.thin,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   modalBtnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
   },
   modalBtnsRow: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
-
-  // Brand footer
-  brandFooter: {
-    ...TYPOGRAPHY.labelSm,
-    fontSize: 8,
-    color: COLORS.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    textAlign: 'center',
-    marginTop: SPACING.lg,
-  },
 
   // Press states
   pressedLight: { opacity: 0.7 },

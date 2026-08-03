@@ -16,7 +16,7 @@ describe('wiring dominio movil', () => {
     const resultado = smokeDominio();
 
     expect(resultado.estado).toBe('OK');
-    expect(resultado.mensaje).toContain('MediApp');
+    expect(resultado.mensaje).toContain('AquaServices');
     expect(typeof resultado.timestamp).toBe('string');
     expect(resultado.smokeMotorTarifario).toBeDefined();
     // Consumo = lecturaActual(1015) - lecturaAnterior(1000) = 15 m3

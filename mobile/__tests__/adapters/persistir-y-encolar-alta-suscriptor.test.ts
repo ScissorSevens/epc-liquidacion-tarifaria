@@ -2,20 +2,12 @@
 //
 // Tests del adapter `persistirYEncolarAltaSuscriptor`.
 //
-// Reemplaza la logica inline de la pantalla `AltaSuscriptor.tsx`:
-// crea SUSCRIPTOR + MEDIDOR en SQLite local, encola ambos para sync
-// con `dependeDe` correcto, y compensa si algo del medidor falla.
-//
-// Casos cubiertos:
-//   1. Happy path: ambos creados → 2 items encolados, MEDIDOR depende
-//      de SUSCRIPTOR.
-//   2. Falla crear medidor → eliminar suscriptor de SQLite + eliminar
-//      item SUSCRIPTOR de cola. Adapter relanza el error.
-//   3. Falla crear medidor + falla `suscriptorRepo.eliminar` →
-//      adapter relanza el error original del medidor PERO igual intenta
-//      eliminar el item de cola (best effort).
-//   4. Falla crear suscriptor → no se persiste nada, no se encola nada,
-//      adapter relanza.
+// Cubre la transaccion SQLite que crea SUSCRIPTOR + MEDIDOR y encola ambos:
+//   1. Happy path: las cuatro escrituras confirman y MEDIDOR depende de SUSCRIPTOR.
+//   2. Falla crear medidor: revierte suscriptor e item sin compensacion manual.
+//   3. T-TX-5: el rollback automatico funciona aunque los deletes manuales fallen.
+//   4. Falla encolar suscriptor: revierte el suscriptor y no crea medidor.
+//   5. Falla crear suscriptor: no persiste ni encola nada.
 
 import { persistirYEncolarAltaSuscriptor } from '../../src/adapters/persistir-y-encolar-alta-suscriptor';
 import type { Suscriptor } from '@dominio/suscriptores/types';
@@ -27,9 +19,13 @@ import type { ItemCola } from '@dominio/sincronizacion/types';
 const BORRADOR_SUS = {
   codigo: '0042',
   nombre_apellidos: 'Test User',
+  cedula: '123456789',
+  municipio: 'Bogota',
   direccion: 'Calle 1',
   estrato: 2 as const,
   aplica_subsidio: false,
+  id_prestador: 0,
+  categoria_uso: 'residencial' as const,
   estado: 'activo' as const,
 };
 
@@ -44,9 +40,13 @@ function susCreado(id: number): Suscriptor {
     id_suscriptor: id,
     codigo: BORRADOR_SUS.codigo,
     nombre_apellidos: BORRADOR_SUS.nombre_apellidos,
+    cedula: BORRADOR_SUS.cedula,
+    municipio: BORRADOR_SUS.municipio,
     direccion: BORRADOR_SUS.direccion,
     estrato: BORRADOR_SUS.estrato,
     aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
     estado: BORRADOR_SUS.estado,
     created_at: '2026-05-07T00:00:00.000Z',
   };
@@ -64,11 +64,29 @@ function medCreado(id: number, idSus: number): Medidor {
 }
 
 function setup() {
+  const suscriptoresPersistidos: Suscriptor[] = [];
+  const medidoresPersistidos: Medidor[] = [];
   const itemsGuardados: ItemCola[] = [];
-  const itemsEliminados: string[] = [];
+
+  const withTransactionAsync = jest.fn(async (task: () => Promise<void>): Promise<void> => {
+    const snapshot = {
+      suscriptores: [...suscriptoresPersistidos],
+      medidores: [...medidoresPersistidos],
+      items: [...itemsGuardados],
+    };
+    try {
+      await task();
+    } catch (error) {
+      suscriptoresPersistidos.splice(0, suscriptoresPersistidos.length, ...snapshot.suscriptores);
+      medidoresPersistidos.splice(0, medidoresPersistidos.length, ...snapshot.medidores);
+      itemsGuardados.splice(0, itemsGuardados.length, ...snapshot.items);
+      throw error;
+    }
+  });
 
   return {
     suscriptorRepo: {
+      withTransactionAsync,
       crear: jest.fn(),
       eliminar: jest.fn(),
     },
@@ -79,17 +97,17 @@ function setup() {
       guardar: jest.fn(async (it: ItemCola) => {
         itemsGuardados.push(it);
       }),
-      eliminar: jest.fn(async (id: string) => {
-        itemsEliminados.push(id);
-      }),
+      eliminar: jest.fn(),
     },
     idGenerator: (() => {
       let n = 0;
       return { uuid: jest.fn(() => `uuid-${++n}`) };
     })(),
     hasher: { sha256: jest.fn(() => 'hash-fake') },
+    withTransactionAsync,
+    suscriptoresPersistidos,
+    medidoresPersistidos,
     itemsGuardados,
-    itemsEliminados,
   };
 }
 
@@ -122,11 +140,10 @@ describe('persistirYEncolarAltaSuscriptor', () => {
     expect(s.colaRepo.eliminar).not.toHaveBeenCalled();
   });
 
-  it('falla_medidor_revierte_suscriptor_y_borra_item_cola', async () => {
+  it('falla_medidor_revierte_suscriptor_e_item_sin_compensacion_manual', async () => {
     const s = setup();
     s.suscriptorRepo.crear.mockResolvedValue(susCreado(8));
     s.medidorRepo.crear.mockRejectedValue(new Error('UK violada'));
-    s.suscriptorRepo.eliminar.mockResolvedValue(undefined);
 
     await expect(
       persistirYEncolarAltaSuscriptor({
@@ -140,20 +157,23 @@ describe('persistirYEncolarAltaSuscriptor', () => {
       }),
     ).rejects.toThrow('UK violada');
 
-    expect(s.suscriptorRepo.eliminar).toHaveBeenCalledWith(8);
-    // El item SUSCRIPTOR que llegamos a encolar debe borrarse.
-    const itSusGuardado = s.itemsGuardados.find((i) => i.tipo === 'SUSCRIPTOR');
-    expect(itSusGuardado).toBeDefined();
-    expect(s.colaRepo.eliminar).toHaveBeenCalledWith(itSusGuardado!.id);
-    // No debe haberse encolado MEDIDOR.
-    expect(s.itemsGuardados.find((i) => i.tipo === 'MEDIDOR')).toBeUndefined();
+    expect(s.withTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(s.itemsGuardados).toEqual([]);
+    expect(s.suscriptorRepo.eliminar).not.toHaveBeenCalled();
+    expect(s.colaRepo.eliminar).not.toHaveBeenCalled();
   });
 
-  it('falla_medidor_y_falla_eliminar_suscriptor_igual_intenta_borrar_item_cola_y_relanza', async () => {
+  it('T-TX-5 si crear medidor falla, SQLite revierte el suscriptor aunque el rollback manual no exista', async () => {
     const s = setup();
-    s.suscriptorRepo.crear.mockResolvedValue(susCreado(9));
-    s.medidorRepo.crear.mockRejectedValue(new Error('FK invalida'));
-    s.suscriptorRepo.eliminar.mockRejectedValue(new Error('eliminar stub'));
+    const suscriptor = susCreado(81);
+    const errorMedidor = new Error('medidor write failed');
+    s.suscriptorRepo.crear.mockImplementation(async () => {
+      s.suscriptoresPersistidos.push(suscriptor);
+      return suscriptor;
+    });
+    s.medidorRepo.crear.mockRejectedValue(errorMedidor);
+    s.suscriptorRepo.eliminar.mockRejectedValue(new Error('rollback manual suscriptor'));
+    s.colaRepo.eliminar.mockRejectedValue(new Error('rollback manual cola'));
 
     await expect(
       persistirYEncolarAltaSuscriptor({
@@ -165,12 +185,41 @@ describe('persistirYEncolarAltaSuscriptor', () => {
         idGenerator: s.idGenerator,
         hasher: s.hasher,
       }),
-    ).rejects.toThrow('FK invalida');
+    ).rejects.toBe(errorMedidor);
 
-    // Best effort: ambas compensaciones se intentan.
-    expect(s.suscriptorRepo.eliminar).toHaveBeenCalledWith(9);
-    const itSusGuardado = s.itemsGuardados.find((i) => i.tipo === 'SUSCRIPTOR');
-    expect(s.colaRepo.eliminar).toHaveBeenCalledWith(itSusGuardado!.id);
+    expect(s.withTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(s.suscriptoresPersistidos).toEqual([]);
+    expect(s.itemsGuardados).toEqual([]);
+    expect(s.suscriptorRepo.eliminar).not.toHaveBeenCalled();
+    expect(s.colaRepo.eliminar).not.toHaveBeenCalled();
+  });
+
+  it('falla_encolar_suscriptor_revierte_el_suscriptor_y_no_crea_medidor', async () => {
+    const s = setup();
+    const suscriptor = susCreado(9);
+    const errorCola = new Error('cola no disponible');
+    s.suscriptorRepo.crear.mockImplementation(async () => {
+      s.suscriptoresPersistidos.push(suscriptor);
+      return suscriptor;
+    });
+    s.colaRepo.guardar.mockRejectedValue(errorCola);
+
+    await expect(
+      persistirYEncolarAltaSuscriptor({
+        borradorSuscriptor: BORRADOR_SUS,
+        borradorMedidor: BORRADOR_MED,
+        suscriptorRepo: s.suscriptorRepo,
+        medidorRepo: s.medidorRepo,
+        colaRepo: s.colaRepo,
+        idGenerator: s.idGenerator,
+        hasher: s.hasher,
+      }),
+    ).rejects.toBe(errorCola);
+
+    expect(s.suscriptoresPersistidos).toEqual([]);
+    expect(s.medidorRepo.crear).not.toHaveBeenCalled();
+    expect(s.suscriptorRepo.eliminar).not.toHaveBeenCalled();
+    expect(s.colaRepo.eliminar).not.toHaveBeenCalled();
   });
 
   it('falla_crear_suscriptor_no_persiste_ni_encola_nada', async () => {

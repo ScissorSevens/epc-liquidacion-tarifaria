@@ -1,66 +1,130 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
+  Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 
 import type { Medidor } from '@dominio/medidores/types';
+import type { Prestador } from '@dominio/prestadores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
-import { useNetInfo } from '../hooks/useNetInfo';
 import type { InicioStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+import { BotonPrimario } from '../componentes/BotonPrimario';
+import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
+import { useWorkspace } from '../composicion/useWorkspace';
 
 type Props = InicioStackScreenProps<'RutaDeHoy'>;
 
 /**
  * Pantalla INICIO — muestra la ruta de lecturas del día.
  *
- * Carga suscriptores y calcula el progreso de lecturas capturadas hoy.
- * El banner offline es SIEMPRE visible porque useNetInfo() usa un shim
- * que retorna { isConnected: false } — comportamiento intencional para
- * el flujo offline-first de MediApp. Ver src/hooks/useNetInfo.ts.
+ * Identidad del prestador (Opción A + B):
+ *   - TopBar recibe el nombre del prestador en uso como subtitulo.
+ *   - Banner de identidad con NIT, segmento, total suscriptores y %
+ *     capturado del mes — acerca al operario al prestador con el que
+ *     trabaja (no una lista genérica de "suscriptores").
+ *
+ * Banner de conectividad removido temporalmente. La funcionalidad de
+ * sync se deshabilita por ahora (2026-07-25).
  */
 export default function RutaDeHoy({ navigation }: Props) {
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
   const [capturasHoy, setCapturasHoy] = useState(0);
   const [pendientesCola, setPendientesCola] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [recargando, setRecargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capturadosHoy, setCapturadosHoy] = useState<Map<number, boolean>>(new Map());
 
-  const { isConnected } = useNetInfo();
+  // ── Selector de medidor ───────────────────────────────────────────────────
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [medidoresSelector, setMedidoresSelector] = useState<Medidor[]>([]);
+  const [suscriptorSelector, setSuscriptorSelector] = useState<{ id: number; nombre: string } | null>(null);
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
+  // ── Smart reload: no recargar si el día y el prestador no cambiaron.
+  // Antes: useFocusEffect siempre llamaba `cargar(false)` al volver a la
+  // tab. Esto disparaba 4 queries SQLite innecesarias en cada focus.
+  // Ahora: trackeamos la última combinacion (id_prestador, YYYY-MM-DD) y
+  // hacemos skip si coincide. Se sigue recargando al cambiar de día o
+  // cuando el operario cambia de prestador.
+  const ultimoReloadRef = useRef<{ prestadorId: number; dia: string } | null>(null);
+
+  // PER-05: selectores específicos en useWorkspace. Cambios en otros
+  // campos (acuerdo_vigente, parametros_vigentes, cargando) NO disparan
+  // re-render de RutaDeHoy.
+  const id_prestador_activo = useWorkspace((s) => s.id_prestador_activo);
+  const prestador = useWorkspace((s) => s.prestador);
+
+  // ── Carga lazy del prestador en uso (fix bug) ─────────────────────────────
+  // En cold-boot, `useWorkspace.setSesionCompleta(sesion)` setea
+  // `id_prestador_activo` pero NO el objeto `prestador` (queda null).
+  // Si llegamos acá con `prestador === null` pero `id_prestador_activo !== 0`,
+  // cargamos el objeto del repo SQLite local. Cuando el repo devuelve null
+  // (id huérfano / borrado) dejamos `prestador` en null y la UI se encarga
+  // de mostrar el estado vacío con CTA — nunca el fallback "Sin prestador
+  // activo".
+  useEffect(() => {
+    if (prestador) return;
+    if (id_prestador_activo === 0) return;
+    let cancelado = false;
+    void (async () => {
+      try {
+        const { repos: { prestadorRepo } } = await getBootstrap();
+        const p = await prestadorRepo.obtenerPorId(id_prestador_activo);
+        if (cancelado) return;
+        if (p) {
+          useWorkspace.setState({ prestador: p });
+        }
+      } catch (e) {
+        // Silencioso: si falla la carga del prestador, la UI mostrará el
+        // estado vacío con CTA. NO propagamos para no romper la pantalla.
+        console.warn('[RutaDeHoy] cargar prestador:', e);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [id_prestador_activo, prestador]);
+
+  const cargar = useCallback(async (esPrimeraCarga = false) => {
+    if (esPrimeraCarga) {
+      setLoading(true);
+    } else {
+      setRecargando(true);
+    }
     setError(null);
     try {
       const bootstrap = await getBootstrap();
-      // Mes actual YYYY-MM — antes del Promise.all para usarlo en la query
-      const mesActual = new Date().toISOString().slice(0, 7);
-      const [listaSuscriptores, lecturasDelMes, itemsCola, todosMedidores] = await Promise.all([
-        bootstrap.suscriptorRepo.listar(),
-        bootstrap.lecturaRepo.listarPorMes(mesActual),
-        bootstrap.colaRepo.listar(),
-        bootstrap.medidorRepo.listar(),
+      const [listaSuscriptores, todasLecturas, itemsCola, todosMedidores] = await Promise.all([
+        bootstrap.repos.suscriptorRepo.listar(),
+        bootstrap.repos.lecturaRepo.listar(),
+        bootstrap.repos.colaRepo.listar(),
+        bootstrap.repos.medidorRepo.listar(),
       ]);
 
-      // IDs de medidores con lectura capturada este mes
+      // Contar lecturas capturadas en el mes actual (YYYY-MM)
+      const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
       const idsConLecturaHoy = new Set(
-        lecturasDelMes
-          .filter((l) => l.id_medidor != null)
+        todasLecturas
+          .filter((l) => l.timestamp_captura.slice(0, 7) === mesActual)
           .map((l) => l.id_medidor),
       );
 
@@ -83,10 +147,8 @@ export default function RutaDeHoy({ navigation }: Props) {
         }),
       );
 
-      // Contar suscriptores PENDIENTE en cola para el botón sticky
-      const pendientes = itemsCola.filter(
-        (i) => i.tipo === 'SUSCRIPTOR' && i.estado === 'PENDIENTE',
-      ).length;
+      // Contar items PENDIENTE en cola para el botón sticky
+      const pendientes = itemsCola.filter((i) => i.estado === 'PENDIENTE').length;
 
       setSuscriptores(listaSuscriptores);
       setCapturasHoy(idsConLecturaHoy.size);
@@ -96,22 +158,52 @@ export default function RutaDeHoy({ navigation }: Props) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setRecargando(false);
     }
   }, []);
 
-  useEffect(() => {
-    void cargar();
-  }, [cargar]);
+  // Primera carga al montar
+  useEffect(() => { void cargar(true); }, [cargar]);
+  // Re-carga silenciosa al enfocar tab — solo si cambió dia o prestador.
+  useFocusEffect(
+    useCallback(() => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const clave = { prestadorId: id_prestador_activo, dia: hoy };
+      const previa = ultimoReloadRef.current;
+      if (
+        previa &&
+        previa.prestadorId === clave.prestadorId &&
+        previa.dia === clave.dia
+      ) {
+        return;
+      }
+      ultimoReloadRef.current = clave;
+      void cargar(false);
+    }, [cargar, id_prestador_activo]),
+  );
 
-  // Recarga silenciosa al volver a enfocar la pantalla
-  // (ej: después de importar CSV o capturar una lectura)
-  useFocusEffect(useCallback(() => { void cargar(); }, [cargar]));
-
-  const fechaHoy = new Date().toLocaleDateString('es-CO', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+  const navegarACapturar = useCallback(async (item: Suscriptor) => {
+    try {
+      // Haptics de selección al TAP — feedback táctil inmediato.
+      await Haptics.selectionAsync();
+      const { repos: { medidorRepo } } = await getBootstrap();
+      const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
+      if (medidores.length === 0) return;
+      if (medidores.length === 1 && medidores[0]) {
+        navigation.navigate('CapturarLectura', {
+          id_medidor: medidores[0].id_medidor, id_suscriptor: item.id_suscriptor,
+        });
+        // Haptics de éxito después de navegar — confirmación post-acción.
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setMedidoresSelector(medidores);
+        setSuscriptorSelector({ id: item.id_suscriptor, nombre: item.nombre_apellidos });
+        setSelectorVisible(true);
+      }
+    } catch (e) {
+      console.warn('[navegarACapturar] error:', e);
+    }
+  }, [navigation]);
 
   if (loading) {
     return (
@@ -128,134 +220,321 @@ export default function RutaDeHoy({ navigation }: Props) {
         <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>
           Error al cargar: {error}
         </Text>
-        <Pressable onPress={() => void cargar()} style={styles.btnRetry}>
-          <Text style={[TYPOGRAPHY.labelLg, styles.btnRetryText]}>REINTENTAR</Text>
-        </Pressable>
+        <BotonPrimario
+          texto="Reintentar"
+          tono="azul"
+          tamano="compacto"
+          onPress={() => void cargar()}
+        />
       </View>
     );
   }
 
   const progreso = suscriptores.length > 0 ? capturasHoy / suscriptores.length : 0;
+  const porcentaje = Math.round(progreso * 100);
+
+  // ── Identidad del prestador (TopBar subtitulo + banner Nequi) ────────────
+  // TopBar subtitulo: pasamos null si no hay prestador, así NO cae en el
+  // fallback histórico "Sin prestador asignado" — el TopBar simplemente no
+  // renderiza la segunda línea.
+  const prestadorSubtitulo = prestador
+    ? `${prestador.nombre} · ${prestador.municipio}`
+    : undefined;
+
+  // Total suscriptores = urbanos + rurales (lo que el prestador declara).
+  const totalSuscriptoresPrestador = prestador
+    ? prestador.num_suscriptores_urbanos + prestador.num_suscriptores_rurales
+    : 0;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTexts}>
-            <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>RUTA DE HOY</Text>
-            <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>{fechaHoy}</Text>
-          </View>
-          <MaterialIcons name="account-circle" size={28} color={COLORS.primary} />
-        </View>
-      </View>
-
-      {/* Banner conectividad — sticky entre header y lista */}
-      {isConnected === false && (
-        <View style={styles.banner}>
-          <MaterialIcons name="cloud-off" size={20} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
-            Sin conexión — los datos se guardarán acá
-          </Text>
-        </View>
-      )}
-      {isConnected === true && (
-        <View style={[styles.banner, styles.bannerOnline]}>
-          <MaterialIcons name="cloud-done" size={20} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.labelLg, styles.bannerText]}>
-            Conectado — sincronización disponible
-          </Text>
-        </View>
-      )}
-
-      <FlatList
-        data={suscriptores}
-        keyExtractor={(item) => String(item.id_suscriptor)}
-        contentContainerStyle={
-          suscriptores.length === 0 ? styles.listaVaciaContainer : styles.lista
-        }
-        ListHeaderComponent={
-          <>
-            {/* Progreso */}
-            <View style={styles.progresoSection}>
-              <View style={styles.progresoRow}>
-                <Text style={[TYPOGRAPHY.labelLg]}>Progreso de lectura</Text>
-                <Text style={[TYPOGRAPHY.labelLg]}>
-                  {capturasHoy} / {suscriptores.length} capturadas
-                </Text>
-              </View>
-              <View style={styles.barraContainer}>
-                <View
-                  style={[
-                    styles.barraFill,
-                    { width: `${Math.round(progreso * 100)}%` },
-                  ]}
-                />
-              </View>
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>
-              Sin suscriptores cargados
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => (
+      {/* TopAppBar — subtitulo: nombre del prestador en uso. */}
+      <TopBar
+        titulo="Ruta de hoy"
+        subtitulo={prestadorSubtitulo}
+        accionDerecha={
           <Pressable
-            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() =>
-              navigation.navigate('DetalleSuscriptor', { id_suscriptor: item.id_suscriptor })
-            }
+            style={({ pressed }) => [styles.topBarBtn, pressed && styles.topBarBtnPressed]}
+            onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
           >
-            <View style={styles.cardContent}>
-              <View style={styles.cardInfo}>
-                <Text style={[TYPOGRAPHY.labelSm, styles.cardCodigo]}>
-                  {item.codigo.toUpperCase()}
-                </Text>
-                <Text style={[TYPOGRAPHY.headlineSm, styles.cardNombre]}>
-                  {item.nombre_apellidos}
-                </Text>
-                {capturadosHoy.get(item.id_suscriptor) === true ? (
-                  <View style={styles.statusRow}>
-                    <MaterialIcons name="check-circle" size={14} color={COLORS.primary} />
-                    <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>Capturada hoy</Text>
-                  </View>
-                ) : (
-                  <View style={styles.statusRow}>
-                    <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>Pendiente</Text>
-                  </View>
-                )}
-              </View>
-              <MaterialIcons name="chevron-right" size={24} color={COLORS.primary} />
-            </View>
+            {Platform.OS === 'ios' ? (
+              <Image
+                source={'sf:person.crop.circle' as any}
+                style={{ width: 24, height: 24, tintColor: COLORS.onPrimary }}
+              />
+            ) : (
+              <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
+            )}
           </Pressable>
-        )}
+        }
       />
 
-      {/* Botón sticky — solo visible si hay pendientes en cola */}
-      {pendientesCola > 0 && (
-        <View style={styles.stickyFooter}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.btnSync,
-              pressed && styles.btnSyncPressed,
-            ]}
-            onPress={() => navigation.navigate('Sincronizacion', { screen: 'Sincronizacion' })}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        {/* Banner de identidad (estilo Nequi) o estado vacío con CTA. */}
+        {prestador ? (
+          <IdentidadCardMemo
+            prestador={prestador}
+            totalSuscriptores={totalSuscriptoresPrestador}
+            porcentaje={porcentaje}
+          />
+        ) : (
+          <View
+            style={styles.identidadVaciaCard}
+            accessibilityRole="alert"
+            accessibilityLabel="No hay prestador asignado. Configurá uno para ver la ruta."
           >
-            <MaterialIcons name="sync" size={20} color={COLORS.onPrimary} />
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnSyncText]}>
-              SINCRONIZAR ({pendientesCola} {pendientesCola === 1 ? 'suscriptor' : 'suscriptores'})
+            <View style={styles.identidadVaciaIconCircle}>
+              <MaterialIcons name="storefront" size={26} color={COLORS.onSecondaryContainer} />
+            </View>
+            <Text style={styles.identidadVaciaTitulo}>
+              Configurá tu prestador
             </Text>
+            <Text style={styles.identidadVaciaCopy}>
+              Necesitamos un prestador en uso para mostrar la ruta de hoy y
+              los suscriptores asignados.
+            </Text>
+            <BotonPrimario
+              texto="Configurar prestador"
+              icono="arrow-forward"
+              tono="azul"
+              tamano="compacto"
+              onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
+            />
+          </View>
+        )}
+
+        {/* Sección de progreso */}
+        <ProgresoCardMemo capturas={capturasHoy} total={suscriptores.length} porcentaje={porcentaje} />
+
+        {/* Lista de suscriptores (un solo grupo sin sector en datos reales) */}
+        {suscriptores.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>Sin suscriptores cargados</Text>
+          </View>
+        ) : (
+          <View style={styles.grupo}>
+            <View style={styles.grupoHeader}>
+              <Text style={[TYPOGRAPHY.labelLg, styles.grupoTitulo]}>
+                Suscriptores asignados
+              </Text>
+              <View style={styles.grupoDivisor} />
+            </View>
+
+            {(
+              <FlatList
+                data={suscriptores}
+                keyExtractor={(item) => String(item.id_suscriptor)}
+                renderItem={({ item }) => (
+                  <SuscriptorCardMemo
+                    item={item}
+                    capturado={capturadosHoy.get(item.id_suscriptor) === true}
+                    onPress={() => { void navegarACapturar(item); }}
+                  />
+                )}
+                scrollEnabled={false}
+                initialNumToRender={10}
+                removeClippedSubviews={false}
+              />
+            )}
+          </View>
+        )}
+
+        <FooterApp />
+      </ScrollView>
+
+      {/* ── Modal selector de medidor ─────────────────────────────────────── */}
+      <Modal
+        visible={selectorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectorVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setSelectorVisible(false)}>
+          <Pressable style={styles.bottomSheet} onPress={() => {}}>
+            <View style={styles.handleBar} />
+            <Text style={styles.sheetTitulo}>Seleccionar medidor</Text>
+            {suscriptorSelector && (
+              <Text style={styles.sheetSubtitulo}>{suscriptorSelector.nombre}</Text>
+            )}
+            {medidoresSelector.map((med) => (
+              <Pressable
+                key={med.id_medidor}
+                style={({ pressed }) => [styles.medidorItem, pressed && styles.medidorItemPressed]}
+                onPress={() => {
+                  setSelectorVisible(false);
+                  if (suscriptorSelector) {
+                    navigation.navigate('CapturarLectura', {
+                        id_medidor: med.id_medidor,
+                        id_suscriptor: suscriptorSelector.id,
+                      });
+                  }
+                }}
+              >
+                <MaterialIcons name="speed" size={20} color={COLORS.secondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.medidorNro}>Medidor #{med.id_medidor}</Text>
+                  <Text style={styles.medidorSerie}>{med.numero_medidor}</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color={COLORS.onSurfaceVariant} />
+              </Pressable>
+            ))}
+            <Pressable
+              style={({ pressed }) => [styles.btnCancelar, pressed && { opacity: 0.6 }]}
+              onPress={() => setSelectorVisible(false)}
+            >
+              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+            </Pressable>
           </Pressable>
-        </View>
-      )}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+// ── Subcomponentes memoizados ────────────────────────────────────────────────
+// Separar el card de suscriptor y los banners en componentes con React.memo
+// reduce re-renders cuando SOLO cambia el campo `capturado` de un item o
+// cuando el workspace cambia `cargando` sin afectar la lista. Sin memo,
+// cada cambio de state rerenderiza TODA la lista.
+
+interface SuscriptorCardProps {
+  item: Suscriptor;
+  capturado: boolean;
+  onPress: () => void;
+}
+
+const SuscriptorCard = ({ item, capturado, onPress }: SuscriptorCardProps) => (
+  <Pressable
+    style={({ pressed }) => [
+      styles.card,
+      capturado && styles.cardCapturada,
+      pressed && !capturado && styles.cardPressed,
+    ]}
+    onPress={onPress}
+    disabled={capturado}
+    accessibilityRole="button"
+    accessibilityLabel={`${capturado ? 'Capturado' : 'Pendiente'}: suscriptor ${item.codigo} ${item.nombre_apellidos}`}
+  >
+    <View style={styles.cardContent}>
+      <View style={styles.cardInfo}>
+        <View style={styles.cardFilaMeta}>
+          <Text style={[TYPOGRAPHY.labelMd, styles.cardCodigo]}>
+            {item.codigo}
+          </Text>
+          {capturado ? (
+            <View style={styles.statusRow}>
+              <MaterialIcons name="check-circle" size={14} color={COLORS.secondary} />
+              <Text style={[TYPOGRAPHY.labelSm, styles.statusCapturada]}>
+                Capturado este mes
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.statusRow}>
+              <MaterialIcons name="schedule" size={14} color={COLORS.onSurfaceVariant} />
+              <Text style={[TYPOGRAPHY.labelSm, styles.statusPendiente]}>
+                Lectura pendiente
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text
+          style={[
+            TYPOGRAPHY.headlineSm,
+            capturado ? styles.cardNombreCapturado : styles.cardNombre,
+          ]}
+          numberOfLines={1}
+        >
+          {item.nombre_apellidos}
+        </Text>
+      </View>
+      {capturado ? (
+        <View style={styles.iconCircleCheck}>
+          <MaterialIcons name="task-alt" size={22} color={COLORS.secondary} />
+        </View>
+      ) : (
+        <MaterialIcons name="chevron-right" size={24} color={COLORS.onSurfaceVariant} />
+      )}
+    </View>
+  </Pressable>
+);
+
+const SuscriptorCardMemo = memo(SuscriptorCard);
+
+interface IdentidadCardProps {
+  prestador: Prestador;
+  totalSuscriptores: number;
+  porcentaje: number;
+}
+
+const IdentidadCard = ({ prestador, totalSuscriptores, porcentaje }: IdentidadCardProps) => (
+  <View
+    style={styles.identidadCard}
+    accessibilityRole="summary"
+    accessibilityLabel={`Prestador ${prestador.nombre}, NIT ${prestador.nit}, segmento ${prestador.segmento}, ${totalSuscriptores} suscriptores, ${porcentaje} por ciento capturado del mes`}
+  >
+    <View style={styles.identidadDecorCircle} pointerEvents="none" />
+    <View style={styles.identidadFilaIcono}>
+      <View style={styles.identidadIconCircle}>
+        <MaterialIcons name="business" size={24} color={COLORS.onSecondaryContainer} />
+      </View>
+      <View style={styles.identidadTitulos}>
+        <Text style={styles.identidadNombre} numberOfLines={1}>
+          {prestador.nombre}
+        </Text>
+        <Text style={styles.identidadMetaTexto} numberOfLines={1}>
+          NIT {prestador.nit} · Segmento {prestador.segmento}{' '}
+          {prestador.segmento === 1 ? 'urbano' : 'rural'}
+        </Text>
+      </View>
+    </View>
+    <View style={styles.identidadStats}>
+      <View style={styles.identidadStat}>
+        <Text style={styles.identidadStatNumero}>{totalSuscriptores}</Text>
+        <Text style={styles.identidadStatLabel}>suscriptores</Text>
+      </View>
+      <View style={styles.identidadStatDerecha}>
+        <Text style={styles.identidadStatNumeroMd}>{porcentaje}%</Text>
+        <Text style={styles.identidadStatLabel}>lecturas del mes</Text>
+      </View>
+    </View>
+    <View style={styles.identidadBarraContainer}>
+      <View
+        style={[styles.identidadBarraFill, { width: `${porcentaje}%` as `${number}%` }]}
+      />
+    </View>
+  </View>
+);
+
+const IdentidadCardMemo = memo(IdentidadCard);
+
+interface ProgresoCardProps {
+  capturas: number;
+  total: number;
+  porcentaje: number;
+}
+
+const ProgresoCard = ({ capturas, total, porcentaje }: ProgresoCardProps) => (
+  <View style={styles.progresoCard}>
+    <View style={styles.progresoRow}>
+      <Text style={[TYPOGRAPHY.labelLg, styles.progresoLabel]}>Lecturas del mes</Text>
+      <Text style={[TYPOGRAPHY.headlineSm, styles.progresoNumero]}>
+        {capturas}{' '}
+        <Text style={[TYPOGRAPHY.bodySm, styles.progresoTotal]}>/ {total}</Text>
+      </Text>
+    </View>
+    <View style={styles.barraContainer}>
+      <View style={[styles.barraFill, { width: `${porcentaje}%` as `${number}%` }]} />
+    </View>
+  </View>
+);
+
+const ProgresoCardMemo = memo(ProgresoCard);
+
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -266,25 +545,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.margin,
   },
-  header: {
-    paddingTop: SPACING.xl,
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.background,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTexts: {
-    flex: 1,
-  },
-  titulo: {
-    color: COLORS.primary,
-  },
   muted: {
     color: COLORS.textSecondary,
   },
@@ -293,80 +553,259 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
-  banner: {
+
+  // ── TopAppBar (accionDerecha) ──────────────────────────────────────────────
+  topBarBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.full,
+  },
+  topBarBtnPressed: {
+    backgroundColor: COLORS.surfaceContainer,
+  },
+
+  // ── ScrollView ────────────────────────────────────────────────────────────
+  scrollContent: {
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xl * 3, // espacio para el sticky + footer nav
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.lg,
+  },
+
+  // ── Banner de identidad del prestador — estilo Nequi ─────────────────────
+  // Inspiración: cards curvas + círculo de color de marca como forma
+  // geométrica distintiva (Nequi usa formas orgánicas como backgrounds).
+  //
+  // Reglas de impeccable aplicadas:
+  //   - Border radius 20 (entre lg y xl — sin pasar 24).
+  //   - Sin border + shadow combo (solo border 1 con outlineVariant).
+  //   - Sin ALL CAPS (todo el copy es oracion).
+  //   - Tipografia con jerarquia: headlineMd (nombre) + bodySm (meta).
+  //   - Padding generoso (lg, no sm/md).
+  //   - El círculo decorativo es un View absoluto: posicion absolute,
+  //     top: -32, right: -32, tamaño 96x96, color secondaryContainer.
+  //     Esto evita gradientes y shapes SVG — geometría pura con Views.
+  //
+  // Reemplaza al banner de conectividad (removido temporalmente — sync
+  // deshabilitado 2026-07-25).
+  identidadCard: {
+    position: 'relative',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.lg, // ≤ 16 (RADIUS.lg)
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING.lg, // padding generoso
+    gap: SPACING.md,
+    overflow: 'hidden', // clipea el círculo decorativo a la card
+  },
+  identidadDecorCircle: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 120,
+    height: 120,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    opacity: 0.18,
+  },
+  identidadFilaIcono: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.background,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    ...BORDERS.thin,
-    marginHorizontal: SPACING.margin,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.sm,
+    gap: SPACING.md,
   },
-  bannerText: {
-    color: COLORS.primary,
+  identidadIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identidadTitulos: {
     flex: 1,
+    gap: 2,
   },
-  bannerOnline: {
-    backgroundColor: COLORS.background,
-    borderColor: COLORS.secondary ?? COLORS.primary,
+  identidadNombre: {
+    ...TYPOGRAPHY.headlineMd, // más prominente que headlineSm
+    color: COLORS.onSurface,
+    flexShrink: 1,
   },
-  progresoSection: {
-    paddingHorizontal: SPACING.margin,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.lg,
+  identidadMetaTexto: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+    flexShrink: 1,
+  },
+  identidadStats: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  identidadStat: {
+    gap: 2,
+  },
+  identidadStatDerecha: {
+    gap: 2,
+    alignItems: 'flex-end',
+  },
+  identidadStatNumero: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.secondary,
+  },
+  identidadStatNumeroMd: {
+    ...TYPOGRAPHY.headlineMd,
+    color: COLORS.primary,
+  },
+  identidadStatLabel: {
+    ...TYPOGRAPHY.labelMd,
+    color: COLORS.onSurfaceVariant,
+  },
+  identidadBarraContainer: {
+    height: 8,
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  identidadBarraFill: {
+    height: '100%',
+    backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.full,
+  },
+
+  // ── Estado vacío: sin prestador asignado (CTA) ──────────────────────────────
+  // Mismo lenguaje visual (círculo decorativo + radio 20) que el banner de
+  // identidad, pero con icono storefront y CTA primario.
+  identidadVaciaCard: {
+    position: 'relative',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: SPACING.lg,
     gap: SPACING.sm,
+    overflow: 'hidden',
+  },
+  identidadVaciaIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identidadVaciaTitulo: {
+    ...TYPOGRAPHY.headlineMd,
+    color: COLORS.onSurface,
+  },
+  identidadVaciaCopy: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurfaceVariant,
+  },
+
+  // ── Progreso ──────────────────────────────────────────────────────────────
+  // Sin border+shadow combo: solo border 1 con outlineVariant. Sin
+  // elevación ni sombra (anti-pattern ghost-card).
+  progresoCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
   },
   progresoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+  },
+  progresoLabel: {
+    color: COLORS.onSurfaceVariant,
+  },
+  progresoNumero: {
+    color: COLORS.onSurface,
+  },
+  progresoTotal: {
+    color: COLORS.onSurfaceVariant,
+    fontWeight: '400',
   },
   barraContainer: {
-    height: 8,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
+    height: 12,
+    backgroundColor: COLORS.surfaceContainer,
     borderRadius: RADIUS.full,
     overflow: 'hidden',
   },
   barraFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.full,
   },
-  lista: {
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.xl,
+
+  // ── Grupo / Sector ────────────────────────────────────────────────────────
+  grupo: {
+    gap: SPACING.sm,
   },
-  listaVaciaContainer: {
+  grupoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  grupoTitulo: {
+    color: COLORS.secondary,
+    fontWeight: '700',
+  },
+  grupoDivisor: {
     flex: 1,
+    height: 1,
+    backgroundColor: COLORS.surfaceDim,
   },
+
+  // ── Cards de suscriptores ─────────────────────────────────────────────────
+  // Estilo Nequi: una card con 2 filas (meta + nombre), border 1 outline
+  // (sin shadow + border combo), border radius 16 (RADIUS.lg).
+  // Sin ALL CAPS — el codigo se muestra como viene.
   card: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.default,
-    marginBottom: SPACING.sm,
-    ...BORDERS.thin,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    minHeight: 64, // touch target minimo (ya viene de paddings + content)
+  },
+  cardCapturada: {
+    backgroundColor: COLORS.surfaceContainerLow,
+    opacity: 0.65,
   },
   cardPressed: {
-    opacity: 0.7,
+    backgroundColor: COLORS.surfaceContainer,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
   },
   cardInfo: {
     flex: 1,
-    gap: SPACING.xs,
+    gap: 2, // 2px entre meta y nombre
+  },
+  cardFilaMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
   },
   cardCodigo: {
-    color: COLORS.textSecondary,
+    color: COLORS.secondary,
+    letterSpacing: -0.3,
   },
   cardNombre: {
-    color: COLORS.primary,
+    color: COLORS.onSurface,
+  },
+  cardNombreCapturado: {
+    color: COLORS.onSurfaceVariant,
   },
   statusRow: {
     flexDirection: 'row',
@@ -374,40 +813,90 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   statusCapturada: {
-    color: COLORS.primary,
+    color: COLORS.secondary,
+    fontWeight: '500',
   },
   statusPendiente: {
-    color: COLORS.textSecondary,
+    color: COLORS.onSurfaceVariant,
   },
-  stickyFooter: {
-    paddingHorizontal: SPACING.margin,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.background,
-  },
-  btnSync: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
+  iconCircleCheck: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    backgroundColor: 'rgba(0,103,127,0.10)', // tinte del secondary teal
     alignItems: 'center',
-    borderRadius: RADIUS.default,
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    minHeight: 48,
   },
-  btnSyncPressed: {
-    opacity: 0.7,
+
+  // ── Empty ─────────────────────────────────────────────────────────────────
+  emptyBox: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
   },
-  btnSyncText: {
-    color: COLORS.onPrimary,
+
+  // ── Error / Retry ─────────────────────────────────────────────────────────
+  // El botón "Reintentar" se renderiza via <BotonPrimario> extraído.
+
+  // ── Modal selector de medidor ─────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
   },
-  btnRetry: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
-    ...BORDERS.thin,
+  bottomSheet: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xl,
   },
-  btnRetryText: {
-    color: COLORS.onPrimary,
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.full,
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sheetTitulo: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    marginBottom: SPACING.xs,
+  },
+  sheetSubtitulo: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: SPACING.lg,
+  },
+  medidorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    marginBottom: SPACING.sm,
+  },
+  medidorItemPressed: {
+    backgroundColor: COLORS.surfaceContainer,
+  },
+  medidorNro: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  medidorSerie: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+  },
+  btnCancelar: {
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  btnCancelarTexto: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onSurfaceVariant,
   },
 });

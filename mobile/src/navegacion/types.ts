@@ -1,5 +1,5 @@
 /**
- * Tipos centralizados de navegación para MediApp.
+ * Tipos centralizados de navegación para AquaServices.
  *
  * Un único archivo con todos los ParamLists y helpers de screen props
  * evita import cycles entre stacks y es el único lugar donde cambiar rutas.
@@ -15,8 +15,14 @@ import type {
   ParametrosTarifa,
   ResultadoCalculo as ResultadoCalculoTipo,
 } from '@dominio/motor-tarifario/types';
+import type { Prestador } from '@dominio/prestadores';
+import type { Suscriptor } from '@dominio/suscriptores/types';
 
 // ── Stacks ────────────────────────────────────────────────────────────────────
+
+export type RootStackParamList = {
+  Main: NavigatorScreenParams<TabParamList>;
+};
 
 export type InicioStackParamList = {
   RutaDeHoy: undefined;
@@ -29,12 +35,16 @@ export type InicioStackParamList = {
     parametros: ParametrosTarifa;
     estrato: Estrato;
     id_suscriptor: number;
+    nombre_suscriptor: string;
+    prestador: Prestador;
   };
+  EditarSuscriptor: { suscriptor: Suscriptor };
 };
 
 export type LecturasStackParamList = {
   ListaSuscriptores: undefined;
   DetalleSuscriptor: { id_suscriptor: number };
+  Historial: { id_suscriptor: number; nombre: string };
   CapturarLectura: { id_medidor: number; id_suscriptor: number };
   CapturarFoto: { id_medidor: number; id_periodo: string; id_suscriptor: number };
   ResultadoCalculo: {
@@ -43,8 +53,12 @@ export type LecturasStackParamList = {
     parametros: ParametrosTarifa;
     estrato: Estrato;
     id_suscriptor: number;
+    nombre_suscriptor: string;
+    prestador: Prestador;
   };
   AltaSuscriptor: undefined;
+  ImportarCsv: undefined;
+  EditarSuscriptor: { suscriptor: Suscriptor };
 };
 
 export type SyncStackParamList = {
@@ -52,9 +66,21 @@ export type SyncStackParamList = {
 };
 
 export type ConfigStackParamList = {
-  Configuracion: undefined;
+  /**
+   * mi-perfil-unification-and-param-persistence — "MiPerfil" es ahora
+   * el entry-point del tab "Perfil". Antes el initial route era
+   * "Configuracion" (eliminado). La Pantalla MiPerfil absorbe toda la
+   * info del operario + Gestión (AltaSuscriptor, ImportarCsv, Versión,
+   * Cerrar sesión con Alert.alert).
+   */
+  MiPerfil: undefined;
   AltaSuscriptor: undefined;
   ImportarCsv: undefined;
+  Admin: undefined;
+  GestionPrestadores: undefined;
+  AcuerdoMunicipal: { id_prestador: number };
+  ParametrosTarifa: { id_prestador: number };
+  ImportarPrestadores: undefined;
 };
 
 // ── Tab raíz ──────────────────────────────────────────────────────────────────
@@ -103,3 +129,7 @@ export type ConfigStackScreenProps<T extends keyof ConfigStackParamList> =
     NativeStackScreenProps<ConfigStackParamList, T>,
     BottomTabScreenProps<TabParamList>
   >;
+
+/** Props para pantallas dentro del RootStack (Main). */
+export type RootStackScreenProps<T extends keyof RootStackParamList> =
+  NativeStackScreenProps<RootStackParamList, T>;

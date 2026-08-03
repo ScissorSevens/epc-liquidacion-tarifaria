@@ -11,8 +11,8 @@
  *    de better-sqlite3).
  *  - El mapeo de errores SQLite va por substring del mensaje (ver
  *    `traducir-error.ts`): expo-sqlite no expone `.code` discreto.
- *  - `actualizar` y `eliminar` son stubs honestos — fuera de scope MVP,
- *    igual que el adapter Node.
+ *  - `actualizar` esta implementado con SQL real (UPDATE + re-fetch).
+ *  - `eliminar` es stub honesto — fuera de scope de la version actual.
  *
  * IMPORTANTE: este adapter NO esta cubierto por jest del root (no hay
  * infra jest mobile). Validacion contractual: tests Node del adapter
@@ -30,17 +30,26 @@ import { mapearErrorExpoSqlite } from './traducir-error';
 
 export interface SuscriptorRepositoryExpoSqlite extends SuscriptorRepository {
   cerrar(): Promise<void>;
+  toggleSubsidio(id: number, valor: boolean): Promise<Suscriptor>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 
 interface SuscriptorRow {
   readonly id_suscriptor: number;
   readonly codigo: string;
   readonly nombre_apellidos: string;
+  readonly cedula: string;
+  readonly email: string | null;
+  readonly telefono: string | null;
+  readonly municipio: string;
+  readonly sector: string | null;
   readonly direccion: string;
   readonly estrato: number;
   readonly matricula_inmobiliaria: string | null;
   readonly numero_catastral: string | null;
   readonly aplica_subsidio: number;
+  readonly id_prestador: number;
+  readonly categoria_uso: Suscriptor['categoria_uso'];
   readonly estado: string;
   readonly created_at: string;
 }
@@ -50,11 +59,18 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     id_suscriptor: row.id_suscriptor,
     codigo: row.codigo,
     nombre_apellidos: row.nombre_apellidos,
+    cedula: row.cedula,
+    municipio: row.municipio,
     direccion: row.direccion,
     estrato: row.estrato as Suscriptor['estrato'],
     aplica_subsidio: row.aplica_subsidio === 1,
+    id_prestador: row.id_prestador,
+    categoria_uso: row.categoria_uso,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
+    ...(row.email !== null && { email: row.email }),
+    ...(row.telefono !== null && { telefono: row.telefono }),
+    ...(row.sector !== null && { sector: row.sector }),
     ...(row.matricula_inmobiliaria !== null && {
       matricula_inmobiliaria: row.matricula_inmobiliaria,
     }),
@@ -68,8 +84,9 @@ function fromRow(row: SuscriptorRow): Suscriptor {
 const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
-    matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio,
+    cedula, email, telefono, municipio, sector
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
@@ -80,6 +97,36 @@ const SQL_MAX_CODIGO = `SELECT MAX(CAST(codigo AS INTEGER)) AS max_codigo FROM s
 // orden natural de presentacion para listas de clientes.
 const SQL_LISTAR = `SELECT * FROM suscriptor ORDER BY codigo ASC`;
 const SQL_UPDATE_SUBSIDIO = `UPDATE suscriptor SET aplica_subsidio = ? WHERE id_suscriptor = ?`;
+
+/**
+ * Columnas permitidas en el UPDATE parcial. La whitelist es deliberada:
+ * `cambios` cruza un boundary de datos y no puede convertirse directamente
+ * en SQL sin controlar sus claves.
+ */
+const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof SuscriptorRow> = [
+  'nombre_apellidos',
+  'cedula',
+  'email',
+  'telefono',
+  'municipio',
+  'sector',
+  'direccion',
+  'estrato',
+  'matricula_inmobiliaria',
+  'numero_catastral',
+  'aplica_subsidio',
+  'categoria_uso',
+  'id_prestador',
+  'estado',
+];
+
+function toSqlValue(
+  value: ActualizarSuscriptorInput[keyof ActualizarSuscriptorInput] | undefined,
+): string | number | null {
+  if (value === undefined) return null;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  return value;
+}
 
 /**
  * Traduce errores expo-sqlite a mensajes de dominio especificos para
@@ -103,6 +150,10 @@ export function crearSuscriptorRepositoryExpoSqlite(
   db: SQLite.SQLiteDatabase,
 ): SuscriptorRepositoryExpoSqlite {
   return {
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+      await db.withTransactionAsync(task);
+    },
+
     async crear(data: SuscriptorBorrador): Promise<Suscriptor> {
       let result: SQLite.SQLiteRunResult;
       try {
@@ -116,6 +167,11 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.numero_catastral ?? null,
           data.estado,
           data.aplica_subsidio ? 1 : 0,
+          data.cedula,
+          data.email ?? null,
+          data.telefono ?? null,
+          data.municipio,
+          data.sector ?? null,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });
@@ -157,10 +213,29 @@ export function crearSuscriptorRepositoryExpoSqlite(
       return rows.map(fromRow);
     },
 
-    async actualizar(_id: number, _cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
-      throw new Error(
-        'actualizar: no implementado todavia — fuera de scope de la versión actual',
+    async actualizar(id: number, cambios: ActualizarSuscriptorInput): Promise<Suscriptor> {
+      const camposActualizar = COLUMNAS_ACTUALIZABLES.filter((k) => k in cambios);
+
+      if (camposActualizar.length === 0) {
+        const row = await db.getFirstAsync<SuscriptorRow>(SQL_SELECT_BY_ID, id);
+        if (!row) throw new Error(`Suscriptor id=${id} no existe`);
+        return fromRow(row);
+      }
+
+      const setClauses = camposActualizar.map((k) => `${k} = ?`).join(', ');
+      const values = camposActualizar.map((k) =>
+        toSqlValue(cambios[k as keyof ActualizarSuscriptorInput]),
       );
+
+      await db.runAsync(
+        `UPDATE suscriptor SET ${setClauses} WHERE id_suscriptor = ?`,
+        ...values,
+        id,
+      );
+
+      const row = await db.getFirstAsync<SuscriptorRow>(SQL_SELECT_BY_ID, id);
+      if (!row) throw new Error(`Suscriptor id=${id} no existe`);
+      return fromRow(row);
     },
 
     async toggleSubsidio(id: number, valor: boolean): Promise<Suscriptor> {

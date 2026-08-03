@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -66,7 +66,7 @@ namespace MediApp.Api.Persistence.Migrations
                 column: "numero_cedula",
                 unique: true);
 
-            // Limpiar id_operario huérfanos antes de crear la FK
+            // Limpiar id_operario hu�rfanos antes de crear la FK
             // (lecturas existentes pueden tener id_operario con valores que no existen en operarios)
             migrationBuilder.Sql("UPDATE lecturas SET id_operario = NULL WHERE id_operario IS NOT NULL");
 

@@ -107,6 +107,35 @@ Servidor local (red LAN del prestador)
 
 ---
 
+## Auth (estado actual — 2026-07-09)
+
+La app funciona **100% local sin backend** gracias al SDD `setup-inicial-multi-tenant-auth`:
+
+- **Setup inicial**: wizard de 2 pasos en el primer inicio (configurar prestador + crear primer operario).
+- **Login**: validación de cédula y contraseña contra SQLite local; la contraseña se compara mediante SHA-256.
+- **Multi-tenant**: cada operario entra a SU prestador usando el `idPrestador` asociado en SQLite, sin valores hardcodeados.
+- **Cerrar sesión**: disponible en **Mi Perfil → Gestión → Cerrar sesión**.
+- **Token**: la sesión vence a las 24 horas; al vencer, un banner amarillo muestra "Tu sesión anterior venció" y vuelve a solicitar credenciales.
+- **Legacy cleanup**: los datos residuales del bypass anterior se limpian automáticamente durante el arranque.
+
+### Limitación actual
+
+El token es fake (`fake-token-{timestamp}`). Cuando se implemente el backend real (Fase 6 del SDD), se reemplazará por un GUID generado por el backend .NET y la sesión se validará contra PostgreSQL.
+
+### Roadmap
+
+- **Fase 6**: backend real (`/api/v1/operarios/vincular-dispositivo`) con token GUID + `expiresAt`.
+- **Fase 7**: pruebas E2E con backend real.
+- **Fase 11**: documentación de despliegue.
+
+### Tests del SDD
+
+- **+377 pruebas verdes**: 192 unitarias + 64 de integración mobile + 25 E2E + 96 de backend conceptual.
+- **0 regresiones nuevas**.
+- **64 commits atómicos de implementación previos a PUNTO F**, con conventional commits.
+
+---
+
 ## Configuración
 
 La URL del servidor se configura desde la pantalla **CONFIG** de la app móvil.  

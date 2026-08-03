@@ -1,16 +1,16 @@
-import { NavigationContainer } from '@react-navigation/native';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 
-import AppNavigator from './src/navegacion/AppNavigator';
+import { AuthGate } from './src/componentes/AuthGate';
+
+SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   return (
     <PaperProvider>
-      <NavigationContainer>
-        <AppNavigator />
-        <StatusBar style="auto" />
-      </NavigationContainer>
+      <AuthGate />
+      <StatusBar style="auto" />
     </PaperProvider>
   );
 }

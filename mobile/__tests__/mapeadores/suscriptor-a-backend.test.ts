@@ -28,10 +28,15 @@ describe('mapearSuscriptorParaBackend', () => {
       id_suscriptor: 12,
       codigo: '1234567890',
       nombre_apellidos: 'Juan Pérez',
+      cedula: '123456789',
+      municipio: 'Bogotá',
       direccion: 'Calle 1 # 2-3',
       estrato: 3,
+      aplica_subsidio: false,
       estado: 'activo',
       created_at: '2026-05-01T10:00:00.000Z',
+      id_prestador: 0,
+      categoria_uso: 'residencial',
       ...over,
     };
   }
@@ -48,6 +53,9 @@ describe('mapearSuscriptorParaBackend', () => {
       estado: 'activo',
       createdAt: '2026-05-01T10:00:00.000Z',
       idCliente: 'mobile:12',
+      cedula: '123456789',
+      municipio: 'Bogotá',
+      aplicaSubsidio: false,
     });
   });
 

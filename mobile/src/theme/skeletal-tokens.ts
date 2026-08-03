@@ -18,29 +18,76 @@
  */
 
 export const COLORS = {
+  // === COLORES INSTITUCIONALES EPC (fuente de verdad: identidad visual) ===
+  // 4 colores principales: azul oscuro (identidad), azul claro (complementario),
+  // amarillo y rojo.
+  // 3 complementarios: verde, azul digital y gris claro.
+  brandAzulOscuro: '#093C5D',     // color principal de la identidad
+  brandAzulClaro: '#359CC8',     // complementario
+  brandAmarillo: '#FFDC26',
+  brandRojo: '#D5212A',
+  brandVerde: '#76B718',
+  brandAzulDigital: '#0092FF',
+  brandGrisClaro: '#DADADA',
+
   // Capa de fondo — el lienzo "papel".
-  background: '#FFFFFF',
+  background: '#F8F9FF',
   // Superficies elevadas (cards, inputs activos en hover).
-  surfaceLight: '#F2F2F2',
-  // Superficie ligera para footers metadata (zinc-100/200 del Tailwind ref).
-  surfaceMuted: '#F4F4F5',
+  surfaceLight: '#EFF4FF',
+  // Superficie ligera para footers metadata.
+  surfaceMuted: '#E5EEFF',
   surfaceMuted2: '#E4E4E7',
   // Tinta primaria — bordes, texto principal, botones primarios.
-  primary: '#000000',
+  // Mapeado al brandAzulOscuro institucional.
+  primary: '#093C5D',
   onPrimary: '#FFFFFF',
+  // Contenedor primario y sobre contenedor primario.
+  primaryContainer: '#1A2B48',
+  onPrimaryContainer: '#B3C5D8',
+  // Color secundario — mapeado al brandAzulDigital institucional.
+  secondary: '#0092FF',
+  secondaryContainer: '#00CCF9',
+  onSecondaryContainer: '#005266',
+  // Superficies de contenedor.
+  surfaceContainerLowest: '#FFFFFF',
+  surfaceContainerLow: '#EFF4FF',   // equivalente a surfaceLight, alias para M3
+  surfaceContainerHigh: '#DCE9FF',
+  surface: '#F8F9FF',
+  // Sobre superficie.
+  onSurface: '#0B1C30',
+  onSurfaceVariant: '#44474D',
   // Texto secundario / iconografía secundaria.
-  textSecondary: '#5d5f5f',
+  textSecondary: '#44474D',
   textTertiary: '#808080',
-  // Borde estándar — siempre 1px black.
-  outline: '#000000',
+  // Bordes.
+  outline: '#75777E',
+  outlineVariant: '#C5C6CE',
   // Divisores internos en cards (zinc-300).
   divider: '#D4D4D8',
   // Placeholder en inputs (zinc-300/400).
   placeholder: '#D4D4D8',
-  // Estados de error (heredados del DESIGN.md).
+  // Colores de superficie adicionales.
+  onBackground: '#0B1C30',
+  surfaceContainer: '#E5EEFF',
+  surfaceVariant: '#D3E4FE',
+  surfaceDim: '#CBDBF5',
+  inverseSurface: '#213145',
+  inverseOnSurface: '#EAF1FF',
+  // Advertencia.
+  warning: '#EF6C00',
+  warningContainer: '#FFEDD5',
+  onWarningContainer: '#5A3500',
+  // Estados de exito — Mapeado al brandVerde institucional.
+  // Agregado en admin-parametros-tarifa-redesign Task 2 para
+  // colorear feedback post-guardado y mensajes de "Parametros
+  // guardados correctamente" sin hardcodear hex.
+  success: '#76B718',
+  successContainer: '#E8F5D9',
+  onSuccessContainer: '#2E5A0A',
+  // Estados de error — mapeado al brandRojo institucional.
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',
-  error: '#ba1a1a',
+  error: '#D5212A',
 } as const;
 
 /**
@@ -54,6 +101,7 @@ export const SPACING = {
   md: 16,
   lg: 24,
   xl: 32,
+  xxl: 48,
   margin: 20,
 } as const;
 
@@ -64,7 +112,8 @@ export const SPACING = {
 export const RADIUS = {
   none: 0,
   sm: 4,
-  default: 8,
+  default: 12,
+  card: 16,
   md: 12,
   lg: 16,
   xl: 24,
@@ -132,6 +181,13 @@ export const TYPOGRAPHY = {
     fontWeight: '500' as const,
     lineHeight: 14,
   },
+  displayLg: {
+    fontFamily: undefined,
+    fontSize: 40,
+    fontWeight: '700' as const,
+    lineHeight: 44,
+    letterSpacing: -1.5,
+  },
 } as const;
 
 /**
@@ -150,5 +206,27 @@ export const BORDERS = {
     borderWidth: 1,
     borderColor: COLORS.outline,
     borderStyle: 'dashed' as const,
+  },
+  focused: { borderWidth: 2, borderColor: COLORS.secondary },
+  error: { borderWidth: 2, borderColor: COLORS.error },
+} as const;
+
+/**
+ * Sombras para elevación FUNCIONAL. `float` es para FABs, bottom-bars y
+ * popovers que necesitan sombra para separarse del contenido scrolleable.
+ *
+ * Antes existia `card` (elevation: 2, shadowRadius: 4) pensado como
+ * decoracion de cards normales. Pero combinada con `borderWidth: 1`
+ * producia el patron "ghost-card" que veta impecable v1. Cards de
+ * contenido usan solo borderWidth + borderColor; la sombra se reserva
+ * para superficies REALMENTE elevadas del scroll.
+ */
+export const SHADOWS = {
+  float: {
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
   },
 } as const;

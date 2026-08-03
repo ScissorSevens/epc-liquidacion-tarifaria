@@ -12,7 +12,7 @@
   "jest": {
     "preset": "jest-expo",
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-native-reanimated|react-native-worklets)"
     ],
     "moduleFileExtensions": [
       "ts",
@@ -30,33 +30,41 @@
     "moduleNameMapper": {
       "@expo/vector-icons/(.*)": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
       "@expo/vector-icons": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
+      "^expo(/.*)?$": "<rootDir>/__tests__/__mocks__/expo.js",
       "^expo-sqlite$": "<rootDir>/__tests__/__mocks__/expo-sqlite.js",
       "expo-asset": "<rootDir>/__tests__/__mocks__/expo-asset.js"
     }
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/bottom-tabs": "^7.15.13",
     "@react-navigation/native": "^7.2.2",
     "@react-navigation/native-stack": "^7.14.12",
     "@types/jest": "29.5.14",
-    "expo": "~54.0.33",
+    "expo": "~54.0.36",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.9",
     "expo-document-picker": "~14.0.8",
-    "expo-file-system": "~19.0.22",
+    "expo-file-system": "~19.0.23",
+    "expo-haptics": "~15.0.8",
+    "expo-image": "~3.0.11",
+    "expo-router": "~6.0.24",
     "expo-sharing": "~14.0.8",
+    "expo-splash-screen": "~31.0.13",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "jest-expo": "~54.0.17",
+    "js-sha256": "^0.11.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-get-random-values": "~1.11.0",
     "react-native-paper": "^5.15.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
-    "react-native-vector-icons": "^10.3.0"
+    "react-native-vector-icons": "^10.3.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@testing-library/react-native": "^13.3.3",

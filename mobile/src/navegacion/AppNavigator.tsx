@@ -1,70 +1,294 @@
 import type { ComponentProps } from 'react';
+import { useEffect, useRef } from 'react';
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  View,
+  type AccessibilityState,
+} from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { BORDERS, COLORS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { COLORS, RADIUS } from '../theme/skeletal-tokens';
 import type { TabParamList } from './types';
 import ConfigStack from './stacks/ConfigStack';
 import InicioStack from './stacks/InicioStack';
 import LecturasStack from './stacks/LecturasStack';
-import SyncStack from './stacks/SyncStack';
+// Tab Sincro deshabilitado por ahora — la app debe ser autonoma.
+// La pantalla Sincronizacion.tsx queda en codigo para la Fase 6
+// (backend real). Ver SDD setup-inicial-backend-real.
+// import SyncStack from './stacks/SyncStack';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
 type IconName = ComponentProps<typeof MaterialIcons>['name'];
 
-// Mapa de íconos MaterialIcons por nombre de tab
 const TAB_ICONS: Record<keyof TabParamList, IconName> = {
   Inicio: 'home',
-  Lecturas: 'menu-book',
+  Lecturas: 'edit-note',
+  // Sincronizacion: inactiva hasta Fase 6 (backend real). Mantener la
+  // entry aca para que `Record<keyof TabParamList, IconName>` siga
+  // satisfaciendo el type checker y reactivar el tab sea un un-comment.
   Sincronizacion: 'sync',
   Config: 'settings',
 };
 
-// Etiquetas visibles en la tab bar
-const TAB_LABELS: Record<keyof TabParamList, string> = {
-  Inicio: 'INICIO',
-  Lecturas: 'LECTURAS',
-  Sincronizacion: 'SYNC',
-  Config: 'CONFIG',
-};
+// ── Componente de ícono animado ────────────────────────────────────────────────
+// Usa useIsFocused() directamente para garantizar que las animaciones corran
+// cuando React Navigation cambia el tab activo.
+//
+// Accesibilidad (WCAG 2.1 AA, regla de impecable): el wrapper expone
+// accessibilityLabel + accessibilityRole + accessibilityState al screen
+// reader. El `tabBarButton` que React Navigation envuelve por encima del
+// tabBarIcon usa estos valores para anunciar el tab via TalkBack/VoiceOver.
+// El label describe la accion ("Ir a Inicio"), no el destino puro, para
+// que el screen reader anuncie una accion clara: "Ir a Inicio, tab".
 
-export default function AppNavigator() {
+interface TabIconProps {
+  name: IconName;
+  label: string;
+  // Accesibilidad — propagadas al wrapper View.
+  accessibilityLabel: string;
+  accessibilityRole: 'tab';
+  accessibilityState: AccessibilityState;
+  accessibilityHint?: string;
+}
+
+function TabIcon({
+  name,
+  label,
+  accessibilityLabel,
+  accessibilityRole,
+  accessibilityState,
+  accessibilityHint,
+}: TabIconProps) {
+  const focused = useIsFocused();
+  // Regla de impecable: "Reduced motion is not optional". Si el OS tiene
+  // Reduce Motion activado, los iconos cambian de foco instantaneamente
+  // (sin spring ni timing) — crossfade instantaneo.
+  const reducedMotion = useReducedMotion();
+
+  const translateY    = useRef(new Animated.Value(focused ? -6 : 0)).current;
+  const scale         = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
+  const bubbleOpacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const iconOpacity   = useRef(new Animated.Value(focused ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      // Sin transicion — seteamos el valor final directamente. El
+      // `useRef` arriba ya inicializa el estado de mount correctamente;
+      // esto cubre los cambios de `focused` mientras reducedMotion esta
+      // activo.
+      translateY.setValue(focused ? -6 : 0);
+      scale.setValue(focused ? 1 : 0.6);
+      bubbleOpacity.setValue(focused ? 1 : 0);
+      iconOpacity.setValue(focused ? 0 : 1);
+      return;
+    }
+
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: focused ? -6 : 0,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 9,
+      }),
+      Animated.spring(scale, {
+        toValue: focused ? 1 : 0.6,
+        useNativeDriver: true,
+        tension: 120,
+        friction: 9,
+      }),
+      Animated.timing(bubbleOpacity, {
+        toValue: focused ? 1 : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(iconOpacity, {
+        toValue: focused ? 0 : 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused, reducedMotion, translateY, scale, bubbleOpacity, iconOpacity]);
+
+  return (
+    <View
+      style={tabIconStyles.wrapper}
+      accessible={true}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      accessibilityState={accessibilityState}
+      accessibilityHint={accessibilityHint}
+    >
+      {/* Ícono plano — visible cuando inactivo */}
+      <Animated.View style={[tabIconStyles.iconPlano, { opacity: iconOpacity }]}>
+        <MaterialIcons name={name} size={22} color={COLORS.onSurfaceVariant} />
+        <Text style={tabIconStyles.label} numberOfLines={1}>{label}</Text>
+      </Animated.View>
+
+      {/* Burbuja activa — fade + scale + translateY */}
+      <Animated.View
+        style={[
+          tabIconStyles.bubble,
+          {
+            opacity: bubbleOpacity,
+            transform: [{ translateY }, { scale }],
+          },
+        ]}
+      >
+        <MaterialIcons name={name} size={22} color={COLORS.onPrimary} />
+      </Animated.View>
+
+      {/* Label bajo la burbuja cuando activo */}
+      <Animated.Text
+        style={[tabIconStyles.label, tabIconStyles.labelFocused, { opacity: bubbleOpacity }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Animated.Text>
+    </View>
+  );
+}
+
+const tabIconStyles = StyleSheet.create({
+  wrapper: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: 80,
+    paddingBottom: 10,
+  },
+  iconPlano: {
+    position: 'absolute',
+    bottom: 10,
+    alignItems: 'center',
+  },
+  bubble: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: COLORS.onSurfaceVariant,
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  labelFocused: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+});
+
+// ── Navigator ─────────────────────────────────────────────────────────────────
+
+interface Props {
+  readonly onLogoutRequested: () => void;
+}
+
+export default function AppNavigator({ onLogoutRequested }: Props) {
   return (
     <Tab.Navigator
       initialRouteName="Inicio"
-      screenOptions={({ route }) => ({
+      screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: COLORS.background,
-          borderTopWidth: BORDERS.thin.borderWidth,
-          borderTopColor: BORDERS.thin.borderColor,
-          height: 64,
-          paddingBottom: SPACING.sm,
-          paddingTop: SPACING.xs,
+          backgroundColor: COLORS.surfaceContainerLowest,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.outlineVariant,
+          height: 80,
+          paddingBottom: 0,
+          paddingTop: 0,
         },
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textSecondary,
-        tabBarLabelStyle: {
-          ...TYPOGRAPHY.labelSm,
+        tabBarShowLabel: false,
+        tabBarItemStyle: {
+          paddingVertical: 0,
         },
-        tabBarActiveTabStyle: {
-          fontWeight: '700',
-        },
-        tabBarLabel: TAB_LABELS[route.name as keyof TabParamList] ?? route.name,
-        tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-          <MaterialIcons
-            name={TAB_ICONS[route.name as keyof TabParamList] ?? 'circle'}
-            size={size}
-            color={color}
-          />
-        ),
-      })}
+      }}
     >
-      <Tab.Screen name="Inicio" component={InicioStack} />
-      <Tab.Screen name="Lecturas" component={LecturasStack} />
-      <Tab.Screen name="Sincronizacion" component={SyncStack} />
-      <Tab.Screen name="Config" component={ConfigStack} options={{ unmountOnBlur: true }} />
+      <Tab.Screen
+        name="Inicio"
+        component={InicioStack}
+        options={{
+          // Accesibilidad WCAG 2.1 AA: label describe la accion ("Ir a
+          // Inicio"), role "tab" para que el screen reader agrupe los 3
+          // tabs, y accessibilityState.selected sigue el focused tab.
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              name="home"
+              label="Inicio"
+              accessibilityLabel="Ir a Inicio"
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityHint="Pantalla principal del dia"
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Lecturas"
+        component={LecturasStack}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              name="edit-note"
+              label="Lecturas"
+              accessibilityLabel="Ir a Lecturas"
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityHint="Captura y consulta de lecturas de medidores"
+            />
+          ),
+        }}
+      />
+      {/* Tab Sincro deshabilitado por ahora — la app debe ser autonoma.
+          La pantalla Sincronizacion.tsx queda en codigo para la Fase 6
+          (backend real). Ver SDD setup-inicial-backend-real. */}
+      {/* <Tab.Screen
+        name="Sincronizacion"
+        component={SyncStack}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              name="sync"
+              label="Sincro"
+              accessibilityLabel="Ir a Sincro"
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityHint="Sincronizacion de datos con el servidor"
+            />
+          ),
+        }}
+      /> */}
+      <Tab.Screen
+        name="Config"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              name="person"
+              label="Perfil"
+              accessibilityLabel="Ir a Config"
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityHint="Configuracion y perfil del operario"
+            />
+          ),
+        }}
+      >
+        {() => <ConfigStack onLogoutRequested={onLogoutRequested} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }

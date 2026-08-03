@@ -1,0 +1,26 @@
+-- Migration 024: campo calle eliminado del modelo.
+--
+-- El campo `calle` se quitó del modelo `Suscriptor` (era redundante con
+-- `direccion`). Esta migration es NO-OP para SQLite: la columna `calle`
+-- PERMANECE en la DB para preservar datos históricos sin pérdida de
+-- información ni ruptura de compatibilidad con dispositivos ya
+-- desplegados.
+--
+-- Decisiones:
+--  - No ejecutamos `ALTER TABLE suscriptor DROP COLUMN calle` porque:
+--    * SQL < 3.35 no soporta DROP COLUMN (la version empaquetada en
+--      expo-sqlite SDK 54 cae en este rango).
+--    * Filas preexistentes continuarían con la columna `calle` poblada
+--      en la DB; al removerla sin proceso de migracion de datos se
+--      perdería evidencia de cómo se venía completando el formulario.
+--    * El adapter SQLite (mobile/dominio/persistencia/sqlite) deja de
+--      leerla y escribirla en code-level, pero la columna sigue
+--      accesible para queries ad-hoc durante auditorías.
+--  - El campo fue quitado del modelo de dominio (Suscriptor type),
+--    del factory (`crearSuscriptor`), del repository SQLite
+--    (INSERT/mapper) y del importador CSV. La UI ya no captura `calle`.
+--  - La snapshot de Factura (`FacturaSnapshotSuscriptor`) sigue
+--    declarando `calle: string | null` por especificidad de Res CRA
+--    1038/2026 §3 (ubicación del predio). Por consistencia con el
+--    modelo de Suscriptor, el snapshot se completa con `calle: null`
+--    en `emitirFactura` — la fuente ya no aporta ese dato.

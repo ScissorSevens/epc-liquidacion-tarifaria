@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import PeriodoPicker from '../components/PeriodoPicker';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   Image,
   KeyboardAvoidingView,
@@ -15,18 +16,23 @@ import {
 import {
   liquidarLectura,
   registrarLectura,
+  type ContextoLiquidacion,
 } from '@dominio/captura-lecturas/captura-lecturas';
 import type {
   EntradaLectura,
   EvidenciaFoto,
 } from '@dominio/captura-lecturas/types';
-import type { Estrato } from '@dominio/motor-tarifario/types';
+import type { ParametrosTarifa } from '@dominio/parametros-tarifa';
+import type { AcuerdoMunicipal } from '@dominio/acuerdo-municipal';
+import type { Prestador } from '@dominio/prestadores';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarLectura } from '../adapters/persistir-y-encolar-lectura';
-import { PARAMETROS_TARIFARIOS_DEMO } from '../composition/parametros-tarifarios-demo';
 import { photoCaptureStore } from '../composition/photo-capture-store';
+import { cargarSesion } from '../composition/constantes';
+import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -43,6 +49,12 @@ interface FormState {
   lectura_actual: string;
   id_periodo: string;
   observaciones: string;
+}
+
+interface ContextoMultiTenant {
+  readonly prestador: Prestador;
+  readonly parametros: ParametrosTarifa | null;
+  readonly acuerdo: AcuerdoMunicipal | null;
 }
 
 type CampoForm = keyof FormState;
@@ -116,7 +128,8 @@ function validarCampo(nombre: CampoForm, valor: string): string | undefined {
  *     del medidor (si existe) via `lecturaRepo.listar({ id_medidor })`.
  *  2) Carga el Suscriptor via `suscriptorRepo.buscarPorId` para mostrar
  *     nombre + dirección + estado en la card superior. Si falla, placeholders.
- *  3) Construye `EntradaLectura` con `id_operario: 1` (sin módulo de auth).
+ *  3) Construye `EntradaLectura` con `id_operario: sesion.idOperario`
+ *     (CRA 825/2017 — auditoria legal; antes del fix COR-04 estaba hardcoded a 1).
  *  4) Llama `registrarLectura` y `liquidarLectura` igual que antes.
  *  5) Navega a `ResultadoCalculo` con todo el contexto.
  *  6) Snackbar inline con mensajes del dominio si error.
@@ -141,11 +154,24 @@ export default function CapturarLectura({ navigation, route }: Props) {
     mensaje: '',
     tipo: 'ok',
   });
+  // Campo activo para focus state visual.
+  const [campoFocal, setCampoFocal] = useState<CampoForm | null>(null);
   // Datos del suscriptor para mostrar en la card superior. Se carga via
   // `suscriptorRepo.buscarPorId`. Si falla, queda undefined y mostramos "—".
   const [suscriptor, setSuscriptor] = useState<Suscriptor | undefined>(
     undefined,
   );
+  // Contexto multi-tenant: prestador + parametros vigentes + acuerdo vigente.
+  // Resuelto via `resolverContextoPrestador` del bootstrap. Si falla, queda
+  // undefined y la UI muestra un error bloqueante.
+  const [contextoMultiTenant, setContextoMultiTenant] = useState<ContextoMultiTenant | undefined>(
+    undefined,
+  );
+  const [errorContexto, setErrorContexto] = useState<string | undefined>(undefined);
+  // Sesion del operario autenticado. Se carga al mount para que el id del
+  // operario real quede atribuido en cada lectura (CRA 825/2017 — auditoria
+  // legal). Antes del fix COR-04 esto era `id_operario: 1` hardcoded.
+  const [idOperarioSesion, setIdOperarioSesion] = useState<number | null>(null);
 
   // Recibe la evidencia cuando `CapturarFoto` llama `goBack()` y depositó
   // la evidencia en `photoCaptureStore`. El listener de 'focus' garantiza
@@ -160,13 +186,44 @@ export default function CapturarLectura({ navigation, route }: Props) {
     return unsubscribe;
   }, [navigation]);
 
+  // Carga del id del operario autenticado (CRA 825/2017 — auditoria legal).
+  // AuthGate ya garantiza que el usuario esta logueado al llegar aqui, pero
+  // defensivamente hacemos el load y mostramos un snack si la sesion es null.
+  // Sin este idOperario, NO podemos construir EntradaLectura — antes del fix
+  // COR-04 quedo hardcoded a 1 en onCalcular.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const sesion = await cargarSesion();
+        if (cancelado) return;
+        if (sesion === null) {
+          // Caso defensivo: AuthGate no deberia permitir llegar aca sin sesion.
+          // Si pasa (carrera, sesion caducada entre mount y accion, etc.),
+          // mostramos el snack y bloqueamos la accion en onCalcular.
+          setIdOperarioSesion(null);
+          mostrarSnack('No hay sesión activa. Vuelve a iniciar sesión.', 'error');
+        } else {
+          setIdOperarioSesion(sesion.idOperario);
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[CapturarLectura] no se pudo cargar sesion:', e);
+        if (!cancelado) setIdOperarioSesion(null);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   // Prefill de lectura anterior usando el historial del medidor. Si no
   // hay registros previos asumimos primera lectura y dejamos vacio.
   useEffect(() => {
     let cancelado = false;
     (async () => {
       try {
-        const { lecturaRepo } = await getBootstrap();
+        const { repos: { lecturaRepo } } = await getBootstrap();
         const previas = await lecturaRepo.listar({ id_medidor });
         if (cancelado) return;
         if (previas.length > 0) {
@@ -198,10 +255,28 @@ export default function CapturarLectura({ navigation, route }: Props) {
     let cancelado = false;
     (async () => {
       try {
-        const { suscriptorRepo } = await getBootstrap();
+        const { repos: { suscriptorRepo } } = await getBootstrap();
         const s = await suscriptorRepo.buscarPorId(id_suscriptor);
         if (cancelado) return;
-        if (s !== null) setSuscriptor(s);
+        if (s !== null) {
+          setSuscriptor(s);
+          // Tambien cargar el contexto multi-tenant del prestador del suscriptor
+          if (s.id_prestador > 0 || contextoMultiTenant === undefined) {
+            try {
+              const { services: { resolverContextoPrestador } } = await getBootstrap();
+              const ctx = await resolverContextoPrestador(s.id_prestador);
+              if (!cancelado) setContextoMultiTenant(ctx);
+            } catch (eCtx) {
+              if (!cancelado) {
+                setErrorContexto(
+                  `No se pudo cargar el contexto del prestador ${s.id_prestador}: ${
+                    eCtx instanceof Error ? eCtx.message : String(eCtx)
+                  }`,
+                );
+              }
+            }
+          }
+        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.warn('[CapturarLectura] no se pudo cargar suscriptor:', e);
@@ -249,39 +324,62 @@ export default function CapturarLectura({ navigation, route }: Props) {
       mostrarSnack('Cargando datos del suscriptor, reintentar en un momento', 'error');
       return;
     }
+    if (errorContexto !== undefined) {
+      mostrarSnack(errorContexto, 'error');
+      return;
+    }
+    if (contextoMultiTenant === undefined || contextoMultiTenant.parametros === null) {
+      mostrarSnack(
+        `El prestador ${suscriptor.id_prestador} no tiene ParametrosTarifa vigentes. Configurelos antes de liquidar.`,
+        'error',
+      );
+      return;
+    }
+    // COR-04 fix: la sesion DEBE tener un idOperario real. Si llegamos aca
+    // sin el (caso defensivo, AuthGate normalmente bloca esto), rehusamos
+    // construir EntradaLectura con un id hardcoded — seria peor aun que el
+    // bug original.
+    if (idOperarioSesion === null || idOperarioSesion <= 0) {
+      mostrarSnack(
+        'No hay sesión activa del operario. Vuelve a iniciar sesión para registrar lecturas.',
+        'error',
+      );
+      return;
+    }
     setCalculando(true);
     try {
       const obs = form.observaciones.trim();
       const entrada: EntradaLectura = {
         id_medidor,
         id_periodo: form.id_periodo.trim(),
-        id_operario: 1, // sin módulo de auth activo.
+        id_operario: idOperarioSesion, // sesion.idOperario — auditoria legal
         lectura_actual: Number.parseFloat(form.lectura_actual),
         lectura_anterior: Number.parseFloat(form.lectura_anterior),
         ...(obs !== '' && { observaciones: obs }),
         ...(evidencia !== undefined && { evidencia }),
       };
-      const lectura = registrarLectura(entrada);
-      const estrato = suscriptor.estrato as Estrato;
-      const resultado = liquidarLectura(
-        lectura,
-        PARAMETROS_TARIFARIOS_DEMO,
-        estrato,
-      );
+      const lectura = registrarLectura(entrada, suscriptor.id_prestador);
+      const contexto: ContextoLiquidacion = {
+        parametros: contextoMultiTenant.parametros,
+        acuerdo: contextoMultiTenant.acuerdo,
+      };
+      const resultado = liquidarLectura(lectura, suscriptor, contexto);
       const bootstrap = await getBootstrap();
       await persistirYEncolarLectura({
         lectura,
-        lecturaRepo: bootstrap.lecturaRepo,
-        colaRepo: bootstrap.colaRepo,
-        idGenerator: bootstrap.idGenerator,
-        hasher: bootstrap.hasher,
+        lecturaRepo: bootstrap.repos.lecturaRepo,
+        colaRepo: bootstrap.repos.colaRepo,
+        idGenerator: bootstrap.adapters.idGenerator,
+        hasher: bootstrap.adapters.hasher,
       });
       navigation.navigate('ResultadoCalculo', {
         lectura,
         resultado,
-        parametros: PARAMETROS_TARIFARIOS_DEMO,
-        estrato,
+        parametros: contextoMultiTenant.parametros,
+        estrato: suscriptor.estrato,
         id_suscriptor,
+        nombre_suscriptor: suscriptor.nombre_apellidos,
+        prestador: contextoMultiTenant.prestador,
       });
     } catch (err) {
       const causa = (err as { cause?: { codigo?: string } })?.cause?.codigo;
@@ -320,35 +418,23 @@ export default function CapturarLectura({ navigation, route }: Props) {
     [id_suscriptor, id_medidor],
   );
 
+  // Warning de consumo inusual: se muestra si el incremento supera 40% del anterior.
+  const mostrarWarningConsumo = useMemo(() => {
+    const anterior = Number.parseFloat(form.lectura_anterior);
+    const actual = Number.parseFloat(form.lectura_actual);
+    if (isNaN(anterior) || isNaN(actual) || anterior <= 0) return false;
+    const consumo = actual - anterior;
+    if (consumo <= 0) return false;
+    return consumo / anterior > 0.4;
+  }, [form.lectura_anterior, form.lectura_actual]);
+
   return (
     <View style={styles.root}>
-      {/* Header brutalist: back + título capitalizado + account icon */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          disabled={calculando}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Volver"
-        >
-          <Text style={styles.headerIcon}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>CAPTURAR LECTURA</Text>
-        <Pressable
-          onPress={() => {
-            // Perfil: requiere módulo de autenticación.
-          }}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            pressed && styles.pressedDark,
-          ]}
-          accessibilityLabel="Cuenta"
-        >
-          <Text style={styles.headerIcon}>◉</Text>
-        </Pressable>
-      </View>
+      {/* Header */}
+      <TopBar
+        titulo="Capturar lectura"
+        onBack={() => navigation.goBack()}
+      />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -363,7 +449,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <View style={styles.cardSuscriptorTop}>
               <View style={styles.flex}>
                 <Text style={styles.abonadoLabel}>
-                  ABONADO #{id_suscriptor}
+                  Suscriptor #{id_suscriptor}
                 </Text>
                 <Text style={styles.abonadoNombre} numberOfLines={1}>
                   {nombreSuscriptor}
@@ -374,13 +460,15 @@ export default function CapturarLectura({ navigation, route }: Props) {
               </View>
             </View>
             <View style={styles.cardSuscriptorRow}>
+              <MaterialIcons name="location-on" size={14} color={COLORS.textSecondary} style={styles.cardRowIcon} />
               <Text style={styles.cardSuscriptorLine} numberOfLines={2}>
-                ◎  {direccionSuscriptor}
+                {direccionSuscriptor}
               </Text>
             </View>
             <View style={styles.cardSuscriptorRow}>
+              <MaterialIcons name="grid-on" size={14} color={COLORS.textSecondary} style={styles.cardRowIcon} />
               <Text style={styles.cardSuscriptorLine}>
-                ▦  Categoría: Estrato {suscriptor?.estrato ?? '—'}
+                Categoría: Estrato {suscriptor?.estrato ?? '—'}
               </Text>
             </View>
             <Text style={styles.subtituloMeta}>{subtitulo}</Text>
@@ -400,20 +488,25 @@ export default function CapturarLectura({ navigation, route }: Props) {
 
           {/* Input lectura actual */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Lectura actual (m³) *</Text>
-            <TextInput
-              value={form.lectura_actual}
-              onChangeText={(v) => setCampo('lectura_actual', v)}
-              onBlur={() => onBlur('lectura_actual')}
-              placeholder="0000"
-              placeholderTextColor={COLORS.placeholder}
-              keyboardType="decimal-pad"
-              editable={!calculando}
-              style={[
-                styles.inputBig,
-                errores.lectura_actual !== undefined && styles.inputError,
-              ]}
-            />
+            <Text style={styles.fieldLabel}>Lectura actual (m³)</Text>
+            <View style={styles.inputBigWrapper}>
+              <TextInput
+                value={form.lectura_actual}
+                onChangeText={(v) => setCampo('lectura_actual', v)}
+                onFocus={() => setCampoFocal('lectura_actual')}
+                onBlur={() => { setCampoFocal(null); onBlur('lectura_actual'); }}
+                placeholder="0000"
+                placeholderTextColor={COLORS.surfaceDim}
+                keyboardType="decimal-pad"
+                editable={!calculando}
+                style={[
+                  styles.inputBig,
+                  campoFocal === 'lectura_actual' && styles.inputFocused,
+                  errores.lectura_actual !== undefined && styles.inputError,
+                ]}
+              />
+              <Text style={styles.inputBigUnit}>m³</Text>
+            </View>
             {errores.lectura_actual !== undefined && (
               <Text style={styles.errorText}>{errores.lectura_actual}</Text>
             )}
@@ -425,13 +518,15 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <TextInput
               value={form.lectura_anterior}
               onChangeText={(v) => setCampo('lectura_anterior', v)}
-              onBlur={() => onBlur('lectura_anterior')}
+              onFocus={() => setCampoFocal('lectura_anterior')}
+              onBlur={() => { setCampoFocal(null); onBlur('lectura_anterior'); }}
               placeholder="0000"
               placeholderTextColor={COLORS.placeholder}
               keyboardType="decimal-pad"
               editable={!calculando && !cargandoPrefill}
               style={[
                 styles.input,
+                campoFocal === 'lectura_anterior' && styles.inputFocused,
                 errores.lectura_anterior !== undefined && styles.inputError,
               ]}
             />
@@ -460,7 +555,8 @@ export default function CapturarLectura({ navigation, route }: Props) {
             <TextInput
               value={form.observaciones}
               onChangeText={(v) => setCampo('observaciones', v)}
-              onBlur={() => onBlur('observaciones')}
+              onFocus={() => setCampoFocal('observaciones')}
+              onBlur={() => { setCampoFocal(null); onBlur('observaciones'); }}
               placeholder="Notas opcionales sobre la lectura"
               placeholderTextColor={COLORS.placeholder}
               multiline
@@ -470,6 +566,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
               textAlignVertical="top"
               style={[
                 styles.inputMulti,
+                campoFocal === 'observaciones' && styles.inputFocused,
                 errores.observaciones !== undefined && styles.inputError,
               ]}
             />
@@ -478,6 +575,21 @@ export default function CapturarLectura({ navigation, route }: Props) {
             )}
           </View>
 
+
+          {/* Botón cámara / preview de evidencia */}
+          {mostrarWarningConsumo && (
+            <View style={styles.warningBox}>
+              <View style={styles.warningIconBox}>
+                <MaterialIcons name="warning" size={22} color={COLORS.error} />
+              </View>
+              <View style={styles.warningTexts}>
+                <Text style={styles.warningTitle}>Consumo inusual detectado</Text>
+                <Text style={styles.warningDesc}>
+                  El incremento es superior al 40% del promedio histórico del suscriptor.
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Botón cámara / preview de evidencia */}
           {evidencia === undefined ? (
@@ -490,8 +602,10 @@ export default function CapturarLectura({ navigation, route }: Props) {
                   pressed && styles.pressedLight,
                 ]}
               >
-                <Text style={styles.camIcon}>▣</Text>
-                <Text style={styles.camLabel}>TOMAR FOTO DEL MEDIDOR</Text>
+                <View style={styles.camCirculo}>
+                  <MaterialIcons name="camera-alt" size={36} color={COLORS.onPrimary} />
+                </View>
+                <Text style={styles.camLabel}>Tomar foto del medidor</Text>
               </Pressable>
               <Text style={styles.camHint}>
                 Foto opcional para validación de consumo inusual
@@ -504,7 +618,10 @@ export default function CapturarLectura({ navigation, route }: Props) {
                 style={styles.evidenciaThumb}
               />
               <View style={styles.evidenciaInfo}>
-                <Text style={styles.evidenciaOk}>✓ FOTO CAPTURADA</Text>
+                <View style={styles.evidenciaOkRow}>
+                  <MaterialIcons name="check-circle" size={16} color={COLORS.secondary} />
+                  <Text style={styles.evidenciaOk}>Foto capturada</Text>
+                </View>
                 {evidencia.foto_hash !== undefined && (
                   <Text style={styles.evidenciaHash}>
                     {evidencia.foto_hash.substring(0, 8)}…
@@ -518,7 +635,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
                     pressed && styles.pressedLight,
                   ]}
                 >
-                  <Text style={styles.replaceBtnText}>REEMPLAZAR</Text>
+                  <Text style={styles.replaceBtnText}>Reemplazar foto</Text>
                 </Pressable>
               </View>
             </View>
@@ -546,7 +663,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           )}
 
           {/* Footer de marca dentro del scroll para que no tape */}
-          <Text style={styles.brandFooter}>MEDIAPP V1.0.4 - MODO OFFLINE</Text>
+          <FooterApp />
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -560,7 +677,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
             pressed && styles.pressedLight,
           ]}
         >
-          <Text style={styles.btnSecondaryText}>CANCELAR</Text>
+          <Text style={styles.btnSecondaryText}>Cancelar</Text>
         </Pressable>
         <Pressable
           onPress={onCalcular}
@@ -572,7 +689,7 @@ export default function CapturarLectura({ navigation, route }: Props) {
           ]}
         >
           <Text style={styles.btnPrimaryText}>
-            {calculando ? 'CALCULANDO…' : 'GUARDAR Y CALCULAR'}
+            {calculando ? 'Calculando…' : 'Guardar y calcular'}
           </Text>
         </Pressable>
       </View>
@@ -580,7 +697,6 @@ export default function CapturarLectura({ navigation, route }: Props) {
   );
 }
 
-const HEADER_HEIGHT = 56;
 const BOTTOM_HEIGHT = 88;
 
 const styles = StyleSheet.create({
@@ -589,34 +705,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   flex: { flex: 1 },
-
-  // Header
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.margin,
-    backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outline,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    ...TYPOGRAPHY.headlineSm,
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
-  },
 
   // Scroll
   scroll: {
@@ -644,8 +732,6 @@ const styles = StyleSheet.create({
   abonadoLabel: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   abonadoNombre: {
     ...TYPOGRAPHY.headlineSm,
@@ -656,18 +742,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.full,
   },
   badgeText: {
     ...TYPOGRAPHY.labelSm,
     color: COLORS.onPrimary,
     fontWeight: '700',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   cardSuscriptorRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  cardRowIcon: {
+    marginRight: 2,
   },
   cardSuscriptorLine: {
     ...TYPOGRAPHY.bodySm,
@@ -678,8 +767,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
 
   // Loader
@@ -728,30 +815,35 @@ const styles = StyleSheet.create({
     height: 48,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     color: COLORS.primary,
     ...TYPOGRAPHY.bodyMd,
   },
   inputBig: {
     width: '100%',
-    height: 64,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    height: 80,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.primaryContainer,
+    borderRadius: RADIUS.xl,
     paddingHorizontal: SPACING.md,
+    paddingRight: 48, // espacio para el "m³" a la derecha
     color: COLORS.primary,
-    ...TYPOGRAPHY.headlineMd,
+    ...TYPOGRAPHY.headlineLg,
   },
   inputMulti: {
     width: '100%',
     minHeight: 96,
     backgroundColor: COLORS.background,
     ...BORDERS.thin,
-    borderRadius: RADIUS.none,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
     color: COLORS.primary,
     ...TYPOGRAPHY.bodyMd,
+  },
+  inputFocused: {
+    ...BORDERS.focused,
   },
   inputError: {
     borderColor: COLORS.error,
@@ -774,15 +866,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
   },
-  camIcon: {
-    fontSize: 36,
-    color: COLORS.primary,
+  camCirculo: {
+    width: 80,
+    height: 80,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   camLabel: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
   },
   camHint: {
     ...TYPOGRAPHY.labelSm,
@@ -811,10 +905,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 2,
   },
+  evidenciaOkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
   evidenciaOk: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
   },
   evidenciaHash: {
     ...TYPOGRAPHY.labelMd,
@@ -830,8 +928,6 @@ const styles = StyleSheet.create({
   replaceBtnText: {
     ...TYPOGRAPHY.labelMd,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 
   // Snack inline
@@ -869,8 +965,6 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSm,
     fontSize: 8,
     color: COLORS.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
     textAlign: 'center',
     marginTop: SPACING.lg,
   },
@@ -887,36 +981,40 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
     flexDirection: 'row',
     gap: SPACING.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surfaceContainerLowest,
     borderTopWidth: 1,
-    borderTopColor: COLORS.outline,
+    borderTopColor: COLORS.outlineVariant,
   },
   btnSecondary: {
     flex: 1,
     height: 56,
-    backgroundColor: COLORS.background,
-    ...BORDERS.thin,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnSecondaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnPrimary: {
     flex: 1,
     height: 56,
     backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.default,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   btnPrimaryText: {
     ...TYPOGRAPHY.labelLg,
     color: COLORS.onPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
   btnDisabled: {
     opacity: 0.5,
@@ -928,5 +1026,53 @@ const styles = StyleSheet.create({
   },
   pressedDark: {
     opacity: 0.85,
+  },
+
+  // Input big wrapper (lectura actual con unidad flotante)
+  inputBigWrapper: {
+    position: 'relative',
+  },
+  inputBigUnit: {
+    position: 'absolute',
+    right: SPACING.lg,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurfaceVariant,
+    fontWeight: '500',
+  },
+
+  // Warning consumo inusual
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.md,
+    backgroundColor: COLORS.errorContainer,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.md,
+  },
+  warningIconBox: {
+    backgroundColor: COLORS.errorContainer,
+    borderRadius: RADIUS.default,
+    padding: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  warningTexts: {
+    flex: 1,
+    gap: SPACING.xs,
+  },
+  warningTitle: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onErrorContainer,
+    fontWeight: '600',
+  },
+  warningDesc: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onErrorContainer,
+    lineHeight: 20,
   },
 });

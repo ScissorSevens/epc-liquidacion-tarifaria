@@ -46,5 +46,21 @@ public class SuscriptorValidator : AbstractValidator<SuscriptorPayload>
             .NotEmpty().MaximumLength(120)
             .Must(v => v is not null && IdClienteRegex.IsMatch(v))
             .WithMessage("idCliente debe tener formato `dispositivo:id_local`.");
+
+        // Campos extendidos: validacion CONDICIONAL para retrocompatibilidad con
+        // suscriptores legacy sincronizados antes de este change (pueden no tener estos campos).
+        RuleFor(x => x.Cedula)
+            .MaximumLength(20)
+            .When(x => x.Cedula is not null);
+
+        RuleFor(x => x.Municipio)
+            .MaximumLength(100)
+            .When(x => x.Municipio is not null);
+
+        RuleFor(x => x.Sector)
+            .MaximumLength(100)
+            .When(x => x.Sector is not null);
+
+        // AplicaSubsidio es bool? — no necesita regla de longitud ni formato.
     }
 }

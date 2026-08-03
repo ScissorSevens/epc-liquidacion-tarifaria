@@ -38,11 +38,15 @@ function suscriptorBase(): Suscriptor {
     id_suscriptor: 1,
     codigo: '00001',
     nombre_apellidos: 'María López',
+    cedula: '123456789',
+    municipio: 'Bogotá',
     direccion: 'Calle 5 #2-10',
     estrato: 2,
     aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
     estado: 'activo',
-    created_at: '2026-01-01T00:00:00.000Z',
+        created_at: '2026-01-01T00:00:00.000Z',
   };
 }
 
@@ -87,15 +91,9 @@ function operarioBase(): Operario {
 
 function resultadoBase(): ResultadoCalculo {
   return {
-    consumo: 12,
-    consumoBasico: 12,
-    consumoExcedente: 0,
-    cargoFijo: 5000,
-    cargoConsumo: 18000,
-    cargoExcedente: 0,
-    subsidio: 4600,
-    contribucion: 0,
-    total: 18400,
+    id_prestador: 0, estrato: 4 as const, categoria_uso: 'residencial' as const, consumo_m3: 10, consumo_efectivo_m3: 10, bloques: [],
+    cargo_fijo: 5000, cc_unitario: 1500, cc_total: 15000,
+    subsidio: 0, contribucion: 0, total: 20000, factor_aplicado: 0, metadata: { norma_aplicada: 'X', acuerdo_id: null, parametros_id: 0, cmviaa_aplicado: false, minimo_vital_aplicado: false, factor_capeado: false, version_motor: 'X', calculo_timestamp: 'X' },
   };
 }
 

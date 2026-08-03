@@ -5,7 +5,7 @@ jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {
     ...actual,
-    useFocusEffect: (cb) => {
+    useFocusEffect: (cb: () => unknown) => {
       ReactNative.useEffect(() => {
         const cleanup = cb();
         return typeof cleanup === 'function' ? cleanup : undefined;

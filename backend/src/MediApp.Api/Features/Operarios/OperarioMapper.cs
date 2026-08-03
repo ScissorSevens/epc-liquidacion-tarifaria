@@ -1,4 +1,4 @@
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
 
 namespace MediApp.Api.Features.Operarios;
 
@@ -19,6 +19,7 @@ public static class OperarioMapper
         Estado = p.Estado,
         DispositivoId = p.DispositivoId,
         CreatedAt = p.CreatedAt,
+        IdPrestador = p.IdPrestador,
     };
 
     /// <summary>
@@ -33,5 +34,6 @@ public static class OperarioMapper
         if (p.Rol is not null) entidad.Rol = p.Rol;
         if (p.Estado is not null) entidad.Estado = p.Estado;
         if (p.DispositivoId is not null) entidad.DispositivoId = p.DispositivoId;
+        if (p.IdPrestador.HasValue) entidad.IdPrestador = p.IdPrestador.Value;
     }
 }

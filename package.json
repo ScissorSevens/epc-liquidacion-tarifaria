@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Sistema de liquidación tarifaria para prestadores rurales de agua - EPC Cundinamarca",
   "main": "dist/index.js",
+  "workspaces": [
+    "mobile"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "jest",

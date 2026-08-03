@@ -1,500 +1,492 @@
-import { calcularLiquidacion, calcularBatch } from '../motor-tarifario';
-import { EntradaCalculo } from '../types';
+/**
+ * Tests del motor tarifario conforme a Res CRA 825/2017 + Res 907/2019.
+ * Multi-tenant: cada escenario usa ParametrosTarifa + AcuerdoMunicipal
+ * del prestador.
+ *
+ * Cobertura (alineada con spec #646 + design #648):
+ *  - Cargo Fijo (art. 9): basico, con CMAA, sin CMAA
+ *  - Cargo por Consumo (art. 10 mod 907/2019 art. 14): sin CMVIAA,
+ *    con CMVIAA, sin CMVIAA cuando flag inactivo
+ *  - Topes L142/1994 art. 99.6: E1-E6 dentro de rango, fuera de rango
+ *  - Categorías de uso: comercial, industrial, oficial, especial
+ *  - Mínimo vital: 6 escenarios (flag, m3_gratis, comercial, etc.)
+ *  - Multi-tenant: 2 prestadores no contamine
+ *  - Determinismo: 100 invocaciones idénticas
+ *  - Acuerdo null → topes nacionales
+ *  - Validaciones: Parametros null, id_prestador mismatch, estrato
+ */
 
-describe('Motor Tarifario CRA', () => {
-  const parametrosBase: EntradaCalculo['parametros'] = {
-    cargoFijo: 5000,
-    precioM3: 800,
-    precioM3Excedente: 1500,
-    consumoBasico: 20,
+import {
+  calcularCCUnitario,
+  calcularFactor,
+  calcularLiquidacion,
+  aplicarMinimoVital,
+  caparFactorEstrato,
+  TOPES_NACIONALES,
+} from '../motor-tarifario';
+import type { AcuerdoMunicipal, ParametrosTarifa, EntradaCalculo } from '../types';
+
+// ===== Fixtures =====
+
+const PARAMETROS_BASE: ParametrosTarifa = {
+  id_parametros: 1,
+  id_prestador: 0,
+  id_acuerdo: 1,
+  periodo: 2026,
+  cma: 30_000_000,
+  cmo: 1500,
+  cmi: 300,
+  cmt: 200,
+  cmviaa: 0,
+  aplica_cmviaa: false,
+  agua_suministrada_m3_anio: 100_000,
+  ipuf_m3_suscriptor_mes: 6,
+  suscriptores_promedio: 3000,
+  aplica_minimo_vital: false,
+  m3_gratis_minimo_vital: 0,
+  vigente_desde: '2026-01-01',
+  vigente_hasta: '2026-12-31',
+  created_at: '2026-01-01T00:00:00',
+};
+
+const ACUERDO_BASE: AcuerdoMunicipal = {
+  id_acuerdo: 1,
+  id_prestador: 0,
+  factor_subsidio_e1: -0.60,
+  factor_subsidio_e2: -0.50,
+  factor_subsidio_e3: -0.40,
+  factor_contribucion_e5: 0.50,
+  factor_contribucion_e6: 0.60,
+  factor_contribucion_comercial: 0.50,
+  factor_contribucion_industrial: 0.30,
+  fecha_vigencia_desde: '2026-01-01',
+  fecha_vigencia_hasta: '2026-12-31',
+  acto_administrativo_url: null,
+  observaciones: null,
+  created_at: '2026-01-01T00:00:00',
+};
+
+function entradaBase(overrides: Partial<EntradaCalculo> = {}): EntradaCalculo {
+  return {
+    id_prestador: 0,
+    consumo_m3: 18,
+    estrato: 3,
+    categoria_uso: 'residencial',
+    ...overrides,
   };
+}
 
-  describe('calculo de consumo y tarifa diferencial', () => {
-    it('calcula consumo y total con parámetros básicos', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-      };
+// ===== CF (art. 9) =====
 
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.consumo).toBe(15);
-      expect(resultado.consumoBasico).toBe(15);
-      expect(resultado.consumoExcedente).toBe(0);
-      expect(resultado.cargoFijo).toBe(5000);
-      expect(resultado.cargoConsumo).toBe(12000);
-      expect(resultado.cargoExcedente).toBe(0);
-      expect(resultado.total).toBe(17000);
-    });
-
-    it('consumo cero cobra solo cargo fijo', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 200,
-        lecturaActual: 200,
-        parametros: parametrosBase,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.consumo).toBe(0);
-      expect(resultado.consumoBasico).toBe(0);
-      expect(resultado.consumoExcedente).toBe(0);
-      expect(resultado.cargoConsumo).toBe(0);
-      expect(resultado.cargoExcedente).toBe(0);
-      expect(resultado.total).toBe(5000);
-    });
-
-    it('cobra tarifa excedente cuando supera consumo basico', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 125,
-        parametros: parametrosBase,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.consumo).toBe(25);
-      expect(resultado.consumoBasico).toBe(20);
-      expect(resultado.consumoExcedente).toBe(5);
-      expect(resultado.cargoConsumo).toBe(16000);      // 20 * 800
-      expect(resultado.cargoExcedente).toBe(7500);     // 5 * 1500
-      expect(resultado.total).toBe(28500);             // 5000 + 16000 + 7500
-    });
-
-    it('consumo exactamente en el limite basico no cobra excedente', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 120,
-        parametros: parametrosBase,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.consumo).toBe(20);
-      expect(resultado.consumoBasico).toBe(20);
-      expect(resultado.consumoExcedente).toBe(0);
-      expect(resultado.cargoConsumo).toBe(16000);
-      expect(resultado.cargoExcedente).toBe(0);
-      expect(resultado.total).toBe(21000);
-    });
-
-    it('consumo alto (100 m³) calcula correctamente basico y excedente', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 200,
-        parametros: parametrosBase,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.consumo).toBe(100);
-      expect(resultado.consumoBasico).toBe(20);
-      expect(resultado.consumoExcedente).toBe(80);
-      expect(resultado.cargoFijo).toBe(5000);
-      expect(resultado.cargoConsumo).toBe(16000);      // 20 * 800
-      expect(resultado.cargoExcedente).toBe(120000);   // 80 * 1500
-      expect(resultado.total).toBe(141000);            // 5000 + 16000 + 120000
-    });
-
-    it('cargo fijo cero es valido (minimo vital Decreto 0776/2025)', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 110, // consumo = 10 m³
-        parametros: { cargoFijo: 0, precioM3: 800, precioM3Excedente: 1500, consumoBasico: 20 },
-        estrato: 1,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      // cargoConsumo = 10 * 800 = 8000, subsidio 70% = 5600
-      expect(resultado.cargoFijo).toBe(0);
-      expect(resultado.cargoConsumo).toBe(8000);
-      expect(resultado.subsidio).toBe(5600);
-      expect(resultado.total).toBe(2400);              // 0 + 8000 - 5600
-    });
-
-    it('redondea a pesos enteros cuando tarifas tienen decimales', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 107, // consumo = 7 m³
-        parametros: {
-          cargoFijo: 4350.60,
-          precioM3: 823.45,
-          precioM3Excedente: 1547.80,
-          consumoBasico: 20,
-        },
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      // cargoConsumo = 7 * 823.45 = 5764.15
-      // total = 4350.60 + 5764.15 = 10114.75 → redondeado a 10115
-      expect(resultado.cargoConsumo).toBe(5764);       // Math.round(5764.15)
-      expect(resultado.cargoFijo).toBe(4351);          // Math.round(4350.60)
-      expect(resultado.total).toBe(10115);             // Math.round(total)
-    });
+describe('calcularLiquidacion — Cargo Fijo (art. 9 Res 825/2017)', () => {
+  it('CF básico residencial E3 con CMA=30M N=3000', () => {
+    const r = calcularLiquidacion(entradaBase(), PARAMETROS_BASE, ACUERDO_BASE);
+    // CF = CMA/N = 30_000_000 / 3000 = 10_000
+    expect(r.cargo_fijo).toBe(10_000);
   });
 
-  describe('subsidio y contribucion por estrato', () => {
-    it('sin estrato se comporta como estrato 4 (costo real)', () => {
-      const conEstrato4: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 4,
-      };
-      const sinEstrato: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-      };
-
-      const resultado4 = calcularLiquidacion(conEstrato4);
-      const resultadoSin = calcularLiquidacion(sinEstrato);
-
-      expect(resultadoSin.subsidio).toBe(resultado4.subsidio);
-      expect(resultadoSin.contribucion).toBe(resultado4.contribucion);
-      expect(resultadoSin.total).toBe(resultado4.total);
-    });
-
-    it('estrato 1 aplica subsidio del 70% sobre cargo fijo y consumo basico', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 1,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      // Base subsidiable: cargoFijo + cargoConsumo = 5000 + 12000 = 17000
-      // Subsidio 70%: 17000 * 0.70 = 11900
-      expect(resultado.subsidio).toBe(11900);
-      expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(5100);              // 5000 + 12000 - 11900
-    });
-
-    it('estrato 2 aplica subsidio del 40% sobre cargo fijo y consumo basico', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 2,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      // Base subsidiable: 5000 + 12000 = 17000
-      // Subsidio 40%: 17000 * 0.40 = 6800
-      expect(resultado.subsidio).toBe(6800);
-      expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(10200);             // 5000 + 12000 - 6800
-    });
-
-    it('estrato 4 paga costo real sin subsidio ni contribucion', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 4,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.subsidio).toBe(0);
-      expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(17000);             // 5000 + 12000
-    });
-
-    it('estrato 6 aplica contribucion del 60% sobre cargo fijo y consumo total', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 6,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      // Base contribucion: cargoFijo + cargoConsumoTotal = 5000 + 12000 = 17000
-      // Contribución 60%: 17000 * 0.60 = 10200
-      expect(resultado.subsidio).toBe(0);
-      expect(resultado.contribucion).toBe(10200);
-      expect(resultado.total).toBe(27200);             // 5000 + 12000 + 10200
-    });
-
-    it('estrato 1 con consumo excedente aplica subsidio SOLO sobre fijo y basico', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 130,
-        parametros: parametrosBase,
-        estrato: 1,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      // cargoFijo = 5000, cargoConsumo = 20 * 800 = 16000 (subsidiable)
-      // cargoExcedente = 10 * 1500 = 15000 (NO subsidiable)
-      // Subsidio 70% de (5000 + 16000) = 70% de 21000 = 14700
-      expect(resultado.consumo).toBe(30);
-      expect(resultado.consumoBasico).toBe(20);
-      expect(resultado.consumoExcedente).toBe(10);
-      expect(resultado.cargoConsumo).toBe(16000);
-      expect(resultado.cargoExcedente).toBe(15000);
-      expect(resultado.subsidio).toBe(14700);
-      expect(resultado.contribucion).toBe(0);
-      expect(resultado.total).toBe(21300);             // 5000 + 16000 + 15000 - 14700
-    });
+  it('CF con CMAA cuando aplica_cmviaa=true (extension analogica)', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      cmviaa: 3_000_000,
+      aplica_cmviaa: true,
+    };
+    const r = calcularLiquidacion(entradaBase(), params, ACUERDO_BASE);
+    // (30M + 3M) / 3000 = 11_000 (CMVIAA no se suma al CF, al CC unitario)
+    // El CF sigue siendo CMA/N = 30M/3000 = 10_000
+    expect(r.cargo_fijo).toBe(10_000);
+    // CC unitario SI incluye CMVIAA
+    expect(r.cc_unitario).toBeGreaterThan(0);
   });
 
-  describe('periodo de facturacion', () => {
-    it('incluye periodo en el resultado cuando se proporciona en la entrada', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        periodo: { mes: 3, anio: 2025 },
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.periodo).toEqual({ mes: 3, anio: 2025 });
-      expect(resultado.total).toBe(17000);
-    });
-
-    it('resultado sin periodo cuando no se proporciona (backwards compat)', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-      };
-
-      const resultado = calcularLiquidacion(entrada);
-
-      expect(resultado.periodo).toBeUndefined();
-    });
-
-    it('lanza error si mes es invalido (fuera de rango 1-12)', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        periodo: { mes: 13, anio: 2025 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Mes debe ser un valor entre 1 y 12');
-    });
-
-    it('lanza error si mes es cero', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        periodo: { mes: 0, anio: 2025 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Mes debe ser un valor entre 1 y 12');
-    });
-
-    it('lanza error si anio es menor a 2000', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        periodo: { mes: 6, anio: 1999 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Anio debe ser mayor o igual a 2000');
-    });
-  });
-
-  describe('validaciones de entrada', () => {
-    it('lanza error si lectura actual es menor que anterior', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 90,
-        parametros: parametrosBase,
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Lectura actual no puede ser menor que la anterior');
-    });
-
-    it('lanza error si lectura anterior es negativa', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: -5,
-        lecturaActual: 10,
-        parametros: parametrosBase,
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Las lecturas no pueden ser negativas');
-    });
-
-    it('lanza error si lectura actual es negativa', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 10,
-        lecturaActual: -3,
-        parametros: parametrosBase,
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Las lecturas no pueden ser negativas');
-    });
-
-    it('lanza error si cargo fijo es negativo', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: -1000, precioM3: 800, precioM3Excedente: 1500, consumoBasico: 20 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El cargo fijo no puede ser negativo');
-    });
-
-    it('lanza error si precio por m3 es negativo', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: 5000, precioM3: -500, precioM3Excedente: 1500, consumoBasico: 20 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El precio por m3 debe ser mayor a cero');
-    });
-
-    it('lanza error si precio por m3 es cero', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: 5000, precioM3: 0, precioM3Excedente: 1500, consumoBasico: 20 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El precio por m3 debe ser mayor a cero');
-    });
-
-    it('lanza error si precio excedente es negativo', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: -200, consumoBasico: 20 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El precio excedente debe ser mayor a cero');
-    });
-
-    it('lanza error si precio excedente es cero', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: 0, consumoBasico: 20 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El precio excedente debe ser mayor a cero');
-    });
-
-    it('lanza error si consumo basico es negativo', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: 1500, consumoBasico: -5 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El consumo basico debe ser mayor a cero');
-    });
-
-    it('lanza error si consumo basico es cero', () => {
-      const entrada: EntradaCalculo = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: { cargoFijo: 5000, precioM3: 800, precioM3Excedente: 1500, consumoBasico: 0 },
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('El consumo basico debe ser mayor a cero');
-    });
-
-    it('lanza error si estrato es invalido (fuera de rango 1-6)', () => {
-      const entrada = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 7 as any,
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Estrato debe ser un valor entre 1 y 6');
-    });
-
-    it('lanza error si estrato es cero', () => {
-      const entrada = {
-        lecturaAnterior: 100,
-        lecturaActual: 115,
-        parametros: parametrosBase,
-        estrato: 0 as any,
-      };
-
-      expect(() => calcularLiquidacion(entrada)).toThrow('Estrato debe ser un valor entre 1 y 6');
-    });
+  it('CF idéntico para todas las categorías de uso (es solo CMA/N)', () => {
+    const cats = ['residencial', 'comercial', 'industrial', 'oficial', 'especial'] as const;
+    const cfs = cats.map((cat) =>
+      calcularLiquidacion(entradaBase({ categoria_uso: cat }), PARAMETROS_BASE, ACUERDO_BASE).cargo_fijo,
+    );
+    expect(new Set(cfs).size).toBe(1);
+    expect(cfs[0]).toBe(10_000);
   });
 });
 
-describe('Liquidacion Batch', () => {
-  const parametrosBase: EntradaCalculo['parametros'] = {
-    cargoFijo: 5000,
-    precioM3: 800,
-    precioM3Excedente: 1500,
-    consumoBasico: 20,
-  };
+// ===== CC (art. 10 mod 907/2019 art. 14) =====
 
-  it('liquida multiples suscriptores en una sola llamada', () => {
-    const entradas: EntradaCalculo[] = [
-      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase, estrato: 1 },
-      { lecturaAnterior: 200, lecturaActual: 210, parametros: parametrosBase, estrato: 4 },
-      { lecturaAnterior: 300, lecturaActual: 325, parametros: parametrosBase, estrato: 6 },
-    ];
-
-    const resultados = calcularBatch(entradas);
-
-    expect(resultados).toHaveLength(3);
-    // Estrato 1: subsidio 70% de (5000 + 12000) = 11900
-    expect(resultados[0].subsidio).toBe(11900);
-    expect(resultados[0].total).toBe(5100);
-    // Estrato 4: sin subsidio ni contribución, consumo 10
-    expect(resultados[1].subsidio).toBe(0);
-    expect(resultados[1].total).toBe(13000);           // 5000 + 8000
-    // Estrato 6: consumo 25 (20 basico + 5 excedente)
-    // contribución 60% de (5000 + 16000 + 7500) = 60% de 28500 = 17100
-    expect(resultados[2].contribucion).toBe(17100);
-    expect(resultados[2].total).toBe(45600);           // 5000 + 16000 + 7500 + 17100
+describe('calcularLiquidacion — Cargo por Consumo (art. 10 mod 907/2019)', () => {
+  it('CC básico E3 residencial sin CMVIAA', () => {
+    const r = calcularLiquidacion(entradaBase(), PARAMETROS_BASE, ACUERDO_BASE);
+    // ASP = 100_000 - 6*12*3000 = 100_000 - 216_000 = NEGATIVO
+    // Math.max(_, 1) = 1
+    // CC unit = (1500+300+200)/1 + 0 = 2000
+    // CC total = 2000 * 18 = 36_000
+    expect(r.cc_unitario).toBeCloseTo(2000, 2);
+    expect(r.cc_total).toBe(36_000);
   });
 
-  it('retorna array vacio cuando no hay entradas', () => {
-    const resultados = calcularBatch([]);
-
-    expect(resultados).toEqual([]);
+  it('CC con CMVIAA cuando flag activo', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000, // ASP positivo
+      cmviaa: 50,
+      aplica_cmviaa: true,
+    };
+    // ASP = 500_000 - 216_000 = 284_000
+    // CC unit = (1500+300+200)/284_000 + 50 = 0.00704... + 50 ≈ 50.007
+    // CC total = 50.007 * 18 ≈ 900.13 → 900
+    const r = calcularLiquidacion(entradaBase(), params, ACUERDO_BASE);
+    expect(r.cc_unitario).toBeGreaterThan(50);
+    expect(r.cc_unitario).toBeLessThan(51);
+    expect(r.metadata.cmviaa_aplicado).toBe(true);
   });
 
-  it('cada resultado es independiente del resto', () => {
-    const entradas: EntradaCalculo[] = [
-      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase },
-      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase },
-    ];
+  it('CC sin CMVIAA cuando flag inactivo (aunque cmviaa > 0)', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      cmviaa: 50,
+      aplica_cmviaa: false,
+    };
+    const r = calcularLiquidacion(entradaBase(), params, ACUERDO_BASE);
+    expect(r.metadata.cmviaa_aplicado).toBe(false);
+  });
+});
 
-    const resultados = calcularBatch(entradas);
-    const individual = calcularLiquidacion(entradas[0]);
+// ===== Topes L142/1994 =====
 
-    expect(resultados[0]).toEqual(individual);
-    expect(resultados[1]).toEqual(individual);
+describe('calcularLiquidacion — Topes L142/1994 art. 99.6', () => {
+  it.each([1, 2, 3, 4, 5, 6])('E%d respeta topes nacionales', (estrato) => {
+    const r = calcularLiquidacion(
+      entradaBase({ estrato: estrato as 1 | 2 | 3 | 4 | 5 | 6 }),
+      PARAMETROS_BASE,
+      ACUERDO_BASE,
+    );
+    const f = r.factor_aplicado;
+    if (estrato === 1) expect(f).toBeGreaterThanOrEqual(-0.60);
+    if (estrato === 2) expect(f).toBeGreaterThanOrEqual(-0.50);
+    if (estrato === 3) expect(f).toBeGreaterThanOrEqual(-0.40);
+    if (estrato === 4) expect(f).toBe(0);
+    if (estrato === 5) expect(f).toBeLessThanOrEqual(+0.50);
+    if (estrato === 6) expect(f).toBeLessThanOrEqual(+0.60);
   });
 
-  it('un error en una entrada no afecta las demas', () => {
-    const entradas: EntradaCalculo[] = [
-      { lecturaAnterior: 100, lecturaActual: 115, parametros: parametrosBase },
-      { lecturaAnterior: 200, lecturaActual: 190, parametros: parametrosBase }, // ERROR: actual < anterior
-      { lecturaAnterior: 300, lecturaActual: 310, parametros: parametrosBase },
-    ];
+  it('E1 con Acuerdo -0.80 (fuera de rango) se CAPEA a -0.60 + metadata', () => {
+    const acuerdo: AcuerdoMunicipal = { ...ACUERDO_BASE, factor_subsidio_e1: -0.80 };
+    const r = calcularLiquidacion(entradaBase({ estrato: 1 }), PARAMETROS_BASE, acuerdo);
+    expect(r.factor_aplicado).toBeCloseTo(-0.60, 5);
+    expect(r.metadata.factor_capeado).toBe(true);
+  });
 
-    const resultados = calcularBatch(entradas);
+  it('E1 con Acuerdo -0.40 (dentro de rango) se respeta tal cual', () => {
+    const acuerdo: AcuerdoMunicipal = { ...ACUERDO_BASE, factor_subsidio_e1: -0.40 };
+    const r = calcularLiquidacion(entradaBase({ estrato: 1 }), PARAMETROS_BASE, acuerdo);
+    expect(r.factor_aplicado).toBeCloseTo(-0.40, 5);
+    expect(r.metadata.factor_capeado).toBe(false);
+  });
 
-    expect(resultados).toHaveLength(3);
-    expect(resultados[0].total).toBe(17000);
-    expect(resultados[1]).toHaveProperty('error');
-    expect(resultados[2].total).toBe(13000);           // 5000 + 8000
+  it('estrato fuera de rango (7) lanza error', () => {
+    expect(() =>
+      calcularLiquidacion(entradaBase({ estrato: 7 as 1 }), PARAMETROS_BASE, ACUERDO_BASE),
+    ).toThrow('Estrato fuera de rango 1-6');
+  });
+});
+
+// ===== Categorías de uso =====
+
+describe('calcularLiquidacion — Categorías de uso (Q10)', () => {
+  it('comercial E1 → contribución comercial, NUNCA subsidio', () => {
+    const acuerdo: AcuerdoMunicipal = { ...ACUERDO_BASE, factor_subsidio_e1: -0.60 };
+    const r = calcularLiquidacion(
+      entradaBase({ estrato: 1, categoria_uso: 'comercial' }),
+      PARAMETROS_BASE,
+      acuerdo,
+    );
+    expect(r.factor_aplicado).toBeCloseTo(0.50, 5); // factor_contribucion_comercial default
+    expect(r.subsidio).toBe(0);
+    expect(r.contribucion).toBeGreaterThan(0);
+  });
+
+  it('industrial E5 → contribución industrial (NO E5)', () => {
+    const r = calcularLiquidacion(
+      entradaBase({ estrato: 5, categoria_uso: 'industrial' }),
+      PARAMETROS_BASE,
+      ACUERDO_BASE,
+    );
+    expect(r.factor_aplicado).toBeCloseTo(0.30, 5); // factor_contribucion_industrial default
+    expect(r.contribucion).toBeGreaterThan(0);
+    expect(r.subsidio).toBe(0);
+  });
+
+  it('oficial cualquier estrato → tarifa plena, factor 0', () => {
+    for (const e of [1, 2, 3, 4, 5, 6] as const) {
+      const r = calcularLiquidacion(
+        entradaBase({ estrato: e, categoria_uso: 'oficial' }),
+        PARAMETROS_BASE,
+        ACUERDO_BASE,
+      );
+      expect(r.factor_aplicado).toBe(0);
+      expect(r.subsidio).toBe(0);
+      expect(r.contribucion).toBe(0);
+    }
+  });
+
+  it('especial se comporta como residencial', () => {
+    const r1 = calcularLiquidacion(
+      entradaBase({ categoria_uso: 'residencial', estrato: 2 }),
+      PARAMETROS_BASE,
+      ACUERDO_BASE,
+    );
+    const r2 = calcularLiquidacion(
+      entradaBase({ categoria_uso: 'especial', estrato: 2 }),
+      PARAMETROS_BASE,
+      ACUERDO_BASE,
+    );
+    expect(r1.factor_aplicado).toBe(r2.factor_aplicado);
+    expect(r1.subsidio).toBe(r2.subsidio);
+  });
+});
+
+// ===== Mínimo vital =====
+
+describe('calcularLiquidacion — Mínimo vital (Q9)', () => {
+  it('flag=false → comportamiento sin mínimo vital', () => {
+    const params: ParametrosTarifa = { ...PARAMETROS_BASE, agua_suministrada_m3_anio: 500_000 };
+    const r = calcularLiquidacion(entradaBase({ consumo_m3: 25 }), params, ACUERDO_BASE);
+    expect(r.consumo_efectivo_m3).toBe(25);
+    expect(r.metadata.minimo_vital_aplicado).toBe(false);
+  });
+
+  it('flag=true + m3_gratis=0 → inactivo', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      aplica_minimo_vital: true,
+      m3_gratis_minimo_vital: 0,
+    };
+    const r = calcularLiquidacion(entradaBase({ consumo_m3: 25 }), params, ACUERDO_BASE);
+    expect(r.consumo_efectivo_m3).toBe(25);
+    expect(r.metadata.minimo_vital_aplicado).toBe(false);
+  });
+
+  it('flag=true + consumo=10 + m3_gratis=6 → CC sobre 4 m³', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      aplica_minimo_vital: true,
+      m3_gratis_minimo_vital: 6,
+    };
+    const r = calcularLiquidacion(entradaBase({ consumo_m3: 10 }), params, ACUERDO_BASE);
+    expect(r.consumo_efectivo_m3).toBe(4);
+    expect(r.metadata.minimo_vital_aplicado).toBe(true);
+  });
+
+  it('flag=true + consumo=3 ≤ m3_gratis=6 → CC = 0', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      aplica_minimo_vital: true,
+      m3_gratis_minimo_vital: 6,
+    };
+    const r = calcularLiquidacion(entradaBase({ consumo_m3: 3 }), params, ACUERDO_BASE);
+    expect(r.consumo_efectivo_m3).toBe(0);
+    expect(r.cc_total).toBe(0);
+  });
+
+  it('flag=true + categoría=comercial → NO aplica', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      aplica_minimo_vital: true,
+      m3_gratis_minimo_vital: 6,
+    };
+    const r = calcularLiquidacion(
+      entradaBase({ consumo_m3: 10, categoria_uso: 'comercial' }),
+      params,
+      ACUERDO_BASE,
+    );
+    expect(r.consumo_efectivo_m3).toBe(10);
+    expect(r.metadata.minimo_vital_aplicado).toBe(false);
+  });
+
+  it('mínimo vital aplica ANTES del subsidio', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      aplica_minimo_vital: true,
+      m3_gratis_minimo_vital: 6,
+    };
+    const r = calcularLiquidacion(
+      entradaBase({ consumo_m3: 20, estrato: 1, categoria_uso: 'residencial' }),
+      params,
+      ACUERDO_BASE,
+    );
+    expect(r.consumo_efectivo_m3).toBe(14);
+    expect(r.metadata.minimo_vital_aplicado).toBe(true);
+    // Subsidio se aplica sobre CF + CC(14m³), no sobre 20m³
+    expect(r.subsidio).toBeGreaterThan(0);
+  });
+});
+
+// ===== Multi-tenant =====
+
+describe('calcularLiquidacion — Multi-tenant', () => {
+  it('Mismo input + Acuerdo A vs B → outputs diferentes', () => {
+    const acuerdoA: AcuerdoMunicipal = { ...ACUERDO_BASE, id_acuerdo: 1, factor_subsidio_e1: -0.60 };
+    const acuerdoB: AcuerdoMunicipal = { ...ACUERDO_BASE, id_acuerdo: 2, factor_subsidio_e1: -0.30 };
+    const entrada = entradaBase({ estrato: 1 });
+    const rA = calcularLiquidacion(entrada, PARAMETROS_BASE, acuerdoA);
+    const rB = calcularLiquidacion(entrada, PARAMETROS_BASE, acuerdoB);
+    expect(rA.subsidio).not.toBe(rB.subsidio);
+  });
+
+  it('2 prestadores simultáneos en misma corrida NO contaminan configs', () => {
+    const paramsX: ParametrosTarifa = { ...PARAMETROS_BASE, id_prestador: 10, cma: 10_000_000 };
+    const paramsY: ParametrosTarifa = { ...PARAMETROS_BASE, id_prestador: 20, cma: 50_000_000 };
+    const acuerdoX: AcuerdoMunicipal = { ...ACUERDO_BASE, id_prestador: 10, factor_subsidio_e1: -0.10 };
+    const acuerdoY: AcuerdoMunicipal = { ...ACUERDO_BASE, id_prestador: 20, factor_subsidio_e1: -0.60 };
+    const entX: EntradaCalculo = { id_prestador: 10, consumo_m3: 18, estrato: 1, categoria_uso: 'residencial' };
+    const entY: EntradaCalculo = { id_prestador: 20, consumo_m3: 18, estrato: 1, categoria_uso: 'residencial' };
+    const rX = calcularLiquidacion(entX, paramsX, acuerdoX);
+    const rY = calcularLiquidacion(entY, paramsY, acuerdoY);
+    expect(rX.cargo_fijo).toBe(Math.round(10_000_000 / 3000));
+    expect(rY.cargo_fijo).toBe(Math.round(50_000_000 / 3000));
+    expect(rX.factor_aplicado).toBeCloseTo(-0.10, 5);
+    expect(rY.factor_aplicado).toBeCloseTo(-0.60, 5);
+  });
+
+  it('Parametros.id_prestador ≠ entrada.id_prestador → error', () => {
+    const params: ParametrosTarifa = { ...PARAMETROS_BASE, id_prestador: 5 };
+    expect(() => calcularLiquidacion(entradaBase({ id_prestador: 7 }), params, ACUERDO_BASE)).toThrow();
+  });
+
+  it('Acuerdo null → usa topes nacionales L142/1994', () => {
+    const r = calcularLiquidacion(entradaBase({ estrato: 1 }), PARAMETROS_BASE, null);
+    expect(r.factor_aplicado).toBeCloseTo(-0.60, 5); // tope nacional
+  });
+});
+
+// ===== Determinismo =====
+
+describe('calcularLiquidacion — Determinismo', () => {
+  it('100 invocaciones idénticas → outputs bit-exact (excepto timestamp)', () => {
+    const results = Array.from({ length: 100 }, () =>
+      calcularLiquidacion(entradaBase(), PARAMETROS_BASE, ACUERDO_BASE),
+    );
+    // Excluir timestamp del compare (varía con Date.now()).
+    // Determinismo aplica a TODOS los campos de cálculo.
+    const sinTimestamp = (r: typeof results[0]) => {
+      const { metadata, ...rest } = r;
+      return JSON.stringify({ ...rest, metadata: { ...metadata, calculo_timestamp: 'X' } });
+    };
+    const first = sinTimestamp(results[0]);
+    expect(results.every((r) => sinTimestamp(r) === first)).toBe(true);
+  });
+});
+
+// ===== Validaciones =====
+
+describe('calcularLiquidacion — Validaciones', () => {
+  it('Parametros null → error', () => {
+    expect(() =>
+      calcularLiquidacion(entradaBase(), null as unknown as ParametrosTarifa, ACUERDO_BASE),
+    ).toThrow('ParametrosTarifa requerido');
+  });
+
+  it('consumo_m3 negativo → error', () => {
+    expect(() =>
+      calcularLiquidacion(entradaBase({ consumo_m3: -1 }), PARAMETROS_BASE, ACUERDO_BASE),
+    ).toThrow('consumo_m3 no puede ser negativo');
+  });
+});
+
+// ===== Helpers exportados =====
+
+describe('calcularCCUnitario', () => {
+  it('CC unit con ASP = 1 (AS < IPUF*12*N) → costoVariable / 1', () => {
+    const u = calcularCCUnitario(PARAMETROS_BASE);
+    // ASP = max(100_000 - 216_000, 1) = 1
+    // (1500+300+200)/1 = 2000
+    expect(u).toBeCloseTo(2000, 2);
+  });
+
+  it('CC unit con ASP real y CMVIAA activo', () => {
+    const params: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      agua_suministrada_m3_anio: 500_000,
+      cmviaa: 50,
+      aplica_cmviaa: true,
+    };
+    const u = calcularCCUnitario(params);
+    // ASP = 500_000 - 216_000 = 284_000
+    // 2000/284_000 + 50 ≈ 50.007
+    expect(u).toBeGreaterThan(50);
+  });
+});
+
+describe('aplicarMinimoVital', () => {
+  it('sin flag → retorna consumo sin cambio', () => {
+    expect(aplicarMinimoVital(25, PARAMETROS_BASE, 'residencial')).toBe(25);
+  });
+  it('flag=true + consumo > m3_gratis → resta', () => {
+    const p: ParametrosTarifa = { ...PARAMETROS_BASE, aplica_minimo_vital: true, m3_gratis_minimo_vital: 6 };
+    expect(aplicarMinimoVital(10, p, 'residencial')).toBe(4);
+  });
+  it('flag=true + comercial → no aplica', () => {
+    const p: ParametrosTarifa = { ...PARAMETROS_BASE, aplica_minimo_vital: true, m3_gratis_minimo_vital: 6 };
+    expect(aplicarMinimoVital(10, p, 'comercial')).toBe(10);
+  });
+});
+
+describe('calcularFactor', () => {
+  it('residencial E1 con Acuerdo -0.60 → -0.60, no capeado', () => {
+    const r = calcularFactor(1, 'residencial', ACUERDO_BASE);
+    expect(r.factor).toBeCloseTo(-0.60, 5);
+    expect(r.capeado).toBe(false);
+  });
+  it('residencial E1 con Acuerdo -0.80 → capeado a -0.60', () => {
+    const a: AcuerdoMunicipal = { ...ACUERDO_BASE, factor_subsidio_e1: -0.80 };
+    const r = calcularFactor(1, 'residencial', a);
+    expect(r.factor).toBeCloseTo(-0.60, 5);
+    expect(r.capeado).toBe(true);
+  });
+  it('oficial E1 → factor 0, no capeado', () => {
+    const r = calcularFactor(1, 'oficial', ACUERDO_BASE);
+    expect(r.factor).toBe(0);
+    expect(r.capeado).toBe(false);
+  });
+  it('comercial E1 → factor_comercial Acuerdo', () => {
+    const r = calcularFactor(1, 'comercial', ACUERDO_BASE);
+    expect(r.factor).toBeCloseTo(0.50, 5);
+  });
+});
+
+describe('caparFactorEstrato', () => {
+  it('capo E1 al tope -0.60', () => {
+    expect(caparFactorEstrato(-0.80, 1, 'residencial')).toBeCloseTo(-0.60, 5);
+  });
+  it('respeto E1 dentro del tope -0.40', () => {
+    expect(caparFactorEstrato(-0.40, 1, 'residencial')).toBeCloseTo(-0.40, 5);
+  });
+  it('E4 = 0', () => {
+    expect(caparFactorEstrato(0.5, 4, 'residencial')).toBe(0);
+  });
+  it('E5 capo al tope +0.50', () => {
+    expect(caparFactorEstrato(0.7, 5, 'residencial')).toBeCloseTo(0.50, 5);
+  });
+  it('E6 capo al tope +0.60', () => {
+    expect(caparFactorEstrato(0.8, 6, 'residencial')).toBeCloseTo(0.60, 5);
+  });
+  it('comercial E1 no se capa (capo es solo residencial/especial)', () => {
+    expect(caparFactorEstrato(-0.80, 1, 'comercial')).toBe(-0.80);
+  });
+});
+
+describe('TOPES_NACIONALES', () => {
+  it('subsidios E1=-0.60, E2=-0.50, E3=-0.40', () => {
+    expect(TOPES_NACIONALES.SUBSIDIO[1]).toBe(-0.60);
+    expect(TOPES_NACIONALES.SUBSIDIO[2]).toBe(-0.50);
+    expect(TOPES_NACIONALES.SUBSIDIO[3]).toBe(-0.40);
+  });
+  it('contribuciones E5=+0.50, E6=+0.60', () => {
+    expect(TOPES_NACIONALES.CONTRIBUCION[5]).toBe(0.50);
+    expect(TOPES_NACIONALES.CONTRIBUCION[6]).toBe(0.60);
   });
 });

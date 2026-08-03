@@ -7,11 +7,15 @@ import type { CrearSuscriptorInput, SuscriptorBorrador } from '../types';
 import { MENSAJES_ERROR_SUSCRIPTOR } from '../types';
 
 const inputValido: CrearSuscriptorInput = {
-  codigo: '0005',
-  nombre_apellidos: 'Juan Pérez',
-  direccion: 'Calle 5 #10-20',
-  estrato: 3,
-  aplica_subsidio: false,
+    codigo: '0005',
+    nombre_apellidos: 'Juan Perez',
+    cedula: '123456789',
+    municipio: 'Bogota',
+    direccion: 'Calle Falsa 123',
+    estrato: 3,
+    aplica_subsidio: false,
+    id_prestador: 0,
+    categoria_uso: 'residencial',
 };
 
 describe('crearSuscriptor — factory de borrador', () => {
@@ -20,14 +24,30 @@ describe('crearSuscriptor — factory de borrador', () => {
 
     expect(resultado).toEqual({
       codigo: '0005',
-      nombre_apellidos: 'Juan Pérez',
-      direccion: 'Calle 5 #10-20',
+      nombre_apellidos: 'Juan Perez',
+      cedula: '123456789',
+      municipio: 'Bogota',
+      direccion: 'Calle Falsa 123',
       estrato: 3,
+      matricula_inmobiliaria: undefined,
+      numero_catastral: undefined,
       aplica_subsidio: false,
       estado: 'activo',
+      id_prestador: 0,
+      categoria_uso: 'residencial',
     });
     expect(resultado).not.toHaveProperty('id_suscriptor');
     expect(resultado).not.toHaveProperty('created_at');
+  });
+
+  it('propaga id_prestador y categoria_uso cuando el caller los provee', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      id_prestador: 7,
+      categoria_uso: 'comercial',
+    });
+    expect(resultado.id_prestador).toBe(7);
+    expect(resultado.categoria_uso).toBe('comercial');
   });
 });
 
@@ -62,6 +82,14 @@ describe('crearSuscriptor — nombre_apellidos y direccion', () => {
     expect(() =>
       crearSuscriptor({ ...inputValido, nombre_apellidos: 'a'.repeat(151) }),
     ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.NOMBRE_LARGO);
+  });
+
+  it('elimina espacios alrededor de nombre_apellidos', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      nombre_apellidos: '  Juan Pérez  ',
+    });
+    expect(resultado.nombre_apellidos).toBe('Juan Pérez');
   });
 
   it('rechaza direccion vacía', () => {
@@ -130,5 +158,137 @@ describe('crearSuscriptor — estrato, opcionales y estado', () => {
   it('acepta estado suspendido y lo preserva', () => {
     const resultado = crearSuscriptor({ ...inputValido, estado: 'suspendido' });
     expect(resultado.estado).toBe('suspendido');
+  });
+});
+
+describe('crearSuscriptor — cedula', () => {
+  it('rechaza cedula vacía', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA,
+    );
+  });
+
+  it('rechaza cedula con solo espacios', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '   ' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_VACIA,
+    );
+  });
+
+  it('rechaza cedula con letras', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '123abc' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA,
+    );
+  });
+
+  it('rechaza cedula de 5 dígitos (mínimo 6)', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '12345' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA,
+    );
+  });
+
+  it('rechaza cedula de 13 dígitos (máximo 12)', () => {
+    expect(() => crearSuscriptor({ ...inputValido, cedula: '1234567890123' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.CEDULA_INVALIDA,
+    );
+  });
+
+  it('acepta cedula de 6 dígitos (mínimo válido)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456' });
+    expect(resultado.cedula).toBe('123456');
+  });
+
+  it('acepta cedula de 12 dígitos (máximo válido)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '123456789012' });
+    expect(resultado.cedula).toBe('123456789012');
+  });
+
+  it('elimina espacios alrededor de la cedula', () => {
+    const resultado = crearSuscriptor({ ...inputValido, cedula: '  123456  ' });
+    expect(resultado.cedula).toBe('123456');
+  });
+});
+
+describe('crearSuscriptor — municipio', () => {
+  it('rechaza municipio vacío', () => {
+    expect(() => crearSuscriptor({ ...inputValido, municipio: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_VACIO,
+    );
+  });
+
+  it('rechaza municipio de 101 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, municipio: 'a'.repeat(101) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.MUNICIPIO_LARGO);
+  });
+
+  it('acepta municipio de 100 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, municipio: 'a'.repeat(100) });
+    expect(resultado.municipio).toHaveLength(100);
+  });
+
+  it('elimina espacios alrededor del municipio', () => {
+    const resultado = crearSuscriptor({ ...inputValido, municipio: '  Bogotá  ' });
+    expect(resultado.municipio).toBe('Bogotá');
+  });
+});
+
+describe('crearSuscriptor — sector y calle (opcionales)', () => {
+  it('rechaza sector de 101 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, sector: 'a'.repeat(101) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.SECTOR_LARGO);
+  });
+
+  it('acepta sector de 100 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, sector: 'a'.repeat(100) });
+    expect(resultado.sector).toHaveLength(100);
+  });
+
+  it('acepta sin sector (campo opcional)', () => {
+    const resultado = crearSuscriptor(inputValido);
+    expect(resultado).not.toHaveProperty('sector');
+  });
+});
+
+describe('crearSuscriptor — direccion (requerida)', () => {
+  it('acepta dirección válida con caracteres especiales (tildes, ñ, #, comas, puntos)', () => {
+    const resultado = crearSuscriptor({
+      ...inputValido,
+      direccion: 'Cra 50 #20-30, Apto 5B, Mz 4',
+    });
+    expect(resultado.direccion).toBe('Cra 50 #20-30, Apto 5B, Mz 4');
+  });
+
+  it('rechaza dirección vacía', () => {
+    expect(() => crearSuscriptor({ ...inputValido, direccion: '' })).toThrow(
+      MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_VACIA,
+    );
+  });
+
+  it('rechaza dirección de 201 caracteres', () => {
+    expect(() =>
+      crearSuscriptor({ ...inputValido, direccion: 'a'.repeat(201) }),
+    ).toThrow(MENSAJES_ERROR_SUSCRIPTOR.DIRECCION_LARGA);
+  });
+
+  it('acepta dirección de 200 caracteres (límite)', () => {
+    const resultado = crearSuscriptor({ ...inputValido, direccion: 'a'.repeat(200) });
+    expect(resultado.direccion).toHaveLength(200);
+  });
+
+  it('NO incluye campo calle en el Suscriptor retornado (verifica que result.calle es undefined)', () => {
+    // El campo calle fue eliminado del modelo Suscriptor. Aun si el caller
+    // intenta enviarlo (cast forzado para probar el contrato), la factory
+    // lo ignora y NO propaga la propiedad al resultado.
+    const inputConCalle = {
+      ...inputValido,
+      calle: 'Cra 50',
+    } as unknown as CrearSuscriptorInput;
+    const resultado = crearSuscriptor(inputConCalle);
+    // Cast a Record<string, unknown> para verificar la AUSENCIA de la
+    // propiedad sin que el compilador se queje del type (calle no existe
+    // mas en SuscriptorBorrador).
+    expect((resultado as Record<string, unknown>).calle).toBeUndefined();
+    expect(resultado).not.toHaveProperty('calle');
   });
 });

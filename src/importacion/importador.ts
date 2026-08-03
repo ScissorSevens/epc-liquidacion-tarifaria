@@ -70,9 +70,14 @@ export async function importarSuscriptoresYMedidores(
         const borrador = crearSuscriptor({
           codigo,
           nombre_apellidos: fila.nombre_apellidos,
+          cedula: fila.cedula ?? '',
+          municipio: fila.municipio ?? '',
+          ...(fila.sector !== undefined && { sector: fila.sector }),
           direccion: fila.direccion,
           estrato: fila.estrato as Suscriptor['estrato'],
           aplica_subsidio: fila.aplica_subsidio ?? false,
+          id_prestador: 0,
+          categoria_uso: 'residencial',
           ...(fila.matricula_inmobiliaria
             ? { matricula_inmobiliaria: fila.matricula_inmobiliaria }
             : {}),

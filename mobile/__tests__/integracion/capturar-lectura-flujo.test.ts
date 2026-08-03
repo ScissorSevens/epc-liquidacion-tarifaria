@@ -17,6 +17,7 @@ import { persistirYEncolarLectura } from '../../src/adapters/persistir-y-encolar
 import type { Lectura, EntradaLectura } from '@dominio/captura-lecturas/types';
 import type { ItemCola } from '@dominio/sincronizacion/types';
 import type { ParametrosTarifa } from '@dominio/motor-tarifario/types';
+import type { Suscriptor } from '@dominio/suscriptores/types';
 
 // --- Helpers de mocks ---
 
@@ -24,6 +25,7 @@ const makeHasher = () => ({ sha256: jest.fn((_s: string) => 'hash-test') });
 const makeIdGen = () => ({ uuid: jest.fn(() => 'item-uuid-test') });
 
 const makeLecturaRepo = (persistida: Lectura) => ({
+  withTransactionAsync: jest.fn(async (task: () => Promise<void>): Promise<void> => task()),
   guardar: jest.fn(async (_l: Lectura) => persistida),
 });
 
@@ -34,12 +36,52 @@ const makeColaRepo = (existentes: ItemCola[] = []) => ({
 
 // --- Fixtures compartidas ---
 
+// ParametrosTarifas con ASP negativo (agua < perdidas) → ccUnitario ≈ 2000
 const PARAMS: ParametrosTarifa = {
-  cargoFijo: 5000,
-  precioM3: 1200,
-  precioM3Excedente: 2400,
-  consumoBasico: 20,
+  id_parametros: 1,
+  id_prestador: 0,
+  id_acuerdo: 1,
+  periodo: 2026,
+  cma: 30_000_000,
+  cmo: 1500,
+  cmi: 300,
+  cmt: 200,
+  cmviaa: 0,
+  aplica_cmviaa: false,
+  agua_suministrada_m3_anio: 100_000,
+  ipuf_m3_suscriptor_mes: 6,
+  suscriptores_promedio: 3000,
+  aplica_minimo_vital: false,
+  m3_gratis_minimo_vital: 0,
+  ipuf_indice: 1.0,
+  cargo_fijo_resultante: 30_000_000 / 3000,
+  cargo_consumo_resultante: 1500 + 300 + 200,
+  componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+  minimo_vital: null,
+  vigente_desde: '2026-01-01',
+  vigente_hasta: '2026-12-31',
+  created_at: '2026-01-01T00:00:00',
+    anio_base: 2016,
+    factor_indexacion_ipc: 1.0,
 };
+
+// Suscriptor multi-tenant mínimo — id_prestador = 0 (legacy) para matchear PARAMS
+const SUSCRIPTOR_BASE: Suscriptor = {
+  id_suscriptor: 1,
+  codigo: 'S001',
+  nombre_apellidos: 'Test',
+  cedula: '123',
+  municipio: 'Bog',
+  direccion: 'Calle 1',
+  estrato: 3,
+  aplica_subsidio: false,
+  estado: 'activo',
+  created_at: '2026-01-01T00:00:00',
+  id_prestador: 0,
+  categoria_uso: 'residencial',
+};
+
+const CONTEXTO = { parametros: PARAMS, acuerdo: null };
 
 const ENTRADA_BASE: EntradaLectura = {
   id_medidor: 7,
@@ -59,7 +101,7 @@ describe('Flujo capturar-lectura (integracion)', () => {
     const lecturaRepo = makeLecturaRepo(LECTURA_PERSISTIDA);
     const colaRepo = makeColaRepo([]);
 
-    const resultado = liquidarLectura(LECTURA_CAPTURADA, PARAMS, 3);
+    const resultado = liquidarLectura(LECTURA_CAPTURADA, SUSCRIPTOR_BASE, CONTEXTO);
 
     await persistirYEncolarLectura({
       lectura: LECTURA_CAPTURADA,
@@ -69,7 +111,7 @@ describe('Flujo capturar-lectura (integracion)', () => {
       hasher: makeHasher(),
     });
 
-    expect(resultado.consumo).toBe(150);
+    expect(resultado.consumo_m3).toBe(150);
     expect(lecturaRepo.guardar).toHaveBeenCalledTimes(1);
     expect(colaRepo.guardar).toHaveBeenCalledTimes(1);
 
@@ -84,7 +126,10 @@ describe('Flujo capturar-lectura (integracion)', () => {
     const err = Object.assign(new Error('ya existe'), {
       cause: { codigo: 'RESTRICCION_UNICIDAD' },
     });
-    const lecturaRepo = { guardar: jest.fn(async () => { throw err; }) };
+    const lecturaRepo = {
+      withTransactionAsync: jest.fn(async (task: () => Promise<void>): Promise<void> => task()),
+      guardar: jest.fn(async () => { throw err; }),
+    };
     const colaRepo = makeColaRepo([]);
 
     await expect(

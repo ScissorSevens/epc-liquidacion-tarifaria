@@ -35,6 +35,13 @@ public class OperarioPayload
     /// <summary>Fecha de creación en ISO 8601 (string). Espejo del dominio mobile.</summary>
     [JsonPropertyName("createdAt")]
     public string CreatedAt { get; set; } = string.Empty;
+
+    /// <summary>
+    /// FK a Prestador (multi-tenant). Default 0 = prestador legacy "EPC-LEGACY".
+    /// SDD: setup-inicial-multi-tenant-auth phase 3 task 3.4.
+    /// </summary>
+    [JsonPropertyName("id_prestador")]
+    public int IdPrestador { get; set; }
 }
 
 /// <summary>

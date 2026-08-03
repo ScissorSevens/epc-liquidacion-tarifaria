@@ -1,4 +1,4 @@
-using MediApp.Api.Persistence.Entities;
+using MediApp.Api.Dominio.Entidades;
 
 namespace MediApp.Api.Features.Suscriptores;
 
@@ -15,7 +15,14 @@ public static class SuscriptorMapper
         NumeroCatastral = p.NumeroCatastral,
         Estado = p.Estado,
         CreatedAt = p.CreatedAt,
-        IdCliente = p.IdCliente
+        IdCliente = p.IdCliente,
+        // Campos extendidos: asignacion directa (null si no vino, retrocompatible)
+        Cedula = p.Cedula,
+        Email = p.Email,
+        Telefono = p.Telefono,
+        Municipio = p.Municipio,
+        Sector = p.Sector,
+        AplicaSubsidio = p.AplicaSubsidio,
     };
 
     /// <summary>Aplica el payload a una entidad ya persistida (caso sobrescritura).</summary>
@@ -30,5 +37,12 @@ public static class SuscriptorMapper
         entidad.Estado = p.Estado;
         entidad.CreatedAt = p.CreatedAt;
         // IdCliente NO se cambia: es la identidad logica.
+        // Campos extendidos: condicional para no borrar valores existentes con null payload
+        if (p.Cedula is not null) entidad.Cedula = p.Cedula;
+        if (p.Email is not null) entidad.Email = p.Email;
+        if (p.Telefono is not null) entidad.Telefono = p.Telefono;
+        if (p.Municipio is not null) entidad.Municipio = p.Municipio;
+        if (p.Sector is not null) entidad.Sector = p.Sector;
+        if (p.AplicaSubsidio is not null) entidad.AplicaSubsidio = p.AplicaSubsidio;
     }
 }

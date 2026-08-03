@@ -22,7 +22,7 @@ namespace MediApp.Api.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Lectura", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Lectura", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -94,7 +94,7 @@ namespace MediApp.Api.Persistence.Migrations
                     b.ToTable("lecturas", (string)null);
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Liquidacion", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Liquidacion", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -159,7 +159,7 @@ namespace MediApp.Api.Persistence.Migrations
                     b.ToTable("liquidaciones", (string)null);
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Medidor", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Medidor", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -218,7 +218,7 @@ namespace MediApp.Api.Persistence.Migrations
                     b.ToTable("medidores", (string)null);
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Operario", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Operario", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -292,7 +292,7 @@ namespace MediApp.Api.Persistence.Migrations
                     b.ToTable("operarios", (string)null);
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Suscriptor", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Suscriptor", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -300,6 +300,15 @@ namespace MediApp.Api.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool?>("AplicaSubsidio")
+                        .HasColumnType("boolean")
+                        .HasColumnName("aplica_subsidio");
+
+                    b.Property<string>("Cedula")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cedula");
 
                     b.Property<string>("Codigo")
                         .IsRequired()
@@ -340,6 +349,11 @@ namespace MediApp.Api.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("matricula_inmobiliaria");
 
+                    b.Property<string>("Municipio")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("municipio");
+
                     b.Property<string>("NombreApellidos")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -350,6 +364,11 @@ namespace MediApp.Api.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("numero_catastral");
+
+                    b.Property<string>("Sector")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sector");
 
                     b.HasKey("Id")
                         .HasName("pk_suscriptores");
@@ -365,7 +384,7 @@ namespace MediApp.Api.Persistence.Migrations
                     b.ToTable("suscriptores", (string)null);
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.SyncRegistro", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.SyncRegistro", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -410,16 +429,16 @@ namespace MediApp.Api.Persistence.Migrations
                     b.ToTable("sync_registros", (string)null);
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Lectura", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Lectura", b =>
                 {
-                    b.HasOne("MediApp.Api.Persistence.Entities.Medidor", "Medidor")
+                    b.HasOne("MediApp.Api.Dominio.Entidades.Medidor", "Medidor")
                         .WithMany()
                         .HasForeignKey("IdMedidor")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_lecturas_medidores_id_medidor");
 
-                    b.HasOne("MediApp.Api.Persistence.Entities.Operario", "Operario")
+                    b.HasOne("MediApp.Api.Dominio.Entidades.Operario", "Operario")
                         .WithMany()
                         .HasForeignKey("IdOperario")
                         .OnDelete(DeleteBehavior.SetNull)
@@ -430,9 +449,9 @@ namespace MediApp.Api.Persistence.Migrations
                     b.Navigation("Operario");
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Liquidacion", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Liquidacion", b =>
                 {
-                    b.HasOne("MediApp.Api.Persistence.Entities.Lectura", "Lectura")
+                    b.HasOne("MediApp.Api.Dominio.Entidades.Lectura", "Lectura")
                         .WithMany()
                         .HasForeignKey("IdLectura")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -442,9 +461,9 @@ namespace MediApp.Api.Persistence.Migrations
                     b.Navigation("Lectura");
                 });
 
-            modelBuilder.Entity("MediApp.Api.Persistence.Entities.Medidor", b =>
+            modelBuilder.Entity("MediApp.Api.Dominio.Entidades.Medidor", b =>
                 {
-                    b.HasOne("MediApp.Api.Persistence.Entities.Suscriptor", "Suscriptor")
+                    b.HasOne("MediApp.Api.Dominio.Entidades.Suscriptor", "Suscriptor")
                         .WithMany()
                         .HasForeignKey("IdSuscriptor")
                         .OnDelete(DeleteBehavior.Restrict)

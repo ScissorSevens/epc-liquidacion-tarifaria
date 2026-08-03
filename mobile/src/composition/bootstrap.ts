@@ -35,6 +35,29 @@ import {
   crearMedidorRepositoryExpoSqlite,
   type MedidorRepositoryExpoSqlite,
 } from '../persistencia/expo-sqlite/medidor-repository-expo-sqlite';
+import {
+  crearPrestadorRepositoryExpoSqlite,
+  type PrestadorRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/prestador-repository-expo-sqlite';
+import {
+  crearAcuerdoMunicipalRepositoryExpoSqlite,
+  type AcuerdoMunicipalRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/acuerdo-municipal-repository-expo-sqlite';
+import {
+  crearParametrosTarifaRepositoryExpoSqlite,
+  type ParametrosTarifaRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/parametros-tarifa-repository-expo-sqlite';
+import {
+  crearOperarioRepositoryExpoSqlite,
+  type OperarioRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
+import {
+  crearConceptoOtroValorRepositoryExpoSqlite,
+  type ConceptoOtroValorRepositoryExpoSqlite,
+} from '../persistencia/expo-sqlite/concepto-otro-valor-repository-expo-sqlite';
+import type { Prestador } from '../../dominio/prestadores';
+import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal';
+import type { ParametrosTarifa } from '../../dominio/parametros-tarifa';
 import { crearHasherJs } from '@dominio/shared/adapters/hasher-js';
 import { crearIdGeneratorUuid } from '@dominio/shared/adapters/id-generator-uuid';
 import type { Hasher, IdGenerator } from '@dominio/shared/ports';
@@ -70,8 +93,7 @@ export interface ResultadoSync {
   readonly pendientes: number;
 }
 
-export interface BootstrapApp {
-  readonly db: SQLite.SQLiteDatabase;
+export interface BootstrapRepos {
   readonly facturaRepo: FacturaRepositoryExpoSqlite;
   readonly lecturaRepo: LecturaRepositoryExpoSqlite;
   readonly colaRepo: ColaRepositoryExpoSqlite;
@@ -79,16 +101,52 @@ export interface BootstrapApp {
   // `bootstrap-completo.ts` del root para coherencia entre Node y mobile.
   readonly suscriptorRepo: SuscriptorRepositoryExpoSqlite;
   readonly medidorRepo: MedidorRepositoryExpoSqlite;
+  // Multi-tenant (Fase 4 del change motor-tarifario-cra-825-2017-multitenant):
+  readonly prestadorRepo: PrestadorRepositoryExpoSqlite;
+  readonly acuerdoMunicipalRepo: AcuerdoMunicipalRepositoryExpoSqlite;
+  readonly parametrosTarifaRepo: ParametrosTarifaRepositoryExpoSqlite;
+  // Operarios: construido al final para que limpiarDatosLegacyBypass (que
+  // lo construye ad-hoc) pueda seguir funcionando. Fase 5 Tarea 5.1 lo
+  // expone en el BootstrapApp para que el setup wizard cree el primer
+  // operario via bootstrapCompleto() sin tener que re-construir el repo.
+  readonly operarioRepo: OperarioRepositoryExpoSqlite;
+  // Catalogo regulatorio de otros_valores (Res CRA 1038/2026) — fuente
+  // de verdad para la UI `OtrosValoresFactura`. Inyectado via
+  // `getBootstrap().conceptoOtroValorRepo.listar(true)` desde la pantalla.
+  readonly conceptoOtroValorRepo: ConceptoOtroValorRepositoryExpoSqlite;
+}
+
+export interface BootstrapAdapters {
   readonly hasher: Hasher;
   readonly idGenerator: IdGenerator;
   readonly clienteHttp: ClienteSincronizacion;
   readonly apiBaseUrl: string;
+}
+
+export interface BootstrapServices {
   /**
    * Procesa la cola completa una sola vez (no hace polling).
    * Devuelve los contadores del estado final para mostrar feedback.
    */
   readonly procesadorCola: () => Promise<ResultadoSync>;
   readonly smoke: ResultadoSmokeDominio;
+  /**
+   * Resuelve el contexto multi-tenant del prestador en uso:
+   * ParametrosTarifa + AcuerdoMunicipal vigentes. Usado por la UI
+   * (CapturarLectura, ResultadoCalculo) y por la fase 6 (workspace).
+   */
+  readonly resolverContextoPrestador: (id_prestador: number) => Promise<{
+    prestador: Prestador;
+    parametros: ParametrosTarifa | null;
+    acuerdo: AcuerdoMunicipal | null;
+  }>;
+}
+
+export interface BootstrapApp {
+  readonly db: SQLite.SQLiteDatabase;
+  readonly repos: BootstrapRepos;
+  readonly adapters: BootstrapAdapters;
+  readonly services: BootstrapServices;
 }
 
 /**
@@ -110,6 +168,12 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
   const colaRepo = crearColaRepositoryExpoSqlite(db);
   const suscriptorRepo = crearSuscriptorRepositoryExpoSqlite(db);
   const medidorRepo = crearMedidorRepositoryExpoSqlite(db);
+  const prestadorRepo = crearPrestadorRepositoryExpoSqlite(db);
+  const acuerdoMunicipalRepo = crearAcuerdoMunicipalRepositoryExpoSqlite(db);
+  const parametrosTarifaRepo = crearParametrosTarifaRepositoryExpoSqlite(db);
+  const operarioRepo = crearOperarioRepositoryExpoSqlite(db);
+  await operarioRepo.inicializar();
+  const conceptoOtroValorRepo = crearConceptoOtroValorRepositoryExpoSqlite(db);
 
   // Adapters universales del dominio: js-sha256 y uuid v4 (con polyfill
   // de crypto.getRandomValues importado al tope del archivo). Cualquier
@@ -157,18 +221,43 @@ export async function bootstrapApp(): Promise<BootstrapApp> {
 
   const smoke = smokeDominio();
 
+  const resolverContextoPrestador = async (id_prestador: number) => {
+    const prestador = await prestadorRepo.obtenerPorId(id_prestador);
+    if (!prestador) {
+      throw new Error(`resolverContextoPrestador: prestador ${id_prestador} no existe`);
+    }
+    const hoy = new Date().toISOString();
+    const [parametros, acuerdo] = await Promise.all([
+      parametrosTarifaRepo.buscarVigente(id_prestador, hoy),
+      acuerdoMunicipalRepo.buscarVigente(id_prestador, hoy),
+    ]);
+    return { prestador, parametros, acuerdo };
+  };
+
   return {
     db,
-    facturaRepo,
-    lecturaRepo,
-    colaRepo,
-    suscriptorRepo,
-    medidorRepo,
-    hasher,
-    idGenerator,
-    clienteHttp,
-    apiBaseUrl,
-    procesadorCola,
-    smoke,
+    repos: {
+      facturaRepo,
+      lecturaRepo,
+      colaRepo,
+      suscriptorRepo,
+      medidorRepo,
+      prestadorRepo,
+      acuerdoMunicipalRepo,
+      parametrosTarifaRepo,
+      operarioRepo,
+      conceptoOtroValorRepo,
+    },
+    adapters: {
+      hasher,
+      idGenerator,
+      clienteHttp,
+      apiBaseUrl,
+    },
+    services: {
+      procesadorCola,
+      smoke,
+      resolverContextoPrestador,
+    },
   };
 }

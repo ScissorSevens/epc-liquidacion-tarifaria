@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -11,38 +12,56 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 
+import type { Medidor } from '@dominio/medidores/types';
 import type { Suscriptor } from '@dominio/suscriptores/types';
 import { getBootstrap } from '../composition/get-bootstrap';
+import { BotonPrimario } from '../componentes/BotonPrimario';
+import { FilaSuscriptor } from '../componentes/FilaSuscriptor';
+import { FooterApp } from '../componentes/FooterApp';
+import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
-  BORDERS,
   COLORS,
   RADIUS,
+  SHADOWS,
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
 
+// PER-02 — virtualización óptima para 300+ prestadores × N suscriptores.
+// Sin ScrollView padre que fuerce eager mount, FlatList perezosa es la que
+// controla qué filas se montan.
+const FLATLIST_INITIAL_NUM_TO_RENDER = 10;
+const FLATLIST_MAX_TO_RENDER_PER_BATCH = 10;
+const FLATLIST_WINDOW_SIZE = 10;
+
 type Props = LecturasStackScreenProps<'ListaSuscriptores'>;
 
 /**
- * Lista de suscriptores con buscador in-memory.
+ * Listado de suscriptores con cards verticales enriquecidas (wireframe v3.0).
  *
- * - Carga `suscriptorRepo.listar()` al montar.
- * - Filtra por `codigo` o `nombre_apellidos` (case-insensitive).
- * - Tap en item -> navega a DetalleSuscriptor con `id_suscriptor`.
- * - Empty state y error state con retry.
+ * - Card con estado Pendiente / Capturada.
+ * - Chips de filtro: Todas / Pendientes / Capturadas.
+ * - FAB speed dial: Nuevo Suscriptor / Importar CSV.
+ * - Buscador por código o nombre.
  */
 export default function ListaSuscriptores({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [suscriptores, setSuscriptores] = useState<Suscriptor[]>([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [fabAbierto, setFabAbierto] = useState(false);
+
+  // ── Selector de medidor ───────────────────────────────────────────────────
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [medidoresSelector, setMedidoresSelector] = useState<Medidor[]>([]);
+  const [suscriptorSelector, setSuscriptorSelector] = useState<{ id: number; nombre: string } | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { suscriptorRepo } = await getBootstrap();
+      const { repos: { suscriptorRepo } } = await getBootstrap();
       const lista = await suscriptorRepo.listar();
       setSuscriptores(lista);
     } catch (e) {
@@ -66,130 +85,217 @@ export default function ListaSuscriptores({ navigation }: Props) {
     );
   }, [suscriptores, query]);
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: Suscriptor; index: number }) => (
-      <>
-        {index > 0 && <View style={styles.separador} />}
-        <Pressable
-          style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-          onPress={() =>
-            navigation.navigate('DetalleSuscriptor', {
-              id_suscriptor: item.id_suscriptor,
-            })
-          }
-        >
-          <View style={styles.itemInfo}>
-            <Text style={[TYPOGRAPHY.labelSm, styles.itemCodigo]}>
-              {item.codigo.toUpperCase()}
-            </Text>
-            <Text style={[TYPOGRAPHY.bodyMd, styles.itemNombre]}>
-              {item.nombre_apellidos}
-            </Text>
-            {item.direccion !== '' && (
-              <Text style={[TYPOGRAPHY.bodySm, styles.itemDireccion]}>
-                {item.direccion}
-              </Text>
-            )}
-          </View>
-          <View style={styles.itemDerecha}>
-            <View style={styles.estratoChip}>
-              <Text style={[TYPOGRAPHY.labelSm, styles.estratoText]}>
-                E{item.estrato}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </View>
-        </Pressable>
-      </>
-    ),
+  const navegarACapturar = useCallback(
+    async (item: Suscriptor) => {
+      try {
+        const { repos: { medidorRepo } } = await getBootstrap();
+        const medidores = await medidorRepo.listarPorSuscriptor(item.id_suscriptor);
+        if (medidores.length === 0) return;
+        if (medidores.length === 1 && medidores[0]) {
+          navigation.navigate('CapturarLectura', {
+            id_medidor: medidores[0].id_medidor,
+            id_suscriptor: item.id_suscriptor,
+          });
+        } else {
+          setMedidoresSelector(medidores);
+          setSuscriptorSelector({ id: item.id_suscriptor, nombre: item.nombre_apellidos });
+          setSelectorVisible(true);
+        }
+      } catch (e) {
+        console.warn('[ListaSuscriptores] error navegando a CapturarLectura:', e);
+      }
+    },
     [navigation],
+  );
+
+  const keyExtractor = useCallback(
+    (item: Suscriptor) => String(item.id_suscriptor),
+    [],
+  );
+
+  const handleVerFicha = useCallback(
+    (id: number) => navigation.navigate('DetalleSuscriptor', { id_suscriptor: id }),
+    [navigation],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Suscriptor }) => (
+      <FilaSuscriptor
+        item={item}
+        onVerFicha={handleVerFicha}
+        onCapturarLectura={navegarACapturar}
+      />
+    ),
+    [handleVerFicha, navegarACapturar],
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTexts}>
-            <Text style={[TYPOGRAPHY.headlineMd, styles.titulo]}>SUSCRIPTORES</Text>
-            <Text style={[TYPOGRAPHY.bodySm, styles.muted]}>
-              {suscriptores.length} registros
-            </Text>
+      {/* TopAppBar */}
+      <TopBar
+        titulo="Lecturas"
+        accionDerecha={
+          <Pressable
+            style={({ pressed }) => [styles.topBarIconBtn, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('Config', { screen: 'MiPerfil' })}
+          >
+            <MaterialIcons name="account-circle" size={24} color={COLORS.onPrimary} />
+          </Pressable>
+        }
+      />
+
+      {/*
+       * PER-02: FlatList como contenedor raíz del scroll.
+       * Sin ScrollView padre, la virtualización de RN funciona: solo se montan
+       * las filas visibles (initialNumToRender + windowSize).
+       * ListHeaderComponent → buscador (siempre arriba).
+       * ListFooterComponent → FooterApp (slot reservado).
+       * ListEmptyComponent → estados loading / error / vacío / sin resultados.
+       */}
+      <FlatList
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        data={filtrados}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <View style={styles.buscadorContainer}>
+            <MaterialIcons name="search" size={20} color={COLORS.outline} style={styles.buscadorIcono} />
+            <TextInput
+              style={[TYPOGRAPHY.bodyMd, styles.buscador]}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Buscar por nombre o ID de suscriptor..."
+              placeholderTextColor={COLORS.outline}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
           </View>
-          <Pressable
-            style={({ pressed }) => [styles.btnAgregar, pressed && styles.btnPressed]}
-            onPress={() => navigation.navigate('AltaSuscriptor')}
-          >
-            <MaterialIcons name="add" size={24} color={COLORS.onPrimary} />
-          </Pressable>
-        </View>
-      </View>
+        }
+        ListFooterComponent={<FooterApp />}
+        ListEmptyComponent={
+          <View style={styles.center}>
+            {loading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : error !== null ? (
+              <>
+                <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
+                <BotonPrimario
+                  texto="Reintentar"
+                  tono="azul"
+                  tamano="compacto"
+                  onPress={() => void cargar()}
+                />
+              </>
+            ) : suscriptores.length === 0 ? (
+              <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>
+                No hay suscriptores. Usá el botón + para agregar uno.
+              </Text>
+            ) : (
+              <Text style={[TYPOGRAPHY.bodyMd, { color: COLORS.textSecondary }]}>Sin resultados</Text>
+            )}
+          </View>
+        }
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={FLATLIST_INITIAL_NUM_TO_RENDER}
+        maxToRenderPerBatch={FLATLIST_MAX_TO_RENDER_PER_BATCH}
+        windowSize={FLATLIST_WINDOW_SIZE}
+        removeClippedSubviews
+      />
 
-      {/* Buscador */}
-      <View style={styles.buscadorContainer}>
-        <MaterialIcons name="search" size={20} color={COLORS.textSecondary} style={styles.buscadorIcono} />
-        <TextInput
-          style={[TYPOGRAPHY.bodyMd, styles.buscador]}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Buscar por código o nombre..."
-          placeholderTextColor={COLORS.textSecondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      {/* Acción rápida */}
-      <View style={styles.accionesRow}>
-        <Pressable
-          style={({ pressed }) => [styles.btnSecundario, pressed && styles.btnPressed]}
-          onPress={() => navigation.navigate('Config', { screen: 'ImportarCsv' })}
-        >
-          <MaterialIcons name="upload-file" size={16} color={COLORS.primary} />
-          <Text style={[TYPOGRAPHY.labelLg, styles.btnSecundarioText]}>IMPORTAR CSV</Text>
-        </Pressable>
-      </View>
-
-      {/* Contenido principal */}
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+      {/* FAB Speed Dial */}
+      {fabAbierto && (
+        <View style={styles.fabMenu}>
+          {/* Opción: Nuevo Suscriptor */}
+          <View style={styles.fabOpcion}>
+            <View style={styles.fabEtiqueta}>
+              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Agregar suscriptor</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
+              onPress={() => {
+                setFabAbierto(false);
+                navigation.navigate('AltaSuscriptor');
+              }}
+            >
+              <MaterialIcons name="person-add" size={24} color={COLORS.primary} />
+            </Pressable>
+          </View>
+          {/* Opción: Importar CSV */}
+          <View style={styles.fabOpcion}>
+            <View style={styles.fabEtiqueta}>
+              <Text style={[TYPOGRAPHY.labelLg, styles.fabEtiquetaTexto]}>Importar suscriptores</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.fabOpcionBtn, pressed && styles.pressed]}
+              onPress={() => {
+                setFabAbierto(false);
+                navigation.navigate('ImportarCsv');
+              }}
+            >
+              <MaterialIcons name="file-upload" size={24} color={COLORS.primary} />
+            </Pressable>
+          </View>
         </View>
-      ) : error !== null ? (
-        <View style={styles.center}>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.errorText]}>{error}</Text>
-          <Pressable
-            style={({ pressed }) => [styles.btnPrimario, pressed && styles.btnPressed]}
-            onPress={() => void cargar()}
-          >
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>REINTENTAR</Text>
-          </Pressable>
-        </View>
-      ) : suscriptores.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>
-            No hay suscriptores. Agregá uno.
-          </Text>
-          <Pressable
-            style={({ pressed }) => [styles.btnPrimario, pressed && styles.btnPressed]}
-            onPress={() => navigation.navigate('AltaSuscriptor')}
-          >
-            <Text style={[TYPOGRAPHY.labelLg, styles.btnPrimarioText]}>AGREGAR SUSCRIPTOR</Text>
-          </Pressable>
-        </View>
-      ) : filtrados.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={[TYPOGRAPHY.bodyMd, styles.muted]}>Sin resultados</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtrados}
-          keyExtractor={(item) => String(item.id_suscriptor)}
-          renderItem={renderItem}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.lista}
-        />
       )}
+
+      {/* FAB principal */}
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+        onPress={() => setFabAbierto((v) => !v)}
+      >
+        <MaterialIcons
+          name={fabAbierto ? 'close' : 'add'}
+          size={28}
+          color={COLORS.onPrimary}
+        />
+      </Pressable>
+
+      {/* ── Modal selector de medidor ───────────────────────────────────────── */}
+      <Modal
+        visible={selectorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectorVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setSelectorVisible(false)}>
+          <Pressable style={styles.bottomSheet} onPress={() => {}}>
+            <View style={styles.handleBar} />
+            <Text style={styles.sheetTitulo}>Seleccionar medidor</Text>
+            {suscriptorSelector && (
+              <Text style={styles.sheetSubtitulo}>{suscriptorSelector.nombre}</Text>
+            )}
+            {medidoresSelector.map((med) => (
+              <Pressable
+                key={med.id_medidor}
+                style={({ pressed }) => [styles.medidorItem, pressed && styles.medidorItemPressed]}
+                onPress={() => {
+                  setSelectorVisible(false);
+                  if (suscriptorSelector) {
+                    navigation.navigate('CapturarLectura', {
+                      id_medidor: med.id_medidor,
+                      id_suscriptor: suscriptorSelector.id,
+                    });
+                  }
+                }}
+              >
+                <MaterialIcons name="speed" size={20} color={COLORS.secondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.medidorNro}>Medidor #{med.id_medidor}</Text>
+                  <Text style={styles.medidorSerie}>{med.numero_medidor}</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color={COLORS.onSurfaceVariant} />
+              </Pressable>
+            ))}
+            <Pressable
+              style={({ pressed }) => [styles.btnCancelar, pressed && { opacity: 0.6 }]}
+              onPress={() => setSelectorVisible(false)}
+            >
+              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -199,58 +305,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.margin,
-    gap: SPACING.md,
+
+  // ── TopAppBar (accionDerecha) ──────────────────────────────────────────────
+  topBarIconBtn: {
+    padding: SPACING.xs,
   },
-  header: {
-    paddingTop: SPACING.xl,
+
+  // ── Scroll ─────────────────────────────────────────────────────────────────
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: SPACING.lg,
     paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.background,
+    paddingBottom: 120, // espacio para FAB
+    rowGap: SPACING.sm + 4, // gap entre filas (PER-02)
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTexts: {
-    flex: 1,
-  },
-  titulo: {
-    color: COLORS.primary,
-  },
-  muted: {
-    color: COLORS.textSecondary,
-  },
-  errorText: {
-    color: COLORS.error,
-    textAlign: 'center',
-  },
-  btnAgregar: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
+  // ── Buscador ───────────────────────────────────────────────────────────────
   buscadorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: SPACING.margin,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.default,
-    backgroundColor: COLORS.background,
+    height: 48,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.full,
+    marginBottom: SPACING.md,
   },
   buscadorIcono: {
     marginRight: SPACING.sm,
@@ -260,87 +342,134 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     paddingVertical: 0,
   },
-  accionesRow: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.margin,
-    marginBottom: SPACING.md,
-    gap: SPACING.sm,
-  },
-  btnSecundario: {
-    flexDirection: 'row',
+
+  // ── Botones compartidos (usados también en el estado de error/retry) ────────
+  // El botón "Reintentar" se renderiza via <BotonPrimario> extraído.
+
+  // ── Estados centro ─────────────────────────────────────────────────────────
+  center: {
+    paddingVertical: SPACING.xxl,
     alignItems: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.default,
-    backgroundColor: COLORS.background,
+    gap: SPACING.md,
   },
-  btnSecundarioText: {
-    color: COLORS.primary,
+  errorText: {
+    color: COLORS.error,
+    textAlign: 'center',
   },
-  btnPrimario: {
+
+  // ── FAB ────────────────────────────────────────────────────────────────────
+  fab: {
+    position: 'absolute',
+    bottom: 88,
+    right: SPACING.lg,
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.full,
     backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.default,
-    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.float,
   },
-  btnPrimarioText: {
-    color: COLORS.onPrimary,
+  fabMenu: {
+    position: 'absolute',
+    bottom: 88 + 56 + SPACING.md,
+    right: SPACING.lg,
+    gap: SPACING.sm,
+    alignItems: 'flex-end',
   },
-  btnPressed: {
-    opacity: 0.7,
-  },
-  lista: {
-    paddingHorizontal: SPACING.margin,
-    paddingBottom: SPACING.xl,
-  },
-  separador: {
-    height: 1,
-    backgroundColor: COLORS.primary,
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.background,
-  },
-  itemPressed: {
-    opacity: 0.7,
-  },
-  itemInfo: {
-    flex: 1,
-    gap: SPACING.xs,
-  },
-  itemCodigo: {
-    color: COLORS.textSecondary,
-  },
-  itemNombre: {
-    color: COLORS.primary,
-  },
-  itemDireccion: {
-    color: COLORS.textSecondary,
-  },
-  itemDerecha: {
+  fabOpcion: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  estratoChip: {
-    paddingHorizontal: SPACING.sm,
+  fabEtiqueta: {
+    paddingHorizontal: SPACING.sm + SPACING.xs,
     paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.surfaceLight,
-    ...BORDERS.thin,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.lg,
   },
-  estratoText: {
+  fabEtiquetaTexto: {
     color: COLORS.primary,
   },
-  chevron: {
-    fontSize: 24,
-    color: COLORS.textSecondary,
+  fabOpcionBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.float,
+  },
+
+  // ── Util ───────────────────────────────────────────────────────────────────
+  pressed: {
+    opacity: 0.7,
+  },
+
+  // ── Modal selector de medidor ─────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.outlineVariant,
+    borderRadius: RADIUS.full,
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sheetTitulo: {
+    ...TYPOGRAPHY.headlineSm,
+    color: COLORS.primary,
+    marginBottom: SPACING.xs,
+  },
+  sheetSubtitulo: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: SPACING.lg,
+  },
+  medidorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    marginBottom: SPACING.sm,
+  },
+  medidorItemPressed: {
+    backgroundColor: COLORS.surfaceContainer,
+  },
+  medidorNro: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+  medidorSerie: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.onSurfaceVariant,
+  },
+  btnCancelar: {
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  btnCancelarTexto: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onSurfaceVariant,
   },
 });
