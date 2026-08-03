@@ -201,6 +201,42 @@ describe('TopBar — principios impeccable', () => {
     });
   });
 
+  // ── D7: props testID/testIDBack (parametros-tarifa-impeccable-v2) ─────────
+  describe('D7: props opcionales testID y testIDBack se propagan al DOM', () => {
+    it('el contenedor exterior expone el testID pasado via prop testID', () => {
+      // Backward-compatible: el prop testID es opcional. Cuando se pasa,
+      // se aplica al View raiz para que callers puedan hacer
+      // `getByTestId('param-topbar')`.
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <TopBar titulo="Parámetros" testID="param-topbar" />,
+      );
+      const root = UNSAFE_getByProps({ testID: 'param-topbar' });
+      expect(root).toBeTruthy();
+    });
+
+    it('el Pressable de back expone el testID pasado via prop testIDBack', () => {
+      // D7: el back button (Pressable) acepta un testID opcional para
+      // que callers (ej: ParametrosTarifa) puedan resolver
+      // `getByTestId('param-topbar-back')` y testear el click.
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <TopBar titulo="Parámetros" onBack={() => undefined} testIDBack="param-topbar-back" />,
+      );
+      const back = UNSAFE_getByProps({ testID: 'param-topbar-back' });
+      expect(back).toBeTruthy();
+    });
+
+    it('cuando NO se pasan testID/testIDBack, los componentes no tienen esos testIDs (default zero-cost)', () => {
+      // Backward-compatible: callers existentes (los 4+ que ya usan
+      // TopBar sin estos props) deben seguir funcionando sin esos
+      // testIDs colgando en el árbol.
+      const { UNSAFE_queryByProps } = renderConSafeArea(
+        <TopBar titulo="Inicio" onBack={() => undefined} />,
+      );
+      expect(UNSAFE_queryByProps({ testID: 'param-topbar' })).toBeNull();
+      expect(UNSAFE_queryByProps({ testID: 'param-topbar-back' })).toBeNull();
+    });
+  });
+
   // ── Sanidad: el componente sigue siendo TopBar ───────────────────────────
   describe('sanidad', () => {
     it('exporta TopBar como componente nominal', () => {

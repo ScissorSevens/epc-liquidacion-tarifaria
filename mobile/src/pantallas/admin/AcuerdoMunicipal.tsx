@@ -21,6 +21,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
+import { SeccionForm } from '../../componentes/SeccionForm';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
@@ -205,116 +206,120 @@ export default function AcuerdoMunicipalForm({
         Topes conforme a Ley 142/1994 art. 99.6
       </Text>
 
-      <Text style={estilos.seccion}>Subsidios por estrato (negativos)</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="Estrato E1 (≤ 60% de subsidio)"
-          value={factorE1}
-          onChangeText={setFactorE1}
-          error={errores['E1']}
-          keyboardType="numeric"
-          editable={!guardando}
-          accessibilityHint="Factor de subsidio para estrato 1, valor negativo entre -1 y -0.60"
-          testID="acuerdo-e1"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Estrato E2 (≤ 50% de subsidio)"
-          value={factorE2}
-          onChangeText={setFactorE2}
-          error={errores['E2']}
-          keyboardType="numeric"
-          editable={!guardando}
-          accessibilityHint="Factor de subsidio para estrato 2, valor negativo entre -1 y -0.50"
-          testID="acuerdo-e2"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Estrato E3 (≤ 40% de subsidio)"
-          value={factorE3}
-          onChangeText={setFactorE3}
-          error={errores['E3']}
-          keyboardType="numeric"
-          editable={!guardando}
-          accessibilityHint="Factor de subsidio para estrato 3, valor negativo entre -1 y -0.40"
-          testID="acuerdo-e3"
-        />
-      </View>
+      <SeccionForm titulo="Subsidios por estrato (negativos)">
+        <View style={estilos.campo}>
+          <FormField
+            label="Estrato E1 (≤ 60% de subsidio)"
+            value={factorE1}
+            onChangeText={setFactorE1}
+            error={errores['E1']}
+            keyboardType="numeric"
+            editable={!guardando}
+            accessibilityHint="Factor de subsidio para estrato 1, valor negativo entre -1 y -0.60"
+            testID="acuerdo-e1"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Estrato E2 (≤ 50% de subsidio)"
+            value={factorE2}
+            onChangeText={setFactorE2}
+            error={errores['E2']}
+            keyboardType="numeric"
+            editable={!guardando}
+            accessibilityHint="Factor de subsidio para estrato 2, valor negativo entre -1 y -0.50"
+            testID="acuerdo-e2"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Estrato E3 (≤ 40% de subsidio)"
+            value={factorE3}
+            onChangeText={setFactorE3}
+            error={errores['E3']}
+            keyboardType="numeric"
+            editable={!guardando}
+            accessibilityHint="Factor de subsidio para estrato 3, valor negativo entre -1 y -0.40"
+            testID="acuerdo-e3"
+          />
+        </View>
+      </SeccionForm>
 
-      <Text style={estilos.seccion}>Contribuciones por estrato (positivas)</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="Estrato E5 (≤ 50% de contribución)"
-          value={factorE5}
-          onChangeText={setFactorE5}
-          error={errores['E5']}
-          keyboardType="numeric"
-          editable={!guardando}
-          accessibilityHint="Factor de contribución para estrato 5, valor positivo entre 0 y 0.50"
-          testID="acuerdo-e5"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Estrato E6 (≤ 60% de contribución)"
-          value={factorE6}
-          onChangeText={setFactorE6}
-          error={errores['E6']}
-          keyboardType="numeric"
-          editable={!guardando}
-          accessibilityHint="Factor de contribución para estrato 6, valor positivo entre 0 y 0.60"
-          testID="acuerdo-e6"
-        />
-      </View>
+      <SeccionForm titulo="Contribuciones por estrato (positivas)">
+        <View style={estilos.campo}>
+          <FormField
+            label="Estrato E5 (≤ 50% de contribución)"
+            value={factorE5}
+            onChangeText={setFactorE5}
+            error={errores['E5']}
+            keyboardType="numeric"
+            editable={!guardando}
+            accessibilityHint="Factor de contribución para estrato 5, valor positivo entre 0 y 0.50"
+            testID="acuerdo-e5"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Estrato E6 (≤ 60% de contribución)"
+            value={factorE6}
+            onChangeText={setFactorE6}
+            error={errores['E6']}
+            keyboardType="numeric"
+            editable={!guardando}
+            accessibilityHint="Factor de contribución para estrato 6, valor positivo entre 0 y 0.60"
+            testID="acuerdo-e6"
+          />
+        </View>
+      </SeccionForm>
 
-      <Text style={estilos.seccion}>Contribuciones por categoría de uso</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="Comercial (0 a 100%)"
-          value={factorComercial}
-          onChangeText={setFactorComercial}
-          error={errores['Comercial']}
-          keyboardType="numeric"
-          editable={!guardando}
-          testID="acuerdo-comercial"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Industrial (0 a 100%)"
-          value={factorIndustrial}
-          onChangeText={setFactorIndustrial}
-          error={errores['Industrial']}
-          keyboardType="numeric"
-          editable={!guardando}
-          testID="acuerdo-industrial"
-        />
-      </View>
+      <SeccionForm titulo="Contribuciones por categoría de uso">
+        <View style={estilos.campo}>
+          <FormField
+            label="Comercial (0 a 100%)"
+            value={factorComercial}
+            onChangeText={setFactorComercial}
+            error={errores['Comercial']}
+            keyboardType="numeric"
+            editable={!guardando}
+            testID="acuerdo-comercial"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Industrial (0 a 100%)"
+            value={factorIndustrial}
+            onChangeText={setFactorIndustrial}
+            error={errores['Industrial']}
+            keyboardType="numeric"
+            editable={!guardando}
+            testID="acuerdo-industrial"
+          />
+        </View>
+      </SeccionForm>
 
-      <Text style={estilos.seccion}>Vigencia</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="Desde (YYYY-MM-DD)"
-          value={vigenteDesde}
-          onChangeText={setVigenteDesde}
-          error={errores['vigencia']}
-          editable={!guardando}
-          accessibilityHint="Fecha de inicio de vigencia, formato AAAA-MM-DD"
-          testID="acuerdo-vigente-desde"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Hasta (YYYY-MM-DD)"
-          value={vigenteHasta}
-          onChangeText={setVigenteHasta}
-          editable={!guardando}
-          accessibilityHint="Fecha de fin de vigencia, formato AAAA-MM-DD"
-          testID="acuerdo-vigente-hasta"
-        />
-      </View>
+      <SeccionForm titulo="Vigencia">
+        <View style={estilos.campo}>
+          <FormField
+            label="Desde (YYYY-MM-DD)"
+            value={vigenteDesde}
+            onChangeText={setVigenteDesde}
+            error={errores['vigencia']}
+            editable={!guardando}
+            accessibilityHint="Fecha de inicio de vigencia, formato AAAA-MM-DD"
+            testID="acuerdo-vigente-desde"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Hasta (YYYY-MM-DD)"
+            value={vigenteHasta}
+            onChangeText={setVigenteHasta}
+            editable={!guardando}
+            accessibilityHint="Fecha de fin de vigencia, formato AAAA-MM-DD"
+            testID="acuerdo-vigente-hasta"
+          />
+        </View>
+      </SeccionForm>
 
       <BotonPrimario
         texto="Guardar Acuerdo"

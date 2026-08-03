@@ -87,12 +87,28 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
   TYPOGRAPHY: {
     labelMd: { fontSize: 14 },
     labelLg: { fontSize: 18 },
+    labelSm: { fontSize: 10 },
     headlineLg: { fontSize: 22 },
     headlineSm: { fontSize: 16 },
+    bodyLg: { fontSize: 18 },
     bodyMd: { fontSize: 14 },
     bodySm: { fontSize: 12 },
   },
 }));
+
+// D7 (parametros-tarifa-impeccable-v2 Commit 1): TopBar invoca
+// useNavigation().goBack(). Mockeamos useNavigation aqui tambien para
+// que este test de integracion no rompa por NavigationContainer faltante.
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => ({
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+    }),
+  };
+});
 
 // --- Fixtures ---
 

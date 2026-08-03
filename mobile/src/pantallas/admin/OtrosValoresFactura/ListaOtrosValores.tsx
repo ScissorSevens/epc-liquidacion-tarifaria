@@ -11,11 +11,12 @@
  * @see `OtroValorItem.tsx` — render de cada item individual.
  */
 
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import type { ConceptoOtroValor } from '@dominio/concepto-otro-valor';
 import type { OtroValor } from '@dominio/factura';
-import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../../theme/skeletal-tokens';
+import { COLORS, SPACING, TYPOGRAPHY } from '../../../theme/skeletal-tokens';
+import { SeccionForm } from '../../../componentes/SeccionForm';
 import OtroValorItem from './OtroValorItem';
 
 export interface ListaOtrosValoresProps {
@@ -34,8 +35,7 @@ export default function ListaOtrosValores({
   onEditarGlosa,
 }: ListaOtrosValoresProps): React.ReactElement {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitulo}>Conceptos aplicados</Text>
+    <SeccionForm titulo="Conceptos aplicados">
       {otrosValores.length === 0 ? (
         <Text style={styles.empty}>No hay conceptos aplicados.</Text>
       ) : (
@@ -50,19 +50,10 @@ export default function ListaOtrosValores({
           />
         ))
       )}
-    </View>
+    </SeccionForm>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    gap: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  sectionTitulo: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary },
   empty: { ...TYPOGRAPHY.bodySm, color: COLORS.textSecondary, fontStyle: 'italic' },
 });

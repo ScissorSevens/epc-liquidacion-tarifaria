@@ -16,14 +16,34 @@ interface TopBarProps {
   subtitulo?: string;           // línea secundaria bajo el título (pantallas de detalle)
   onBack?: () => void;          // si se pasa → modo "detalle": título más pequeño + flecha
   accionDerecha?: ReactNode;    // slot libre para iconos derecha
+  /**
+   * testID opcional para el contenedor exterior. Permite a callers
+   * identificar la TopBar en tests (D7 — parametros-tarifa-impeccable-v2).
+   * Backward-compatible: si no se pasa, no se setea el testID.
+   */
+  testID?: string;
+  /**
+   * testIDBack opcional para el Pressable de back. Permite a callers
+   * testear el click del back (D7). Backward-compatible: si no se pasa,
+   * no se setea el testID.
+   */
+  testIDBack?: string;
 }
 
-export function TopBar({ titulo, subtitulo, onBack, accionDerecha }: TopBarProps) {
+export function TopBar({
+  titulo,
+  subtitulo,
+  onBack,
+  accionDerecha,
+  testID,
+  testIDBack,
+}: TopBarProps) {
   const insets = useSafeAreaInsets();
   const esDetalle = Boolean(onBack);
 
   return (
     <View
+      testID={testID}
       style={[
         styles.topBar,
         esDetalle ? styles.topBarDetalle : styles.topBarRaiz,
@@ -33,6 +53,7 @@ export function TopBar({ titulo, subtitulo, onBack, accionDerecha }: TopBarProps
       <View style={styles.izq}>
         {onBack && (
           <Pressable
+            testID={testIDBack}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             onPress={onBack}
             hitSlop={12}

@@ -16,13 +16,16 @@
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
+import { SeccionForm } from '../../componentes/SeccionForm';
+import { TopBar } from '../../componentes/TopBar';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
 import { useWorkspace } from '../../composicion/useWorkspace';
 import { getBootstrap } from '../../composition/get-bootstrap';
@@ -153,22 +156,10 @@ interface Props {
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
 
 /**
- * TITULO_FONT_SIZE_CLAMP — H1 clamp del título del screen.
- *
- * Simula `clamp(1.5rem, 3vw, 2.25rem)` de CSS en runtime React Native.
- * Rango efectivo: 24 px (1.5rem) a 36 px (2.25rem). El preferred 3vw
- * se computa contra el ancho de pantalla — al frame default de jest
- * (320×568) cae en el piso (24 px) sin overflow.
- *
- * admin-parametros-tarifa-redesign Task 1 — impeccable craft typography.
+ * Commit 1 (parametros-tarifa-impeccable-v2): el titulo inline + clamp
+ * CSS se ELIMINARON del screen. El titulo ahora vive en TopBar con su
+ * propia tipografia fija (bodyLg 18px en modo detalle).
  */
-const TITULO_FONT_SIZE_CLAMP = ((): number => {
-  const { width } = Dimensions.get('window');
-  const minimo = 24; // 1.5rem
-  const maximo = 36; // 2.25rem
-  const preferido = width * 0.03; // 3vw
-  return Math.min(Math.max(minimo, preferido), maximo);
-})();
 
 export default function ParametrosTarifaForm({
   id_prestador: idProp,
@@ -400,6 +391,11 @@ export default function ParametrosTarifaForm({
   // Ver admin-screen-perf-fixes #T-LOAD-1/#T-LOAD-2/#T-LOAD-3.
   const cargandoInputs = repo === null || cargando;
 
+  // PER-05: navigation hook se invoca UNA vez al inicio del componente
+  // (no en cada render). useNavigation de @react-navigation/native
+  // retorna un objeto estable mientras la pantalla este montada.
+  const navigation = useNavigation();
+
   return (
     <ScrollView
       style={estilos.root}
@@ -416,204 +412,214 @@ export default function ParametrosTarifaForm({
           <Text style={estilos.cargandoTexto}>Cargando contexto del prestador...</Text>
         </View>
       )}
-      <Text style={estilos.titulo}>Parámetros Tarifarios · Prestador #{id_prestador}</Text>
-      <Text style={estilos.sub}>Conforme a Res CRA 825/2017 + 907/2019 art. 14</Text>
+      {/* TopBar con back (D7 — parametros-tarifa-impeccable-v2 Commit 1). */}
+      <TopBar
+        titulo="Parámetros Tarifarios"
+        subtitulo={`Prestador #${id_prestador} · Res CRA 825/2017 + 907/2019 art. 14`}
+        onBack={() => navigation.goBack()}
+        testID="param-topbar"
+        testIDBack="param-topbar-back"
+      />
 
-      <Text style={estilos.seccion}>Periodo y vigencia</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="Periodo (año tarifario, 5 años)"
-          required
-          value={periodo}
-          onChangeText={setPeriodo}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-periodo"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Anio base IPC (Res CRA 825 Art. 7, default 2016)"
-          value={anioBase}
-          onChangeText={setAnioBase}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          helperText="Norma CRA 825: anio_base=2016 (default). Override posible."
-          testID="param-anio-base"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Vigente desde (YYYY-MM-DD)"
-          value={vigenteDesde}
-          onChangeText={setVigenteDesde}
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          accessibilityHint="Fecha de inicio de vigencia del periodo tarifario"
-          testID="param-vigente-desde"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Vigente hasta (YYYY-MM-DD)"
-          value={vigenteHasta}
-          onChangeText={setVigenteHasta}
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
-          testID="param-vigente-hasta"
-        />
-      </View>
-
-      <Text style={estilos.seccion}>Costos medios (estudio de costos del prestador)</Text>
-      <Text style={estilos.nota}>Estos son los insumos de la fórmula normativa. El motor NO acepta inputs planos.</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="CMA · Costo Medio Administración ($/año, art. 9)"
-          value={cma}
-          onChangeText={setCma}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-cma"
-        />
-      </View>
-      {num(cma) < CMA_MINIMO_ACUEDUCTO && (
-        <Text style={estilos.warningCma} testID="param-cma-warning">
-          CMA bajo el minimo normativo (Res CRA 825 Art. 15): minimo acueducto = ${CMA_MINIMO_ACUEDUCTO}, alcantarillado = ${CMA_MINIMO_ALCANTARILLADO}. Recomendamos ajustar antes de guardar.
-        </Text>
-      )}
-      <View style={estilos.campo}>
-        <FormField
-          label="CMO · Costo Medio Operación ($/m³)"
-          value={cmo}
-          onChangeText={setCmo}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-cmo"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="CMI · Costo Medio Inversión ($/m³)"
-          value={cmi}
-          onChangeText={setCmi}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-cmi"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="CMT · Costo Medio Tasas Ambientales ($/m³)"
-          value={cmt}
-          onChangeText={setCmt}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-cmt"
-        />
-      </View>
-
-      <View style={estilos.campoFila}>
-        <Text style={estilos.label}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
-        <Switch
-          value={aplicaCmviaa}
-          onValueChange={setAplicaCmviaa}
-          disabled={guardando || cargandoInputs}
-          accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
-        />
-      </View>
-      {aplicaCmviaa && (
+      <SeccionForm titulo="Periodo y vigencia" icono="event" testID="seccion-card-periodo">
         <View style={estilos.campo}>
           <FormField
-            label="CMVIAA · Costo Medio Variable Inv. Ambientales Adicionales ($/m³)"
-            value={cmviaa}
-            onChangeText={setCmviaa}
+            label="Periodo (año tarifario, 5 años)"
+            required
+            value={periodo}
+            onChangeText={setPeriodo}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
-            testID="param-cmviaa"
+            testID="param-periodo"
           />
         </View>
-      )}
-
-      <Text style={estilos.seccion}>Agua y suscriptores (insumo ASP = AS - IPUF×12×N)</Text>
-      <View style={estilos.campo}>
-        <FormField
-          label="Agua Suministrada año base (m³/año)"
-          value={aguaSuministrada}
-          onChangeText={setAguaSuministrada}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-agua"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="IPUF (m³/suscriptor/mes, art. 5, estándar 6)"
-          value={ipuf}
-          onChangeText={setIpuf}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          helperText="Estándar CRA: 6 m³/suscriptor/mes"
-          testID="param-ipuf"
-        />
-      </View>
-      <View style={estilos.campo}>
-        <FormField
-          label="Suscriptores promedio (N) — divisor de CF = CMA/N"
-          value={suscriptoresPromedio}
-          onChangeText={setSuscriptoresPromedio}
-          keyboardType="numeric"
-          editable={!guardando && !cargandoInputs}
-          selectable
-          tabularNums
-          testID="param-suscriptores"
-        />
-      </View>
-
-      <Text style={estilos.seccion}>Mínimo vital (Decreto 776/2025 — opcional)</Text>
-      <View style={estilos.campoFila}>
-        <Text style={estilos.label}>Activar mínimo vital</Text>
-        <Switch
-          value={aplicaMinimoVital}
-          onValueChange={setAplicaMinimoVital}
-          disabled={guardando || cargandoInputs}
-          accessibilityLabel="Aplicar mínimo vital"
-        />
-      </View>
-      {aplicaMinimoVital && (
         <View style={estilos.campo}>
           <FormField
-            label="M³ gratis al inicio del periodo"
-            value={m3Gratis}
-            onChangeText={setM3Gratis}
+            label="Anio base IPC (Res CRA 825 Art. 7, default 2016)"
+            value={anioBase}
+            onChangeText={setAnioBase}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
-            testID="param-m3gratis"
+            helperText="Norma CRA 825: anio_base=2016 (default). Override posible."
+            testID="param-anio-base"
           />
         </View>
-      )}
+        <View style={estilos.campo}>
+          <FormField
+            label="Vigente desde (YYYY-MM-DD)"
+            value={vigenteDesde}
+            onChangeText={setVigenteDesde}
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            accessibilityHint="Fecha de inicio de vigencia del periodo tarifario"
+            testID="param-vigente-desde"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Vigente hasta (YYYY-MM-DD)"
+            value={vigenteHasta}
+            onChangeText={setVigenteHasta}
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
+            testID="param-vigente-hasta"
+          />
+        </View>
+      </SeccionForm>
+
+      <SeccionForm titulo="Costos medios (estudio de costos del prestador)" icono="calculate" testID="seccion-card-cma">
+        <Text style={estilos.nota}>Estos son los insumos de la fórmula normativa. El motor NO acepta inputs planos.</Text>
+        <View style={estilos.campo}>
+          <FormField
+            label="CMA · Costo Medio Administración ($/año, art. 9)"
+            value={cma}
+            onChangeText={setCma}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            testID="param-cma"
+          />
+        </View>
+        {num(cma) < CMA_MINIMO_ACUEDUCTO && (
+          <Text style={estilos.warningCma} testID="param-cma-warning">
+            CMA bajo el minimo normativo (Res CRA 825 Art. 15): minimo acueducto = ${CMA_MINIMO_ACUEDUCTO}, alcantarillado = ${CMA_MINIMO_ALCANTARILLADO}. Recomendamos ajustar antes de guardar.
+          </Text>
+        )}
+        <View style={estilos.campo}>
+          <FormField
+            label="CMO · Costo Medio Operación ($/m³)"
+            value={cmo}
+            onChangeText={setCmo}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            testID="param-cmo"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="CMI · Costo Medio Inversión ($/m³)"
+            value={cmi}
+            onChangeText={setCmi}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            testID="param-cmi"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="CMT · Costo Medio Tasas Ambientales ($/m³)"
+            value={cmt}
+            onChangeText={setCmt}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            testID="param-cmt"
+          />
+        </View>
+
+        <View style={estilos.campoFila}>
+          <Text style={estilos.label}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
+          <Switch
+            value={aplicaCmviaa}
+            onValueChange={setAplicaCmviaa}
+            disabled={guardando || cargandoInputs}
+            accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
+          />
+        </View>
+        {aplicaCmviaa && (
+          <View style={estilos.campo}>
+            <FormField
+              label="CMVIAA · Costo Medio Variable Inv. Ambientales Adicionales ($/m³)"
+              value={cmviaa}
+              onChangeText={setCmviaa}
+              keyboardType="numeric"
+              editable={!guardando && !cargandoInputs}
+              selectable
+              tabularNums
+              testID="param-cmviaa"
+            />
+          </View>
+        )}
+      </SeccionForm>
+
+      <SeccionForm titulo="Agua y suscriptores (insumo ASP = AS - IPUF×12×N)" icono="water-drop" testID="seccion-card-agua">
+        <View style={estilos.campo}>
+          <FormField
+            label="Agua Suministrada año base (m³/año)"
+            value={aguaSuministrada}
+            onChangeText={setAguaSuministrada}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            testID="param-agua"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="IPUF (m³/suscriptor/mes, art. 5, estándar 6)"
+            value={ipuf}
+            onChangeText={setIpuf}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Estándar CRA: 6 m³/suscriptor/mes"
+            testID="param-ipuf"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Suscriptores promedio (N) — divisor de CF = CMA/N"
+            value={suscriptoresPromedio}
+            onChangeText={setSuscriptoresPromedio}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            testID="param-suscriptores"
+          />
+        </View>
+      </SeccionForm>
+
+      <SeccionForm titulo="Mínimo vital (Decreto 776/2025 — opcional)" icono="shield" testID="seccion-card-minimo-vital">
+        <View style={estilos.campoFila}>
+          <Text style={estilos.label}>Activar mínimo vital</Text>
+          <Switch
+            value={aplicaMinimoVital}
+            onValueChange={setAplicaMinimoVital}
+            disabled={guardando || cargandoInputs}
+            accessibilityLabel="Aplicar mínimo vital"
+          />
+        </View>
+        {aplicaMinimoVital && (
+          <View style={estilos.campo}>
+            <FormField
+              label="M³ gratis al inicio del periodo"
+              value={m3Gratis}
+              onChangeText={setM3Gratis}
+              keyboardType="numeric"
+              editable={!guardando && !cargandoInputs}
+              selectable
+              tabularNums
+              testID="param-m3gratis"
+            />
+          </View>
+        )}
+      </SeccionForm>
 
       <BotonPrimario
         texto="Guardar Parámetros"
@@ -633,15 +639,7 @@ export default function ParametrosTarifaForm({
 const estilos = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.md, gap: SPACING.sm },
-  // H1 clamp: fontSize entre 24 y 36 px efectivo (clamp 1.5rem .. 2.25rem).
-  // Computado en TITULO_FONT_SIZE_CLAMP respetando el viewport real.
-  titulo: {
-    ...TYPOGRAPHY.headlineLg,
-    color: COLORS.onSurface,
-    fontSize: TITULO_FONT_SIZE_CLAMP,
-    lineHeight: TITULO_FONT_SIZE_CLAMP * 1.2,
-  },
-  sub: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, marginBottom: SPACING.md },
+  // Commit 1: `titulo` y `sub` eliminados — el titulo vive en TopBar.
   seccion: { ...TYPOGRAPHY.headlineSm, color: COLORS.primary, marginTop: SPACING.md },
   nota: { ...TYPOGRAPHY.bodySm, color: COLORS.onSurfaceVariant, fontStyle: 'italic', marginBottom: SPACING.xs },
   campo: { gap: SPACING.xs },

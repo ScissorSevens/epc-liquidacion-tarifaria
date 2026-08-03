@@ -29,9 +29,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import React from 'react';
 import { Profiler } from 'react';
 import { Alert, Platform, StyleSheet } from 'react-native';
-import { render, waitFor, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, waitFor, fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn().mockResolvedValue(undefined),
@@ -138,16 +139,79 @@ jest.mock('../../../src/theme/skeletal-tokens', () => ({
   TYPOGRAPHY: {
     labelMd: { fontSize: 14 },
     labelLg: { fontSize: 18 },
+    labelSm: { fontSize: 10 },
     headlineLg: { fontSize: 22 },
     headlineSm: { fontSize: 16 },
+    bodyLg: { fontSize: 18 },
     bodyMd: { fontSize: 14 },
     bodySm: { fontSize: 12 },
   },
 }));
 
+// D7 (parametros-tarifa-impeccable-v2 Commit 1): TopBar invoca
+// `useNavigation().goBack()` cuando se toca el back. Sin NavigationContainer
+// real en jest, mockeamos useNavigation con stubs. Patron copiado de
+// Admin.test.tsx / GestionPrestadores.test.tsx.
+//
+// Usamos `var` (hoisted) para que jest.mock factory pueda leer la
+// referencia al cargar el modulo. Los tests acceden via `(global as
+// any).__goBackMock` despues de mockear.
+declare global {
+  // eslint-disable-next-line no-var
+  var __goBackMock: jest.Mock;
+}
+(global as { __goBackMock?: jest.Mock }).__goBackMock = jest.fn();
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => ({
+      navigate: jest.fn(),
+      goBack: (global as { __goBackMock?: jest.Mock }).__goBackMock ?? jest.fn(),
+    }),
+  };
+});
+
 import { useWorkspace } from '../../../src/composicion/useWorkspace';
 import ParametrosTarifaForm from '../../../src/pantallas/admin/ParametrosTarifa';
 import type { ParametrosTarifa } from '../../../dominio/parametros-tarifa/types';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+/**
+ * Wrapper de render que provee SafeAreaProvider (requerido por TopBar via
+ * `useSafeAreaInsets()`). Patron copiado de TopBar.test.tsx. Todos los
+ * tests del screen ParametrosTarifa deben usar `renderConSafeArea` en
+ * lugar de `render` directo a partir del Commit 1.
+ */
+function renderConSafeArea(ui: React.ReactElement) {
+  const result = rtlRender(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 320, height: 568 },
+        insets: { top: 0, left: 0, right: 0, bottom: 0 },
+      }}
+    >
+      {ui}
+    </SafeAreaProvider>,
+  );
+  // Wrap `rerender` para que el nuevo render siga dentro del
+  // SafeAreaProvider — el rerender nativo NO reenvuelve automaticamente.
+  const originalRerender = result.rerender;
+  return {
+    ...result,
+    rerender: (newUi: React.ReactElement) =>
+      originalRerender(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 320, height: 568 },
+            insets: { top: 0, left: 0, right: 0, bottom: 0 },
+          }}
+        >
+          {newUi}
+        </SafeAreaProvider>,
+      ),
+  };
+}
 
 /** Parámetros tarifarios de fixture. */
 const parametrosFixture: ParametrosTarifa = {
@@ -227,10 +291,14 @@ describe('ParametrosTarifaForm', () => {
   // Render smoke — titulo y secciones del formulario presentes.
   // ─────────────────────────────────────────────────────────────
   describe('render', () => {
-    it('T-PT-RENDER-1 renderiza titulo y secciones con parametrosActuales inyectado', async () => {
+    it('T-PT-RENDER-1 renderiza TopBar + secciones con parametrosActuales inyectado', async () => {
+      // Cambio D9 (parametros-tarifa-impeccable-v2 Commit 1): el titulo
+      // del screen ahora vive en TopBar con testID `param-topbar` y el
+      // subtitulo contiene `Prestador #7`. El texto plano del titulo
+      // NO vive mas en el form.
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake();
-      const { getByText } = render(
+      const { UNSAFE_getByProps, getByText } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -241,15 +309,184 @@ describe('ParametrosTarifaForm', () => {
       );
 
       await waitFor(() => {
-        expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+        expect(UNSAFE_getByProps({ testID: 'param-topbar' })).toBeTruthy();
       });
-      // Secciones del form.
+      // El subtitulo menciona el id_prestador (Presador #7).
+      expect(getByText(/Prestador #7/)).toBeTruthy();
+      // Secciones del form (cada una envuelta en SeccionForm card).
       expect(getByText('Periodo y vigencia')).toBeTruthy();
       expect(getByText('Costos medios (estudio de costos del prestador)')).toBeTruthy();
       expect(getByText('Agua y suscriptores (insumo ASP = AS - IPUF×12×N)')).toBeTruthy();
       expect(getByText('Mínimo vital (Decreto 776/2025 — opcional)')).toBeTruthy();
       // Botón guardar presente.
       expect(getByText('Guardar Parámetros')).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // T-IMPC-1..3 (parametros-tarifa-impeccable-v2 Commit 1):
+  //   TopBar con `param-topbar` + back button funcional.
+  // ─────────────────────────────────────────────────────────────
+  describe('T-IMPC: TopBar y navegacion back', () => {
+    it('T-IMPC-1 getByTestId(param-topbar) resuelve al contenedor de la TopBar', () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'param-topbar' })).toBeTruthy();
+    });
+
+    it('T-IMPC-2 getByTestId(param-topbar-back) resuelve al Pressable de back', () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'param-topbar-back' })).toBeTruthy();
+    });
+
+it('T-IMPC-3 fireEvent.press(param-topbar-back) invoca navigation.goBack() 1 vez', () => {
+      // D7: TopBar acepta onBack que el screen conecta a navigation.goBack.
+      // El mock global de @react-navigation/native expone `goBack` en una
+      // variable de module scope (__goBackMock) que podemos inspeccionar
+      // tras un press del Pressable.
+      (global as { __goBackMock?: jest.Mock }).__goBackMock?.mockClear();
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      const back = UNSAFE_getByProps({ testID: 'param-topbar-back' });
+      expect(back).toBeTruthy();
+fireEvent.press(back);
+      expect((global as { __goBackMock?: jest.Mock }).__goBackMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // T-IMPC-MIG: las secciones del form viven en SeccionForm cards
+  // con testID `seccion-card-*`. Regresion guard para la migracion
+  // Commit 1 (parametros-tarifa-impeccable-v2).
+  // ─────────────────────────────────────────────────────────────
+  describe('T-IMPC-MIG: secciones migradas a SeccionForm cards', () => {
+    it('T-IMPC-MIG-1 existe seccion-card-periodo', () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'seccion-card-periodo' })).toBeTruthy();
+    });
+
+    it('T-IMPC-MIG-2 existe seccion-card-cma', () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'seccion-card-cma' })).toBeTruthy();
+    });
+
+    it('T-IMPC-MIG-3 existe seccion-card-agua', () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'seccion-card-agua' })).toBeTruthy();
+    });
+
+    it('T-IMPC-MIG-4 existe seccion-card-minimo-vital', () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'seccion-card-minimo-vital' })).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // T-IMPC-PRES-1: regression guard — los 14 testIDs param-*
+  // deben seguir resolviendo después de la migracion a SeccionForm.
+  // ─────────────────────────────────────────────────────────────
+  describe('T-IMPC-PRES-1: testIDs param-* preservados post-migracion', () => {
+    it('los 11 testIDs siempre renderizados siguen resolviendo', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await waitFor(() => {
+        expect(getByTestId('param-periodo').props.value).toBe('2026');
+      });
+      const ids = [
+        'param-periodo',
+        'param-anio-base',
+        'param-vigente-desde',
+        'param-vigente-hasta',
+        'param-cma',
+        'param-cmo',
+        'param-cmi',
+        'param-cmt',
+        'param-agua',
+        'param-ipuf',
+        'param-suscriptores',
+      ];
+      for (const id of ids) {
+        expect(getByTestId(id)).toBeTruthy();
+      }
+      // El boton guardar siempre presente.
+      expect(getByTestId('param-guardar')).toBeTruthy();
     });
   });
 
@@ -270,7 +507,7 @@ describe('ParametrosTarifaForm', () => {
       useWorkspace.setState({ id_prestador_activo: 7 });
       const spy = jest.fn();
 
-      render(
+      renderConSafeArea(
         <Profiler id="pt" onRender={spy}>
           <ParametrosTarifaForm
             id_acuerdo={100}
@@ -298,7 +535,7 @@ describe('ParametrosTarifaForm', () => {
       useWorkspace.setState({ id_prestador_activo: 7 });
       const spy = jest.fn();
 
-      render(
+      renderConSafeArea(
         <Profiler id="pt" onRender={spy}>
           <ParametrosTarifaForm
             id_acuerdo={100}
@@ -326,7 +563,7 @@ describe('ParametrosTarifaForm', () => {
       useWorkspace.setState({ id_prestador_activo: 7 });
       const spy = jest.fn();
 
-      render(
+      renderConSafeArea(
         <Profiler id="pt" onRender={spy}>
           <ParametrosTarifaForm
             id_acuerdo={100}
@@ -374,7 +611,7 @@ describe('ParametrosTarifaForm', () => {
       // "primera alta" del bug fix.
       repo.buscarVigente.mockResolvedValueOnce(null);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -398,7 +635,7 @@ describe('ParametrosTarifaForm', () => {
       const repo = crearRepoFake();
       repo.buscarVigente.mockResolvedValueOnce(null);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -440,7 +677,7 @@ describe('ParametrosTarifaForm', () => {
       repo.buscarVigente.mockResolvedValueOnce(null);
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -468,7 +705,7 @@ describe('ParametrosTarifaForm', () => {
       repo.guardar.mockRejectedValueOnce(new Error('boom'));
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -493,7 +730,7 @@ describe('ParametrosTarifaForm', () => {
     it('T-PT-GUARDAR-5 prefill con `parametrosActuales` propaga los cargos existentes al form', async () => {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByDisplayValue } = render(
+      const { getByDisplayValue } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -528,7 +765,7 @@ describe('ParametrosTarifaForm', () => {
       // debe sincronizar una sola vez.
       repo.buscarVigente.mockResolvedValueOnce(null);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId, rerender } = render(
+      const { getByTestId, rerender } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -575,7 +812,7 @@ describe('ParametrosTarifaForm', () => {
     it('T-SYNC-2 edición local del usuario NO se sobrescribe cuando llega una actualización de parametrosActuales', async () => {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId, rerender } = render(
+      const { getByTestId, rerender } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -623,7 +860,7 @@ describe('ParametrosTarifaForm', () => {
       // Sin repo inyectado ⇒ el componente entra en estado de carga.
       // Todos los FormFields deben tener editable=false.
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId, getByLabelText, queryByTestId } = render(
+      const { getByTestId, getByLabelText, queryByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -653,7 +890,7 @@ describe('ParametrosTarifaForm', () => {
 
     it('T-LOAD-2 ActivityIndicator visible mientras cargando === true', async () => {
       // Sin repo, sin parametrosActuales, sin acuerdoRepo.
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -669,7 +906,7 @@ describe('ParametrosTarifaForm', () => {
     it('T-LOAD-3 FormFields y Switches tienen disabled=false cuando bootstrap terminó (repo !== null && !cargando)', async () => {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId, getByLabelText, queryByTestId } = render(
+      const { getByTestId, getByLabelText, queryByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -737,7 +974,7 @@ describe('ParametrosTarifaForm', () => {
     function renderEstable() {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake();
-      return render(
+      return renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -748,21 +985,31 @@ describe('ParametrosTarifaForm', () => {
       );
     }
 
-    it('T-CRAFT-1 titulo usa fontSize dentro del rango clamp [24, 96] (responsive)', async () => {
-      // El titulo "Parametros Tarifarios ..." debe tener un fontSize
-      // efectivo que respete el clamp CSS `clamp(1.5rem, 3vw, 2.25rem)`
-      // => rango permitido [24, 96] px. El valor exacto depende del
-      // viewport pero SIEMPRE cae dentro del rango.
+    it('T-CRAFT-1 titulo del TopBar tiene fontSize legible (>= 14) y usa tokens tipograficos', async () => {
+      // Commit 1 (parametros-tarifa-impeccable-v2): el titulo ahora vive
+      // en TopBar (no en el screen como antes). El clamp CSS [24, 96] que
+      // tenia el titulo inline del screen ya NO aplica — TopBar usa
+      // tipografia fija del theme (`bodyLg` 18px en modo detalle).
+      // El test verifica que el titulo del TopBar:
+      //   1) Es legible (fontSize >= 14px = WCAG minimo lectura comoda).
+      //   2) USA tokens tipograficos del theme (no fontSize hardcoded).
       const { getByText } = renderEstable();
       await waitFor(() => {
-        expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+        expect(getByText('Parámetros Tarifarios')).toBeTruthy();
       });
-      const titulo = getByText(/Parámetros Tarifarios · Prestador #7/);
+      const titulo = getByText('Parámetros Tarifarios');
       const estilo = StyleSheet.flatten(titulo.props.style) as {
         fontSize?: number;
       };
-      expect(estilo.fontSize).toBeGreaterThanOrEqual(24);
-      expect(estilo.fontSize).toBeLessThanOrEqual(96);
+      // Legibilidad minima: el titulo NO puede ser < 14px (seria ilegible).
+      expect(estilo.fontSize).toBeGreaterThanOrEqual(14);
+      // El screen NO tiene un clamp inline con fontSize hardcoded
+      // (parametros-tarifa-impeccable-v2 Commit 1 lo elimino).
+      const screenSource = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(screenSource).not.toMatch(/TITULO_FONT_SIZE_CLAMP/);
     });
 
     it('T-CRAFT-2 los FormField numéricos tienen touch target ≥ 44 px (TextInput)', async () => {
@@ -857,9 +1104,9 @@ describe('ParametrosTarifaForm', () => {
       // (body text WCAG AA).
       const { getByText } = renderEstable();
       await waitFor(() => {
-        expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+        expect(getByText('Parámetros Tarifarios')).toBeTruthy();
       });
-      const titulo = getByText(/Parámetros Tarifarios · Prestador #7/);
+      const titulo = getByText('Parámetros Tarifarios');
       const estilo = StyleSheet.flatten(titulo.props.style) as {
         color?: string;
       };
@@ -989,7 +1236,7 @@ describe('ParametrosTarifaForm', () => {
       });
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake();
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1018,7 +1265,7 @@ describe('ParametrosTarifaForm', () => {
       });
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake();
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1041,7 +1288,7 @@ describe('ParametrosTarifaForm', () => {
       const repo = crearRepoFake();
       repo.buscarVigente.mockResolvedValueOnce(null);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1197,7 +1444,7 @@ describe('ParametrosTarifaForm', () => {
       const repo = crearRepoFake();
       repo.buscarVigente.mockResolvedValueOnce(null);
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1236,7 +1483,7 @@ describe('ParametrosTarifaForm', () => {
       const stateSpy = jest
         .spyOn(useWorkspace, 'getState')
         .mockReturnValue({ setParametrosVigentes } as never);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1275,7 +1522,7 @@ describe('ParametrosTarifaForm', () => {
       const alertSpy = jest
         .spyOn(Alert, 'alert')
         .mockImplementation(() => undefined);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1319,7 +1566,7 @@ describe('ParametrosTarifaForm', () => {
       const stateSpy = jest
         .spyOn(useWorkspace, 'getState')
         .mockReturnValue({ setParametrosVigentes } as never);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1361,7 +1608,7 @@ describe('ParametrosTarifaForm', () => {
       const stateSpy = jest
         .spyOn(useWorkspace, 'getState')
         .mockReturnValue({ setParametrosVigentes } as never);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1388,7 +1635,7 @@ describe('ParametrosTarifaForm', () => {
     it('T-INTEG-1 renderizado completo con parametrosActuales hidrata cada FormField con el valor correcto', async () => {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1417,7 +1664,7 @@ describe('ParametrosTarifaForm', () => {
       // Sin repo inyectado, el componente entra en estado de carga.
       // El BotonPrimario debe reflejar disabled=true.
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByTestId } = render(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1440,7 +1687,7 @@ describe('ParametrosTarifaForm', () => {
       // Verificamos via el orden de los testIDs.
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByText, getByTestId } = render(
+      const { getByText, getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1450,10 +1697,12 @@ describe('ParametrosTarifaForm', () => {
         />,
       );
       await waitFor(() => {
-        expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+        expect(getByText('Parámetros Tarifarios')).toBeTruthy();
       });
       // El titulo debe estar presente.
-      expect(getByText(/Parámetros Tarifarios · Prestador #7/)).toBeTruthy();
+      expect(getByText('Parámetros Tarifarios')).toBeTruthy();
+      // El subtitulo menciona el id_prestador.
+      expect(getByText(/Prestador #7/)).toBeTruthy();
       // Las 4 secciones del form deben estar presentes (orden
       // logico: Periodo → Costos → Agua → Minimo vital).
       expect(getByText('Periodo y vigencia')).toBeTruthy();
@@ -1469,7 +1718,7 @@ describe('ParametrosTarifaForm', () => {
     function renderConDatos() {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      return render(
+      return renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1521,3 +1770,5 @@ describe('ParametrosTarifaForm', () => {
     });
   });
 });
+
+

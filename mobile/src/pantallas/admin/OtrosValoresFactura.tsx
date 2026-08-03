@@ -57,6 +57,7 @@ import { getBootstrap } from '../../composition/get-bootstrap';
 import type { ConceptoOtroValor, CodigoConceptoOtroValor } from '@dominio/concepto-otro-valor';
 import type { OtroValor } from '@dominio/factura';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../theme/skeletal-tokens';
+import { SeccionForm } from '../../componentes/SeccionForm';
 import ListaOtrosValores from './OtrosValoresFactura/ListaOtrosValores';
 
 interface Props {
@@ -186,8 +187,7 @@ export default function OtrosValoresFactura({
       />
 
       {/* Selector de catalogo */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitulo}>Agregar concepto del catálogo</Text>
+      <SeccionForm titulo="Agregar concepto del catálogo">
         {estado.tipo === 'cargando' && (
           <View style={styles.loadingContainer} testID="catalogo-loading">
             <ActivityIndicator color={COLORS.primary} />
@@ -225,11 +225,10 @@ export default function OtrosValoresFactura({
             ))}
           </View>
         )}
-      </View>
+      </SeccionForm>
 
       {/* Saldo anterior */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitulo}>Saldo anterior</Text>
+      <SeccionForm titulo="Saldo anterior">
         <Text style={styles.sub}>
           Deuda arrastrada de periodos previos. Se suma al total de la factura.
         </Text>
@@ -243,7 +242,7 @@ export default function OtrosValoresFactura({
             style={styles.inputValor}
           />
         </View>
-      </View>
+      </SeccionForm>
 
       {/* Acciones */}
       <View style={styles.actions}>
