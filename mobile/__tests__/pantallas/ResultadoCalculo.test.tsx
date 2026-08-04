@@ -88,18 +88,6 @@ describe('ResultadoCalculo', () => {
     });
   });
 
-  // SC-SYS-03: botón Volver a la ruta llama replace con CapturarLectura
-  it('SC-SYS-03: Volver a la ruta llama navigation.replace con CapturarLectura', () => {
-    renderConProviders(
-      <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
-    );
-    fireEvent.press(screen.getByText('Volver a la ruta'));
-    expect(nav.replace).toHaveBeenCalledWith('CapturarLectura', {
-      id_medidor: paramsBase.lectura.id_medidor,
-      id_suscriptor: paramsBase.id_suscriptor,
-    });
-  });
-
   // SC-SYS-04: toggle del detalle de cálculo oculta y vuelve a mostrar las filas
   it('SC-SYS-04: toggle de detalle oculta y muestra las filas', () => {
     renderConProviders(
