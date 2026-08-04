@@ -34,14 +34,15 @@ import {
 
 type Props = ConfigStackScreenProps<'ImportarCsv'>;
 
-// Header nuevo (11 columnas) — `email` y `telefono` son opcionales.
-// `cedula` y `municipio` son requeridos por el dominio `crearSuscriptor`. La constante DEBE
-// coincidir token-a-token con `HEADER_NUEVO` en `parser-csv.ts`.
-// El test de contrato `__tests__/pantallas/importar-csv-header.test.ts`
-// enforce esa sincronía — si la UI promete un formato distinto al
-// que el parser acepta, el test rompe.
-export const HEADER_ESPERADO_TXT =
-  'nombre_apellidos,cedula,email,telefono,municipio,direccion,estrato,matricula_inmobiliaria,numero_catastral,fecha_instalacion,observaciones_medidor';
+// Header CSV (11 columnas). Vive en su propio archivo (header-csv.ts)
+// para que los tests de contrato puedan importar la constante sin
+// arrastrar el arbol de dependencias nativas del componente (RN, Expo).
+// Ver mobile/src/pantallas/header-csv.ts para el detalle del contrato.
+// Se re-exporta aca para mantener compat con consumers existentes
+// (ej: mobile/__tests__/pantallas/ImportarCsv.test.tsx importa el
+// HEADER_ESPERADO_TXT desde './ImportarCsv').
+import { HEADER_ESPERADO_TXT } from './header-csv';
+export { HEADER_ESPERADO_TXT };
 
 // Umbral a partir del cual pedimos confirmacion al usuario antes de
 // procesar. RN no tiene workers triviales y el bucle es JS thread, asi
