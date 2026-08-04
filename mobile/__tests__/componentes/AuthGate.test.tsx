@@ -194,6 +194,17 @@ function mockBootstrapConPrestadores(
     repos: {
       prestadorRepo: {
         listar: jest.fn().mockResolvedValue(prestadoresComoReales),
+        obtenerPorId: jest.fn().mockImplementation(async (id: number) =>
+          prestadoresComoReales.find(
+            (prestador) => (prestador as { id_prestador?: number }).id_prestador === id,
+          ) ?? null,
+        ),
+      },
+      acuerdoMunicipalRepo: {
+        buscarVigente: jest.fn().mockResolvedValue(null),
+      },
+      parametrosTarifaRepo: {
+        buscarVigente: jest.fn().mockResolvedValue(null),
       },
       operarioRepo: {
         listar: jest.fn().mockResolvedValue(operarios),
@@ -356,7 +367,11 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       await waitFor(() => {
         expect(useWorkspace.getState().id_prestador_activo).toBe(9);
       });
-      expect(spySetSesion).toHaveBeenCalledWith(sesion);
+      expect(spySetSesion).toHaveBeenCalledWith(sesion, {
+        prestador: expect.objectContaining({ obtenerPorId: expect.any(Function) }),
+        acuerdo: expect.objectContaining({ buscarVigente: expect.any(Function) }),
+        parametros: expect.objectContaining({ buscarVigente: expect.any(Function) }),
+      });
     });
   });
 

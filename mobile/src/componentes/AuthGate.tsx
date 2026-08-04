@@ -212,7 +212,11 @@ export function AuthGate() {
         }
 
         // 4. Sync del workspace con la sesion resuelta y decision final.
-        await useWorkspace.getState().setSesionCompleta(sesion);
+        await useWorkspace.getState().setSesionCompleta(sesion, {
+          prestador: bootstrap.repos.prestadorRepo,
+          acuerdo: bootstrap.repos.acuerdoMunicipalRepo,
+          parametros: bootstrap.repos.parametrosTarifaRepo,
+        });
         if (cancelado) return;
         setDecision('con_sesion');
       } catch (error) {

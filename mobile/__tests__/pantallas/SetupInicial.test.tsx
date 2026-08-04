@@ -339,9 +339,15 @@ jest.mock('../../src/composition/bootstrap-completo', () => ({
 jest.mock('../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn().mockResolvedValue({
     repos: {
-      prestadorRepo: {},
-      acuerdoMunicipalRepo: {},
-      parametrosTarifaRepo: {},
+      prestadorRepo: {
+        obtenerPorId: jest.fn().mockResolvedValue({ id_prestador: 42 }),
+      },
+      acuerdoMunicipalRepo: {
+        buscarVigente: jest.fn().mockResolvedValue({ id_acuerdo: 10 }),
+      },
+      parametrosTarifaRepo: {
+        buscarVigente: jest.fn().mockResolvedValue({ id_parametros: 20 }),
+      },
       operarioRepo: {},
     },
     adapters: {
@@ -519,7 +525,11 @@ describe('SetupInicial (integracion paso 2 + bootstrap)', () => {
     fireEvent.press(getByText('Finalizar'));
 
     await waitFor(() => {
-      expect(spySetSesion).toHaveBeenCalledWith(SESION_FAKE_VALIDA);
+      expect(spySetSesion).toHaveBeenCalledWith(SESION_FAKE_VALIDA, {
+        prestador: expect.objectContaining({ obtenerPorId: expect.any(Function) }),
+        acuerdo: expect.objectContaining({ buscarVigente: expect.any(Function) }),
+        parametros: expect.objectContaining({ buscarVigente: expect.any(Function) }),
+      });
     });
     await waitFor(() => {
       expect(onCompleteMock).toHaveBeenCalledTimes(1);

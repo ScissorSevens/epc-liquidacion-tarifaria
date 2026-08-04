@@ -101,6 +101,26 @@ describe('useWorkspace (Fase 4.2.1)', () => {
       });
       expect(escrituraId99).toBeDefined();
     });
+
+    it('T-WKS-SESION-1: setSesionCompleta carga el contexto tarifario (prestador + acuerdo + parámetros)', async () => {
+      const prestador = { id_prestador: 1, nombre: 'Prestador Test' } as Prestador;
+      const acuerdo = { id_acuerdo: 10, id_prestador: 1 } as AcuerdoMunicipal;
+      const parametros = { id_parametros: 20, id_prestador: 1 } as ParametrosTarifa;
+      const repos = {
+        prestador: { obtenerPorId: jest.fn().mockResolvedValue(prestador) },
+        acuerdo: { buscarVigente: jest.fn().mockResolvedValue(acuerdo) },
+        parametros: { buscarVigente: jest.fn().mockResolvedValue(parametros) },
+      };
+      const sesion = crearSesionValida({ idPrestador: 1 });
+
+      await useWorkspace.getState().setSesionCompleta(sesion, repos);
+
+      const state = useWorkspace.getState();
+      expect(state.id_prestador_activo).toBe(1);
+      expect(state.prestador).toEqual(prestador);
+      expect(state.acuerdo_vigente).toEqual(acuerdo);
+      expect(state.parametros_vigentes).toEqual(parametros);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
