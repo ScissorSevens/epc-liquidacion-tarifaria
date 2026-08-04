@@ -188,7 +188,10 @@ describe('ResultadoCalculo', () => {
 // Contratos cubiertos:
 //   T-RES-NAV-1  Sin back button (icono arrow-back ausente del DOM).
 //   T-RES-NAV-2  Sin FooterApp (no se rendera contenido de footer institucional).
-//   T-RES-NAV-3  Botón "Continuar" navega a 'Inicio' vía navigate (no goBack).
+//   T-RES-NAV-3  Botón "Continuar" cierra el stack (popToTop) y navega al
+//                tab Inicio via navigate (no goBack, no replace).
+//   T-RES-NAV-4  No existe botón "Volver a la ruta" (acción incoherente
+//                post-captura; el operario sale solo via "Continuar").
 describe('ResultadoCalculo — ocultar navegación tras captura', () => {
   let nav: ReturnType<typeof crearNavMock>;
 
@@ -219,18 +222,39 @@ describe('ResultadoCalculo — ocultar navegación tras captura', () => {
     expect(screen.queryByText(/EPC · Versión/i)).toBeNull();
   });
 
-  // T-RES-NAV-3: el botón "Continuar" debe ser la ÚNICA salida explícita
-  // hacia una ruta segura. Usa navigation.navigate con destino al tab
-  // 'Inicio' (pantalla raíz RutaDeHoy), NUNCA navigation.goBack()
-  // (que devolvería al operario a la pantalla de captura).
-  it('T-RES-NAV-3: botón "Continuar" navega a "Inicio" sin usar goBack', () => {
+  // T-RES-NAV-3-actualizado: el botón "Continuar" debe ser la ÚNICA salida
+  // explícita hacia una ruta segura. Ademas de navegar al tab 'Inicio',
+  // debe limpiar el stack actual (popToTop) para que el operario NO pueda
+  // volver a CapturarLectura si despues navega al tab Lecturas. Contrato
+  // explicito (experto del dominio, 2026-08-04): al volver a Lecturas, el
+  // stack NO debe mantener CapturarLectura en el historial — debe estar en
+  // su raiz (ListaSuscriptores).
+  it('T-RES-NAV-3: botón "Continuar" cierra el stack y navega a "Inicio" (no goBack, no replace)', () => {
     renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
     fireEvent.press(screen.getByText('Continuar'));
+    // 1. Cierra el stack actual (LecturasStack → popToTop a ListaSuscriptores).
+    expect(nav.popToTop).toHaveBeenCalled();
+    // 2. Navega al tab Inicio con la pantalla raiz RutaDeHoy.
     expect(nav.navigate).toHaveBeenCalledWith('Inicio', {
       screen: 'RutaDeHoy',
     });
+    // 3. No usa goBack (devolveria al operario a la pantalla de captura).
     expect(nav.goBack).not.toHaveBeenCalled();
+    // 4. No usa replace (no debe remplazar la pantalla actual).
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  // T-RES-NAV-4-NUEVO: el botón "Volver a la ruta" se ELIMINA del cuerpo
+  // de la pantalla. Esa acción (replace a CapturarLectura) era incoherente
+  // despues de una captura exitosa — el operario debe salir explicitamente
+  // con "Continuar", no volver al flujo de captura. Contrato explicito del
+  // experto del dominio (2026-08-04).
+  it('T-RES-NAV-4: NO existe botón "Volver a la ruta" en la pantalla', () => {
+    renderConProviders(
+      <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
+    );
+    expect(screen.queryByText('Volver a la ruta')).toBeNull();
   });
 });
