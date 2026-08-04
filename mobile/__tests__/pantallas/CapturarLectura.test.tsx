@@ -394,3 +394,110 @@ describe('CapturarLectura — idOperario desde sesion (COR-04)', () => {
     expect(mockPersistirYEncolarLectura).not.toHaveBeenCalled();
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// Bloque nuevo: lectura_anterior readonly cuando hay lecturas previas.
+// Regla de negocio (senior architect): la lectura anterior es dato historico
+// persistido — NO la puede inventar el operario. Si hay historial del medidor,
+// viene prefill desde ultima.lectura_actual y el input queda read-only.
+// Si NO hay historial (primera lectura del medidor), el operario pone el
+// valor inicial — input editable.
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('CapturarLectura — lectura_anterior readonly cuando hay lecturas previas', () => {
+  let nav: ReturnType<typeof crearNavMock>;
+
+  const LECTURA_HISTORICA = {
+    id_lectura: 50,
+    id_medidor: 7,
+    id_periodo: '202603',
+    id_operario: 42,
+    lectura_anterior: 1100,
+    lectura_actual: 1234,
+    timestamp_captura: '2026-03-15T10:00:00.000Z',
+    estado_validacion: 'aprobado',
+    estado_sync: 'sincronizado',
+  } as const;
+
+  function setupBootstrap(opts: { lecturasPrevias: unknown[] }) {
+    // Mismo patron que `configurarMocksExito` de arriba — un unico mockResolvedValue
+    // para que TODAS las llamadas a getBootstrap() (lecturaRepo, suscriptorRepo,
+    // resolverContextoPrestador) devuelvan el mismo objeto completo.
+    (mockCargarSesion as jest.Mock).mockResolvedValue(SESION_ID_OPERARIO_42);
+    (mockPersistirYEncolarLectura as jest.Mock).mockResolvedValue(undefined);
+    (mockGetBootstrap as jest.Mock).mockResolvedValue({
+      repos: {
+        lecturaRepo: {
+          listar: jest.fn().mockResolvedValue(opts.lecturasPrevias),
+        },
+        suscriptorRepo: {
+          buscarPorId: jest.fn().mockResolvedValue(SUSCRIPTOR_BASE),
+        },
+        lecturaRepoPersistir: {
+          guardar: jest.fn().mockResolvedValue(undefined),
+        },
+        colaRepo: {
+          guardar: jest.fn().mockResolvedValue(undefined),
+          listar: jest.fn().mockResolvedValue([]),
+        },
+      },
+      services: {
+        resolverContextoPrestador: jest.fn().mockResolvedValue({
+          prestador: PRESTADOR,
+          parametros: PARAMETROS,
+          acuerdo: ACUERDO,
+        }),
+      },
+      adapters: {
+        idGenerator: { uuid: jest.fn(() => 'uuid-1') },
+        hasher: { sha256: jest.fn((s: string) => `sha256(${s})`) },
+      },
+    });
+  }
+
+  beforeEach(() => {
+    nav = crearNavMock();
+    jest.clearAllMocks();
+  });
+
+  it('T-CAP-1: primera lectura del medidor (sin historial) → lectura_anterior editable y vacio', async () => {
+    // Setup: lecturaRepo.listar retorna [] → SIN lecturas previas.
+    setupBootstrap({ lecturasPrevias: [] });
+
+    renderConProviders(
+      <CapturarLectura navigation={nav as any} route={crearRouteMock() as any} />,
+    );
+
+    // Esperamos al re-render post-prefill (cargandoPrefill=false → editable activo).
+    const inputAnterior = await waitFor(() => {
+      const inputs = screen.getAllByPlaceholderText('0000');
+      expect(inputs.length).toBe(2);
+      // Sin lecturas previas → editable=true y valor vacio.
+      expect(inputs[1].props.editable).toBe(true);
+      return inputs[1];
+    });
+
+    // Operario debe escribir el valor inicial — input vacio y editable.
+    expect(inputAnterior.props.value).toBe('');
+  });
+
+  it('T-CAP-2: lecturas subsiguientes (con historial) → lectura_anterior readonly con valor prefill', async () => {
+    // Setup: lecturaRepo.listar retorna [{lectura_actual: 1234, ...}] → CON historial.
+    setupBootstrap({ lecturasPrevias: [LECTURA_HISTORICA] });
+
+    renderConProviders(
+      <CapturarLectura navigation={nav as any} route={crearRouteMock() as any} />,
+    );
+
+    // Esperamos al re-render post-prefill: value='1234' y editable=false.
+    const inputAnterior = await waitFor(() => {
+      const inputs = screen.getAllByPlaceholderText('0000');
+      expect(inputs.length).toBe(2);
+      expect(inputs[1].props.value).toBe('1234');
+      return inputs[1];
+    });
+
+    // Lectura anterior viene del historial → NO se puede editar.
+    expect(inputAnterior.props.editable).toBe(false);
+  });
+});
