@@ -176,3 +176,59 @@ describe('ResultadoCalculo', () => {
     expect(String(totalEl.props.children)).toMatch(/15[.,\s]?000/);
   });
 });
+
+// ── Ocultar navegación tras captura exitosa ──────────────────────────────────
+//
+// Razón de dominio (experto del usuario, 2026-08-04): después de hacer una
+// captura de lectura, no tiene sentido que el operario pueda volver a la
+// pantalla de toma o captura. La única salida debe ser una navegación
+// explícita a una ruta válida (Inicio). El back del header y la barra de
+// navegación inferior son ruido que confunde al operario en campo.
+//
+// Contratos cubiertos:
+//   T-RES-NAV-1  Sin back button (icono arrow-back ausente del DOM).
+//   T-RES-NAV-2  Sin FooterApp (no se rendera contenido de footer institucional).
+//   T-RES-NAV-3  Botón "Continuar" navega a 'Inicio' vía navigate (no goBack).
+describe('ResultadoCalculo — ocultar navegación tras captura', () => {
+  let nav: ReturnType<typeof crearNavMock>;
+
+  beforeEach(() => {
+    nav = crearNavMock();
+    jest.clearAllMocks();
+  });
+
+  // T-RES-NAV-1: el back arrow del TopBar no debe renderizarse.
+  // El mock de @expo/vector-icons expone `name` como children del Text,
+  // por eso `queryByText('arrow-back')` es la consulta directa al icono.
+  it('T-RES-NAV-1: NO muestra back button del header', () => {
+    renderConProviders(
+      <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
+    );
+    expect(screen.queryByText('arrow-back')).toBeNull();
+  });
+
+  // T-RES-NAV-2: FooterApp está desactivado y retorna null; verificamos que
+  // tampoco aparezca en el subtree del screen (regression: si alguien lo
+  // reactiva con contenido institucional, este test lo cazaría).
+  it('T-RES-NAV-2: NO muestra FooterApp (barra de navegación inferior)', () => {
+    renderConProviders(
+      <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
+    );
+    // El footer histórico contenía "EPC · Versión X.Y.Z"; su ausencia
+    // confirma que no hay banner inferior visible para el operario.
+    expect(screen.queryByText(/EPC · Versión/i)).toBeNull();
+  });
+
+  // T-RES-NAV-3: el botón "Continuar" debe ser la ÚNICA salida explícita
+  // hacia una ruta segura. Usa navigation.navigate('Inicio'), nunca
+  // navigation.goBack() (que devolvería al operario a la pantalla de
+  // captura).
+  it('T-RES-NAV-3: botón "Continuar" navega a "Inicio" sin usar goBack', () => {
+    renderConProviders(
+      <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
+    );
+    fireEvent.press(screen.getByText('Continuar'));
+    expect(nav.navigate).toHaveBeenCalledWith('Inicio');
+    expect(nav.goBack).not.toHaveBeenCalled();
+  });
+});
