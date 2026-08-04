@@ -442,6 +442,12 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
               { id_prestador: 1, codigo: '0001', estado: 'activo' },
             ]),
         },
+        operarioRepo: {
+          // AuthGate consulta operarioRepo.listar() en el check de cold-boot
+          // parcial (commit post-reinstall). Devolvemos 1 operario para que
+          // el flujo siga hacia sin_sesion (Login), no hacia sin_setup.
+          listar: jest.fn().mockResolvedValue([{ id_operario: 1 }]),
+        },
       });
       await findByText('login-mock');
       // El splash sigue montado encima hasta que splashComplete se dispare.
@@ -533,6 +539,14 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
                 ordenLlamadas.push('prestadorRepo.listar');
                 return [];
               }),
+            },
+            operarioRepo: {
+              // AuthGate consulta operarioRepo.listar() tras el fix de
+              // cold-boot post-reinstall. Devolvemos 1 operario para que
+              // NO se enrute a sin_setup en este test (que precisamente
+              // prueba que prestadorRepo.listar() se llama antes de la
+              // limpieza — la rama sin_setup ya esta cubierta por A1.*).
+              listar: jest.fn().mockResolvedValue([{ id_operario: 1 }]),
             },
           },
           db: {} as never,

@@ -130,6 +130,42 @@ export function AuthGate() {
           return;
         }
 
+        // 1b. FASE POST-REINSTALL — deteccion de DB parcial.
+        //
+        //     Por que este check existe: cuando el usuario desinstala y
+        //     reinstala Expo Go, AsyncStorage se wipea PERO el archivo
+        //     SQLite `mediapp.db` puede persistir en disco (politica del
+        //     OS + el sub-path de Expo Go). Resultado: una DB con el
+        //     prestador del setup previo pero potencialmente SIN
+        //     operarios (rollback transaccional, eliminacion manual, o
+        //     simplemente porque el setup nunca llego a crear uno).
+        //
+        //     Si dejamos el flujo actual "hay prestador -> Login", el
+        //     usuario ve Login, mete credenciales, loginLocal tira
+        //     OPERARIO_NO_ENCONTRADO (porque no hay contra que validar)
+        //     y termina en un dead-end UX. Ademas, si la sesion estaba
+        //     'valida' pero apunta a un operario que ya no existe, el
+        //     RootNavigator crashearia al primer query contra la tabla
+        //     vacia.
+        //
+        //     Regla nueva: si hay prestadores reales pero la tabla
+        //     `operarios` esta vacia, enrutar a sin_setup para que el
+        //     usuario re-corra el wizard de setup. El wizard es
+        //     idempotente: si el prestador ya existe, `bootstrapCompleto`
+        //     crea uno nuevo con codigo correlativo (siguienteCodigoPrestador).
+        //     Aplica INCLUSO si hay sesion persistida, porque una sesion
+        //     apuntando a un operario inexistente es un estado roto y
+        //     no podemos recuperarnos sin re-setup.
+        //
+        //     Cubierto por A8.1 (redirige a SetupInicial) y A8.2
+        //     (regression guard del happy path con operarios).
+        const operariosExistentes = await bootstrap.repos.operarioRepo.listar();
+        if (cancelado) return;
+        if (operariosExistentes.length === 0) {
+          setDecision('sin_setup');
+          return;
+        }
+
         // 2. PUNTO C: clasificamos la sesion persistida ANTES de pedirla.
         //    Asi podemos mostrar el banner "Tu sesion anterior vencio"
         //    solo cuando aplique (estado === 'vencida'), no en cold-boot
