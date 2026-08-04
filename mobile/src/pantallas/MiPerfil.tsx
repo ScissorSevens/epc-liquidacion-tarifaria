@@ -85,7 +85,6 @@ function obtenerIniciales(nombre: string | undefined): string {
 }
 
 export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
-  const [toastVisible, setToastVisible] = useState(false);
   const [sesion, setSesion] = useState<Sesion | null>(null);
   // F-1 (responsive-text REQ-2): H1 clamp reactivo. Rango [32, 52] px.
   const { width: windowWidth } = useWindowDimensions();
@@ -113,11 +112,6 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
       cancelado = true;
     };
   }, []);
-
-  function mostrarToast() {
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 2500);
-  }
 
   /**
    * Confirma el cierre de sesión con Alert.alert destructivo.
@@ -202,8 +196,13 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             con el resto de los screens (impeccable: el avatar es anchor
             emocional, no un elemento dominante). */}
         <View style={estilos.avatarSeccion}>
-          <View style={estilos.avatar} testID="avatar">
-            <Text style={estilos.avatarTexto}>{iniciales}</Text>
+          <View style={estilos.avatarWrapper}>
+            <View style={[estilos.avatar, estilos.avatarShadow]} testID="avatar">
+              <Text style={estilos.avatarTexto}>{iniciales}</Text>
+            </View>
+            {sesion !== null && (
+              <View style={estilos.avatarStatusDot} testID="avatar-status-dot" />
+            )}
           </View>
           <Text style={[estilos.nombre, { fontSize: nombreFontSize }]} testID="perfil-nombre">{nombre}</Text>
           <Text style={estilos.rol} testID="perfil-rol">{rol}</Text>
@@ -263,29 +262,9 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           />
         </View>
 
-        {/* Configuración — simplificada: solo "Parámetros tarifarios" como
-            entry. La sección "Notificaciones" con toggle está eliminada
-            (era placeholder sin implementación real). */}
-        <Text style={estilos.seccionTitulo}>Configuración</Text>
-        <View style={estilos.listaCard}>
-          <Pressable
-            style={estilos.filaConfig}
-            onPress={() => navigation.navigate('Config', { screen: 'ParametrosTarifa', params: { id_prestador: id_prestador_activo } })}
-            accessibilityRole="button"
-            accessibilityLabel="Ir a parámetros tarifarios"
-            testID="boton-ir-parametros-tarifarios"
-          >
-            <View style={estilos.filaConfigIzq}>
-              <MaterialIcons name="tune" size={20} color={COLORS.primary} />
-              <Text style={estilos.filaConfigTexto}>Parámetros tarifarios</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={22} color={COLORS.outlineVariant} />
-          </Pressable>
-        </View>
-
-        {/* Gestión — única entry del tab Perfil. Ahora "Cerrar sesión"
-            vive SOLO acá (no duplicado). El botón rojo BotonPrimario se
-            eliminó para no repetir el patrón con el item de Gestión. */}
+        {/* Gestión — incluye Parámetros tarifarios (movido de la sección
+            Configuración, que se eliminó por tener un solo item huerfano).
+            "Cerrar sesión" vive al fondo por convención Apple HIG. */}
         <Text style={estilos.seccionTitulo}>Gestión</Text>
         <View style={estilos.listaCard}>
           <ItemGestion
@@ -293,6 +272,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             etiqueta="Agregar suscriptor"
             onPress={() => navigation.navigate('AltaSuscriptor')}
             testID="item-alta-suscriptor"
+            accessibilityHint="Abre el formulario para registrar un nuevo suscriptor."
             destructive={false}
           />
           <View style={estilos.filaConfigDivisor} />
@@ -301,6 +281,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             etiqueta="Importar desde CSV"
             onPress={() => navigation.navigate('ImportarCsv')}
             testID="item-importar-csv"
+            accessibilityHint="Abre el importador desde archivo CSV."
             destructive={false}
           />
           <View style={estilos.filaConfigDivisor} />
@@ -313,22 +294,26 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           />
           <View style={estilos.filaConfigDivisor} />
           <ItemGestion
+            icono="tune"
+            etiqueta="Parámetros tarifarios"
+            onPress={() => navigation.navigate('Config', { screen: 'ParametrosTarifa', params: { id_prestador: id_prestador_activo } })}
+            testID="item-parametros-tarifarios"
+            accessibilityHint="Abre la pantalla de parámetros tarifarios."
+            destructive={false}
+          />
+          <View style={estilos.filaConfigDivisor} />
+          <ItemGestion
             icono="logout"
             etiqueta="Cerrar sesión"
             onPress={handleCerrarSesion}
             testID="item-cerrar-sesion"
+            accessibilityHint="Confirma y cierra la sesión actual."
             destructive
           />
         </View>
 
         <FooterApp />
       </ScrollView>
-
-      {toastVisible && (
-        <View style={estilos.toast}>
-          <Text style={estilos.toastTexto}>Próximamente disponible</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -385,13 +370,15 @@ function ItemGestion({
   onPress,
   testID,
   destructive = false,
+  accessibilityHint,
 }: {
-  icono: 'person-add' | 'upload-file' | 'info' | 'logout';
+  icono: 'person-add' | 'upload-file' | 'info' | 'logout' | 'tune';
   etiqueta: string;
   valor?: string;
   onPress?: () => void;
   testID?: string;
   destructive?: boolean;
+  accessibilityHint?: string;
 }): ReactElement {
   const color = destructive ? COLORS.error : COLORS.primary;
   const contenido = (
@@ -431,13 +418,19 @@ function ItemGestion({
     onPress();
   };
 
+  // F-6 (press-feedback REQ-1): pressed state visual con rgba.
+  // F-14 (a11y hints): hint opcional en items navegables.
   return (
     <Pressable
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={etiqueta}
+      accessibilityHint={accessibilityHint}
       testID={testID}
-      style={estilos.itemGestion}
+      style={({ pressed }) => [
+        estilos.itemGestion,
+        pressed && estilos.itemGestionPressed,
+      ]}
     >
       {contenido}
     </Pressable>
@@ -458,6 +451,11 @@ const estilos = StyleSheet.create({
     paddingBottom: SPACING.lg,
     paddingHorizontal: SPACING.margin,
   },
+  // F-7a (D8 design): wrapper relativo para anclar el status dot
+  // absoluto sin escapar del contexto del avatar.
+  avatarWrapper: {
+    position: 'relative',
+  },
   avatar: {
     // 80 px — tono sobrio coherente con el resto de los screens
     // (impeccable: el avatar es anchor emocional, no elemento dominante).
@@ -470,6 +468,27 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.md,
+  },
+  // F-7a (D8 design): shadow sutil cross-platform + elevation Android.
+  avatarShadow: {
+    shadowColor: COLORS.brandAzulOscuro,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  // F-7b (D9 design): status dot verde en bottom-right, condicional
+  // a sesion !== null. Borde blanco para separacion visual del avatar.
+  avatarStatusDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: SPACING.md,
+    width: 16,
+    height: 16,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.success,
+    borderWidth: 2,
+    borderColor: COLORS.surfaceContainerLowest,
   },
   avatarTexto: {
     ...TYPOGRAPHY.headlineMd,
@@ -494,6 +513,9 @@ const estilos = StyleSheet.create({
     marginHorizontal: SPACING.margin,
     marginBottom: SPACING.sm,
     marginTop: SPACING.lg,
+    // F-12 (Apple HIG tracking): letterSpacing 0.5 para que el
+    // uppercase-tracked labelMd se lea con ritmo, no gritando.
+    letterSpacing: 0.5,
   },
   gridFila: {
     flexDirection: 'row',
@@ -503,7 +525,9 @@ const estilos = StyleSheet.create({
   listaCard: {
     marginHorizontal: SPACING.margin,
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: RADIUS.xl,
+    // F-8 (anti-ghost-card): 16px en lugar de 24 (RADIUS.xl) para
+    // tono sobrio coherente con el resto de los screens.
+    borderRadius: RADIUS.lg,
     ...BORDERS.thin,
     overflow: 'hidden',
   },
@@ -539,10 +563,16 @@ const estilos = StyleSheet.create({
     // WCAG 2.5.5: touch target >= 44px en toda la fila (no solo el icono).
     minHeight: 44,
   },
+  // F-6 (press-feedback REQ-1): pressed state en filaConfig. Mismo
+  // rgba que filaConfigPressed de ItemGestion.
+  filaConfigPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+  },
   filaConfigIzq: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm + 4,
+    // F-13 (token discipline): magic-number SPACING.sm + 4 → SPACING.gutter (12).
+    gap: SPACING.gutter,
     // WCAG 2.5.5: touch target >= 44px. La fila entera (icon + texto)
     // debe ser tappable, no solo el icono. Sin esto, el Pressable
     // colapsa al alto del contenido (~36px) y falla el criterio.
@@ -583,20 +613,6 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
   },
-  toast: {
-    position: 'absolute',
-    bottom: 90,
-    alignSelf: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm + 4,
-    borderRadius: RADIUS.full,
-  },
-  toastTexto: {
-    color: COLORS.onPrimary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
   // mi-perfil-unification — estilos de ItemGestion.
   itemGestion: {
     flexDirection: 'row',
@@ -605,6 +621,10 @@ const estilos = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     // WCAG 2.5.5: touch target >= 44px. 56 da margen sobre el icono + label.
     minHeight: 56,
+  },
+  // F-6 (press-feedback REQ-1): pressed state para ItemGestion.
+  itemGestionPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
   },
   itemGestionIzq: {
     flexDirection: 'row',
