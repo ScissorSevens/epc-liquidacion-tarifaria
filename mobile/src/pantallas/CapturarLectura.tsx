@@ -143,6 +143,14 @@ export default function CapturarLectura({ navigation, route }: Props) {
     id_periodo: periodoActual(),
     observaciones: '',
   });
+  // Ultima lectura persistida del medidor (si existe). Fuente de verdad para
+  // decidir si `lectura_anterior` viene del historial (read-only) o es la
+  // primera lectura del medidor (editable). Regla de negocio (senior architect):
+  // la lectura anterior es dato historico persistido — NO la puede inventar
+  // el operario.
+  const [ultima, setUltima] = useState<
+    { lectura_actual: number; [k: string]: unknown } | undefined
+  >(undefined);
   const [errores, setErrores] = useState<Errores>({});
   const [calculando, setCalculando] = useState(false);
   const [cargandoPrefill, setCargandoPrefill] = useState(true);
@@ -228,11 +236,12 @@ export default function CapturarLectura({ navigation, route }: Props) {
         if (cancelado) return;
         if (previas.length > 0) {
           // `listar` ordena por id_lectura ascendente -> ultima es la mas reciente.
-          const ultima = previas[previas.length - 1];
-          if (ultima !== undefined) {
+          const u = previas[previas.length - 1];
+          if (u !== undefined) {
+            setUltima({ lectura_actual: u.lectura_actual });
             setForm((prev) => ({
               ...prev,
-              lectura_anterior: String(ultima.lectura_actual),
+              lectura_anterior: String(u.lectura_actual),
             }));
           }
         }
@@ -428,6 +437,12 @@ export default function CapturarLectura({ navigation, route }: Props) {
     return consumo / anterior > 0.4;
   }, [form.lectura_anterior, form.lectura_actual]);
 
+  // Hay lecturas previas del medidor -> lectura_anterior viene del historial
+  // y NO puede ser editada. Regla de negocio (senior architect): es dato
+  // historico persistido, NO algo que el operario pueda inventar.
+  const hayLecturasPrevias =
+    ultima !== undefined && ultima.lectura_actual > 0;
+
   return (
     <View style={styles.root}>
       {/* Header */}
@@ -512,9 +527,17 @@ export default function CapturarLectura({ navigation, route }: Props) {
             )}
           </View>
 
-          {/* Input lectura anterior (editable, segun plan se conserva) */}
+          {/* Input lectura anterior (editable si es primera lectura; readonly si hay historial) */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Lectura anterior (m³) *</Text>
+            <View style={styles.fieldLabelRow}>
+              <Text style={styles.fieldLabel}>Lectura anterior (m³) *</Text>
+              {hayLecturasPrevias && (
+                <View style={styles.lockBadge}>
+                  <MaterialIcons name="lock" size={12} color={COLORS.textSecondary} />
+                  <Text style={styles.lockBadgeText}>Solo lectura</Text>
+                </View>
+              )}
+            </View>
             <TextInput
               value={form.lectura_anterior}
               onChangeText={(v) => setCampo('lectura_anterior', v)}
@@ -523,15 +546,20 @@ export default function CapturarLectura({ navigation, route }: Props) {
               placeholder="0000"
               placeholderTextColor={COLORS.placeholder}
               keyboardType="decimal-pad"
-              editable={!calculando && !cargandoPrefill}
+              editable={!calculando && !cargandoPrefill && !hayLecturasPrevias}
               style={[
                 styles.input,
                 campoFocal === 'lectura_anterior' && styles.inputFocused,
                 errores.lectura_anterior !== undefined && styles.inputError,
+                hayLecturasPrevias && styles.inputReadonly,
               ]}
             />
-            {errores.lectura_anterior !== undefined && (
-              <Text style={styles.errorText}>{errores.lectura_anterior}</Text>
+            {hayLecturasPrevias ? (
+              <Text style={styles.hintText}>Solo lectura: viene del historial del medidor</Text>
+            ) : (
+              errores.lectura_anterior !== undefined && (
+                <Text style={styles.errorText}>{errores.lectura_anterior}</Text>
+              )
             )}
           </View>
 
@@ -809,6 +837,36 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelLg,
     color: COLORS.primary,
     marginLeft: 2,
+  },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.sm,
+  },
+  lockBadgeText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  inputReadonly: {
+    backgroundColor: COLORS.surfaceLight,
+    borderColor: COLORS.outlineVariant,
+    color: COLORS.textSecondary,
+  },
+  hintText: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textSecondary,
+    marginLeft: 2,
+    marginTop: 2,
   },
   input: {
     width: '100%',
