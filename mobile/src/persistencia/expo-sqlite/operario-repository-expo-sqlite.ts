@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS operarios (
   rol            TEXT NOT NULL DEFAULT 'operario',
   estado         TEXT NOT NULL DEFAULT 'activo',
   dispositivo_id TEXT,
-  created_at     TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+  created_at     TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 )
 `;
 
