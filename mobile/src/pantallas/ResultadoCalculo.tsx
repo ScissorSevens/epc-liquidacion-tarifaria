@@ -220,13 +220,23 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  // Salida explicita y unica hacia una ruta segura. Usa navigate, no
-  // goBack, porque goBack devolveria al operario a la pantalla de
-  // captura anterior (violacion del contrato hide-nav-after-captura).
+  // Salida explicita y unica hacia una ruta segura. Antes de navegar al
+  // tab Inicio, limpia el stack actual (popToTop) para que si el operario
+  // vuelve despues al tab Lecturas NO encuentre CapturarLectura en el
+  // historial — solo ListaSuscriptores (raiz del LecturasStack). Sin este
+  // popToTop, el stack LecturasStack mantiene CapturarFoto → CapturarLectura
+  // → ResultadoCalculo, y al cambiar de tab el stack queda "congelado"
+  // con esas pantallas accesibles via volver. Contrato explicito del
+  // experto del dominio (2026-08-04).
+  //
   // Patron tab + screen: 'Inicio' es un tab de TabParamList; sin el
   // segundo parametro el tipo de CompositeScreenProps rechaza el
   // string pelado. RutaDeHoy es el root del InicioStack.
+  //
+  // NO usa goBack (devolveria al operario a la pantalla de captura) ni
+  // replace (no debe remplazar la pantalla actual — debe cerrar el flujo).
   const handleContinuar = (): void => {
+    navigation.popToTop();
     navigation.navigate('Inicio', { screen: 'RutaDeHoy' });
   };
 
@@ -389,21 +399,12 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
               nombre: nombre_suscriptor,
             })}
           />
-          <Pressable
-            onPress={() =>
-              navigation.replace('CapturarLectura', {
-                id_medidor: lectura.id_medidor,
-                id_suscriptor,
-              })
-            }
-            style={({ pressed }) => [styles.btnSecondary, pressed && styles.pressedLight]}
-          >
-            <MaterialIcons name="map" size={20} color={COLORS.primary} />
-            <Text style={styles.btnSecondaryText}>Volver a la ruta</Text>
-          </Pressable>
           {/* Boton "Continuar" — salida explicita al tab Inicio.
-              Contrato T-RES-NAV-3: navega via navigate('Inicio'),
-              nunca goBack. Es la unica salida segura del flujo post-captura. */}
+              Contrato T-RES-NAV-3: popToTop (limpia el stack) + navigate
+              al tab Inicio/RutaDeHoy. Es la unica salida segura del flujo
+              post-captura. Contrato T-RES-NAV-4: el antiguo boton
+              "Volver a la ruta" (replace a CapturarLectura) fue eliminado
+              por incoherente con un operario post-captura exitosa. */}
           <BotonPrimario
             texto="Continuar"
             icono="check"
@@ -672,22 +673,6 @@ const styles = StyleSheet.create({
   actionsCol: {
     gap: SPACING.sm,
     marginTop: SPACING.lg,
-  },
-  btnSecondary: {
-    width: '100%',
-    height: 56,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1,
-    borderColor: 'rgba(3,22,50,0.2)', // primary/20
-    borderRadius: RADIUS.default,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-  },
-  btnSecondaryText: {
-    ...TYPOGRAPHY.labelLg,
-    color: COLORS.primary,
   },
   btnDisabled: {
     opacity: 0.5,
