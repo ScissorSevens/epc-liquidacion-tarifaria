@@ -495,11 +495,15 @@ export default function CapturarLectura({ navigation, route }: Props) {
             </View>
           )}
 
-          {/* Card lectura anterior */}
-          <View style={styles.cardAnterior}>
-            <Text style={styles.anteriorLabel}>Lectura anterior</Text>
-            <Text style={styles.anteriorValor}>{lecturaAnteriorTxt}</Text>
-          </View>
+          {/* Card lectura anterior: solo si hay historial (subsiguiente).
+     El dato viene del medidor y NO se edita — pintar el input ademas
+     seria redundancia visual. */}
+          {hayLecturasPrevias && (
+            <View style={styles.cardAnterior} testID="card-lectura-anterior">
+              <Text style={styles.anteriorLabel}>Lectura anterior</Text>
+              <Text style={styles.anteriorValor}>{lecturaAnteriorTxt}</Text>
+            </View>
+          )}
 
           {/* Input lectura actual */}
           <View style={styles.fieldGroup}>
@@ -527,41 +531,33 @@ export default function CapturarLectura({ navigation, route }: Props) {
             )}
           </View>
 
-          {/* Input lectura anterior (editable si es primera lectura; readonly si hay historial) */}
-          <View style={styles.fieldGroup}>
-            <View style={styles.fieldLabelRow}>
+          {/* Input lectura anterior: solo si NO hay historial (primera lectura).
+     Cuando hay historial, la card de arriba ya muestra el dato y este
+     input seria redundante. */}
+          {!hayLecturasPrevias && (
+            <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Lectura anterior (m³) *</Text>
-              {hayLecturasPrevias && (
-                <View style={styles.lockBadge}>
-                  <MaterialIcons name="lock" size={12} color={COLORS.textSecondary} />
-                  <Text style={styles.lockBadgeText}>Solo lectura</Text>
-                </View>
+              <TextInput
+                value={form.lectura_anterior}
+                onChangeText={(v) => setCampo('lectura_anterior', v)}
+                onFocus={() => setCampoFocal('lectura_anterior')}
+                onBlur={() => { setCampoFocal(null); onBlur('lectura_anterior'); }}
+                placeholder="0000"
+                placeholderTextColor={COLORS.placeholder}
+                keyboardType="decimal-pad"
+                editable={!calculando && !cargandoPrefill}
+                style={[
+                  styles.input,
+                  campoFocal === 'lectura_anterior' && styles.inputFocused,
+                  errores.lectura_anterior !== undefined && styles.inputError,
+                ]}
+                testID="input-lectura-anterior"
+              />
+              {errores.lectura_anterior !== undefined && (
+                <Text style={styles.errorText}>{errores.lectura_anterior}</Text>
               )}
             </View>
-            <TextInput
-              value={form.lectura_anterior}
-              onChangeText={(v) => setCampo('lectura_anterior', v)}
-              onFocus={() => setCampoFocal('lectura_anterior')}
-              onBlur={() => { setCampoFocal(null); onBlur('lectura_anterior'); }}
-              placeholder="0000"
-              placeholderTextColor={COLORS.placeholder}
-              keyboardType="decimal-pad"
-              editable={!calculando && !cargandoPrefill && !hayLecturasPrevias}
-              style={[
-                styles.input,
-                campoFocal === 'lectura_anterior' && styles.inputFocused,
-                errores.lectura_anterior !== undefined && styles.inputError,
-                hayLecturasPrevias && styles.inputReadonly,
-              ]}
-            />
-            {hayLecturasPrevias ? (
-              <Text style={styles.hintText}>Solo lectura: viene del historial del medidor</Text>
-            ) : (
-              errores.lectura_anterior !== undefined && (
-                <Text style={styles.errorText}>{errores.lectura_anterior}</Text>
-              )
-            )}
-          </View>
+          )}
 
           {/* Periodo */}
           <View style={styles.fieldGroup}>

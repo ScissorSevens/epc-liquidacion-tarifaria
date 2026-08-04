@@ -396,15 +396,16 @@ describe('CapturarLectura — idOperario desde sesion (COR-04)', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────
-// Bloque nuevo: lectura_anterior readonly cuando hay lecturas previas.
-// Regla de negocio (senior architect): la lectura anterior es dato historico
-// persistido — NO la puede inventar el operario. Si hay historial del medidor,
-// viene prefill desde ultima.lectura_actual y el input queda read-only.
-// Si NO hay historial (primera lectura del medidor), el operario pone el
-// valor inicial — input editable.
+// Bloque nuevo: lectura_anterior se renderiza como CARD si hay historial
+// (subsiguiente) y como INPUT si NO hay historial (primera lectura).
+// Regla UX (senior architect): evitar redundancia visual. La card ya
+// muestra la lectura anterior arriba — si ademas hay un input editable/
+// readonly abajo, el operario ve la misma informacion dos veces.
+//   - hayLecturasPrevias=true  → SOLO card-lectura-anterior (consulta)
+//   - hayLecturasPrevias=false → SOLO input-lectura-anterior (editable)
 // ──────────────────────────────────────────────────────────────────────────
 
-describe('CapturarLectura — lectura_anterior readonly cuando hay lecturas previas', () => {
+describe('CapturarLectura — lectura_anterior: card vs input segun historial', () => {
   let nav: ReturnType<typeof crearNavMock>;
 
   const LECTURA_HISTORICA = {
@@ -460,7 +461,7 @@ describe('CapturarLectura — lectura_anterior readonly cuando hay lecturas prev
     jest.clearAllMocks();
   });
 
-  it('T-CAP-1: primera lectura del medidor (sin historial) → lectura_anterior editable y vacio', async () => {
+  it('T-CAP-1: primera lectura (sin historial) → SOLO input editable, card ausente', async () => {
     // Setup: lecturaRepo.listar retorna [] → SIN lecturas previas.
     setupBootstrap({ lecturasPrevias: [] });
 
@@ -468,20 +469,18 @@ describe('CapturarLectura — lectura_anterior readonly cuando hay lecturas prev
       <CapturarLectura navigation={nav as any} route={crearRouteMock() as any} />,
     );
 
-    // Esperamos al re-render post-prefill (cargandoPrefill=false → editable activo).
-    const inputAnterior = await waitFor(() => {
-      const inputs = screen.getAllByPlaceholderText('0000');
-      expect(inputs.length).toBe(2);
-      // Sin lecturas previas → editable=true y valor vacio.
-      expect(inputs[1].props.editable).toBe(true);
-      return inputs[1];
-    });
+    // Card de lectura anterior NO debe estar en el arbol
+    // (la card muestra el dato del historial; sin historial no aplica).
+    expect(screen.queryByTestId('card-lectura-anterior')).toBeNull();
 
-    // Operario debe escribir el valor inicial — input vacio y editable.
+    // Input editable SI debe estar: el operario tipea el valor inicial.
+    const inputAnterior = await screen.findByTestId('input-lectura-anterior');
+    expect(inputAnterior.props.editable).toBe(true);
     expect(inputAnterior.props.value).toBe('');
+    expect(inputAnterior.props.placeholder).toBe('0000');
   });
 
-  it('T-CAP-2: lecturas subsiguientes (con historial) → lectura_anterior readonly con valor prefill', async () => {
+  it('T-CAP-2: subsiguiente (con historial) → SOLO card con valor prefill, input ausente', async () => {
     // Setup: lecturaRepo.listar retorna [{lectura_actual: 1234, ...}] → CON historial.
     setupBootstrap({ lecturasPrevias: [LECTURA_HISTORICA] });
 
@@ -489,15 +488,18 @@ describe('CapturarLectura — lectura_anterior readonly cuando hay lecturas prev
       <CapturarLectura navigation={nav as any} route={crearRouteMock() as any} />,
     );
 
-    // Esperamos al re-render post-prefill: value='1234' y editable=false.
-    const inputAnterior = await waitFor(() => {
-      const inputs = screen.getAllByPlaceholderText('0000');
-      expect(inputs.length).toBe(2);
-      expect(inputs[1].props.value).toBe('1234');
-      return inputs[1];
-    });
+    // Card SI debe estar, mostrando el valor del historial prefill.
+    const card = await screen.findByTestId('card-lectura-anterior');
+    // El valor prefill '1234' debe ser visible dentro de la card.
+    expect(screen.getByText('1234 m³')).toBeTruthy();
+    // Y la card debe estar en el arbol (referencia retenida por findByTestId).
+    expect(card).toBeTruthy();
 
-    // Lectura anterior viene del historial → NO se puede editar.
-    expect(inputAnterior.props.editable).toBe(false);
+    // Input NO debe estar en el arbol — la card ya muestra la informacion,
+    // pintar el input ademas seria redundancia visual.
+    expect(screen.queryByTestId('input-lectura-anterior')).toBeNull();
+
+    // El badge "Solo lectura" del input ya no existe (la card lo reemplaza).
+    expect(screen.queryByText('Solo lectura')).toBeNull();
   });
 });
