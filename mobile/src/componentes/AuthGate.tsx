@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -311,18 +311,25 @@ export function AuthGate() {
         </Pressable>
         <Pressable
           style={estilos.botonClear}
-          onPress={() => {
-            // TODO: clear AsyncStorage + pedir al user que reinstale.
-            // Por ahora, navegar a Login con warning.
-            Alert.alert(
-              'Datos corruptos',
-              'Si el problema persiste, desinstala Expo Go y vuelve a instalar.',
-              [{ text: 'OK', onPress: () => setDecision('sin_sesion') }],
-            );
+          onPress={async () => {
+            // Limpiar sesion persistida (por si quedo basura) y enrutar a
+            // SetupInicial. NO pedimos reinstalar: el bug es de SQL syntax
+            // (NO de install corrupto). Si el SQL sigue fallando, error_db
+            // reaparece con el mismo mensaje claro y el operario puede
+            // re-tapear Limpiar y continuar hasta que el cold-boot limpia
+            // pase, o esperar a una correccion de schema.
+            try {
+              await limpiarSesion();
+            } catch {
+              // silent: limpiarSesion es best-effort (puede fallar si
+              // AsyncStorage no responde, pero el usuario ya esta en
+              // error_db — no podemos hacer mucho mas).
+            }
+            setDecision('sin_setup');
           }}
           accessibilityRole="button"
           accessibilityLabel="Limpiar y continuar"
-          accessibilityHint="Muestra instrucciones de reinstalación y permite continuar al Login"
+          accessibilityHint="Borra la sesión persistida y abre el wizard de configuración inicial"
           testID="auth-gate-error-clear"
         >
           <Text style={estilos.botonClearTexto}>Limpiar y continuar</Text>
