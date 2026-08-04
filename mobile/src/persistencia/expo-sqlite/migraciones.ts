@@ -284,7 +284,7 @@ CREATE TABLE operarios (
   estado         TEXT    NOT NULL DEFAULT 'activo'
                           CHECK (estado IN ('activo', 'inactivo')),
   dispositivo_id TEXT    NULL,
-  created_at     TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+  created_at     TEXT    DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 CREATE UNIQUE INDEX idx_operario_dispositivo_unique
   ON operarios(dispositivo_id)
@@ -349,7 +349,7 @@ CREATE TABLE IF NOT EXISTS concepto_otro_valor (
   version        TEXT    NOT NULL,
   activo         INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
   requiere_glosa INTEGER NOT NULL DEFAULT 0 CHECK (requiere_glosa IN (0, 1)),
-  created_at     TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+  created_at     TEXT    DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_concepto_otro_valor_activo
