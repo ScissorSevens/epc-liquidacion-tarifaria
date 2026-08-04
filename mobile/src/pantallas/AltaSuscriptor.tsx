@@ -21,6 +21,7 @@ import {
   type CategoriaUso,
 } from '@dominio/categorias-uso';
 import { logger } from '../composicion/logger';
+import { useWorkspace } from '../composicion/useWorkspace';
 import type { MedidorBorradorSinSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
 import { getBootstrap } from '../composition/get-bootstrap';
 import { persistirYEncolarAltaSuscriptor } from '../adapters/persistir-y-encolar-alta-suscriptor';
@@ -295,7 +296,12 @@ export default function AltaSuscriptor({ navigation }: Props) {
         direccion: form.direccion.trim(),
         estrato: estratoNum,
         aplica_subsidio: form.aplica_subsidio,
-        id_prestador: 0,
+        // Multi-tenant: el prestador del suscriptor DEBE ser el prestador
+        // activo del workspace. Antes este campo quedaba en 0 (placeholder
+        // EPC-LEGACY), lo que rompia CapturarLectura con el snack
+        // "El prestador 0 no tiene ParametrosTarifa vigentes".
+        // Ver regression test `suscriptor-id-prestador-fix-e2e.test.ts`.
+        id_prestador: useWorkspace.getState().id_prestador_activo,
         categoria_uso: form.categoria_uso,
         matricula_inmobiliaria:
           form.matricula_inmobiliaria.trim() === ''
