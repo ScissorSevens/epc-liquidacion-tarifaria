@@ -167,16 +167,23 @@ function crearSesionValida(overrides: Partial<Sesion> = {}): Sesion {
   };
 }
 
-/** Stub del bootstrap con `prestadorRepo.listar()` configurable. */
-function mockBootstrapConPrestadores(prestadores: unknown[]): void {
-  // AuthGate (commit 40b44ca) filtra el placeholder `EPC-LEGACY`
-  // (id=0, codigo='EPC-LEGACY') y prestadores no-activos antes de
-  // detectar `sin_setup`. Para que un prestador mockeado cuente como
-  // "real" a ojos del filtro, inyectamos defaults de `codigo` +
-  // `estado: 'activo'` salvo que el test los pise explicitamente
-  // (el spread del input viene despues y sobrescribe los defaults).
-  // Tests que mockean `[]` (casos sin_setup: A1.*, A6.*) no se ven
-  // afectados porque `.map()` sobre un array vacio es no-op.
+/** Stub del bootstrap con `prestadorRepo.listar()` configurable.
+ *
+ * Parametros:
+ *   - `prestadores`: lo que devuelve `prestadorRepo.listar()`. AuthGate filtra
+ *     `EPC-LEGACY` y prestadores suspendidos (commit 40b44ca).
+ *   - `operarios`: lo que devuelve `operarioRepo.listar()` (default: 1 operario).
+ *     Por que? Tras el fix de cold-boot post-reinstall, AuthGate consulta
+ *     AMBOS repos: si hay prestadores pero NO hay operarios (estado parcial
+ *     post-reinstall: DB SQLite persistio con prestador viejo pero operarios
+ *     wipeados), debe mostrar SetupInicial en lugar de Login (porque login
+ *     fallaria con OPERARIO_NO_ENCONTRADO). Tests existentes usan el default
+ *     `[{}]` para mantener su semantica previa (prestador + operario = Login).
+ */
+function mockBootstrapConPrestadores(
+  prestadores: unknown[],
+  operarios: unknown[] = [{}],
+): void {
   const prestadoresComoReales = prestadores.map((p) => ({
     codigo: '0001',
     estado: 'activo' as const,
@@ -186,6 +193,9 @@ function mockBootstrapConPrestadores(prestadores: unknown[]): void {
     repos: {
       prestadorRepo: {
         listar: jest.fn().mockResolvedValue(prestadoresComoReales),
+      },
+      operarioRepo: {
+        listar: jest.fn().mockResolvedValue(operarios),
       },
     },
     db: {} as never,
@@ -350,6 +360,125 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
+  // Cold-boot post-reinstall: DB tiene prestadores pero NO operarios.
+  //
+  // Escenario: el usuario desinstalo Expo Go (o lo reinstalo tras un
+  // factory reset) pero el archivo SQLite `mediapp.db` persistio en disco
+  // porque el OS no lo wipeo al desinstalar. La DB tiene prestadores del
+  // setup inicial previo, pero el unico operario que se habia creado
+  // quedo huerfano (rollback de transaccion, eliminacion manual, etc).
+  // AsyncStorage de sesion esta vacio (wipeado por la reinstall).
+  //
+  // Comportamiento esperado ANTES del fix: AuthGate mostraba Login
+  // (porque hay prestadores), el usuario metia credenciales, loginLocal
+  // tiraba OPERARIO_NO_ENCONTRADO, y veia un Alert generico.
+  //
+  // Comportamiento esperado DESPUES del fix: AuthGate debe enrutar a
+  // SetupInicial. Razon: si NO hay forma de validar login contra la DB
+  // local (porque no hay operarios), mostrar Login es un dead-end UX.
+  // El usuario debe poder re-correr el setup wizard para crear el
+  // operario que falta.
+  //
+  // Ref: exploracion en Engram topic
+  // `sdd/first-launch-post-reinstall-bug/explore` (#1022).
+  // ─────────────────────────────────────────────────────────────
+  describe('cold-boot post-reinstall: DB parcial con prestadores pero sin operarios', () => {
+    it('A8.1 enruta a SetupInicial cuando hay prestadores, operarios vacio, y sesion null', async () => {
+      // Escenario: prestador persistio del setup previo + 0 operarios + sin sesion.
+      mockBootstrapConPrestadores([{ id_prestador: 1 }], []);
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      const { findByText, queryByText } = render(<AuthGate />);
+
+      await findByText('setup-inicial-mock');
+      expect(queryByText('login-mock')).toBeNull();
+      expect(queryByText('root-navigator-mock')).toBeNull();
+    });
+
+    it('A8.2 sigue mostrando Login cuando hay prestadores Y operarios (caso feliz)', async () => {
+      // Regression guard: el fix NO debe romper el flujo normal donde
+      // hay prestadores + operarios + sin sesion -> Login (el operario
+      // debe poder autenticarse).
+      mockBootstrapConPrestadores(
+        [{ id_prestador: 1 }],
+        [{ id_operario: 42, numero_cedula: '12345678' }],
+      );
+      mockedGetItem.mockResolvedValueOnce(null);
+
+      const { findByText, queryByText } = render(<AuthGate />);
+
+      await findByText('login-mock');
+      expect(queryByText('setup-inicial-mock')).toBeNull();
+    });
+
+    it('T-AUTH-ERR-1 operarioRepo.listar() throws -> error_db (no Login dead-end)', async () => {
+      const listarOperarios = jest
+        .fn()
+        .mockRejectedValue(new Error('SQLite execAsync rejected'));
+      mockedGetBootstrap.mockResolvedValue({
+        repos: {
+          prestadorRepo: {
+            listar: jest.fn().mockResolvedValue([
+              { id_prestador: 1, codigo: '0001', estado: 'activo' },
+            ]),
+          },
+          operarioRepo: { listar: listarOperarios },
+        },
+        db: {} as never,
+      } as never);
+
+      const pantalla = render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeTruthy();
+        expect(pantalla.queryByTestId('auth-gate-error-retry')).toBeTruthy();
+        expect(pantalla.queryByTestId('auth-gate-error-clear')).toBeTruthy();
+        expect(pantalla.queryByText('SQLite execAsync rejected')).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+    });
+
+    it('T-AUTH-ERR-2 retry button re-dispara la deteccion desde loading', async () => {
+      let resolverSegundoIntento: (operarios: unknown[]) => void = () => {};
+      const segundoIntento = new Promise<unknown[]>((resolve) => {
+        resolverSegundoIntento = resolve;
+      });
+      const listarOperarios = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('DB temporalmente no disponible'))
+        .mockImplementationOnce(() => segundoIntento);
+      mockedGetBootstrap.mockResolvedValue({
+        repos: {
+          prestadorRepo: {
+            listar: jest.fn().mockResolvedValue([
+              { id_prestador: 1, codigo: '0001', estado: 'activo' },
+            ]),
+          },
+          operarioRepo: { listar: listarOperarios },
+        },
+        db: {} as never,
+      } as never);
+      mockedGetItem.mockResolvedValue(null);
+
+      const pantalla = render(<AuthGate />);
+      const botonReintentar = await pantalla.findByTestId('auth-gate-error-retry');
+
+      fireEvent.press(botonReintentar);
+
+      await waitFor(() => {
+        expect(listarOperarios).toHaveBeenCalledTimes(2);
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeNull();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+
+      await act(async () => {
+        resolverSegundoIntento([{ id_operario: 42 }]);
+      });
+      await pantalla.findByText('login-mock');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
   // Estado loading
   // ─────────────────────────────────────────────────────────────
   describe('estado loading', () => {
@@ -372,13 +501,22 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       // Ahora resolvemos el bootstrap -> deberia ir a sin_sesion y montar el Login
       // DEBAJO del splash overlay (no condicional a splashComplete).
       resolverBootstrap({
-        prestadorRepo: {
-          listar: jest
-            .fn()
-            .mockResolvedValue([
-              { id_prestador: 1, codigo: '0001', estado: 'activo' },
-            ]),
+        repos: {
+          prestadorRepo: {
+            listar: jest
+              .fn()
+              .mockResolvedValue([
+                { id_prestador: 1, codigo: '0001', estado: 'activo' },
+              ]),
+          },
+          operarioRepo: {
+            // AuthGate consulta operarioRepo.listar() en el check de cold-boot
+            // parcial (commit post-reinstall). Devolvemos 1 operario para que
+            // el flujo siga hacia sin_sesion (Login), no hacia sin_setup.
+            listar: jest.fn().mockResolvedValue([{ id_operario: 1 }]),
+          },
         },
+        db: {} as never,
       });
       await findByText('login-mock');
       // El splash sigue montado encima hasta que splashComplete se dispare.
@@ -389,6 +527,48 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       expect(queryAllByText('splash-animado-mock').length).toBeGreaterThanOrEqual(0); // puede estar desmontandose
       // El Login YA esta accesible (el arbol real lo contiene):
       expect(queryByText('login-mock')).not.toBeNull();
+    });
+    it('T-AUTH-CATCH-1 getBootstrap() throws -> error_db (no Login dead-end)', async () => {
+      mockedGetBootstrap.mockRejectedValue(
+        new Error('SQLite execAsync rejected: near NOT'),
+      );
+
+      const pantalla = render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeTruthy();
+        expect(pantalla.queryByTestId('auth-gate-error-retry')).toBeTruthy();
+        expect(
+          pantalla.queryByText(
+            'Error al inicializar la app: SQLite execAsync rejected: near NOT',
+          ),
+        ).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+    });
+
+    it('T-AUTH-CATCH-2 prestadorRepo.listar() throws -> error_db (no Login dead-end)', async () => {
+      mockedGetBootstrap.mockResolvedValue({
+        repos: {
+          prestadorRepo: {
+            listar: jest.fn().mockRejectedValue(new Error('no such table')),
+          },
+          operarioRepo: {
+            listar: jest.fn(),
+          },
+        },
+        db: {} as never,
+      } as never);
+
+      const pantalla = render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeTruthy();
+        expect(
+          pantalla.queryByText('Error al inicializar la app: no such table'),
+        ).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
     });
   });
 
@@ -470,6 +650,14 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
                 ordenLlamadas.push('prestadorRepo.listar');
                 return [];
               }),
+            },
+            operarioRepo: {
+              // AuthGate consulta operarioRepo.listar() tras el fix de
+              // cold-boot post-reinstall. Devolvemos 1 operario para que
+              // NO se enrute a sin_setup en este test (que precisamente
+              // prueba que prestadorRepo.listar() se llama antes de la
+              // limpieza — la rama sin_setup ya esta cubierta por A1.*).
+              listar: jest.fn().mockResolvedValue([{ id_operario: 1 }]),
             },
           },
           db: {} as never,

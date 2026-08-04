@@ -26,6 +26,23 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('expo-haptics', () => ({
+  __esModule: true,
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+  impactAsync: jest.fn().mockResolvedValue(undefined),
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+}));
+
+jest.mock('@expo-google-fonts/inter', () => ({
+  useFonts: () => [true, null],
+  Inter_400Regular: {},
+  Inter_500Medium: {},
+  Inter_600SemiBold: {},
+  Inter_700Bold: {},
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn().mockResolvedValue(undefined),
@@ -56,7 +73,7 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
     brandAzulOscuro: '#093C5D',
     brandRojo: '#D5212A',
   },
-  RADIUS: { full: 9999, md: 12, xl: 16, sm: 4 },
+  RADIUS: { full: 9999, md: 12, lg: 16, xl: 24, sm: 4 },
   SHADOWS: { card: {} },
   SPACING: {
     margin: 16, lg: 24, md: 16, sm: 8, xs: 4, xl: 32, xxl: 48,
@@ -118,6 +135,7 @@ jest.mock('@react-navigation/native', () => {
 });
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import MiPerfil from '../../src/pantallas/MiPerfil';
 import type { ConfigStackScreenProps } from '../../src/navegacion/types';
 import type { Sesion } from '../../src/composition/constantes';
@@ -626,12 +644,12 @@ describe('MiPerfil — Navegación a Parámetros Tarifarios (card de descubrimie
 
   it('T-NAV-1: el card "Ir a parámetros tarifarios" está visible en Mi Perfil', () => {
     const { getByTestId } = renderMiPerfil();
-    expect(getByTestId('boton-ir-parametros-tarifarios')).toBeTruthy();
+    expect(getByTestId('item-parametros-tarifarios')).toBeTruthy();
   });
 
   it('T-NAV-2: tap en el card navega a Config → ParametrosTarifa', () => {
     const { getByTestId, nav } = renderMiPerfilConNavSpy();
-    fireEvent.press(getByTestId('boton-ir-parametros-tarifarios'));
+    fireEvent.press(getByTestId('item-parametros-tarifarios'));
     expect(nav.navigate).toHaveBeenCalledWith(
       'Config',
       expect.objectContaining({
@@ -651,7 +669,7 @@ describe('MiPerfil — Navegación a Parámetros Tarifarios (card de descubrimie
       sel({ id_prestador_activo: 42, prestador: null }),
     );
     const { getByTestId, nav } = renderMiPerfilConNavSpy();
-    fireEvent.press(getByTestId('boton-ir-parametros-tarifarios'));
+    fireEvent.press(getByTestId('item-parametros-tarifarios'));
     expect(nav.navigate).toHaveBeenCalledWith(
       'Config',
       expect.objectContaining({
@@ -660,16 +678,16 @@ describe('MiPerfil — Navegación a Parámetros Tarifarios (card de descubrimie
     );
   });
 
-  it('T-NAV-4: el card tiene accessibilityLabel "Ir a parámetros tarifarios"', () => {
+  it('T-NAV-4: el card tiene accessibilityLabel "Parámetros tarifarios"', () => {
     const { getByTestId } = renderMiPerfil();
-    const card = getByTestId('boton-ir-parametros-tarifarios');
-    expect(card.props.accessibilityLabel).toBe('Ir a parámetros tarifarios');
+    const card = getByTestId('item-parametros-tarifarios');
+    expect(card.props.accessibilityLabel).toBe('Parámetros tarifarios');
     expect(card.props.accessibilityRole).toBe('button');
   });
 
   it('T-NAV-5: el card tiene minHeight ≥ 44px (WCAG 2.5.5)', () => {
     const { getByTestId } = renderMiPerfil();
-    const card = getByTestId('boton-ir-parametros-tarifarios');
+    const card = getByTestId('item-parametros-tarifarios');
     const flat = StyleSheet.flatten(card.props.style);
     expect(flat.minHeight).toBeGreaterThanOrEqual(44);
   });
@@ -1205,5 +1223,374 @@ describe('MiPerfil — Unificación con Configuracion (T-UNIFY-1..8)', () => {
     });
     fireEvent.press(getByTestId('item-importar-csv'));
     expect(nav.navigate).toHaveBeenCalledWith('ImportarCsv');
+  });
+});
+
+// =====================================================================
+// mi-perfil-impeccable-v2 — RED tests (commit 4).
+//
+// Estos tests describen los REQ de los 14 fixes del explore (#1010) +
+// ajustes de expo-native-ui. Todos fallan RED porque el codigo actual
+// aun no implementa los fixes; se iran estabilizando en GREEN a medida
+// que se apliquen commits 5 y 6.
+// =====================================================================
+
+describe('MiPerfil — mi-perfil-impeccable-v2 (RED, commits 4-6)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const { useWorkspace, __acciones } = jest.requireMock(
+      '../../src/composicion/useWorkspace',
+    );
+    useWorkspace.mockImplementation((sel: (s: unknown) => unknown) =>
+      sel({
+        id_prestador_activo: 0,
+        prestador: null,
+        prestadores_disponibles: [],
+        acuerdo_vigente: null,
+        parametros_vigentes: null,
+        cargando: false,
+        setParametrosVigentes: __acciones.setParametrosVigentes,
+      }),
+    );
+    mockedGetItem.mockResolvedValue(null);
+  });
+
+  /**
+   * T-NATIVE-PRESS-1 — filaConfig con pressed state cambia bg
+   * a rgba(0,0,0,0.04) (F-6, REQ-1 press-feedback).
+   */
+  it('T-NATIVE-PRESS-1 pressed state en item-parametros-tarifarios', () => {
+    // F-6: el Pressable de ItemGestion usa function-style
+    // `({ pressed }) => [itemGestion, pressed && itemGestionPressed]`
+    // donde itemGestionPressed tiene bg rgba(0,0,0,0.04).
+    // Verificamos el source-level del componente para confirmar la
+    // declaracion (jest + react-test-renderer no propaga fireEvent.pressIn
+    // al internal Pressable state, asi que verificamos declarativamente).
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.join(__dirname, '../../src/pantallas/MiPerfil.tsx'),
+      'utf8',
+    );
+    // itemGestionPressed con bg rgba(0,0,0,0.04) declarado.
+    expect(source).toMatch(/itemGestionPressed[\s\S]*?rgba\(0,\s*0,\s*0,\s*0\.04\)/);
+    // Function-style en el Pressable de ItemGestion.
+    expect(source).toMatch(/pressed[\s\S]{0,40}itemGestionPressed/);
+  });
+
+  /**
+   * T-NATIVE-HAPTIC-1 — Item navegable invoca selectionAsync
+   * (F-3, REQ-1 haptics).
+   */
+  it('T-NATIVE-HAPTIC-1 item navegable invoca selectionAsync', async () => {
+    (Haptics.selectionAsync as jest.Mock).mockClear();
+    const { getByTestId } = renderMiPerfil();
+    fireEvent.press(getByTestId('item-alta-suscriptor'));
+    await waitFor(() => {
+      expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * T-NATIVE-HAPTIC-2 — Tap en "Cerrar sesion" invoca
+   * notificationAsync(Warning) (F-3, REQ-2 haptics).
+   */
+  it('T-NATIVE-HAPTIC-2 tap Cerrar sesion invoca notificationAsync Warning', async () => {
+    (Haptics.notificationAsync as jest.Mock).mockClear();
+    const { getByTestId } = renderMiPerfil();
+    fireEvent.press(getByTestId('item-cerrar-sesion'));
+    await waitFor(() => {
+      expect(Haptics.notificationAsync).toHaveBeenCalledWith('warning');
+    });
+  });
+
+  /**
+   * T-NATIVE-HAPTIC-3 — Error de Haptics no rompe el flujo
+   * (F-3, REQ-3 haptics - safe wrapper).
+   */
+  it('T-NATIVE-HAPTIC-3 error de Haptics no rompe flujo', async () => {
+    (Haptics.selectionAsync as jest.Mock).mockRejectedValueOnce(
+      new Error('hw failure'),
+    );
+    const { getByTestId } = renderMiPerfil();
+    fireEvent.press(getByTestId('item-alta-suscriptor'));
+    await waitFor(() => {
+      expect(getByTestId('item-alta-suscriptor')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-NATIVE-RESPONSIVE-1 — width 320 → fontSize piso 32
+   * (F-1, REQ-4 responsive-text).
+   */
+  it('T-NATIVE-RESPONSIVE-1 width 320 -> NOMBRE_FONT_SIZE_CLAMP es exactamente 32', () => {
+    const RN = jest.requireActual('react-native');
+    const spy = jest
+      .spyOn(RN, 'useWindowDimensions')
+      .mockReturnValue({
+        width: 320,
+        height: 640,
+        scale: 1,
+        fontScale: 1,
+      });
+    try {
+      const { getByTestId } = renderMiPerfil();
+      const nombre = getByTestId('perfil-nombre');
+      const estilo = StyleSheet.flatten(nombre.props.style) as {
+        fontSize?: number;
+      };
+      expect(estilo.fontSize).toBe(32);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  /**
+   * T-NATIVE-RESPONSIVE-2 — width 1040 → fontSize techo 52
+   * (F-1, REQ-3 responsive-text).
+   */
+  it('T-NATIVE-RESPONSIVE-2 width 1040 -> NOMBRE_FONT_SIZE_CLAMP es exactamente 52', () => {
+    const RN = jest.requireActual('react-native');
+    const spy = jest
+      .spyOn(RN, 'useWindowDimensions')
+      .mockReturnValue({
+        width: 1040,
+        height: 800,
+        scale: 1,
+        fontScale: 1,
+      });
+    try {
+      const { getByTestId } = renderMiPerfil();
+      const nombre = getByTestId('perfil-nombre');
+      const estilo = StyleSheet.flatten(nombre.props.style) as {
+        fontSize?: number;
+      };
+      expect(estilo.fontSize).toBe(52);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  /**
+   * T-NATIVE-SELECTABLE-1 — cedula copiable (F-4, REQ-1
+   * copy-selectable).
+   */
+  it('T-NATIVE-SELECTABLE-1 fila-cedula-valor es selectable', () => {
+    const { getByTestId } = renderMiPerfil();
+    expect(getByTestId('fila-cedula-valor').props.selectable).toBe(true);
+  });
+
+  /**
+   * T-NATIVE-SELECTABLE-2 — nombre del prestador NO copiable
+   * (F-4, REQ-3 copy-selectable: conservador opt-in).
+   */
+  it('T-NATIVE-SELECTABLE-2 fila-prestador-nombre-valor NO es selectable', () => {
+    const { getByTestId } = renderMiPerfil();
+    const valorEl = getByTestId('fila-prestador-nombre-valor');
+    expect(valorEl.props.selectable).toBeFalsy();
+  });
+
+  /**
+   * T-IMPC-A11Y-1 — accessibilityHint en Pressables (F-14).
+   */
+  it('T-IMPC-A11Y-1 Parametros tarifarios tiene accessibilityHint', () => {
+    const { getByTestId } = renderMiPerfil();
+    const hint = getByTestId('item-parametros-tarifarios').props
+      .accessibilityHint;
+    expect(typeof hint).toBe('string');
+    expect((hint as string).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * T-IMPC-A11Y-2 — cedula copiable expone accessibilityHint para
+   * VoiceOver/TalkBack (F-4 spec REQ-4 copy-selectable). El hint debe
+   * describir la accion de long-press para copiar, en espanol rioplatense.
+   */
+  it('T-IMPC-A11Y-2 cedula tiene accessibilityHint de long-press para copiar', () => {
+    const { getByTestId } = renderMiPerfil();
+    const cedulaValor = getByTestId('fila-cedula-valor');
+    expect(cedulaValor.props.accessibilityHint).toBe(
+      'Mantén presionado para copiar la cédula',
+    );
+    expect(cedulaValor.props.selectable).toBe(true);
+  });
+
+  /**
+   * T-IMPC-A11Y-3 — ID Operario y codigo del prestador tambien son
+   * copiables y por lo tanto deben tener accessibilityHint. Cubre las
+   * otras dos filas copiables de la spec REQ-4 que T-IMPC-A11Y-2 no
+   * toca (cedula ya validada).
+   */
+  it('T-IMPC-A11Y-3 ID Operario y Código tienen accessibilityHint de copiar', () => {
+    const { getByTestId } = renderMiPerfil();
+    const idOperarioValor = getByTestId('fila-id-operario-valor');
+    const codigoValor = getByTestId('fila-prestador-codigo-valor');
+    expect(idOperarioValor.props.accessibilityHint).toBe(
+      'Mantén presionado para copiar el ID de operario',
+    );
+    expect(idOperarioValor.props.selectable).toBe(true);
+    expect(codigoValor.props.accessibilityHint).toBe(
+      'Mantén presionado para copiar el código del prestador',
+    );
+    expect(codigoValor.props.selectable).toBe(true);
+  });
+
+  /**
+   * T-IMPC-CARD-RADIUS-1 — listaCard borderRadius === RADIUS.lg (16)
+   * (F-8 anti-ghost-card).
+   */
+  it('T-IMPC-CARD-RADIUS-1 listaCard borderRadius === RADIUS.lg (16)', () => {
+    const { UNSAFE_root } = renderMiPerfil();
+    // El primer View con estilo "listaCard" - buscamos recursivamente.
+    // El primer card visible (Informacion personal) usa listaCard.
+    const allNodes: Array<{ props?: { style?: unknown } }> = [];
+    function walk(n: unknown): void {
+      if (n === null || typeof n !== 'object') return;
+      const node = n as {
+        children?: unknown;
+        props?: { style?: unknown };
+      };
+      allNodes.push(node);
+      const children1 = node.children;
+      if (Array.isArray(children1)) {
+        for (const c of children1) walk(c);
+      } else if (children1 !== null && typeof children1 === 'object') {
+        walk(children1);
+      }
+    }
+    walk(UNSAFE_root);
+    // Buscamos el primer nodo View cuyo style tenga borderRadius === 16.
+    // Hay una sola listaCard efectiva antes de aplicar F-8 (las 3 cards
+    // comparten style). Tras F-8, las 3 cards tendran 16.
+    const cards = allNodes.filter((n) => {
+      const flat = StyleSheet.flatten(n.props?.style as object | object[]) as
+        | { borderRadius?: number }
+        | null;
+      return flat?.borderRadius === 16;
+    });
+    // Sin F-8 implementado, las cards tienen 24 (RADIUS.xl) → 0 cards matchean.
+    expect(cards.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * T-IMPC-FONT-VARIANT-1 — fontVariant tabular-nums en filaValor
+   * (F-5).
+   */
+  it('T-IMPC-FONT-VARIANT-1 filaValor tiene fontVariant tabular-nums', () => {
+    const { getByTestId } = renderMiPerfil();
+    const valor = getByTestId('fila-cedula-valor');
+    const style = StyleSheet.flatten(valor.props.style as object | object[]) as
+      | { fontVariant?: string[] }
+      | null;
+    expect(style?.fontVariant).toEqual(['tabular-nums']);
+  });
+
+  /**
+   * T-IMPC-SECTION-STRUCTURE-1 — NO existe seccion "Configuracion";
+   * "Parametros tarifarios" vive dentro de Gestion (F-10).
+   */
+  it('T-IMPC-SECTION-STRUCTURE-1 no existe seccion Configuracion; Parametros tarifarios vive en Gestion', () => {
+    const { queryByText, getByTestId } = renderMiPerfil();
+    expect(queryByText('Configuración')).toBeNull();
+    expect(getByTestId('item-parametros-tarifarios')).toBeTruthy();
+  });
+
+  /**
+   * T-IMPC-AVATAR-STATUS-1 — status dot verde solo si sesion !== null
+   * (F-7b, D9 design).
+   */
+  it('T-IMPC-AVATAR-STATUS-1 status dot visible cuando sesion existe', async () => {
+    mockedGetItem.mockImplementation(async (key: string) => {
+      if (key === '@sistema_epc:sesion') {
+        return JSON.stringify(
+          crearSesionValida({ nombre: 'Juana Pérez' }),
+        );
+      }
+      return null;
+    });
+    const { queryByTestId } = renderMiPerfil();
+    await waitFor(() => {
+      expect(queryByTestId('avatar-status-dot')).toBeTruthy();
+    });
+  });
+
+  /**
+   * T-IMPC-AVATAR-SHADOW-1 — avatar tiene shadowColor + elevation
+   * (F-7a, D8 design).
+   */
+  it('T-IMPC-AVATAR-SHADOW-1 avatar tiene shadowColor y elevation', () => {
+    const { getByTestId } = renderMiPerfil();
+    const avatar = getByTestId('avatar');
+    const style = StyleSheet.flatten(avatar.props.style as object | object[]) as
+      | { shadowColor?: string; elevation?: number }
+      | null;
+    expect(style?.shadowColor).toBeDefined();
+    expect(style?.elevation).toBe(6);
+  });
+
+  /**
+   * T-IMPC-CONTENTINSET-1 — ScrollView contentInsetAdjustmentBehavior
+   * = "automatic" (F-2).
+   */
+  it('T-IMPC-CONTENTINSET-1 ScrollView tiene contentInsetAdjustmentBehavior automatic', () => {
+    const { UNSAFE_root } = renderMiPerfil();
+    // Recorremos el árbol hasta encontrar un ScrollView con esa prop.
+    function walk(node: unknown): boolean {
+      if (node === null || typeof node !== 'object') return false;
+      const n = node as {
+        type?: unknown;
+        props?: { contentInsetAdjustmentBehavior?: string };
+        children?: unknown;
+      };
+      const typeName =
+        typeof n.type === 'string'
+          ? n.type
+          : typeof n.type === 'function'
+            ? (n.type as { displayName?: string; name?: string })
+                .displayName ??
+              (n.type as { name?: string }).name
+            : undefined;
+      const esScroll = typeName === 'ScrollView' || typeName === 'Animated(View)';
+      if (esScroll && n.props?.contentInsetAdjustmentBehavior !== undefined) {
+        return true;
+      }
+      const children1 = n.children;
+      if (Array.isArray(children1)) {
+        for (const c of children1) if (walk(c)) return true;
+      } else if (children1 !== null && typeof children1 === 'object') {
+        if (walk(children1)) return true;
+      }
+      return false;
+    }
+    expect(walk(UNSAFE_root)).toBe(true);
+  });
+
+  /**
+   * T-IMPC-PRESSED-ITEM-1 — ItemGestion tambien tiene pressed state
+   * (F-6, segunda parte).
+   */
+  it('T-IMPC-PRESSED-ITEM-1 ItemGestion pressed state cambia bg a rgba(0,0,0,0.04)', () => {
+    // F-6: el Pressable de ItemGestion usa function-style
+    // `({ pressed }) => [itemGestion, pressed && itemGestionPressed]`
+    // Verificamos source-level (jest no propaga fireEvent.pressIn al
+    // internal Pressable state).
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.join(__dirname, '../../src/pantallas/MiPerfil.tsx'),
+      'utf8',
+    );
+    // itemGestionPressed con bg rgba existe.
+    expect(source).toMatch(/itemGestionPressed[\s\S]*?backgroundColor:\s*['"]rgba\(0,\s*0,\s*0,\s*0\.04\)['"]/);
+  });
+
+  /**
+   * T-IMPC-TOAST-1 — NO existe elemento toast (D12 elimina el
+   * legacy "Proximamente disponible" — dead code sin callers).
+   */
+  it('T-IMPC-TOAST-1 no existe elemento toast', () => {
+    const { queryByTestId, queryByText } = renderMiPerfil();
+    expect(queryByTestId('toast')).toBeNull();
+    expect(queryByText('Próximamente disponible')).toBeNull();
   });
 });

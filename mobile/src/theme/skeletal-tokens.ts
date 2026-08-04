@@ -11,10 +11,11 @@
  *   - Solo `CapturarLectura` y `ResultadoCalculo` consumen estos tokens hoy.
  *
  * Sobre la fuente Inter:
- *   El design system pide `Inter`. NO instalamos `expo-google-fonts/inter`
- *   en este ciclo (sin nuevas deps por mandato del plan). Dejamos
- *   `fontFamily: undefined` para que el sistema use la default — en Android
- *   queda Roboto, en iOS San Francisco. Aceptable para esta versión.
+ *   Inter YA esta instalado via commit anterior (4 pesos: 400/500/600/700).
+ *   Los tokens TYPOGRAPHY.* apuntan a strings `Inter_*` servidos por
+ *   `@expo-google-fonts/inter` (autolinked, sin native code). En el root
+ *   de la app, `useFonts()` + `SplashScreen.hideAsync()` evita el flash
+ *   de Roboto/SF durante el startup.
  */
 
 export const COLORS = {
@@ -121,68 +122,69 @@ export const RADIUS = {
 } as const;
 
 /**
- * Tipografía. `fontFamily: undefined` deja que RN use la fuente del sistema —
- * ver nota al inicio del archivo sobre Inter.
+ * Tipografía. `fontFamily` apunta a strings `Inter_*` servidos por
+ * `@expo-google-fonts/inter` (autolinked, OFL). En el root de la app,
+ * `useFonts()` carga los 4 pesos antes de ocultar el SplashScreen.
  */
 export const TYPOGRAPHY = {
   headlineLg: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_700Bold',
     fontSize: 30,
     fontWeight: '700' as const,
     lineHeight: 36,
     letterSpacing: -0.5,
   },
   headlineMd: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 24,
     fontWeight: '600' as const,
     lineHeight: 30,
     letterSpacing: -0.3,
   },
   headlineSm: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 20,
     fontWeight: '600' as const,
     lineHeight: 26,
   },
   bodyLg: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_400Regular',
     fontSize: 18,
     fontWeight: '400' as const,
     lineHeight: 28,
   },
   bodyMd: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_400Regular',
     fontSize: 16,
     fontWeight: '400' as const,
     lineHeight: 24,
   },
   bodySm: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
     fontWeight: '400' as const,
     lineHeight: 20,
   },
   labelLg: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
     fontWeight: '600' as const,
     lineHeight: 18,
   },
   labelMd: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_500Medium',
     fontSize: 12,
     fontWeight: '500' as const,
     lineHeight: 16,
   },
   labelSm: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_500Medium',
     fontSize: 10,
     fontWeight: '500' as const,
     lineHeight: 14,
   },
   displayLg: {
-    fontFamily: undefined,
+    fontFamily: 'Inter_700Bold',
     fontSize: 40,
     fontWeight: '700' as const,
     lineHeight: 44,
