@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS suscriptor (
     numero_catastral       TEXT      NULL,
     estado                 TEXT      NOT NULL DEFAULT 'activo'
                                      CHECK (estado IN ('activo','inactivo','suspendido')),
-    created_at             TEXT      NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    created_at             TEXT      DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')) NOT NULL,
     CONSTRAINT uk_suscriptor_codigo UNIQUE (codigo)
 );
 CREATE INDEX IF NOT EXISTS ix_suscriptor_estrato ON suscriptor (estrato);
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS medidor (
     estado            TEXT    NOT NULL DEFAULT 'activo'
                               CHECK (estado IN ('activo','inactivo','reemplazado')),
     observaciones     TEXT    NULL,
-    created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    created_at        TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')) NOT NULL,
     CONSTRAINT uk_medidor_numero UNIQUE (numero_medidor),
     CONSTRAINT fk_medidor_suscriptor FOREIGN KEY (id_suscriptor)
         REFERENCES suscriptor (id_suscriptor) ON DELETE RESTRICT
@@ -187,8 +187,8 @@ CREATE TABLE prestador (
   num_suscriptores_rurales  INTEGER NOT NULL DEFAULT 0 CHECK (num_suscriptores_rurales >= 0),
   contacto                  TEXT    NULL,
   estado                    TEXT    NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo', 'suspendido')),
-  created_at                TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')),
-  updated_at                TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
+  created_at                TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')) NOT NULL,
+  updated_at                TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')) NOT NULL
 );
 CREATE INDEX idx_prestador_municipio ON prestador (municipio);
 CREATE INDEX idx_prestador_estado ON prestador (estado);
@@ -219,7 +219,7 @@ CREATE TABLE acuerdo_municipal (
   fecha_vigencia_hasta          TEXT    NOT NULL,
   acto_administrativo_url       TEXT    NULL,
   observaciones                 TEXT    NULL,
-  created_at                    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
+  created_at                    TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')) NOT NULL
 );
 CREATE INDEX idx_acuerdo_prestador_vigencia
   ON acuerdo_municipal (id_prestador, fecha_vigencia_desde, fecha_vigencia_hasta);
@@ -244,7 +244,7 @@ CREATE TABLE parametros_tarifa (
   m3_gratis_minimo_vital     INTEGER NOT NULL DEFAULT 0 CHECK (m3_gratis_minimo_vital >= 0),
   vigente_desde              TEXT    NOT NULL,
   vigente_hasta              TEXT    NOT NULL,
-  created_at                 TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')),
+  created_at                 TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')) NOT NULL,
   UNIQUE (id_prestador, periodo, vigente_desde)
 );
 CREATE INDEX idx_parametros_prestador_periodo
@@ -284,7 +284,7 @@ CREATE TABLE operarios (
   estado         TEXT    NOT NULL DEFAULT 'activo'
                           CHECK (estado IN ('activo', 'inactivo')),
   dispositivo_id TEXT    NULL,
-  created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  created_at     TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
 );
 CREATE UNIQUE INDEX idx_operario_dispositivo_unique
   ON operarios(dispositivo_id)
@@ -349,7 +349,7 @@ CREATE TABLE IF NOT EXISTS concepto_otro_valor (
   version        TEXT    NOT NULL,
   activo         INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
   requiere_glosa INTEGER NOT NULL DEFAULT 0 CHECK (requiere_glosa IN (0, 1)),
-  created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  created_at     TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_concepto_otro_valor_activo
@@ -454,7 +454,7 @@ CREATE TABLE minimo_vital (
   estratos_aplica TEXT    NOT NULL DEFAULT '[]',
   vigente_desde   TEXT    NOT NULL,
   vigente_hasta   TEXT    NOT NULL,
-  created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')),
+  created_at      TEXT    DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')) NOT NULL,
   UNIQUE (id_prestador, vigente_desde)
 );
 
