@@ -410,6 +410,72 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       await findByText('login-mock');
       expect(queryByText('setup-inicial-mock')).toBeNull();
     });
+
+    it('T-AUTH-ERR-1 operarioRepo.listar() throws -> error_db (no Login dead-end)', async () => {
+      const listarOperarios = jest
+        .fn()
+        .mockRejectedValue(new Error('SQLite execAsync rejected'));
+      mockedGetBootstrap.mockResolvedValue({
+        repos: {
+          prestadorRepo: {
+            listar: jest.fn().mockResolvedValue([
+              { id_prestador: 1, codigo: '0001', estado: 'activo' },
+            ]),
+          },
+          operarioRepo: { listar: listarOperarios },
+        },
+        db: {} as never,
+      } as never);
+
+      const pantalla = render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeTruthy();
+        expect(pantalla.queryByTestId('auth-gate-error-retry')).toBeTruthy();
+        expect(pantalla.queryByTestId('auth-gate-error-clear')).toBeTruthy();
+        expect(pantalla.queryByText('SQLite execAsync rejected')).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+    });
+
+    it('T-AUTH-ERR-2 retry button re-dispara la deteccion desde loading', async () => {
+      let resolverSegundoIntento: (operarios: unknown[]) => void = () => {};
+      const segundoIntento = new Promise<unknown[]>((resolve) => {
+        resolverSegundoIntento = resolve;
+      });
+      const listarOperarios = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('DB temporalmente no disponible'))
+        .mockImplementationOnce(() => segundoIntento);
+      mockedGetBootstrap.mockResolvedValue({
+        repos: {
+          prestadorRepo: {
+            listar: jest.fn().mockResolvedValue([
+              { id_prestador: 1, codigo: '0001', estado: 'activo' },
+            ]),
+          },
+          operarioRepo: { listar: listarOperarios },
+        },
+        db: {} as never,
+      } as never);
+      mockedGetItem.mockResolvedValue(null);
+
+      const pantalla = render(<AuthGate />);
+      const botonReintentar = await pantalla.findByTestId('auth-gate-error-retry');
+
+      fireEvent.press(botonReintentar);
+
+      await waitFor(() => {
+        expect(listarOperarios).toHaveBeenCalledTimes(2);
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeNull();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+
+      await act(async () => {
+        resolverSegundoIntento([{ id_operario: 42 }]);
+      });
+      await pantalla.findByText('login-mock');
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
