@@ -525,6 +525,48 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       // El Login YA esta accesible (el arbol real lo contiene):
       expect(queryByText('login-mock')).not.toBeNull();
     });
+    it('T-AUTH-CATCH-1 getBootstrap() throws -> error_db (no Login dead-end)', async () => {
+      mockedGetBootstrap.mockRejectedValue(
+        new Error('SQLite execAsync rejected: near NOT'),
+      );
+
+      const pantalla = render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeTruthy();
+        expect(pantalla.queryByTestId('auth-gate-error-retry')).toBeTruthy();
+        expect(
+          pantalla.queryByText(
+            'Error al inicializar la app: SQLite execAsync rejected: near NOT',
+          ),
+        ).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+    });
+
+    it('T-AUTH-CATCH-2 prestadorRepo.listar() throws -> error_db (no Login dead-end)', async () => {
+      mockedGetBootstrap.mockResolvedValue({
+        repos: {
+          prestadorRepo: {
+            listar: jest.fn().mockRejectedValue(new Error('no such table')),
+          },
+          operarioRepo: {
+            listar: jest.fn(),
+          },
+        },
+        db: {} as never,
+      } as never);
+
+      const pantalla = render(<AuthGate />);
+
+      await waitFor(() => {
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeTruthy();
+        expect(
+          pantalla.queryByText('Error al inicializar la app: no such table'),
+        ).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+      });
+    });
   });
 
   // ─────────────────────────────────────────────────────────────
