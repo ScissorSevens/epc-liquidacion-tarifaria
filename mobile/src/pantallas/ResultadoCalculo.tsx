@@ -1,10 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { BotonPrimario } from '../componentes/BotonPrimario';
-import { FooterApp } from '../componentes/FooterApp';
-import { TopBar } from '../componentes/TopBar';
 import type { LecturasStackScreenProps } from '../navegacion/types';
 import {
   BORDERS,
@@ -212,6 +210,26 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
   const [cargandoEmision, setCargandoEmision] = useState(false);
   const [errorEmision, setErrorEmision] = useState<string | null>(null);
 
+  // Contrato hide-nav-after-captura (R8 sub-cambio, 2026-08-04): esta es
+  // una pantalla terminal del flujo de captura. Despues de emitir la
+  // factura, el operario NO debe poder regresar a CapturarLectura ni a
+  // CapturarFoto (accion accidental). El stack global ya define
+  // `headerShown: false`, pero lo dejamos explicito a nivel de pantalla
+  // para que un futuro cambio global no reactive el header accidental.
+  useEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
+  // Salida explicita y unica hacia una ruta segura. Usa navigate, no
+  // goBack, porque goBack devolveria al operario a la pantalla de
+  // captura anterior (violacion del contrato hide-nav-after-captura).
+  // Patron tab + screen: 'Inicio' es un tab de TabParamList; sin el
+  // segundo parametro el tipo de CompositeScreenProps rechaza el
+  // string pelado. RutaDeHoy es el root del InicioStack.
+  const handleContinuar = (): void => {
+    navigation.navigate('Inicio', { screen: 'RutaDeHoy' });
+  };
+
   const handleVerFacturaCompleta = async (): Promise<void> => {
     setCargandoEmision(true);
     setErrorEmision(null);
@@ -245,12 +263,6 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* Header */}
-      <TopBar
-        titulo="Factura calculada"
-        onBack={() => navigation.goBack()}
-      />
-
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Status: círculo + título + subtítulo */}
         <View style={styles.statusBlock}>
@@ -389,6 +401,16 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
             <MaterialIcons name="map" size={20} color={COLORS.primary} />
             <Text style={styles.btnSecondaryText}>Volver a la ruta</Text>
           </Pressable>
+          {/* Boton "Continuar" — salida explicita al tab Inicio.
+              Contrato T-RES-NAV-3: navega via navigate('Inicio'),
+              nunca goBack. Es la unica salida segura del flujo post-captura. */}
+          <BotonPrimario
+            texto="Continuar"
+            icono="check"
+            tono="azul"
+            testID="btn-continuar"
+            onPress={handleContinuar}
+          />
         </View>
 
         {/* Metadata footer */}
@@ -425,9 +447,6 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
           </View>
         </View>
       </ScrollView>
-
-      {/* Footer fijo */}
-      <FooterApp />
     </View>
   );
 }

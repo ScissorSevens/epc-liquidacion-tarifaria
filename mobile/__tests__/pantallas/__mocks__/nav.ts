@@ -5,6 +5,8 @@ export const crearNavMock = () => ({
   goBack: jest.fn(),
   popToTop: jest.fn(),
   replace: jest.fn(),
+  reset: jest.fn(),
+  setOptions: jest.fn(),
   addListener: jest.fn(() => jest.fn()),
   dispatch: jest.fn(),
 });
