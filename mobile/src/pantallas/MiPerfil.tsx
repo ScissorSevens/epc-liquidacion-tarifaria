@@ -571,7 +571,8 @@ const estilos = StyleSheet.create({
   filaConfigIzq: {
     flexDirection: 'row',
     alignItems: 'center',
-    // F-13 (token discipline): magic-number SPACING.sm + 4 → SPACING.gutter (12).
+    // F-13 (token discipline): usa SPACING.gutter (12) en vez del
+    // magic-number SPACING.sm + 4 (legacy).
     gap: SPACING.gutter,
     // WCAG 2.5.5: touch target >= 44px. La fila entera (icon + texto)
     // debe ser tappable, no solo el icono. Sin esto, el Pressable
