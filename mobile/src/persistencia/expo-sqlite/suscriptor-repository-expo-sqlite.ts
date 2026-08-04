@@ -81,12 +81,21 @@ function fromRow(row: SuscriptorRow): Suscriptor {
   return sus;
 }
 
+// IMPORTANT: SQL_INSERT must include `id_prestador` (multi-tenant FK) and
+// `categoria_uso` (Q10 spec). Without these, the DB defaults from migration
+// 012 (`id_prestador DEFAULT 0`, `categoria_uso DEFAULT 'residencial'`) take
+// over and the suscriptor queda vinculado al prestador placeholder
+// EPC-LEGACY (id=0). Este era el bug que disparaba el snack "El prestador 0
+// no tiene ParametrosTarifa vigentes" en CapturarLectura. El adapter Node
+// espejado (`dominio/persistencia/sqlite/suscriptor-repository-sqlite.ts`)
+// SI los incluye — esto es un espejado verbatim para mantener paridad.
 const SQL_INSERT = `
   INSERT INTO suscriptor (
     codigo, nombre_apellidos, direccion, estrato,
     matricula_inmobiliaria, numero_catastral, estado, aplica_subsidio,
-    cedula, email, telefono, municipio, sector
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    cedula, email, telefono, municipio, sector,
+    id_prestador, categoria_uso
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SQL_SELECT_BY_ID = `SELECT * FROM suscriptor WHERE id_suscriptor = ?`;
@@ -172,6 +181,14 @@ export function crearSuscriptorRepositoryExpoSqlite(
           data.telefono ?? null,
           data.municipio,
           data.sector ?? null,
+          // Multi-tenant: id_prestador y categoria_uso vienen del caller
+          // (AltaSuscriptor.tsx consulta useWorkspace.id_prestador_activo).
+          // Si llegan 0, el suscriptor queda vinculado al placeholder
+          // EPC-LEGACY (id=0) y CapturarLectura falla al resolver el
+          // contexto multi-tenant. Ver regression test
+          // `suscriptor-id-prestador-fix-e2e.test.ts`.
+          data.id_prestador,
+          data.categoria_uso,
         );
       } catch (e) {
         throw traducirError(e, { codigo: data.codigo });
