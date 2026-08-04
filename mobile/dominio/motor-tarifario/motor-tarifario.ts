@@ -193,10 +193,18 @@ export function calcularLiquidacion(
   }
 
   // 2. Cargo Fijo (Art. 9 Res CRA 825/2017)
-  const cargoFijo = Math.round(parametros.cma / parametros.suscriptores_promedio);
+  //    Usa cargo_fijo_resultante PRE-CALCULADO al guardar (calcular.ts:101).
+  //    Si recalculáramos CMA/N acá, cualquier modificación retroactiva de
+  //    metodología tarifaria invalidaría facturas históricas (key insight:
+  //    "future methodology changes don't break historic facturas").
+  const cargoFijo = Math.round(parametros.cargo_fijo_resultante);
 
   // 3. Cargo por Consumo unitario + aplicación al consumo del usuario
-  const ccUnitario = calcularCCUnitario(parametros);
+  //    Mismo principio: usa cargo_consumo_resultante PRE-CALCULADO
+  //    (calcular.ts:114). NO recalcula con CCUnitario()/ASP — eso
+  //    cambiaría el CC_unit cada vez que cambien CMO/CMI/CMT en el admin,
+  //    rompiendo la auditoría histórica.
+  const ccUnitario = parametros.cargo_consumo_resultante;
   const consumoEfectivo = aplicarMinimoVital(
     entrada.consumo_m3,
     parametros,
