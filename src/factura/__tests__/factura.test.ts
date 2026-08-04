@@ -156,6 +156,8 @@ describe('emitirFactura — happy path', () => {
       nombre_apellidos: 'Carlos Ruiz',
       direccion: 'Carrera 7 #14-30',
       estrato: 3,
+      id_prestador: 0,
+      categoria_uso: 'residencial',
     });
     expect(Object.isFrozen(factura.snapshot.suscriptor)).toBe(true);
   });
