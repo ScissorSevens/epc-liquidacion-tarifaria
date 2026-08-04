@@ -501,19 +501,22 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
       // Ahora resolvemos el bootstrap -> deberia ir a sin_sesion y montar el Login
       // DEBAJO del splash overlay (no condicional a splashComplete).
       resolverBootstrap({
-        prestadorRepo: {
-          listar: jest
-            .fn()
-            .mockResolvedValue([
-              { id_prestador: 1, codigo: '0001', estado: 'activo' },
-            ]),
+        repos: {
+          prestadorRepo: {
+            listar: jest
+              .fn()
+              .mockResolvedValue([
+                { id_prestador: 1, codigo: '0001', estado: 'activo' },
+              ]),
+          },
+          operarioRepo: {
+            // AuthGate consulta operarioRepo.listar() en el check de cold-boot
+            // parcial (commit post-reinstall). Devolvemos 1 operario para que
+            // el flujo siga hacia sin_sesion (Login), no hacia sin_setup.
+            listar: jest.fn().mockResolvedValue([{ id_operario: 1 }]),
+          },
         },
-        operarioRepo: {
-          // AuthGate consulta operarioRepo.listar() en el check de cold-boot
-          // parcial (commit post-reinstall). Devolvemos 1 operario para que
-          // el flujo siga hacia sin_sesion (Login), no hacia sin_setup.
-          listar: jest.fn().mockResolvedValue([{ id_operario: 1 }]),
-        },
+        db: {} as never,
       });
       await findByText('login-mock');
       // El splash sigue montado encima hasta que splashComplete se dispare.

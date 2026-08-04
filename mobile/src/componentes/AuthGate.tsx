@@ -216,14 +216,27 @@ export function AuthGate() {
         if (cancelado) return;
         setDecision('con_sesion');
       } catch (error) {
-        // Falla inesperada del bootstrap o carga de sesion: caemos
-        // conservadoramente a sin_sesion para que el operario al menos
-        // vea el Login y pueda re-intentar.
+        // Falla inesperada del bootstrap, prestadorRepo.listar(), operarioRepo.listar(),
+        // estadoSesionPersistida(), cargarSesion(), setSesionCompleta(), o cualquier
+        // otra operacion durante la deteccion. NO ir a sin_sesion (Login dead-end
+        // cuando no hay contra que validar) ni a sin_setup (no sabemos si hay
+        // prestador). Ir a error_db para mostrar UI accionable con retry +
+        // instrucciones de reinstalacion.
+        //
+        // El usuario en primera vez post-reinstall que reciba este error ve
+        // el error_db UI con la opcion "Limpiar y continuar" que muestra
+        // Alert pidiendo reinstalar Expo Go (que es exactamente el caso
+        // donde el bug original `near NOT` se manifiesta).
         logger.warn('AuthGate', 'error en deteccion de estado', {
-          error: String(error),
+          error: error instanceof Error ? error.message : String(error),
         });
         if (!cancelado) {
-          setDecision('sin_sesion');
+          setErrorMessage(
+            error instanceof Error
+              ? `Error al inicializar la app: ${error.message}`
+              : 'Error desconocido al inicializar la app',
+          );
+          setDecision('error_db');
         }
       }
     })();
