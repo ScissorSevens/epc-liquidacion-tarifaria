@@ -26,13 +26,14 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import {
   Alert,
-  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
   View,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { FooterApp } from '../componentes/FooterApp';
@@ -56,23 +57,21 @@ type Props = ConfigStackScreenProps<'MiPerfil'> & {
 const PLACEHOLDER = '—';
 
 /**
- * H1 clamp del nombre del operario.
- *
- * Simula `clamp(2rem, 5vw, 3.25rem)` de CSS en runtime React Native.
- * Rango efectivo: 32 px (2rem) a 52 px (3.25rem). El preferred 5vw se
- * computa contra el ancho de pantalla — al envoltorio de tests con
- * `frame.width: 320` y al frame default de RN 0x0 en jest, el clamp
- * cae en el piso (32 px) sin overflow.
- *
- * mi-perfil-redesign Task 1 — impeccable craft typography.
+ * Wrapper silencioso de Haptics. La API de expo-haptics puede tirar
+ * en simuladores / devices sin motor haptico; en esos casos queremos
+ * fallar silenciosamente y NO romper el flujo del usuario.
  */
-const NOMBRE_FONT_SIZE_CLAMP = ((): number => {
-  const { width } = Dimensions.get('window');
-  const minimo = 32; // 2rem
-  const maximo = 52; // 3.25rem
-  const preferido = width * 0.05; // 5vw
-  return Math.min(Math.max(minimo, preferido), maximo);
-})();
+async function safeHaptic(kind: 'selection' | 'warning'): Promise<void> {
+  try {
+    if (kind === 'selection') {
+      await Haptics.selectionAsync();
+    } else {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+  } catch {
+    // silent - haptics son best-effort
+  }
+}
 
 /** Iniciales (hasta 2 letras) derivadas del nombre. Vacío si no hay nombre. */
 function obtenerIniciales(nombre: string | undefined): string {
@@ -88,6 +87,12 @@ function obtenerIniciales(nombre: string | undefined): string {
 export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
   const [sesion, setSesion] = useState<Sesion | null>(null);
+  // F-1 (responsive-text REQ-2): H1 clamp reactivo. Rango [32, 52] px.
+  const { width: windowWidth } = useWindowDimensions();
+  const nombreFontSize = Math.min(
+    Math.max(32, windowWidth * 0.05),
+    52,
+  );
 
   // PER-05: selectores específicos. Solo nos interesa prestador.
   // Cambios en prestadores_disponibles / cargando / acuerdo_vigente /
@@ -131,6 +136,8 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
    *      transición al stack de Login.
    */
   function handleCerrarSesion(): void {
+    // F-3 (haptics REQ-2): warning haptic en acción destructiva.
+    void safeHaptic('warning');
     Alert.alert(
       'Cerrar sesión',
       '¿Seguro que querés cerrar sesión? Vas a tener que volver a ingresar tu cédula y contraseña.',
@@ -186,7 +193,11 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView contentContainerStyle={estilos.scroll}>
+      <ScrollView
+        testID="scroll-perfil"
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={estilos.scroll}
+      >
         {/* Avatar — reducido de 120 → 80 px para tono más sobrio y coherente
             con el resto de los screens (impeccable: el avatar es anchor
             emocional, no un elemento dominante). */}
@@ -194,7 +205,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
           <View style={estilos.avatar} testID="avatar">
             <Text style={estilos.avatarTexto}>{iniciales}</Text>
           </View>
-          <Text style={estilos.nombre} testID="perfil-nombre">{nombre}</Text>
+          <Text style={[estilos.nombre, { fontSize: nombreFontSize }]} testID="perfil-nombre">{nombre}</Text>
           <Text style={estilos.rol} testID="perfil-rol">{rol}</Text>
         </View>
 
@@ -206,12 +217,14 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             etiqueta="Cédula"
             valor={cedula}
             testID="fila-cedula"
+            selectable
             borde
           />
           <FilaInfo
             etiqueta="ID Operario"
             valor={idOperarioStr}
             testID="fila-id-operario"
+            selectable
             borde
           />
           <FilaInfo
@@ -246,6 +259,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             etiqueta="Código"
             valor={prestadorCodigo === '' ? PLACEHOLDER : prestadorCodigo}
             testID="fila-prestador-codigo"
+            selectable
           />
         </View>
 
@@ -323,11 +337,18 @@ function FilaInfo({
   etiqueta,
   valor,
   borde,
+  selectable = false,
   testID,
 }: {
   etiqueta: string;
   valor: string;
   borde?: boolean;
+  /**
+   * Habilita seleccion nativa de texto en el valor (copy en long-press).
+   * Default false (D1 design: conservador opt-in) — solo cedula,
+   * idOperario y codigo del prestador son copiables.
+   */
+  selectable?: boolean;
   testID?: string;
 }) {
   return (
@@ -335,6 +356,7 @@ function FilaInfo({
       <Text style={estilos.filaEtiqueta}>{etiqueta}</Text>
       <Text
         style={estilos.filaValor}
+        selectable={selectable}
         testID={testID !== undefined ? `${testID}-valor` : undefined}
       >
         {valor}
@@ -401,9 +423,17 @@ function ItemGestion({
     );
   }
 
+  // F-3 (haptics REQ-1): selection haptic en items navegables. La
+  // operacion de haptics corre en paralelo al onPress original via
+  // Promise.allSettled (no bloqueamos el feedback visual del tap).
+  const handlePress = (): void => {
+    void safeHaptic('selection');
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={etiqueta}
       testID={testID}
@@ -448,9 +478,9 @@ const estilos = StyleSheet.create({
   nombre: {
     // H1 clamp: rango efectivo [32, 52] px — simula el clamp(2rem, 5vw,
     // 3.25rem) de web. el `...TYPOGRAPHY.headlineLg` aporta fontWeight
-    // y lineHeight; el fontSize queda overridden por la clamp.
+    // y lineHeight; el fontSize se sobreescribe inline en el JSX con
+    // la clamp reactiva (`nombreFontSize`).
     ...TYPOGRAPHY.headlineLg,
-    fontSize: NOMBRE_FONT_SIZE_CLAMP,
     color: COLORS.primary,
     marginBottom: SPACING.xs,
   },
@@ -496,6 +526,9 @@ const estilos = StyleSheet.create({
     ...TYPOGRAPHY.bodyMd,
     fontWeight: '700',
     color: COLORS.primary,
+    // F-5: tabular-nums para alinear cifras en columnas (cedula,
+    // idOperario, codigo prestador).
+    fontVariant: ['tabular-nums'],
   },
   filaConfig: {
     flexDirection: 'row',
