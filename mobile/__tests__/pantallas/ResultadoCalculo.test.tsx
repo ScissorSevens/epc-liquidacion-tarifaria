@@ -220,15 +220,17 @@ describe('ResultadoCalculo — ocultar navegación tras captura', () => {
   });
 
   // T-RES-NAV-3: el botón "Continuar" debe ser la ÚNICA salida explícita
-  // hacia una ruta segura. Usa navigation.navigate('Inicio'), nunca
-  // navigation.goBack() (que devolvería al operario a la pantalla de
-  // captura).
+  // hacia una ruta segura. Usa navigation.navigate con destino al tab
+  // 'Inicio' (pantalla raíz RutaDeHoy), NUNCA navigation.goBack()
+  // (que devolvería al operario a la pantalla de captura).
   it('T-RES-NAV-3: botón "Continuar" navega a "Inicio" sin usar goBack', () => {
     renderConProviders(
       <ResultadoCalculo navigation={nav as any} route={crearRutaMock() as any} />,
     );
     fireEvent.press(screen.getByText('Continuar'));
-    expect(nav.navigate).toHaveBeenCalledWith('Inicio');
+    expect(nav.navigate).toHaveBeenCalledWith('Inicio', {
+      screen: 'RutaDeHoy',
+    });
     expect(nav.goBack).not.toHaveBeenCalled();
   });
 });
