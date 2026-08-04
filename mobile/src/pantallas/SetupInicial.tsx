@@ -134,7 +134,11 @@ export default function SetupInicial({ onComplete }: Props) {
       await guardarSesion(resultado.sesion);
 
       // 4. Sincronizar useWorkspace con la sesion resuelta.
-      await useWorkspace.getState().setSesionCompleta(resultado.sesion);
+      await useWorkspace.getState().setSesionCompleta(resultado.sesion, {
+        prestador: bs.repos.prestadorRepo,
+        acuerdo: bs.repos.acuerdoMunicipalRepo,
+        parametros: bs.repos.parametrosTarifaRepo,
+      });
 
       // 5. Notificar al padre (AuthGate cambia decision a con_sesion).
       onComplete();

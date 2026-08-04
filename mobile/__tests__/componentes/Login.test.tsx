@@ -102,6 +102,15 @@ jest.mock('../../src/composition/get-bootstrap', () => ({
   getBootstrap: jest.fn().mockResolvedValue({/*refactored*/
     repos: {
       operarioRepo: { buscarPorCedula: jest.fn() },
+      prestadorRepo: {
+        obtenerPorId: jest.fn().mockResolvedValue({ id_prestador: 7 }),
+      },
+      acuerdoMunicipalRepo: {
+        buscarVigente: jest.fn().mockResolvedValue({ id_acuerdo: 10 }),
+      },
+      parametrosTarifaRepo: {
+        buscarVigente: jest.fn().mockResolvedValue({ id_parametros: 20 }),
+      },
     },
     adapters: {
       hasher: { sha256: (s: string) => `sha256(${s})` },

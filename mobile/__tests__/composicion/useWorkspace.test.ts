@@ -112,12 +112,8 @@ describe('useWorkspace (Fase 4.2.1)', () => {
         parametros: { buscarVigente: jest.fn().mockResolvedValue(parametros) },
       };
       const sesion = crearSesionValida({ idPrestador: 1 });
-      const setSesionCompleta = useWorkspace.getState().setSesionCompleta as unknown as (
-        sesionActual: Sesion,
-        reposContexto: typeof repos,
-      ) => Promise<void>;
 
-      await setSesionCompleta(sesion, repos);
+      await useWorkspace.getState().setSesionCompleta(sesion, repos);
 
       const state = useWorkspace.getState();
       expect(state.id_prestador_activo).toBe(1);

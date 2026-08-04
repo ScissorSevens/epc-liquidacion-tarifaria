@@ -99,7 +99,9 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
     setCargando(true);
 
     try {
-      const { repos: { operarioRepo }, adapters: { hasher } } = await getBootstrap();
+      const bootstrap = await getBootstrap();
+      const { operarioRepo } = bootstrap.repos;
+      const { hasher } = bootstrap.adapters;
       const resultado = await loginLocal({
         operarioRepo,
         hasher,
@@ -109,7 +111,11 @@ export default function Login({ onLoginSuccess, mensajeInicial }: Props) {
 
       // Login OK → persistir sesion + sincronizar workspace + notificar.
       await guardarSesion(resultado.sesion);
-      await useWorkspace.getState().setSesionCompleta(resultado.sesion);
+      await useWorkspace.getState().setSesionCompleta(resultado.sesion, {
+        prestador: bootstrap.repos.prestadorRepo,
+        acuerdo: bootstrap.repos.acuerdoMunicipalRepo,
+        parametros: bootstrap.repos.parametrosTarifaRepo,
+      });
       onLoginSuccess();
     } catch (err) {
       const codigo = err instanceof Error ? err.message : String(err);

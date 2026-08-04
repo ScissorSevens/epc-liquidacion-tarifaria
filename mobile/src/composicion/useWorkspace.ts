@@ -14,6 +14,12 @@ import type { Prestador } from '../../dominio/prestadores/types';
 import type { AcuerdoMunicipal } from '../../dominio/acuerdo-municipal/types';
 import type { ParametrosTarifa } from '../../dominio/parametros-tarifa/types';
 
+type WorkspaceRepositories = {
+  prestador: { obtenerPorId: (id: number) => Promise<Prestador | null> };
+  acuerdo: { buscarVigente: (id: number, fecha: string) => Promise<AcuerdoMunicipal | null> };
+  parametros: { buscarVigente: (id: number, fecha: string) => Promise<ParametrosTarifa | null> };
+};
+
 interface WorkspaceState {
   readonly id_prestador_activo: number;
   readonly prestador: Prestador | null;
@@ -68,15 +74,7 @@ interface WorkspaceState {
    */
   cambiarPrestadorYCargarContexto: (
     id: number,
-    repo: {
-      // Alineado con los contratos reales:
-      //   - PrestadorRepository.obtenerPorId
-      //   - AcuerdoMunicipalRepository.buscarVigente(id, fecha).
-      //   - ParametrosTarifaRepository.buscarVigente(id, fecha).
-      prestador: { obtenerPorId: (id: number) => Promise<Prestador | null> };
-      acuerdo: { buscarVigente: (id: number, fecha: string) => Promise<AcuerdoMunicipal | null> };
-      parametros: { buscarVigente: (id: number, fecha: string) => Promise<ParametrosTarifa | null> };
-    },
+    repo: WorkspaceRepositories,
   ) => Promise<void>;
   /**
    * Sincroniza el workspace con la sesión recién autenticada.
@@ -86,7 +84,10 @@ interface WorkspaceState {
    * persist middleware persiste `id_prestador_activo` automáticamente,
    * por lo que no hace falta escribir a AsyncStorage manualmente.
    */
-  setSesionCompleta: (sesion: Sesion) => Promise<void>;
+  setSesionCompleta: (
+    sesion: Sesion,
+    repos?: WorkspaceRepositories,
+  ) => Promise<void>;
   /**
    * Resetea el workspace a estado "sin prestador asignado" — usado en
    * logout (futuro) y cuando se invalida la sesión defensivamente.
@@ -97,6 +98,38 @@ interface WorkspaceState {
    * "olvidar" con qué prestadores puede trabajar el operario.
    */
   limpiarWorkspace: () => Promise<void>;
+}
+
+async function _loadContext(
+  id: number,
+  repos: WorkspaceRepositories,
+  setState: (state: Partial<WorkspaceState>) => void,
+): Promise<void> {
+  setState({
+    id_prestador_activo: id,
+    prestador: null,
+    acuerdo_vigente: null,
+    parametros_vigentes: null,
+    cargando: true,
+  });
+
+  try {
+    const fecha = new Date().toISOString();
+    const [prestador, acuerdo, parametros] = await Promise.all([
+      repos.prestador.obtenerPorId(id),
+      repos.acuerdo.buscarVigente(id, fecha),
+      repos.parametros.buscarVigente(id, fecha),
+    ]);
+    setState({
+      prestador,
+      acuerdo_vigente: acuerdo,
+      parametros_vigentes: parametros,
+      cargando: false,
+    });
+  } catch (err) {
+    setState({ cargando: false });
+    throw err;
+  }
 }
 
 export const useWorkspace = create<WorkspaceState>()(
@@ -130,48 +163,16 @@ export const useWorkspace = create<WorkspaceState>()(
        *   4. set final con resultados o catch con cleanup.
        */
       cambiarPrestadorYCargarContexto: async (id, repo) => {
-        // (1) Limpiar contexto del prestador anterior. El id YA está a punto
-        // de cambiar — si fallara el set siguiente, el estado intermedio
-        // (id nuevo + datos viejos) sería PEOR que partir de null.
-        set({
-          prestador: null,
-          acuerdo_vigente: null,
-          parametros_vigentes: null,
-          cargando: true,
-        });
-        // (2) Setear el id nuevo ANTES de tocar repos. Aunque la Promise.all
-        // falle, el id refleja la intención del usuario (la UI puede
-        // rollbackear si lo desea).
-        set({ id_prestador_activo: id });
-        try {
-          // (3) Carga paralela de los 3 chunks del contexto tarifario.
-          const [prestador, acuerdo, parametros] = await Promise.all([
-            repo.prestador.obtenerPorId(id),
-            repo.acuerdo.buscarVigente(id, new Date().toISOString()),
-            repo.parametros.buscarVigente(id, new Date().toISOString()),
-          ]);
-          // (4) Set final — los 3 campos poblados, spinner off.
-          set({
-            prestador,
-            acuerdo_vigente: acuerdo,
-            parametros_vigentes: parametros,
-            cargando: false,
-          });
-        } catch (err) {
-          // (5) Limpiar spinner y dejar el contexto en null (NO repoblar
-          // con datos del prestador anterior). Propagar para que el caller
-          // decida: toast de error, rollback del id, reintento, etc.
-          set({ cargando: false });
-          throw err;
-        }
+        await _loadContext(id, repo, set);
       },
 
-      setSesionCompleta: async (sesion) => {
+      setSesionCompleta: async (sesion, repos) => {
         set({ id_prestador_activo: sesion.idPrestador });
+        if (repos) {
+          await _loadContext(sesion.idPrestador, repos, set);
+        }
         // Persist middleware escribe automáticamente
         // `id_prestador_activo` en AsyncStorage bajo 'workspace-storage'.
-        // Sin embargo, dejamos el método como async para que el caller
-        // (AuthGate, Login) pueda await-ear la promesa si lo desea.
         await Promise.resolve();
       },
 
