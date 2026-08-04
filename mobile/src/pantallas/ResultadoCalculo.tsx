@@ -1,13 +1,6 @@
 import { useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
 
 import { BotonPrimario } from '../componentes/BotonPrimario';
 import { FooterApp } from '../componentes/FooterApp';
@@ -20,8 +13,111 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '../theme/skeletal-tokens';
+import { calcularTotalComponentes } from '@dominio/factura/pagos';
+import type { Liquidacion } from '../../dominio/calculo/types';
+import { emitirFacturaMovil } from '../../dominio/factura/emitir-factura-movil';
+import { getBootstrap } from '../composition/get-bootstrap';
 
 type Props = LecturasStackScreenProps<'ResultadoCalculo'>;
+
+function crearPeriodoDeEmision(idPeriodo: string, fechaEmision: string) {
+  return {
+    id_periodo: idPeriodo,
+    nombre: idPeriodo,
+    fecha_inicio: `${idPeriodo.slice(0, 4)}-${idPeriodo.slice(4, 6)}-01`,
+    // El cálculo móvil se emite al cierre del flujo; usar la fecha de emisión
+    // evita que una captura del primer día quede bloqueada por un fin de mes
+    // futuro mientras el repositorio de períodos no se sincronizó todavía.
+    fecha_fin: fechaEmision,
+    fecha_pago_sin_recargo: fechaEmision,
+    fecha_pago_con_recargo: fechaEmision,
+    dias_consumo: 0,
+    estado: 'cerrado' as const,
+    created_at: `${fechaEmision}T00:00:00.000Z`,
+  };
+}
+
+function crearLiquidacionDeEmision(
+  lectura: Props['route']['params']['lectura'],
+  resultado: Props['route']['params']['resultado'],
+  fechaEmision: string,
+  hasher: { sha256(value: string): string } | undefined,
+): Liquidacion {
+  const base = {
+    id: `liq-${lectura.id_medidor}-${lectura.id_periodo}`,
+    suscriptorId: String(lectura.id_medidor),
+    fechaGeneracion: new Date(`${fechaEmision}T00:00:00.000Z`),
+    resultado,
+    estado: 'ACTIVA' as const,
+  };
+  const hash = typeof hasher?.sha256 === 'function'
+    ? hasher.sha256(
+        JSON.stringify({
+          id: base.id,
+          suscriptorId: base.suscriptorId,
+          fechaGeneracion: base.fechaGeneracion.toISOString(),
+          resultado: base.resultado,
+          estado: base.estado,
+          reemplazaA: null,
+        }),
+      )
+    : '';
+  return { ...base, hash };
+}
+
+/**
+ * Emite la factura legal antes de entrar al preview. El snapshot contiene lo
+ * que la pantalla ya conoce; el servicio completa las entidades desde el
+ * BootstrapApp y persiste la factura antes de navegar.
+ */
+async function emitirDesdeResultado(
+  navigation: Props['navigation'],
+  params: Props['route']['params'],
+): Promise<void> {
+  const bootstrap = await getBootstrap();
+  const fechaEmision = new Date().toISOString().slice(0, 10);
+  const periodo = crearPeriodoDeEmision(params.lectura.id_periodo, fechaEmision);
+  const liquidacion = crearLiquidacionDeEmision(
+    params.lectura,
+    params.resultado,
+    fechaEmision,
+    bootstrap.adapters?.hasher,
+  );
+  const snapshot = {
+    lectura: params.lectura,
+    id_suscriptor: params.id_suscriptor,
+    id_liquidacion: liquidacion.id,
+    prestador: params.prestador,
+    resultado: params.resultado,
+    periodo,
+    liquidacion,
+    otros_valores: params.otros_valores ?? [],
+    saldo_anterior: params.saldo_anterior ?? 0,
+  };
+
+  // Las implementaciones reales exponen guardar(); los guards mantienen la
+  // pantalla compatible con bootstraps de tests y con instalaciones legacy.
+  const periodoRepo = bootstrap.repos?.periodoRepo;
+  if (periodoRepo !== undefined && 'guardar' in periodoRepo) {
+    await periodoRepo.guardar(periodo);
+  }
+  const liquidacionRepo = bootstrap.repos?.liquidacionRepo;
+  if (liquidacionRepo !== undefined && 'guardar' in liquidacionRepo) {
+    await liquidacionRepo.guardar(liquidacion);
+  }
+
+  const factura = await emitirFacturaMovil(
+    bootstrap,
+    snapshot,
+    fechaEmision,
+    bootstrap.adapters?.hasher,
+    bootstrap.adapters?.idGenerator,
+    bootstrap.services?.consecutivoProvider,
+  );
+  navigation.navigate('FacturaPreview', {
+    id_factura: factura.id_factura ?? factura.id,
+  });
+}
 
 /**
  * Formatea pesos colombianos sin decimales con `Intl.NumberFormat`.
@@ -91,10 +187,42 @@ function formatearFecha(iso: string): string {
  *   placeholder "— (sin evidencia foto)".
  */
 export default function ResultadoCalculo({ navigation, route }: Props) {
-  const { lectura, resultado, parametros, estrato, id_suscriptor, nombre_suscriptor, prestador } =
-    route.params;
+  const {
+    lectura,
+    resultado,
+    parametros,
+    estrato,
+    id_suscriptor,
+    nombre_suscriptor,
+    prestador,
+    otros_valores,
+    saldo_anterior,
+  } = route.params;
+
+  // `factura-preview-print-bluetooth` R8: el total normativo incluye
+  // `liquidacion.total + sum(otros_valores) + saldo_anterior`. Si los
+  // callers legacy no los pasan (pre-emision), default a 0 / [].
+  const totalNormativo = calcularTotalComponentes(
+    resultado.total,
+    otros_valores ?? [],
+    saldo_anterior ?? 0,
+  );
 
   const [detalleAbierto, setDetalleAbierto] = useState(true);
+  const [cargandoEmision, setCargandoEmision] = useState(false);
+  const [errorEmision, setErrorEmision] = useState<string | null>(null);
+
+  const handleVerFacturaCompleta = async (): Promise<void> => {
+    setCargandoEmision(true);
+    setErrorEmision(null);
+    try {
+      await emitirDesdeResultado(navigation, route.params);
+    } catch (error) {
+      setErrorEmision(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCargandoEmision(false);
+    }
+  };
 
   const subsidioMostrar = resultado.subsidio > 0;
   const contribMostrar = resultado.contribucion > 0;
@@ -139,7 +267,12 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
         {/* Bento grid: total + anterior/actual + consumo */}
         <View style={[styles.bentoColFull, styles.bentoColFullTotal]}>
           <Text style={[styles.bentoLabel, styles.bentoLabelTotal]}>Monto total</Text>
-          <Text style={[styles.bentoTotal, styles.bentoTotalBlanco]}>{formatearCOP(resultado.total)}</Text>
+          <Text
+            testID="total-factura"
+            style={[styles.bentoTotal, styles.bentoTotalBlanco]}
+          >
+            {formatearCOP(totalNormativo)}
+          </Text>
         </View>
         <View style={styles.bentoRow}>
           <View style={[styles.bentoColHalf, styles.bentoFill]}>
@@ -221,6 +354,20 @@ export default function ResultadoCalculo({ navigation, route }: Props) {
 
         {/* Acciones */}
         <View style={styles.actionsCol}>
+          {errorEmision !== null && (
+            <View style={styles.errorBox} testID="error-emision" accessibilityRole="alert">
+              <Text style={styles.errorText}>{errorEmision}</Text>
+            </View>
+          )}
+          <BotonPrimario
+            texto="Ver factura completa"
+            icono="description"
+            tono="amarillo"
+            testID="btn-ver-factura-completa"
+            cargando={cargandoEmision}
+            textoCargando="Emitiendo factura…"
+            onPress={handleVerFacturaCompleta}
+          />
           <BotonPrimario
             texto="Ver historial"
             icono="history"

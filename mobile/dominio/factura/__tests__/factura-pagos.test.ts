@@ -19,6 +19,7 @@ import {
   calcularCodigoVerificacion,
   generarReferenciaPago,
   generarQrPago,
+  calcularTotalComponentes,
   esCodigoVerificacionValido,
 } from '../pagos';
 import type { EmitirFacturaInput, Factura } from '../types';
@@ -394,5 +395,48 @@ describe('emitirFactura — campos top-level: codigo_verificacion, referencia_pa
     // pero codigo_verificacion y version_tarifa_aplicada SI se asignan
     expect(factura.codigo_verificacion).toBeDefined();
     expect(factura.version_tarifa_aplicada).toBeDefined();
+  });
+});
+
+describe('calcularTotalComponentes - total normativo a partir de componentes', () => {
+  it('suma liquidacionTotal + sum(otros_valores) + saldoAnterior', () => {
+    expect(
+      calcularTotalComponentes(
+        10000,
+        [{ concepto: 'RECONEXION', valor: 5000 }],
+        2000,
+      ),
+    ).toBe(17000);
+  });
+
+  it('con otros_valores vacio y saldoAnterior 0 retorna liquidacionTotal', () => {
+    expect(calcularTotalComponentes(20000, [], 0)).toBe(20000);
+  });
+
+  it('con solo saldoAnterior suma', () => {
+    expect(calcularTotalComponentes(20000, [], 5000)).toBe(25000);
+  });
+
+  it('con solo otros_valores suma', () => {
+    expect(
+      calcularTotalComponentes(
+        20000,
+        [{ concepto: 'RECONEXION', valor: 8000 }],
+        0,
+      ),
+    ).toBe(28000);
+  });
+
+  it('multiples otros_valores se suman correctamente', () => {
+    expect(
+      calcularTotalComponentes(
+        1000,
+        [
+          { concepto: 'RECONEXION', valor: 200 },
+          { concepto: 'FINANCIACION', valor: 300 },
+        ],
+        100,
+      ),
+    ).toBe(1600);
   });
 });

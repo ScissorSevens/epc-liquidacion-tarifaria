@@ -51,14 +51,21 @@ describe('IPC_VALORES — tabla inmutable 2016-2026', () => {
   });
 
   it('T-IPC-8 (constantes): IPC_VALORES es readonly (Object.freeze)', () => {
-    expect(() => {
-      // TS bloquea en compile, pero intentamos en runtime para
-      // documentar la inmutabilidad. En strict mode tira, en sloppy
-      // ignora. La garantía de runtime es Object.freeze.
+    // El contrato verificable es que IPC_VALORES es inmutable en runtime:
+    // cualquier intento de asignar a una propiedad NO debe alterar el valor.
+    // El mecanismo por el cual el runtime enforce esto depende del modo:
+    //   - TS strict mode (modulos .ts compilados con strict:true) lanza
+    //     TypeError ante la asignacion a un objeto frozen.
+    //   - sloppy mode (Babel sin strict, p.ej. jest-expo) ignora la
+    //     asignacion silenciosamente — la linea no-op no produce efecto.
+    // Ambos modos son validos; lo que importa es el resultado observable.
+    const valorOriginal = IPC_VALORES[2025];
+    try {
       (IPC_VALORES as Record<number, number>)[2025] = 99;
-    }).not.toThrow();
-    // La asignación se IGNORA en modo strict (que es el default de los
-    // modulos TS). El valor sigue siendo el original.
-    expect(IPC_VALORES[2025]).toBe(1.5782);
+    } catch {
+      // strict mode tiro TypeError — esperado, contrato cumplido.
+    }
+    // El valor sigue siendo el original — el freeze impidio la asignacion.
+    expect(IPC_VALORES[2025]).toBe(valorOriginal);
   });
 });

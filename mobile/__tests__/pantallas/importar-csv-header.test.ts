@@ -32,7 +32,7 @@ jest.mock('expo-file-system', () => ({
   },
 }));
 
-import { HEADER_ESPERADO_TXT } from '../../src/pantallas/ImportarCsv';
+import { HEADER_ESPERADO_TXT } from '../../src/pantallas/header-csv';
 import { HEADER_NUEVO, parsearCSV } from '../../dominio/importacion/parser-csv';
 
 describe('ImportarCsv — contrato de header con parser (COR-09)', () => {

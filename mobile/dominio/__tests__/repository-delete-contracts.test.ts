@@ -11,8 +11,14 @@ function compilarContrato(codigo: string): readonly ts.Diagnostic[] {
   }
 
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd());
+  // El tsconfig.json del root define `rootDir: "src"`. Los archivos que
+  // este test valida viven en mobile/dominio/, mobile/src/ y similares —
+  // todos fuera de ese rootDir. Forzamos `rootDir: undefined` para que TS
+  // NO emita el diagnostic "is not under 'rootDir' 'src'" y permita
+  // validar contratos cross-domain.
   const opciones: ts.CompilerOptions = {
     ...parsed.options,
+    rootDir: undefined,
     noEmit: true,
     skipLibCheck: true,
   };

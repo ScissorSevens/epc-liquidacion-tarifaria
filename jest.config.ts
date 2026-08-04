@@ -9,6 +9,7 @@ const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   rootDir: '.',
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   testMatch: ['<rootDir>/src/**/*.test.ts'],
   collectCoverageFrom: ['<rootDir>/src/**/*.ts', '!<rootDir>/src/**/*.test.ts'],
   coverageDirectory: 'coverage',

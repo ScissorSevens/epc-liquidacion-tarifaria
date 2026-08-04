@@ -132,4 +132,47 @@ describe('ResultadoCalculo', () => {
     );
     expect(screen.getByText('— (sin evidencia foto)')).toBeTruthy();
   });
+
+  // R8 fix: el total mostrado es el normativo (liquidacion.total +
+  // otros_valores + saldo_anterior), NO `resultado.total` solo.
+  it('muestra el total normativo con otros_valores y saldo_anterior', () => {
+    const paramsNormativo = {
+      ...paramsBase,
+      resultado: {
+        ...paramsBase.resultado,
+        total: 10000,
+      },
+      otros_valores: [{ concepto: 'RECONEXION', valor: 5000 }],
+      saldo_anterior: 2000,
+    };
+    renderConProviders(
+      <ResultadoCalculo
+        navigation={nav as any}
+        route={crearRutaMock(paramsNormativo) as any}
+      />,
+    );
+    // 10000 + 5000 + 2000 = 17000 → "$ 17.000" (Intl usa NBSP entre $ y numero)
+    const totalEl = screen.getByTestId('total-factura');
+    expect(String(totalEl.props.children)).toMatch(/17[.,\s]?000/);
+  });
+
+  it('total sin otros_valores ni saldo_anterior es la version anterior (regression)', () => {
+    const paramsSin = {
+      ...paramsBase,
+      resultado: {
+        ...paramsBase.resultado,
+        total: 15000,
+      },
+      otros_valores: [],
+      saldo_anterior: 0,
+    };
+    renderConProviders(
+      <ResultadoCalculo
+        navigation={nav as any}
+        route={crearRutaMock(paramsSin) as any}
+      />,
+    );
+    const totalEl = screen.getByTestId('total-factura');
+    expect(String(totalEl.props.children)).toMatch(/15[.,\s]?000/);
+  });
 });

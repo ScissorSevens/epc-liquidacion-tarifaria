@@ -32,7 +32,8 @@
       "@expo/vector-icons": "<rootDir>/__tests__/__mocks__/expo-vector-icons.js",
       "^expo(/.*)?$": "<rootDir>/__tests__/__mocks__/expo.js",
       "^expo-sqlite$": "<rootDir>/__tests__/__mocks__/expo-sqlite.js",
-      "expo-asset": "<rootDir>/__tests__/__mocks__/expo-asset.js"
+      "expo-asset": "<rootDir>/__tests__/__mocks__/expo-asset.js",
+      "^@react-native-async-storage/async-storage$": "<rootDir>/__tests__/__mocks__/@react-native-async-storage/async-storage.js"
     }
   },
   "dependencies": {
@@ -59,6 +60,8 @@
     "js-sha256": "^0.11.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-ble-plx": "^3.5.1",
+    "react-native-bluetooth-escpos-printer": "^0.0.5",
     "react-native-get-random-values": "~1.11.0",
     "react-native-paper": "^5.15.1",
     "react-native-safe-area-context": "~5.6.0",
