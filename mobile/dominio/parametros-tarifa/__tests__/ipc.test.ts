@@ -52,13 +52,13 @@ describe('IPC_VALORES — tabla inmutable 2016-2026', () => {
 
   it('T-IPC-8 (constantes): IPC_VALORES es readonly (Object.freeze)', () => {
     expect(() => {
-      // TS bloquea en compile, pero intentamos en runtime para
-      // documentar la inmutabilidad. En strict mode tira, en sloppy
-      // ignora. La garantía de runtime es Object.freeze.
+      // TS strict mode (default en modulos TS) lanza TypeError ante
+      // cualquier intento de asignar a una propiedad de un objeto frozen.
+      // Esto es exactamente el comportamiento que queremos: la garantía
+      // de runtime de Object.freeze es activa, no pasiva (no-op silencioso).
       (IPC_VALORES as Record<number, number>)[2025] = 99;
-    }).not.toThrow();
-    // La asignación se IGNORA en modo strict (que es el default de los
-    // modulos TS). El valor sigue siendo el original.
+    }).toThrow(TypeError);
+    // El valor sigue siendo el original — el freeze impidio la asignacion.
     expect(IPC_VALORES[2025]).toBe(1.5782);
   });
 });
