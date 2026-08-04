@@ -1402,6 +1402,40 @@ describe('MiPerfil — mi-perfil-impeccable-v2 (RED, commits 4-6)', () => {
   });
 
   /**
+   * T-IMPC-A11Y-2 — cedula copiable expone accessibilityHint para
+   * VoiceOver/TalkBack (F-4 spec REQ-4 copy-selectable). El hint debe
+   * describir la accion de long-press para copiar, en espanol rioplatense.
+   */
+  it('T-IMPC-A11Y-2 cedula tiene accessibilityHint de long-press para copiar', () => {
+    const { getByTestId } = renderMiPerfil();
+    const cedulaValor = getByTestId('fila-cedula-valor');
+    expect(cedulaValor.props.accessibilityHint).toBe(
+      'Mantén presionado para copiar la cédula',
+    );
+    expect(cedulaValor.props.selectable).toBe(true);
+  });
+
+  /**
+   * T-IMPC-A11Y-3 — ID Operario y codigo del prestador tambien son
+   * copiables y por lo tanto deben tener accessibilityHint. Cubre las
+   * otras dos filas copiables de la spec REQ-4 que T-IMPC-A11Y-2 no
+   * toca (cedula ya validada).
+   */
+  it('T-IMPC-A11Y-3 ID Operario y Código tienen accessibilityHint de copiar', () => {
+    const { getByTestId } = renderMiPerfil();
+    const idOperarioValor = getByTestId('fila-id-operario-valor');
+    const codigoValor = getByTestId('fila-prestador-codigo-valor');
+    expect(idOperarioValor.props.accessibilityHint).toBe(
+      'Mantén presionado para copiar el ID de operario',
+    );
+    expect(idOperarioValor.props.selectable).toBe(true);
+    expect(codigoValor.props.accessibilityHint).toBe(
+      'Mantén presionado para copiar el código del prestador',
+    );
+    expect(codigoValor.props.selectable).toBe(true);
+  });
+
+  /**
    * T-IMPC-CARD-RADIUS-1 — listaCard borderRadius === RADIUS.lg (16)
    * (F-8 anti-ghost-card).
    */
