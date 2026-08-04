@@ -157,17 +157,30 @@ export async function aplicarMigration020IdempotenteExpo(
  * No convierte a `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (no soportado
  * por SQLite < 3.35) — esa parte ya la manejamos arriba consultando
  * PRAGMA table_info manualmente.
+ *
+ * BUGFIX (sdd/first-launch-post-reinstall-bug/e2e-reproduction):
+ * La regex anterior `/CREATE\s+(UNIQUE\s+)?INDEX\s+([A-Za-z_]...)/gi`
+ * capturaba MAL cuando el SQL ya tenia `IF NOT EXISTS`: tomaba "IF" como
+ * nombre del indice, generando SQL duplicado:
+ *
+ *   Input:    CREATE UNIQUE INDEX IF NOT EXISTS idx_foo
+ *   Match:    CREATE UNIQUE INDEX IF
+ *   Output:   CREATE UNIQUE INDEX IF NOT EXISTS IF NOT EXISTS idx_foo
+ *
+ * SQLite parsea eso como `CREATE UNIQUE INDEX [IF NOT EXISTS] [IF] [NOT EXISTS idx_foo]`
+ * y emite `near "NOT": syntax error`.
+ *
+ * Fix: la regex captura opcionalmente `\s+IF\s+NOT\s+EXISTS` entre INDEX y el
+ * nombre. Si lo incluye, retorna el match intacto (ya es idempotente). Si no,
+ * lo agrega.
  */
 function idempotizarResto020(restoSql: string): string {
   if (restoSql.length === 0) return restoSql;
   return restoSql.replace(
-    /CREATE\s+(UNIQUE\s+)?INDEX\s+([A-Za-z_][A-Za-z0-9_]*)/gi,
-    (match, unique, nombre) => {
-      // Si ya incluye IF NOT EXISTS, no tocar.
-      // La regex ya excluira ese caso porque el patron (UNIQUE\s+)?INDEX no
-      // captura el `IF NOT EXISTS`. Pero por seguridad verificamos el
-      // contexto previo a `INDEX`:
-      if (/IF\s+NOT\s+EXISTS\s+$/i.test(match)) {
+    /CREATE\s+(UNIQUE\s+)?INDEX(\s+IF\s+NOT\s+EXISTS)?\s+([A-Za-z_][A-Za-z0-9_]*)/gi,
+    (match, unique, ifNotExists, nombre) => {
+      // Si ya incluye IF NOT EXISTS, no tocar (match intacto).
+      if (ifNotExists !== undefined) {
         return match;
       }
       return `CREATE ${unique ?? ''}INDEX IF NOT EXISTS ${nombre}`.trim();
