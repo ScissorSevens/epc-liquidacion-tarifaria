@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -17,8 +17,9 @@ import { limpiarDatosLegacyBypass } from '../composition/migracion-datos-legacy'
 import { crearOperarioRepositoryExpoSqlite } from '../persistencia/expo-sqlite/operario-repository-expo-sqlite';
 import { useWorkspace } from '../composicion/useWorkspace';
 import { logger } from '../composicion/logger';
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme/skeletal-tokens';
 
-type Decision = 'loading' | 'sin_setup' | 'sin_sesion' | 'con_sesion';
+type Decision = 'loading' | 'sin_setup' | 'sin_sesion' | 'con_sesion' | 'error_db';
 
 /**
  * Mensaje que se muestra arriba del Login cuando el operario tuvo una
@@ -56,6 +57,7 @@ const MENSAJE_SESION_VENCIDA =
  *   - sin_setup:  SetupInicial (wizard 2 pasos)
  *   - sin_sesion: Login (con mensajeInicial si vencio)
  *   - con_sesion: NavigationContainer(RootNavigator)
+ *   - error_db:   Error accionable con reintento e instrucciones de reinstalacion
  *
  * Dual-flag anti-flicker: solo invoca `SplashScreen.hideAsync()` cuando
  * AMBAS condiciones son verdaderas:
@@ -78,9 +80,12 @@ export function AuthGate() {
    * solo el "semilla" inicial, despias el operario lo cierra con la X).
    */
   const [mensajeInicial, setMensajeInicial] = useState<string | undefined>(undefined);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [intentoDeteccion, setIntentoDeteccion] = useState(0);
 
   useEffect(() => {
-    // La deteccion arranca INMEDIATAMENTE al montar (empty deps).
+    // La deteccion arranca INMEDIATAMENTE al montar y vuelve a correr
+    // cuando el operario solicita un reintento desde error_db.
     // NO esperamos al splash: el splash es puramente visual y la
     // deteccion corre en paralelo. El anti-flicker se logra con el
     // gating de hideAsync (efecto de abajo) que requiere AMBOS:
@@ -159,7 +164,23 @@ export function AuthGate() {
         //
         //     Cubierto por A8.1 (redirige a SetupInicial) y A8.2
         //     (regression guard del happy path con operarios).
-        const operariosExistentes = await bootstrap.repos.operarioRepo.listar();
+        let operariosExistentes;
+        try {
+          operariosExistentes = await bootstrap.repos.operarioRepo.listar();
+        } catch (error) {
+          // DB corruption o SQLite nativo fail. NO ir a Login: reproduciria
+          // el dead-end original al no poder consultar los operarios.
+          console.error('[AuthGate] operarioRepo.listar() failed:', error);
+          if (!cancelado) {
+            setErrorMessage(
+              error instanceof Error
+                ? error.message
+                : 'Error desconocido al consultar operarios',
+            );
+            setDecision('error_db');
+          }
+          return;
+        }
         if (cancelado) return;
         if (operariosExistentes.length === 0) {
           setDecision('sin_setup');
@@ -194,11 +215,13 @@ export function AuthGate() {
         await useWorkspace.getState().setSesionCompleta(sesion);
         if (cancelado) return;
         setDecision('con_sesion');
-      } catch (err) {
+      } catch (error) {
         // Falla inesperada del bootstrap o carga de sesion: caemos
         // conservadoramente a sin_sesion para que el operario al menos
         // vea el Login y pueda re-intentar.
-        logger.warn('AuthGate', 'error en deteccion de estado', { error: String(err) });
+        logger.warn('AuthGate', 'error en deteccion de estado', {
+          error: String(error),
+        });
         if (!cancelado) {
           setDecision('sin_sesion');
         }
@@ -208,7 +231,7 @@ export function AuthGate() {
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [intentoDeteccion]);
 
   const handleLoginSuccess = useCallback(() => {
     setDecision('con_sesion');
@@ -254,7 +277,46 @@ export function AuthGate() {
   //     dispara SplashScreen.hideAsync() del splash nativo
 
   let contenido: React.ReactNode;
-  if (decision === 'sin_setup') {
+  if (decision === 'error_db') {
+    contenido = (
+      <View style={estilos.contenedor} testID="auth-gate-error-db">
+        <Text style={estilos.errorTitulo}>No pudimos verificar tu sesión</Text>
+        <Text style={estilos.errorMensaje}>{errorMessage}</Text>
+        <Pressable
+          style={estilos.botonReintentar}
+          onPress={() => {
+            setDecision('loading');
+            setErrorMessage('');
+            setIntentoDeteccion((intentoActual) => intentoActual + 1);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Reintentar verificación de sesión"
+          accessibilityHint="Vuelve a consultar los datos locales del operario"
+          testID="auth-gate-error-retry"
+        >
+          <Text style={estilos.botonReintentarTexto}>Reintentar</Text>
+        </Pressable>
+        <Pressable
+          style={estilos.botonClear}
+          onPress={() => {
+            // TODO: clear AsyncStorage + pedir al user que reinstale.
+            // Por ahora, navegar a Login con warning.
+            Alert.alert(
+              'Datos corruptos',
+              'Si el problema persiste, desinstala Expo Go y vuelve a instalar.',
+              [{ text: 'OK', onPress: () => setDecision('sin_sesion') }],
+            );
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Limpiar y continuar"
+          accessibilityHint="Muestra instrucciones de reinstalación y permite continuar al Login"
+          testID="auth-gate-error-clear"
+        >
+          <Text style={estilos.botonClearTexto}>Limpiar y continuar</Text>
+        </Pressable>
+      </View>
+    );
+  } else if (decision === 'sin_setup') {
     contenido = <SetupInicial onComplete={handleSetupComplete} />;
   } else if (decision === 'sin_sesion') {
     contenido = (
@@ -285,3 +347,58 @@ export function AuthGate() {
     </View>
   );
 }
+
+const estilos = StyleSheet.create({
+  contenedor: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceContainerLow,
+    paddingHorizontal: SPACING.margin,
+    paddingVertical: SPACING.xl,
+  },
+  errorTitulo: {
+    ...TYPOGRAPHY.headlineMd,
+    color: COLORS.onSurface,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  errorMensaje: {
+    ...TYPOGRAPHY.bodyMd,
+    color: COLORS.onSurfaceVariant,
+    textAlign: 'center',
+    maxWidth: 480,
+    marginBottom: SPACING.xl,
+  },
+  botonReintentar: {
+    width: '100%',
+    maxWidth: 360,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  botonReintentarTexto: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.onPrimary,
+  },
+  botonClear: {
+    width: '100%',
+    maxWidth: 360,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+  },
+  botonClearTexto: {
+    ...TYPOGRAPHY.labelLg,
+    color: COLORS.primary,
+  },
+});
