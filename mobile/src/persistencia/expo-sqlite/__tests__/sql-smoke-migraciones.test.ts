@@ -21,6 +21,8 @@
  */
 
 import Database from 'better-sqlite3';
+import * as fs from 'fs';
+import * as path from 'path';
 
 describe('SQL smoke — aplicacion completa de migrations + operarioRepo SQL', () => {
   let db: Database.Database;
@@ -132,5 +134,58 @@ describe('SQL smoke — aplicacion completa de migrations + operarioRepo SQL', (
     // eslint-disable-next-line no-console
     console.log(`SQLite version: ${result.v}`);
     expect(result.v).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('SMOKE-7: invariante — ningun CREATE/ALTER en expo-sqlite usa NOT NULL DEFAULT (expr) con parentesis', () => {
+    // Por que importa: SQLite 3.50.3 nativo en device (Expo SDK 54) parece
+    // rechazar el orden `NOT NULL DEFAULT (expr)` en algunos contextos,
+    // mientras que better-sqlite3 3.53.0 (en este runner) lo acepta.
+    // El fix defensivo es reordenar a `DEFAULT (expr) NOT NULL` (orden valido
+    // en TODAS las versiones de SQLite >= 3.0). Este test sirve como
+    // regression guard: cualquier CREATE/ALTER futuro debe respetar el orden.
+    //
+    // Scope: solo archivos de produccion en `mobile/src/persistencia/expo-sqlite/`
+    // (no incluye `__tests__/` porque ese codigo es testing de hipotesis y debe
+    // poder ejercitar AMBOS ordenes para documentar el bug).
+    const dirProduccion = path.resolve(__dirname, '../');
+    const archivosProduccion = fs
+      .readdirSync(dirProduccion)
+      .filter((f: string) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+
+    const offending: Array<{ archivo: string; linea: number; match: string }> = [];
+    const pattern = /NOT NULL DEFAULT\s*\(/g;
+
+    for (const archivo of archivosProduccion) {
+      const rutaCompleta = path.join(dirProduccion, archivo);
+      const lineas = fs.readFileSync(rutaCompleta, 'utf-8').split('\n');
+      lineas.forEach((linea, idx) => {
+        const matches = linea.match(pattern);
+        if (matches) {
+          offending.push({ archivo, linea: idx + 1, match: linea.trim() });
+        }
+      });
+    }
+
+    expect(offending).toEqual([]);
+  });
+
+  it('SMOKE-8: el orden correcto de constraints (DEFAULT antes de NOT NULL) se respeta en archivos criticos', () => {
+    // Por que importa: SMOKE-7 verifica ausencia del patron malo a nivel
+    // global. SMOKE-8 lo refuerza en los 2 archivos mas criticos
+    // (migraciones.ts y operario-repository-expo-sqlite.ts) con un mensaje
+    // de error mas especifico que apunta al archivo responsable si vuelve
+    // a aparecer el patron.
+    const archivosCriticos = [
+      'operario-repository-expo-sqlite.ts',
+      'migraciones.ts',
+    ];
+    const dirProduccion = path.resolve(__dirname, '../');
+    const badPattern = /NOT NULL DEFAULT\s*\(/;
+
+    for (const archivo of archivosCriticos) {
+      const rutaCompleta = path.join(dirProduccion, archivo);
+      const contenido = fs.readFileSync(rutaCompleta, 'utf-8');
+      expect(contenido).not.toMatch(badPattern);
+    }
   });
 });
