@@ -217,6 +217,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             valor={cedula}
             testID="fila-cedula"
             selectable
+            accessibilityHint="Mantén presionado para copiar la cédula"
             borde
           />
           <FilaInfo
@@ -224,6 +225,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             valor={idOperarioStr}
             testID="fila-id-operario"
             selectable
+            accessibilityHint="Mantén presionado para copiar el ID de operario"
             borde
           />
           <FilaInfo
@@ -259,6 +261,7 @@ export default function MiPerfil({ navigation, onLogoutRequested }: Props) {
             valor={prestadorCodigo === '' ? PLACEHOLDER : prestadorCodigo}
             testID="fila-prestador-codigo"
             selectable
+            accessibilityHint="Mantén presionado para copiar el código del prestador"
           />
         </View>
 
@@ -323,6 +326,7 @@ function FilaInfo({
   valor,
   borde,
   selectable = false,
+  accessibilityHint,
   testID,
 }: {
   etiqueta: string;
@@ -334,6 +338,13 @@ function FilaInfo({
    * idOperario y codigo del prestador son copiables.
    */
   selectable?: boolean;
+  /**
+   * Hint accesible para VoiceOver/TalkBack. Por spec REQ-4 copy-selectable,
+   * las filas copiables reciben un hint que anuncia la accion de long-press
+   * para copiar (en espanol rioplatense). Filas no copiables omiten el hint
+   * para evitar ruido en screen readers.
+   */
+  accessibilityHint?: string;
   testID?: string;
 }) {
   return (
@@ -342,6 +353,7 @@ function FilaInfo({
       <Text
         style={estilos.filaValor}
         selectable={selectable}
+        accessibilityHint={accessibilityHint}
         testID={testID !== undefined ? `${testID}-valor` : undefined}
       >
         {valor}
