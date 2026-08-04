@@ -30,6 +30,7 @@
 // get-bootstrap.ts tiene un cache `cached` que persiste entre tests si no
 // forzamos re-import — eso rompe el aislamiento.
 
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('expo-splash-screen', () => ({
@@ -475,6 +476,52 @@ describe('AuthGate (Fase 4.2 — 4 estados)', () => {
         resolverSegundoIntento([{ id_operario: 42 }]);
       });
       await pantalla.findByText('login-mock');
+    });
+
+    it('T-AUTH-CLEAR-1 "Limpiar y continuar" en error_db enruta a SetupInicial (no Login dead-end)', async () => {
+      // Por que: el bug F-CORRECT-1 dejo el handler de "Limpiar y
+      // continuar" mostrando un Alert que al cerrarlo navegaba a
+      // 'sin_sesion' (Login). Como el operario entro a error_db
+      // porque la DB crasheo en cold-boot, NO hay prestador utilizable
+      // y, por lo tanto, ir a Login es un dead-end UX (no puede validar
+      // sus credenciales). La salida correcta es enrutar a SetupInicial
+      // para que el wizard pueda re-crear prestador/operario.
+      //
+      // Ademas, el Alert decia "desinstala Expo Go y vuelve a instalar",
+      // pero el bug es de SQL syntax (NO de install corrupto), asi que
+      // pedirle al usuario que reinstale es ruido. El fix reemplaza el
+      // Alert por limpieza silenciosa de sesion y navegacion directa a
+      // SetupInicial.
+      mockedGetBootstrap.mockRejectedValue(
+        new Error('SQLite execAsync rejected: near NOT'),
+      );
+
+      // Spy sobre Alert.alert — el fix NO debe disparar ningun Alert.
+      const alertSpy = jest
+        .spyOn(Alert, 'alert')
+        .mockImplementation(() => undefined);
+
+      const pantalla = render(<AuthGate />);
+
+      // Esperar la UI de error_db.
+      const botonClear = await pantalla.findByTestId('auth-gate-error-clear');
+
+      // Tap "Limpiar y continuar".
+      fireEvent.press(botonClear);
+
+      // Verificar que la decision cambio a sin_setup (SetupInicial mock),
+      // NO a sin_sesion (Login mock).
+      await waitFor(() => {
+        expect(pantalla.queryByText('setup-inicial-mock')).toBeTruthy();
+        expect(pantalla.queryByText('login-mock')).toBeNull();
+        expect(pantalla.queryByTestId('auth-gate-error-db')).toBeNull();
+      });
+
+      // El fix NO debe pedir reinstalacion (eso era ruido — el bug es
+      // de SQL syntax, no de install).
+      expect(alertSpy).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
     });
   });
 
