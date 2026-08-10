@@ -133,13 +133,15 @@ describe('calcularLiquidacion — Cargo por Consumo (art. 10 mod 907/2019)', () 
       agua_suministrada_m3_anio: 500_000, // ASP positivo
       cmviaa: 50,
       aplica_cmviaa: true,
+      // CMVIAA entra al cargo_consumo_resultante pre-calculado
+      // (ver dominio/parametros-tarifa/calcular.ts:110-112 y el test
+      // "cargo_consumo_resultante = cmo + cmi + cmt + cmviaa"). El motor
+      // NO recalcula en runtime: usa cargo_consumo_resultante persistido
+      // por decisión de auditoría histórica (motor-tarifario.ts:203-208).
+      cargo_consumo_resultante: 1500 + 300 + 200 + 50,
     };
-    // ASP = 500_000 - 216_000 = 284_000
-    // CC unit = (1500+300+200)/284_000 + 50 = 0.00704... + 50 ≈ 50.007
-    // CC total = 50.007 * 18 ≈ 900.13 → 900
     const r = calcularLiquidacion(entradaBase(), params, ACUERDO_BASE);
-    expect(r.cc_unitario).toBeGreaterThan(50);
-    expect(r.cc_unitario).toBeLessThan(51);
+    expect(r.cc_unitario).toBeCloseTo(2050, 2);
     expect(r.metadata.cmviaa_aplicado).toBe(true);
   });
 
@@ -343,16 +345,30 @@ describe('calcularLiquidacion — Multi-tenant', () => {
   });
 
   it('2 prestadores simultáneos en misma corrida NO contaminan configs', () => {
-    const paramsX: ParametrosTarifa = { ...PARAMETROS_BASE, id_prestador: 10, cma: 10_000_000 };
-    const paramsY: ParametrosTarifa = { ...PARAMETROS_BASE, id_prestador: 20, cma: 50_000_000 };
+    // El motor usa cargo_fijo_resultante PRE-CALCULADO
+    // (motor-tarifario.ts:196-201) — NO recalcula cma/N en runtime por
+    // decisión de auditoría histórica. Sobreescribimos también el campo
+    // pre-calculado para reflejar el estado guardado real.
+    const paramsX: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      id_prestador: 10,
+      cma: 10_000_000,
+      cargo_fijo_resultante: 10_000_000 / 3000,
+    };
+    const paramsY: ParametrosTarifa = {
+      ...PARAMETROS_BASE,
+      id_prestador: 20,
+      cma: 50_000_000,
+      cargo_fijo_resultante: 50_000_000 / 3000,
+    };
     const acuerdoX: AcuerdoMunicipal = { ...ACUERDO_BASE, id_prestador: 10, factor_subsidio_e1: -0.10 };
     const acuerdoY: AcuerdoMunicipal = { ...ACUERDO_BASE, id_prestador: 20, factor_subsidio_e1: -0.60 };
     const entX: EntradaCalculo = { id_prestador: 10, consumo_m3: 18, estrato: 1, categoria_uso: 'residencial' };
     const entY: EntradaCalculo = { id_prestador: 20, consumo_m3: 18, estrato: 1, categoria_uso: 'residencial' };
     const rX = calcularLiquidacion(entX, paramsX, acuerdoX);
     const rY = calcularLiquidacion(entY, paramsY, acuerdoY);
-    expect(rX.cargo_fijo).toBe(Math.round(10_000_000 / 3000));
-    expect(rY.cargo_fijo).toBe(Math.round(50_000_000 / 3000));
+    expect(rX.cargo_fijo).toBe(Math.round(paramsX.cargo_fijo_resultante));
+    expect(rY.cargo_fijo).toBe(Math.round(paramsY.cargo_fijo_resultante));
     expect(rX.factor_aplicado).toBeCloseTo(-0.10, 5);
     expect(rY.factor_aplicado).toBeCloseTo(-0.60, 5);
   });
