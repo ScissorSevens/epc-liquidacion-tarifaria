@@ -13,22 +13,65 @@
 export interface AcuerdoMunicipal {
   readonly id_acuerdo: number;
   readonly id_prestador: number;
+  // ── Legacy single-factor (backward-compat) ────────────────────────────
   /**
    * Factor de subsidio para estrato 1. Negativo.
    * Rango legal L142/1994 art. 99.6: [-1.0, -0.60].
    * Si el prestador define -0.80, el motor CAPEA a -0.60.
+   *
+   * @deprecated Mantener por backward-compat. Usar los 3 porcentajes
+   *   separados (`factor_subsidio_e1_cf/_basico/_excedente`) en código
+   *   nuevo. El motor usa los 3 porcentajes; este campo se conserva
+   *   solo para compatibilidad con datos legacy y pantallas antiguas.
    */
   readonly factor_subsidio_e1: number;
   /**
    * Factor de subsidio para estrato 2. Negativo.
    * Rango legal: [-1.0, -0.50].
+   * @deprecated Usar `factor_subsidio_e2_cf/_basico/_excedente`.
    */
   readonly factor_subsidio_e2: number;
   /**
    * Factor de subsidio para estrato 3. Negativo.
    * Rango legal: [-1.0, -0.40].
+   * @deprecated Usar `factor_subsidio_e3_cf/_basico/_excedente`.
    */
   readonly factor_subsidio_e3: number;
+
+  // ── 3 porcentajes separados (Res CRA 825/2017 + Res CRA 750/2016) ───
+  // OPTIONAL por backward-compat: si no estan presentes, el motor usa
+  // los legacy factor_subsidio_e{1,2,3} como fallback (factor unico
+  // sobre el subtotal). El motor prefiere los 3 porcentajes cuando
+  // estan disponibles.
+  /**
+   * Subsidio E1 sobre Cargo Fijo (CMA/N). Negativo.
+   * Rango legal L142/1994 art. 99.6: [-1.0, -0.60].
+   * (Res CRA 825/2017: el subsidio se aplica por bloques, no sobre el
+   *  subtotal.)
+   */
+  readonly factor_subsidio_e1_cf?: number;
+  /** Subsidio E1 sobre Consumo Basico (primeros 11/13/16 m3 segun altitud). Negativo. */
+  readonly factor_subsidio_e1_basico?: number;
+  /**
+   * Subsidio E1 sobre Consumo Excedente. Por norma SIEMPRE es 0
+   * (Res CRA 825/2017 art. 14 — el excedente NO se subsidia).
+   */
+  readonly factor_subsidio_e1_excedente?: number;
+
+  /** Subsidio E2 sobre CF. Rango: [-1.0, -0.50]. */
+  readonly factor_subsidio_e2_cf?: number;
+  /** Subsidio E2 sobre Consumo Basico. Rango: [-1.0, -0.50]. */
+  readonly factor_subsidio_e2_basico?: number;
+  /** Subsidio E2 sobre Excedente. SIEMPRE 0. */
+  readonly factor_subsidio_e2_excedente?: number;
+
+  /** Subsidio E3 sobre CF. Rango: [-1.0, -0.40]. */
+  readonly factor_subsidio_e3_cf?: number;
+  /** Subsidio E3 sobre Consumo Basico. Rango: [-1.0, -0.40]. */
+  readonly factor_subsidio_e3_basico?: number;
+  /** Subsidio E3 sobre Excedente. SIEMPRE 0. */
+  readonly factor_subsidio_e3_excedente?: number;
+
   /**
    * Factor de contribución para estrato 5. Positivo.
    * Rango legal: [0, +0.50].

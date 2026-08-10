@@ -44,6 +44,7 @@ import type {
   ParametrosTarifa,
   ResultadoCalculo,
 } from './types';
+import { aplicarConsumoBasico } from './consumo-basico';
 
 /** Topes legales L142/1994 art. 99.6 — referencia normativa. */
 export const TOPES_NACIONALES = {
@@ -210,43 +211,134 @@ export function calcularLiquidacion(
     parametros,
     entrada.categoria_uso,
   );
-  const ccTotal = Math.round(ccUnitario * consumoEfectivo);
 
-  // 4. Factor de subsidio/contribución según categoría + estrato + Acuerdo
+  // 4. Consumo basico vs excedente (Res CRA 750/2016 art. 3).
+  //    El limite basico depende de la altitud del prestador. Si los
+  //    parametros no tienen altitud (data legacy), usamos periodo=1
+  //    (facturacion mensual estandar) — fallback conservador a 16 m3.
+  const altitud = parametros.altitud_msnm ?? null;
+  const division = aplicarConsumoBasico(consumoEfectivo, altitud, 1);
+  const consumoBasicoM3 = division.basico;
+  const consumoExcedenteM3 = division.excedente;
+  const valorBasico = Math.round(consumoBasicoM3 * ccUnitario);
+  const valorExcedente = Math.round(consumoExcedenteM3 * ccUnitario);
+  const ccTotal = valorBasico + valorExcedente;
+
+  // 5. Factor de subsidio/contribución según categoría + estrato + Acuerdo
   const factorResult = calcularFactor(entrada.estrato, entrada.categoria_uso, acuerdo);
   const factor = factorResult.factor;
 
-  // 5. Aplicar factor
-  // - Residencial/especial: subsidio (factor<0) aplica sobre (CF + CC);
-  //   contribución (factor>0) igual sobre (CF + CC).
-  // - Comercial/industrial: solo contribución sobre (CF + CC), nunca subsidio.
-  // - Oficial: factor=0, no aplica ni subsidio ni contribución.
-  const base = cargoFijo + ccTotal;
-  const subsidio = factor < 0 ? Math.round(Math.abs(factor) * base) : 0;
-  const contribucion = factor > 0 ? Math.round(factor * base) : 0;
+  // 6. Aplicar subsidio por bloques (Res CRA 825/2017 compliance).
+  //    - Si el Acuerdo tiene los 3 porcentajes nuevos (cf/basico/excedente):
+  //      se aplican POR BLOQUE (Res CRA 825 + Res CRA 750/2016).
+  //    - Si NO los tiene (legacy): fallback al factor unico sobre (CF + CC),
+  //      manteniendo backward-compat con datos legacy.
+  //    - Comercial/industrial/oficial: subsidios no aplican (contribucion
+  //      o tarifa plena).
+  let subsidioCf = 0;
+  let subsidioBasico = 0;
+  let subsidioExcedente = 0;
+  let subsidioLegacy = 0;
+  let factorReportado = factor;
 
-  // 6. Total
+  if (entrada.categoria_uso === 'residencial' || entrada.categoria_uso === 'especial') {
+    const tiene3Porcentajes =
+      acuerdo !== null &&
+      acuerdo.factor_subsidio_e1_cf !== undefined &&
+      acuerdo.factor_subsidio_e1_basico !== undefined;
+
+    if (tiene3Porcentajes) {
+      // Residencial con 3 porcentajes separados (compliance nuevo)
+      let factorCf = 0;
+      let factorBasico = 0;
+      let factorExcedente = 0;
+
+      if (entrada.estrato === 1) {
+        factorCf = acuerdo?.factor_subsidio_e1_cf ?? 0;
+        factorBasico = acuerdo?.factor_subsidio_e1_basico ?? 0;
+        factorExcedente = acuerdo?.factor_subsidio_e1_excedente ?? 0;
+      } else if (entrada.estrato === 2) {
+        factorCf = acuerdo?.factor_subsidio_e2_cf ?? 0;
+        factorBasico = acuerdo?.factor_subsidio_e2_basico ?? 0;
+        factorExcedente = acuerdo?.factor_subsidio_e2_excedente ?? 0;
+      } else if (entrada.estrato === 3) {
+        factorCf = acuerdo?.factor_subsidio_e3_cf ?? 0;
+        factorBasico = acuerdo?.factor_subsidio_e3_basico ?? 0;
+        factorExcedente = acuerdo?.factor_subsidio_e3_excedente ?? 0;
+      }
+      // E4/E5/E6: 3 porcentajes subsidiables no aplican (E4=neutro,
+      // E5/E6 son contribuciones).
+
+      // Capea cada factor a los topes L142/1994 art. 99.6.
+      const factorCfCapeado = caparFactorEstrato(factorCf, entrada.estrato, entrada.categoria_uso);
+      const factorBasicoCapeado = caparFactorEstrato(factorBasico, entrada.estrato, entrada.categoria_uso);
+
+      subsidioCf = factorCfCapeado < 0 ? Math.round(Math.abs(factorCfCapeado) * cargoFijo) : 0;
+      subsidioBasico = factorBasicoCapeado < 0 ? Math.round(Math.abs(factorBasicoCapeado) * valorBasico) : 0;
+      // Por norma, subsidio_excedente es SIEMPRE 0 (Res CRA 825 art. 14).
+      // El factor_excedente se ignora aun si viniera != 0 (defensa).
+      subsidioExcedente = 0;
+      // factor_aplicado: para legacy compat, reportamos el factor cf (legacy era
+      // un factor unico sobre el subtotal; el mas representativo es el de cf
+      // porque el de basico puede ser distinto).
+      factorReportado = factorCfCapeado;
+    } else {
+      // Legacy: factor unico sobre (CF + CC)
+      const base = cargoFijo + ccTotal;
+      subsidioLegacy = factor < 0 ? Math.round(Math.abs(factor) * base) : 0;
+    }
+  } else {
+    // Comercial/industrial: solo contribucion (factor legacy).
+    // Oficial: factor=0, sin subsidio ni contribucion.
+    const base = cargoFijo + ccTotal;
+    subsidioLegacy = factor < 0 ? Math.round(Math.abs(factor) * base) : 0;
+  }
+
+  const subsidio = subsidioCf + subsidioBasico + subsidioExcedente + subsidioLegacy;
+
+  // 7. Contribucion (solo aplica a E5/E6/comercial/industrial).
+  //    Las contribuciones siguen siendo factor unico sobre el subtotal
+  //    (Res CRA 825 + L142/1994 art. 99.6).
+  const baseContribucion = cargoFijo + ccTotal;
+  const contribucion = factor > 0 ? Math.round(factor * baseContribucion) : 0;
+
+  // 8. Total
   const total = Math.round(cargoFijo + ccTotal - subsidio + contribucion);
 
-  // 7. Bloques de consumo (compatibilidad: 1 bloque para formato 825)
+  // 9. Bloques de consumo: 2 bloques (basico + excedente) para auditoría
+  //    detallada. Compatible con la spec seccion 9 de la guia de validacion.
   const bloques: readonly BloqueConsumo[] = [
-    {
+    ...(consumoBasicoM3 > 0 ? [{
+      desde_m3: 0,
+      hasta_m3: consumoBasicoM3,
+      m3_facturados: consumoBasicoM3,
+      precio_unitario: Math.round(ccUnitario * 100) / 100,
+      subtotal: valorBasico,
+    }] : []),
+    ...(consumoExcedenteM3 > 0 ? [{
+      desde_m3: consumoBasicoM3,
+      hasta_m3: Number.POSITIVE_INFINITY,
+      m3_facturados: consumoExcedenteM3,
+      precio_unitario: Math.round(ccUnitario * 100) / 100,
+      subtotal: valorExcedente,
+    }] : []),
+    ...(consumoEfectivo === 0 ? [{
       desde_m3: 0,
       hasta_m3: Number.POSITIVE_INFINITY,
-      m3_facturados: consumoEfectivo,
+      m3_facturados: 0,
       precio_unitario: Math.round(ccUnitario * 100) / 100,
-      subtotal: ccTotal,
-    },
+      subtotal: 0,
+    }] : []),
   ];
 
   const metadata: MetadataCalculo = {
-    norma_aplicada: 'Res CRA 825/2017 + Res CRA 907/2019 art. 14',
+    norma_aplicada: 'Res CRA 825/2017 + Res CRA 907/2019 art. 14 + Res CRA 750/2016',
     acuerdo_id: acuerdo?.id_acuerdo ?? null,
     parametros_id: parametros.id_parametros,
     cmviaa_aplicado: parametros.aplica_cmviaa && parametros.cmviaa > 0,
     minimo_vital_aplicado: consumoEfectivo !== entrada.consumo_m3,
     factor_capeado: factorResult.capeado,
-    version_motor: '825-907-v1',
+    version_motor: '825-907-v2', // bump: subsidios por bloques
     calculo_timestamp: new Date().toISOString(),
   };
 
@@ -260,10 +352,17 @@ export function calcularLiquidacion(
     cargo_fijo: cargoFijo,
     cc_unitario: Math.round(ccUnitario * 100) / 100,
     cc_total: ccTotal,
+    consumo_basico_m3: consumoBasicoM3,
+    consumo_excedente_m3: consumoExcedenteM3,
+    valor_basico: valorBasico,
+    valor_excedente: valorExcedente,
+    subsidio_cf: subsidioCf,
+    subsidio_basico: subsidioBasico,
+    subsidio_excedente: subsidioExcedente,
     subsidio,
     contribucion,
     total,
-    factor_aplicado: factor,
+    factor_aplicado: factorReportado,
     metadata,
   };
 }
@@ -299,6 +398,13 @@ export function calcularBatch(entradas: readonly EntradaBatch[]): readonly Resul
         cargo_fijo: 0,
         cc_unitario: 0,
         cc_total: 0,
+        consumo_basico_m3: 0,
+        consumo_excedente_m3: 0,
+        valor_basico: 0,
+        valor_excedente: 0,
+        subsidio_cf: 0,
+        subsidio_basico: 0,
+        subsidio_excedente: 0,
         subsidio: 0,
         contribucion: 0,
         total: 0,
@@ -310,7 +416,7 @@ export function calcularBatch(entradas: readonly EntradaBatch[]): readonly Resul
           cmviaa_aplicado: false,
           minimo_vital_aplicado: false,
           factor_capeado: false,
-          version_motor: '825-907-v1',
+          version_motor: '825-907-v2',
           calculo_timestamp: new Date().toISOString(),
         },
         error: (err as Error).message,

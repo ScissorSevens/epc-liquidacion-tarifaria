@@ -43,6 +43,7 @@ import {
   type ParametrosTarifa,
   type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
+import { limiteConsumoBasicoMensual, LIMITES_CONSUMO_BASICO_MS3 } from '../../../dominio/motor-tarifario/consumo-basico';
 import type { AcuerdoMunicipalRepository } from '../../../dominio/acuerdo-municipal';
 import {
   buildBorradorLocal,
@@ -263,6 +264,11 @@ export default function ParametrosTarifaForm({
   const [vigenteHasta, setVigenteHasta] = useState(
     parametrosActuales?.vigente_hasta?.slice(0, 10) ?? `${Number(periodoDefault()) + 4}-12-31`,
   );
+  // altitud_msnm: Res CRA 750/2016 compliance. Default 0 si no hay
+  // (altitud a nivel del mar → limite 16 m3/mes por fallback).
+  const [altitud, setAltitud] = useState(
+    String(parametrosActuales?.altitud_msnm ?? 0),
+  );
   const [guardando, setGuardando] = useState(false);
 
   // Hidratar el state local cuando parametrosActuales se carga async.
@@ -293,6 +299,7 @@ export default function ParametrosTarifaForm({
     setM3Gratis(String(parametrosActuales.m3_gratis_minimo_vital));
     setVigenteDesde(parametrosActuales.vigente_desde.slice(0, 10));
     setVigenteHasta(parametrosActuales.vigente_hasta.slice(0, 10));
+    setAltitud(String(parametrosActuales.altitud_msnm ?? 0));
     yaSincronizadoRef.current = true;
   }, [parametrosActuales]);
 
@@ -352,6 +359,7 @@ export default function ParametrosTarifaForm({
     m3Gratis,
     vigenteDesde,
     vigenteHasta,
+    altitud,
   };
 
   // ResumenCargos live preview: useMemo con deps acotadas a los inputs
@@ -707,6 +715,32 @@ export default function ParametrosTarifaForm({
         </View>
       </SeccionForm>
 
+      <SeccionForm titulo="Altitud y consumo basico (Res CRA 750/2016)" icono="terrain" testID="seccion-card-altitud">
+        <Text style={estilos.nota}>
+          Res CRA 750/2016 art. 3: el limite de consumo basico (m3/mes subsidiables) depende de la altitud del prestador.
+          Altitud &gt; 2.000 msnm = 11 m3; 1.000-2.000 msnm = 13 m3; &le; 1.000 msnm = 16 m3.
+        </Text>
+        <View style={estilos.campo}>
+          <FormField
+            label="Altitud del prestador (msnm)"
+            value={altitud}
+            onChangeText={setAltitud}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Determina el limite de consumo basico (Res CRA 750/2016)"
+            testID="param-altitud"
+          />
+        </View>
+        <Text
+          style={estilos.previewAltitud}
+          testID="param-altitud-preview"
+        >
+          {`Limite de consumo basico: ${limiteConsumoBasicoMensual(num(altitud))} m3/mes (altitud ${num(altitud)} msnm)`}
+        </Text>
+      </SeccionForm>
+
       <SeccionForm titulo="Mínimo vital (Decreto 776/2025 — opcional)" icono="shield" testID="seccion-card-minimo-vital">
         <View style={estilos.campoFila}>
           <MaterialIcons
@@ -809,5 +843,14 @@ const estilos = StyleSheet.create({
   cargandoTexto: {
     ...TYPOGRAPHY.bodyMd,
     color: COLORS.onSurfaceVariant,
+  },
+  // Preview en vivo del limite de consumo basico (Res CRA 750/2016).
+  // Visible debajo del input de altitud. Texto secundario, sin fondo,
+  // con padding para alinearlo con el field.
+  previewAltitud: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.primary,
+    marginTop: SPACING.xs,
+    paddingHorizontal: SPACING.xs,
   },
 });

@@ -28,7 +28,7 @@ import { COMPONENTES_TARIFARIOS } from '../../../dominio/parametros-tarifa/calcu
 
 /**
  * Shape del state local del screen ParametrosTarifa.
- * Refleja los 14 useState del componente (periodo, anioBase, cma, ...).
+ * Refleja los 15 useState del componente (periodo, anioBase, cma, ...).
  */
 export interface FormValues {
   readonly periodo: string;
@@ -46,6 +46,7 @@ export interface FormValues {
   readonly m3Gratis: string;
   readonly vigenteDesde: string;
   readonly vigenteHasta: string;
+  readonly altitud: string;
 }
 
 /** Contexto: id_prestador + id_acuerdo que derivan `ParametrosTarifa`. */
@@ -106,6 +107,9 @@ export function buildBorradorLocal(
     minimo_vital: null,
     vigente_desde: form.vigenteDesde,
     vigente_hasta: form.vigenteHasta,
+    // altitud_msnm: Res CRA 750/2016 compliance. 0 = default a nivel
+    // del mar → limite 16 m3/mes (el mas conservador).
+    altitud_msnm: entero(form.altitud),
     // cargo_fijo_resultante + cargo_consumo_resultante se recalculan via
     // calcularCargos() en guardar() / useMemo. Acá los dejamos en 0
     // como placeholders (la factoría pura los ignora).

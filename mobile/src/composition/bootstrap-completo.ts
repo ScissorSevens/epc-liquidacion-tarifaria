@@ -110,11 +110,34 @@ const VIGENCIA_ANIOS = 5;
 /** 24h en ms — la sesion local vence al dia siguiente del setup. */
 const MS_EN_UN_DIA = 24 * 60 * 60 * 1000;
 
-/** Defaults del Acuerdo Municipal segun L142/1994 art. 99.6 (rural segmento 2). */
+/** Defaults del Acuerdo Municipal segun L142/1994 art. 99.6 (rural segmento 2).
+ *
+ * Subsidios separados por bloque (Res CRA 825/2017 compliance):
+ *   - `_cf`: porcentaje sobre el Cargo Fijo (CMA/N).
+ *   - `_basico`: porcentaje sobre el Consumo Basico (primeros 11/13/16 m3).
+ *   - `_excedente`: SIEMPRE 0 por Res CRA 825/2017 art. 14 — el
+ *     excedente NO se subsidia.
+ *
+ * Los campos legacy `factor_subsidio_e{1,2,3}` (factor unico sobre el
+ * subtotal) se conservan por backward-compat con datos existentes. */
 const ACUERDO_DEFAULTS = {
-  factor_subsidio_e1: -0.50,
-  factor_subsidio_e2: -0.40,
-  factor_subsidio_e3: -0.15,
+  // Legacy single-factor (backward-compat)
+  factor_subsidio_e1: -0.60,
+  factor_subsidio_e2: -0.50,
+  factor_subsidio_e3: -0.40,
+  // 3 porcentajes separados E1 (maximo nacional L142/1994 art. 99.6)
+  factor_subsidio_e1_cf: -0.60,
+  factor_subsidio_e1_basico: -0.60,
+  factor_subsidio_e1_excedente: 0,
+  // E2
+  factor_subsidio_e2_cf: -0.50,
+  factor_subsidio_e2_basico: -0.50,
+  factor_subsidio_e2_excedente: 0,
+  // E3
+  factor_subsidio_e3_cf: -0.40,
+  factor_subsidio_e3_basico: -0.40,
+  factor_subsidio_e3_excedente: 0,
+  // Contribuciones (single-factor, valido para E5/E6/comercial/industrial)
   factor_contribucion_e5: 0.50,
   factor_contribucion_e6: 0.60,
   factor_contribucion_comercial: 0.50,
@@ -196,9 +219,20 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
     // 2. Crear acuerdo municipal con defaults L142/1994.
     const acuerdo = await deps.acuerdoRepo.crear({
       id_prestador: prestador.id_prestador,
+      // Legacy (backward-compat)
       factor_subsidio_e1: ACUERDO_DEFAULTS.factor_subsidio_e1,
       factor_subsidio_e2: ACUERDO_DEFAULTS.factor_subsidio_e2,
       factor_subsidio_e3: ACUERDO_DEFAULTS.factor_subsidio_e3,
+      // 3 porcentajes separados (compliance nuevo)
+      factor_subsidio_e1_cf: ACUERDO_DEFAULTS.factor_subsidio_e1_cf,
+      factor_subsidio_e1_basico: ACUERDO_DEFAULTS.factor_subsidio_e1_basico,
+      factor_subsidio_e1_excedente: ACUERDO_DEFAULTS.factor_subsidio_e1_excedente,
+      factor_subsidio_e2_cf: ACUERDO_DEFAULTS.factor_subsidio_e2_cf,
+      factor_subsidio_e2_basico: ACUERDO_DEFAULTS.factor_subsidio_e2_basico,
+      factor_subsidio_e2_excedente: ACUERDO_DEFAULTS.factor_subsidio_e2_excedente,
+      factor_subsidio_e3_cf: ACUERDO_DEFAULTS.factor_subsidio_e3_cf,
+      factor_subsidio_e3_basico: ACUERDO_DEFAULTS.factor_subsidio_e3_basico,
+      factor_subsidio_e3_excedente: ACUERDO_DEFAULTS.factor_subsidio_e3_excedente,
       factor_contribucion_e5: ACUERDO_DEFAULTS.factor_contribucion_e5,
       factor_contribucion_e6: ACUERDO_DEFAULTS.factor_contribucion_e6,
       factor_contribucion_comercial: ACUERDO_DEFAULTS.factor_contribucion_comercial,

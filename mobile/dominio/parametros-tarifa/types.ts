@@ -143,6 +143,20 @@ export interface ParametrosTarifa {
    * Fase 1 (`param-tarifa-res-825-compliance-phase1`).
    */
   readonly factor_indexacion_ipc: number;
+  /**
+   * Altitud del prestador sobre el nivel del mar (msnm). Determina
+   * el límite de consumo básico conforme a Res CRA 750/2016:
+   *   altitud > 2.000 → 11 m³/mes
+   *   altitud 1.000-2.000 → 13 m³/mes
+   *   altitud ≤ 1.000 → 16 m³/mes
+   *
+   * OPTIONAL por backward-compat con data legacy. `null` = altitud
+   * desconocida; el motor usa el limite default de 16 m³/mes (≤1.000
+   * msnm) como fallback conservador.
+   *
+   * Fase 4 (`compliance-cra-825-subsidios-bloques`).
+   */
+  readonly altitud_msnm?: number | null;
 }
 
 export type ParametrosTarifaBorrador = Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>;
