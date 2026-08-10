@@ -157,6 +157,33 @@ export interface ParametrosTarifa {
    * Fase 4 (`compliance-cra-825-subsidios-bloques`).
    */
   readonly altitud_msnm?: number | null;
+  /**
+   * CMAA — Costo Medio de Administración por Inversiones Ambientales
+   * Adicionales (Res CRA 907/2019 art. 13 que modifica Res CRA 825/2017
+   * art. 9). SOLO aplica al servicio de ACUEDUCTO. Para alcantarillado
+   * el CF es solo CMA (sin CMAA). El prestador puede optar por incluir
+   * estas inversiones — si lo hace, setea `cmaa > 0` y `aplica_cmviaa = true`.
+   *
+   * Normativa: Res CRA 0874/2018 + Res CRA 907/2019 art. 31.B.
+   *
+   * `null` por backward-compat con data legacy. Default 0 si el prestador
+   * NO opta por inversiones ambientales.
+   *
+   * Fase 2 (`param-tarifa-res-825-compliance-phase2`).
+   */
+  readonly cmaa?: number | null;
+  /**
+   * URL o referencia del acto administrativo que adoptó la metodología
+   * tarifaria del prestador. Requerido para que la `AcuerdoMunicipal`
+   * pase a `estado: ACTIVO`. Ej: decreto alcaldía 042 de 2024.
+   *
+   * OPTIONAL por backward-compat. Default null.
+   */
+  readonly acto_adopcion?: string | null;
+  /** ID del estudio de costos del prestador (referencia externa, ej: SUI). */
+  readonly estudio_costos_id?: string | null;
+  /** URL del documento soporte del estudio de costos (PDF, etc.). */
+  readonly documento_soporte_url?: string | null;
 }
 
 export type ParametrosTarifaBorrador = Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>;
@@ -218,4 +245,7 @@ export const MENSAJES_ERROR_PARAMETROS = {
   // Res CRA 825/2017 Art. 15: el CMA no puede ser menor al mínimo
   // normativo del servicio. Cambio `param-tarifa-res-825-compliance-phase1`.
   CMA_BAJO_MINIMO: 'CMA no puede ser menor al mínimo normativo de la Res CRA 825 Art. 15',
+  // Res CRA 825/2017 Art. 18: el CMOG no puede ser menor al mínimo
+  // normativo del servicio. Cambio `param-tarifa-res-825-compliance-phase2`.
+  CMOG_BAJO_MINIMO: 'CMOG no puede ser menor al mínimo normativo de la Res CRA 825 Art. 18',
 } as const;

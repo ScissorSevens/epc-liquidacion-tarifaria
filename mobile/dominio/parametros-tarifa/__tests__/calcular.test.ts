@@ -52,13 +52,21 @@ function baseParametros(overrides: Partial<ParametrosTarifa> = {}): ParametrosTa
 
 describe('calcularCargos — Res CRA 825/2017 art. 9-10 + 907/2019 art. 14', () => {
   /**
-   * Si TODOS los componentes relevantes están activos, el cargo fijo
-   * es `cma / suscriptores_promedio` (formula normativa).
+   * Decisión param-tarifa-res-825-compliance-phase2: el campo `cma` de
+   * ParametrosTarifa representa el CMA normativo en $/suscriptor/mes
+   * (NO el CA anual). Por lo tanto, el CF es directamente `cma` sin
+   * dividir por suscriptores_promedio. `suscriptores_promedio` se
+   * mantiene en el modelo para uso en otras validaciones (CMOG
+   * mínimo, MSNM, etc.) pero NO participa en el cálculo del CF.
+   *
+   * Alineado con art. 9 Res CRA 825/2017 (mod. Res 907/2019 art. 13):
+   *   CF acueducto = CMA (sin dividir cuando CMA es mensual).
+   *   CF alcantarillado = CMA (idéntico).
    */
-  it('cargo_fijo_resultante = cma / suscriptores_promedio', () => {
+  it('cargo_fijo_resultante = cma (sin dividir) cuando CMA está activo', () => {
     const p = baseParametros({ cma: 12_000_000, suscriptores_promedio: 1000 });
     const { cargo_fijo } = calcularCargos(p);
-    expect(cargo_fijo).toBe(12_000);
+    expect(cargo_fijo).toBe(12_000_000);
   });
 
   /**
@@ -87,6 +95,47 @@ describe('calcularCargos — Res CRA 825/2017 art. 9-10 + 907/2019 art. 14', () 
    * contribuye al cargo. Caso de uso: el segmento 2 rural puede NO
    * cargar CMT (tasa ambiental cero o exenta).
    */
+  /**
+   * Param-tarifa-res-825-compliance-phase2 / task 2.3-2.4: si el
+   * prestador opta por inversiones ambientales (cmaa > 0 y
+   * aplica_cmviaa=true), el CF incluye CMAA: `cargo_fijo = cma + cmaa`
+   * (Res CRA 825/2017 art. 9 mod. 907/2019 art. 13).
+   *
+   * Solo aplica a ACUEDUCTO — no hay "alcantarillado con inversiones
+   * ambientales" equivalente en la normativa actual.
+   */
+  it('cargo_fijo incluye CMAA cuando aplica_cmviaa=true y cmaa>0', () => {
+    const p = baseParametros({
+      cma: 8_000,
+      cmaa: 2_000,
+      aplica_cmviaa: true,
+      componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
+    });
+    const { cargo_fijo } = calcularCargos(p);
+    expect(cargo_fijo).toBe(10_000); // 8_000 + 2_000
+  });
+
+  it('cargo_fijo NO incluye CMAA cuando aplica_cmviaa=false (aunque cmaa>0)', () => {
+    const p = baseParametros({
+      cma: 8_000,
+      cmaa: 2_000,
+      aplica_cmviaa: false,
+    });
+    const { cargo_fijo } = calcularCargos(p);
+    // CMAA desactivado por el prestador → cargo_fijo = solo cma.
+    expect(cargo_fijo).toBe(8_000);
+  });
+
+  it('cargo_fijo NO incluye CMAA cuando cmaa=null (legacy)', () => {
+    const p = baseParametros({
+      cma: 8_000,
+      aplica_cmviaa: true,
+      // cmaa omitido (undefined) — legacy data sin inversiones ambientales.
+    });
+    const { cargo_fijo } = calcularCargos(p);
+    expect(cargo_fijo).toBe(8_000);
+  });
+
   it('cargo_consumo excluye CMT cuando CMT no está en componentes_aplicables', () => {
     const p = baseParametros({
       cmo: 500,
@@ -160,7 +209,8 @@ describe('calcularCargos — Res CRA 825/2017 art. 9-10 + 907/2019 art. 14', () 
       aplica_cmviaa: false,
     });
     const { cargo_fijo, cargo_consumo } = calcularCargos(p);
-    expect(cargo_fijo).toBe(8000);
+    // cma es $/suscriptor/mes → cargo_fijo = cma sin dividir.
+    expect(cargo_fijo).toBe(9_600_000);
     expect(cargo_consumo).toBe(950);
   });
 
@@ -180,7 +230,8 @@ describe('calcularCargos — Res CRA 825/2017 art. 9-10 + 907/2019 art. 14', () 
       componentes_aplicables: ['CMA', 'CMO'],
     });
     const { cargo_fijo, cargo_consumo } = calcularCargos(p);
-    expect(cargo_fijo).toBe(10_000);
+    // cma es $/suscriptor/mes → cargo_fijo = cma sin dividir.
+    expect(cargo_fijo).toBe(5_000_000);
     expect(cargo_consumo).toBe(800);
   });
 
@@ -213,7 +264,8 @@ describe('calcularCargos — Res CRA 825/2017 art. 9-10 + 907/2019 art. 14', () 
       componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA', 'CMX_FUTURO'],
     });
     const { cargo_fijo, cargo_consumo } = calcularCargos(p);
-    expect(cargo_fijo).toBe(12_000);
+    // cma es $/suscriptor/mes → cargo_fijo = cma sin dividir.
+    expect(cargo_fijo).toBe(12_000_000);
     expect(cargo_consumo).toBe(850);
   });
 });

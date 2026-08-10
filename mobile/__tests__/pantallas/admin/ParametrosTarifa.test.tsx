@@ -244,7 +244,7 @@ const parametrosFixture: ParametrosTarifa = {
   aplica_minimo_vital: false,
   m3_gratis_minimo_vital: 0,
   ipuf_indice: 1.0,
-  cargo_fijo_resultante: 12_345_678 / 350,
+  cargo_fijo_resultante: 12_345_678,
   cargo_consumo_resultante: 450 + 120 + 80,
   componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
   minimo_vital: null,
@@ -776,8 +776,8 @@ fireEvent.press(back);
         // El card ResumenCargos debe aparecer.
         const cards = getAllByTestId('resumen-cargos');
         expect(cards.length).toBeGreaterThanOrEqual(1);
-        // getByText matchea el Text hijo del card. CF = 12_000_000/300 = 40_000.
-        expect(getByText('$ 40.000')).toBeTruthy();
+        // getByText matchea el Text hijo del card. CF = 12_000_000 (cma sin dividir post GAP-1).
+        expect(getByText('$ 12.000.000')).toBeTruthy();
         // CC = CMO + CMI + CMT = 800 + 200 + 100 = 1.100.
         expect(getByText('$ 1.100')).toBeTruthy();
       });
@@ -805,14 +805,14 @@ fireEvent.press(back);
         fireEvent.changeText(getByTestId('param-suscriptores'), '300');
       });
       await waitFor(() => {
-        expect(getByText('$ 40.000')).toBeTruthy();
+        expect(getByText('$ 12.000.000')).toBeTruthy();
       });
-      // Cambiamos CMA a 15_000_000 → CF = 15_000_000/300 = 50_000.
+      // Cambiamos CMA a 15_000_000 → CF = 15_000_000 (cma sin dividir).
       await act(async () => {
         fireEvent.changeText(getByTestId('param-cma'), '15000000');
       });
       await waitFor(() => {
-        expect(getByText('$ 50.000')).toBeTruthy();
+        expect(getByText('$ 15.000.000')).toBeTruthy();
       });
     });
 
@@ -829,7 +829,7 @@ fireEvent.press(back);
           acuerdoRepo={acuerdoRepo}
         />,
       );
-      // Setup: CMA=12_000_000, N=300 → CF=40_000.
+      // Setup: CMA=12_000_000, N=300 → CF=12_000_000 (cma sin dividir post GAP-1).
       await act(async () => {
         fireEvent.changeText(getByTestId('param-cma'), '12000000');
         fireEvent.changeText(getByTestId('param-cmo'), '500');
@@ -838,14 +838,16 @@ fireEvent.press(back);
         fireEvent.changeText(getByTestId('param-suscriptores'), '300');
       });
       await waitFor(() => {
-        expect(getByText('$ 40.000')).toBeTruthy();
+        expect(getByText('$ 12.000.000')).toBeTruthy();
       });
-      // Cambiamos N a 600 → CF = 12_000_000/600 = 20_000.
+      // Cambiamos N a 600 → CF sigue siendo 12_000_000 (CF no depende de N; el cambio de
+      // N afecta la validación CMOG/CMA-mínimo y la navegación en el form, no el CF).
+      // Cambio semántico vs. la versión original del test: post GAP-1 el CF es cma puro.
       await act(async () => {
         fireEvent.changeText(getByTestId('param-suscriptores'), '600');
       });
       await waitFor(() => {
-        expect(getByText('$ 20.000')).toBeTruthy();
+        expect(getByText('$ 12.000.000')).toBeTruthy();
       });
     });
 
@@ -1094,7 +1096,7 @@ fireEvent.press(back);
       };
       // El componente pre-calcula CF = CMA/N = 12_000_000/1000 = 12_000.
       // Y CC = CMO + CMI + CMT = 500 + 200 + 100 = 800.
-      expect(arg.cargo_fijo_resultante).toBe(12_000);
+      expect(arg.cargo_fijo_resultante).toBe(12_000_000);
       expect(arg.cargo_consumo_resultante).toBe(800);
     });
 
@@ -1934,7 +1936,7 @@ fireEvent.press(back);
       const payloadGuardado: ParametrosTarifa = {
         ...parametrosFixture,
         cma: 99_999_999,
-        cargo_fijo_resultante: 99_999_999 / 350,
+        cargo_fijo_resultante: 99_999_999,
       };
       repo.guardar.mockResolvedValueOnce(payloadGuardado);
       repo.buscarVigente.mockResolvedValueOnce(null);
@@ -2034,7 +2036,7 @@ fireEvent.press(back);
         ...parametrosFixture,
         cma: 77_777_777,
         suscriptores_promedio: 350,
-        cargo_fijo_resultante: 77_777_777 / 350,
+        cargo_fijo_resultante: 77_777_777,
         cargo_consumo_resultante: 450 + 120 + 80,
       };
       repo.guardar.mockResolvedValueOnce(nuevosParams);
@@ -2069,7 +2071,7 @@ fireEvent.press(back);
       });
       const arg = setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
       // El payload guardado incluye los cargos pre-calculados.
-      expect(arg.cargo_fijo_resultante).toBe(77_777_777 / 350);
+      expect(arg.cargo_fijo_resultante).toBe(77_777_777);
       expect(arg.cargo_consumo_resultante).toBe(450 + 120 + 80);
       expect(arg.cma).toBe(77_777_777);
       stateSpy.mockRestore();
@@ -2296,7 +2298,7 @@ fireEvent.press(back);
       const paramsReales: ParametrosTarifa = {
         ...parametrosFixture,
         cma: 4_000_000,
-        cargo_fijo_resultante: 4_000_000 / 350,
+        cargo_fijo_resultante: 4_000_000,
       };
       const repo = crearRepoFake();
       repo.buscarVigente.mockResolvedValueOnce(paramsReales);
@@ -2334,12 +2336,12 @@ fireEvent.press(back);
       const paramsViejos: ParametrosTarifa = {
         ...parametrosFixture,
         cma: 5_000_000,
-        cargo_fijo_resultante: 5_000_000 / 350,
+        cargo_fijo_resultante: 5_000_000,
       };
       const paramsNuevos: ParametrosTarifa = {
         ...parametrosFixture,
         cma: 4_000_000,
-        cargo_fijo_resultante: 4_000_000 / 350,
+        cargo_fijo_resultante: 4_000_000,
       };
       const repo = crearRepoFake();
       // Primer mount: el repo retorna el valor original (5M).

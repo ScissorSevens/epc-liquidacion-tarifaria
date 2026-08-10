@@ -98,9 +98,22 @@ export function calcularCargos(p: ParametrosTarifa): CargosResultantes {
   const cmviaa = noNegativo(p.cmviaa);
   const n = p.suscriptores_promedio;
 
+  // Decisión param-tarifa-res-825-compliance-phase2: `cma` representa el
+  // CMA normativo en $/suscriptor/mes (NO el CA anual). Por lo tanto,
+  // CF_acueducto = cma (sin dividir por suscriptores_promedio). El
+  // campo `suscriptores_promedio` se mantiene en el modelo para uso en
+  // validaciones (CMOG mínimo, MSNM por altitud, etc.) pero NO
+  // participa en el cálculo del CF.
+  //
+  // Para acueducto con inversiones ambientales (cmaa > 0 y
+  // aplica_cmviaa=true): CF = cma + cmaa (art. 9 mod 907/2019).
+  const cmaaAplicada =
+    p.aplica_cmviaa && componenteActivo(p.componentes_aplicables, 'CMVIAA') && p.cmaa != null
+      ? p.cmaa
+      : 0;
   const cargo_fijo =
     componenteActivo(p.componentes_aplicables, 'CMA') && n > 0
-      ? cma / n
+      ? cma + cmaaAplicada
       : 0;
 
   let cargo_consumo = 0;

@@ -81,8 +81,6 @@ async function crearTenant(app: BootstrapApp) {
         segmento: 2,
         num_suscriptores_urbanos: 0,
         num_suscriptores_rurales: 15,
-        email: 'e2e@example.test',
-        telefono: '3001234567',
         contacto: null,
         estado: 'activo',
         aps: null,
@@ -225,7 +223,7 @@ describe('E2E parámetros persistidos → liquidación → factura móvil', () =
       cmi: 300,
       cmt: 200,
       suscriptores_promedio: 15,
-      cargo_fijo_resultante: 10_000_000 / 15,
+      cargo_fijo_resultante: 10_000_000,
       cargo_consumo_resultante: 1_500,
     });
 
@@ -233,12 +231,13 @@ describe('E2E parámetros persistidos → liquidación → factura móvil', () =
     const subtotal = resultado.cargo_fijo + resultado.cc_total;
 
     expect(resultado.total).not.toBe(100_001);
-    expect(resultado.cargo_fijo).toBe(666_667);
+    expect(resultado.cargo_fijo).toBe(10_000_000);
     expect(resultado.cc_unitario).toBe(1_500);
     expect(resultado.cc_total).toBe(15_000);
     expect(resultado.factor_aplicado).toBe(-0.5);
     expect(resultado.subsidio).toBe(Math.round(subtotal * 0.5));
-    expect(resultado.total).toBe(340_833);
+    // total = (cargo_fijo + cc_total) - subsidio + contribucion = (10_000_000 + 15_000) - 5_007_500 = 5_007_500
+    expect(resultado.total).toBe(5_007_500);
   });
 
   it('PARAM-E2E-2: con defaults del bootstrap, el cálculo es consistente', async () => {
@@ -254,7 +253,7 @@ describe('E2E parámetros persistidos → liquidación → factura móvil', () =
       cmi: 200,
       cmt: 100,
       suscriptores_promedio: 15,
-      cargo_fijo_resultante: 5_000_000 / 15,
+      cargo_fijo_resultante: 5_000_000,
       cargo_consumo_resultante: 1_100,
     });
 
@@ -262,11 +261,12 @@ describe('E2E parámetros persistidos → liquidación → factura móvil', () =
     const subtotal = resultado.cargo_fijo + resultado.cc_total;
 
     expect(resultado.total).not.toBe(100_001);
-    expect(resultado.cargo_fijo).toBe(333_333);
+    expect(resultado.cargo_fijo).toBe(5_000_000);
     expect(resultado.cc_unitario).toBe(1_100);
     expect(resultado.cc_total).toBe(11_000);
     expect(resultado.factor_aplicado).toBe(-0.5);
     expect(resultado.subsidio).toBe(Math.round(subtotal * 0.5));
-    expect(resultado.total).toBe(172_166);
+    // total = (5_000_000 + 11_000) - 2_505_500 = 2_505_500
+    expect(resultado.total).toBe(2_505_500);
   });
 });
