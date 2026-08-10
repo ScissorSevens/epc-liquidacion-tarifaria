@@ -951,8 +951,9 @@ describe('bootstrapCompleto()', () => {
         }),
       ).rejects.toThrow();
 
-      // prestadorRepo.crear NUNCA se invocó.
-      expect(deps.prestadorRepo.listar).toHaveBeenCalledTimes(0);
+      // La transacción SQLite NUNCA se abrió: el gate falló antes.
+      // Verificamos via withTransactionAsync (jest.fn) que no se invoca.
+      expect(deps.prestadorRepo.withTransactionAsync).toHaveBeenCalledTimes(0);
     });
   });
 });
