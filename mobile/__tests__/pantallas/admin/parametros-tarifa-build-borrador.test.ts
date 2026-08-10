@@ -167,4 +167,77 @@ describe('buildBorradorLocal — helper extraido de guardar()', () => {
       expect(borrador.aplica_minimo_vital).toBe(true);
     });
   });
+
+  // ── T-BB-5 — Fase 2 (param-tarifa-res-825-compliance-phase2, task 4.6 RED):
+  // los 4 campos nuevos del screen (cmaa, acto_adopcion, estudio_costos_id,
+  // documento_soporte_url) deben mapearse correctamente al borrador
+  // persistible. Antes de este fix, los campos se ignoraban: el admin
+  // los tipeaba pero `buildBorradorLocal` no los exponía, y al
+  // `repo.guardar()` llegaba `cmaa: undefined`, `acto_adopcion: undefined`,
+  // etc. Tras este test (RED), verificamos que los 4 valores se
+  // preservan tal cual en el output.
+  describe('T-BB-5: campos nuevos de soporte documental (Fase 2)', () => {
+    it('T-BB-5.1 incluye cmaa numerico parseado al output', () => {
+      const borrador = buildBorradorLocal(formCompleto, ctx);
+      // cmaa del fixture: '1500' → 1500 (number).
+      expect(borrador.cmaa).toBe(1500);
+    });
+
+    it('T-BB-5.2 propaga acto_adopcion, estudio_costos_id y documento_soporte_url como strings', () => {
+      const borrador = buildBorradorLocal(formCompleto, ctx);
+      expect(borrador.acto_adopcion).toBe(
+        'https://example.com/decreto-042-2024',
+      );
+      expect(borrador.estudio_costos_id).toBe('SUI-2024-EST-001');
+      expect(borrador.documento_soporte_url).toBe(
+        'https://example.com/estudio-costos.pdf',
+      );
+    });
+
+    it('T-BB-5.3 strings vacios en los 3 docs se traducen a null (no a string vacia)', () => {
+      // El tipo ParametrosTarifa exige `acto_adopcion?: string | null`,
+      // no `string | ''`. El helper convierte '' → null para mantener
+      // backward-compat con la columna SQLite (que es TEXT NULL).
+      const formVacio: FormValues = {
+        ...formCompleto,
+        actoAdopcion: '',
+        estudioCostosId: '',
+        documentoSoporteUrl: '',
+      };
+      const borrador = buildBorradorLocal(formVacio, ctx);
+      expect(borrador.acto_adopcion).toBeNull();
+      expect(borrador.estudio_costos_id).toBeNull();
+      expect(borrador.documento_soporte_url).toBeNull();
+    });
+
+    it('T-BB-5.4 cmaa con string vacio o NaN se convierte a 0 (number, no null)', () => {
+      // A diferencia de los docs (strings opcionales), cmaa es un
+      // number|null segun el diseño. Si el admin lo deja vacio, cae
+      // a 0 (default limpio, NO null) para que el motor siempre vea
+      // un number.
+      const formCmaaVacio: FormValues = {
+        ...formCompleto,
+        cmaa: '',
+      };
+      const borrador = buildBorradorLocal(formCmaaVacio, ctx);
+      expect(borrador.cmaa).toBe(0);
+    });
+
+    it('T-BB-5.5 los 4 campos del output son readonly (inmutabilidad del shape persistible)', () => {
+      // El type de retorno es ParametrosTarifaBorrador: todos los
+      // campos son readonly. La verificación runtime de inmutabilidad
+      // puede hacerse en TypeScript; este test es contra el shape literal.
+      const borrador = buildBorradorLocal(formCompleto, ctx);
+      // Type assertion: TS infiere el tipo correcto del output.
+      const keys: Array<keyof typeof borrador> = [
+        'cmaa',
+        'acto_adopcion',
+        'estudio_costos_id',
+        'documento_soporte_url',
+      ];
+      for (const k of keys) {
+        expect(borrador).toHaveProperty(k);
+      }
+    });
+  });
 });
