@@ -29,6 +29,9 @@ interface AcuerdoRow {
   readonly acto_administrativo_url: string | null;
   readonly observaciones: string | null;
   readonly created_at: string;
+  // Phase 3.6: estado del ciclo de vida del Acuerdo.
+  // Default 'ACTIVO' para legacy data (acto previo ya cargado).
+  readonly estado: string | null;
 }
 
 function fromRow(row: AcuerdoRow): AcuerdoMunicipal {
@@ -46,6 +49,7 @@ function fromRow(row: AcuerdoRow): AcuerdoMunicipal {
     fecha_vigencia_hasta: row.fecha_vigencia_hasta,
     acto_administrativo_url: row.acto_administrativo_url,
     observaciones: row.observaciones,
+    estado: (row.estado ?? 'ACTIVO') as AcuerdoMunicipal['estado'],
     created_at: row.created_at,
   };
 }
@@ -61,13 +65,18 @@ export function crearAcuerdoMunicipalRepositoryExpoSqlite(
           factor_contribucion_e5, factor_contribucion_e6,
           factor_contribucion_comercial, factor_contribucion_industrial,
           fecha_vigencia_desde, fecha_vigencia_hasta,
-          acto_administrativo_url, observaciones
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          acto_administrativo_url, observaciones, estado
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         data.id_prestador, data.factor_subsidio_e1, data.factor_subsidio_e2, data.factor_subsidio_e3,
         data.factor_contribucion_e5, data.factor_contribucion_e6,
         data.factor_contribucion_comercial, data.factor_contribucion_industrial,
         data.fecha_vigencia_desde, data.fecha_vigencia_hasta,
         data.acto_administrativo_url, data.observaciones,
+        // Default conservador: si el caller no setea estado, se persiste
+        // 'ACTIVO' (asume acto previo cargado). Para Acuerdo nuevo
+        // creado por bootstrap, `data.estado === 'BORRADOR'` (ver
+        // Phase 4 batch).
+        data.estado ?? 'ACTIVO',
       );
       const id = Number(result.lastInsertRowId);
       const row = await db.getFirstAsync<AcuerdoRow>(

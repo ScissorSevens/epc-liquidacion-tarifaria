@@ -76,16 +76,27 @@ function componenteActivo(
 /**
  * Calcula los cargos resultantes de un ParametrosTarifa.
  *
- * Reglas (Res CRA 825/2017 art. 9-10 + 907/2019 art. 14):
- *   - CF = CMA / N (si CMA está en `componentes_aplicables`).
+ * Reglas (Res CRA 825/2017 art. 9-10 + 907/2019 art. 14, modelo mono-servicio):
+ *   - CF = cma + cmaa (si CMA y CMVIAA están en `componentes_aplicables`).
+ *     `cma` representa el CMA normativo en $/suscriptor/mes (NO CA anual),
+ *     por eso NO se divide por suscriptores_promedio. `cmaa` solo se suma
+ *     cuando aplica_cmviaa=true. Decisión `param-tarifa-res-825-compliance-phase2`
+ *     (GAP-1).
  *   - CC_unitario = CMO + CMI + CMT + CMVIAA
  *     (CMVIAA solo si aplica_cmviaa=true y CMVIAA en
  *     `componentes_aplicables`).
  *
  * Defensiva:
- *   - N <= 0 → cargo_fijo = 0 (anti division por cero).
+ *   - N <= 0 → cargo_fijo = 0 (anti división por cero en caso de regresión
+ *     a la fórmula vieja, aunque hoy ya no se divide).
  *   - Componentes desconocidos en el array → ignorados.
  *   - Input con campos no-finitos → 0 (no NaN, no Infinity).
+ *
+ * Nota sobre modelo mono-servicio: ParametrosTarifa NO separa acueducto
+ * y alcantarillado (Res CRA 825/2017 aplica a prestadores rurales <5000
+ * suscriptores donde usualmente el prestador es mono-servicio). Si en el
+ * futuro el dominio requiere multi-servicio, agregar parámetros
+ * separados por servicio.
  *
  * @param p ParametrosTarifa con todos los campos completos.
  * @returns { cargo_fijo, cargo_consumo } (number, no string).

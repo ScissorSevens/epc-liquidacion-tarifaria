@@ -40,6 +40,15 @@ interface ParametrosRow {
   readonly created_at: string;
   readonly anio_base: number;
   readonly factor_indexacion_ipc: number;
+  // Phase 3.2: compliance CRA 825/2017 + Res CRA 907/2019.
+  // cmaa: CMAA — Costo Medio de Administración por Inversiones Ambientales
+  //        Adicionales (Res CRA 907/2019 art. 31.B). Real nullable.
+  // acto_adopcion / estudio_costos_id / documento_soporte_url: trazabilidad
+  // del estudio de costos y acto administrativo que adopta la metodología.
+  readonly cmaa: number | null;
+  readonly acto_adopcion: string | null;
+  readonly estudio_costos_id: string | null;
+  readonly documento_soporte_url: string | null;
 }
 
 interface MinimoVitalRow {
@@ -110,6 +119,10 @@ function fromRow(row: ParametrosRow, minimoVital: MinimoVital | null): Parametro
     created_at: row.created_at,
     anio_base: row.anio_base,
     factor_indexacion_ipc: row.factor_indexacion_ipc,
+    cmaa: row.cmaa,
+    acto_adopcion: row.acto_adopcion,
+    estudio_costos_id: row.estudio_costos_id,
+    documento_soporte_url: row.documento_soporte_url,
   };
 }
 
@@ -140,8 +153,9 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
           aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
           cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
-          vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc,
+          cmaa, acto_adopcion, estudio_costos_id, documento_soporte_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
@@ -150,6 +164,8 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
         data.anio_base, data.factor_indexacion_ipc,
+        data.cmaa ?? null, data.acto_adopcion ?? null,
+        data.estudio_costos_id ?? null, data.documento_soporte_url ?? null,
       );
       const id = Number(result.lastInsertRowId);
       const row = await db.getFirstAsync<ParametrosRow>(
@@ -263,8 +279,9 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           agua_suministrada_m3_anio, ipuf_m3_suscriptor_mes, suscriptores_promedio,
           aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
           cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
-          vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc,
+          cmaa, acto_adopcion, estudio_costos_id, documento_soporte_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id_prestador, periodo, vigente_desde) DO UPDATE SET
           id_acuerdo = excluded.id_acuerdo,
           cma = excluded.cma,
@@ -284,7 +301,11 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           componentes_aplicables = excluded.componentes_aplicables,
           vigente_hasta = excluded.vigente_hasta,
           anio_base = excluded.anio_base,
-          factor_indexacion_ipc = excluded.factor_indexacion_ipc`,
+          factor_indexacion_ipc = excluded.factor_indexacion_ipc,
+          cmaa = excluded.cmaa,
+          acto_adopcion = excluded.acto_adopcion,
+          estudio_costos_id = excluded.estudio_costos_id,
+          documento_soporte_url = excluded.documento_soporte_url`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
@@ -293,6 +314,8 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
         data.anio_base, data.factor_indexacion_ipc,
+        data.cmaa ?? null, data.acto_adopcion ?? null,
+        data.estudio_costos_id ?? null, data.documento_soporte_url ?? null,
       );
       const row = await db.getFirstAsync<ParametrosRow>(
         `SELECT * FROM parametros_tarifa

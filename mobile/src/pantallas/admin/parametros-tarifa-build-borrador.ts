@@ -29,6 +29,14 @@ import { COMPONENTES_TARIFARIOS } from '../../../dominio/parametros-tarifa/calcu
 /**
  * Shape del state local del screen ParametrosTarifa.
  * Refleja los 15 useState del componente (periodo, anioBase, cma, ...).
+ *
+ * Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.5+4.7):
+ * incluye 4 campos adicionales de soporte documental / CMAA:
+ *   - cmaa: Costo Medio de Administración por Inversiones Ambientales
+ *     Adicionales (Res CRA 907/2019 art. 13 mod. Res CRA 825/2017 art. 9).
+ *   - actoAdopcion: URL del acto administrativo de adopción.
+ *   - estudioCostosId: ID del estudio de costos (referencia externa).
+ *   - documentoSoporteUrl: URL del documento soporte del estudio.
  */
 export interface FormValues {
   readonly periodo: string;
@@ -38,7 +46,11 @@ export interface FormValues {
   readonly cmi: string;
   readonly cmt: string;
   readonly cmviaa: string;
+  readonly cmaa: string;
   readonly aplicaCmviaa: boolean;
+  readonly actoAdopcion: string;
+  readonly estudioCostosId: string;
+  readonly documentoSoporteUrl: string;
   readonly aguaSuministrada: string;
   readonly ipuf: string;
   readonly suscriptoresPromedio: string;
@@ -68,11 +80,24 @@ function entero(s: string): number {
 }
 
 /**
+ * Helper de string → number|null. Convierte '' a null (para los docs
+ * opcionales que la columna SQLite admite como NULL). Strings NaN
+ * tambien caen a null.
+ */
+function stringOVacioANull(s: string): string | null {
+  if (s === undefined || s === null) return null;
+  const trimmed = s.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
  * Construye un ParametrosTarifaBorrador (sin id_parametros/created_at)
  * desde los FormValues del state local. El shape es COMPLETO — el caller
  * puede pasar el resultado directo a `calcularCargos()`.
  *
- * @param form FormValues del state local (14 strings + 2 booleans).
+ * @param form FormValues del state local (14 strings + 2 booleans +
+ *             4 nuevos campos Fase 2: cmaa, actoAdopcion,
+ *             estudioCostosId, documentoSoporteUrl).
  * @param ctx  id_prestador + id_acuerdo del workspace / bootstrap.
  * @returns ParametrosTarifaBorrador listo para `calcularCargos` o `repo.guardar`.
  */
@@ -91,7 +116,18 @@ export function buildBorradorLocal(
     cmi: num(form.cmi),
     cmt: num(form.cmt),
     cmviaa: form.aplicaCmviaa ? num(form.cmviaa) : 0,
+    // CMAA (Fase 2, task 4.7 GREEN): Costo Medio de Administración
+    // por Inversiones Ambientales Adicionales. Se persiste como
+    // number (0 = sin inversiones). Si el campo del form está vacío,
+    // caemos a 0 (no null) para que el motor siempre vea un number.
+    cmaa: num(form.cmaa),
     aplica_cmviaa: form.aplicaCmviaa,
+    // 3 docs de soporte (Fase 2, task 4.7 GREEN). '' → null para
+    // mantener la convención de la columna SQLite (TEXT NULL por
+    // backward-compat con acuerdos legacy sin docs).
+    acto_adopcion: stringOVacioANull(form.actoAdopcion),
+    estudio_costos_id: stringOVacioANull(form.estudioCostosId),
+    documento_soporte_url: stringOVacioANull(form.documentoSoporteUrl),
     agua_suministrada_m3_anio: num(form.aguaSuministrada),
     ipuf_m3_suscriptor_mes: num(form.ipuf),
     suscriptores_promedio: entero(form.suscriptoresPromedio),

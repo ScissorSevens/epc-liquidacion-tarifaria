@@ -187,11 +187,15 @@ describe('E2E handleFinalizar — reproduce el path SQL real del device', () => 
       expect(nombres).toContain('concepto_otro_valor');
       expect(nombres).toContain('minimo_vital');
 
-      // Verificamos que las 24 migrations quedaron registradas
+      // Verificamos que las 27 migrations quedaron registradas
+      // (24 previas + 3 de param-tarifa-res-825-compliance-phase2:
+      //  025 parametros_tarifa.cmaa + docs,
+      //  026 suscriptor.verification,
+      //  027 acuerdo_municipal.estado).
       const aplicadas = db
         .prepare('SELECT version FROM __migraciones_aplicadas ORDER BY version')
         .all() as Array<{ version: number }>;
-      expect(aplicadas.length).toBe(24);
+      expect(aplicadas.length).toBe(27);
     });
   }, 30000);
 

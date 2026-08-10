@@ -42,6 +42,8 @@ import { crearOperario } from '../../dominio/operarios/operarios';
 import type { Sesion } from './constantes';
 import { obtenerOCrearDeviceId } from './device-id';
 import type { Hasher, IdGenerator } from '../../dominio/shared/ports';
+import { validarAmbito } from '../../dominio/ambito-tarifario/validar-ambito';
+import type { PrestadorAmbitoInfo, ResultadoAmbito } from '../../dominio/ambito-tarifario/types';
 
 /** Prestador con acceso a la transaccion de la conexion SQLite compartida. */
 export interface PrestadorRepoPort {
@@ -100,6 +102,22 @@ export interface BootstrapCompletoDeps {
   readonly input: BootstrapCompletoInput;
   /** Para tests que quieren inyectar un Date fijo. Default = new Date(). */
   readonly ahora?: () => Date;
+  /**
+   * Gate de ámbito tarifario (Fase 2, task 4.4 GREEN). Inyectado para
+   * que los tests puedan simular NO_APLICA / INDETERMINADO / APLICA
+   * sin tocar la implementación real de `validarAmbito`. Default =
+   * la función pura del dominio `validarAmbito` (Res CRA 825/2017 +
+   * Res CRA 1032/2026 art. 2.1.2.1.1.1).
+   *
+   * Si el gate retorna NO_APLICA, el bootstrap ABORTA con un error
+   * claro que distingue "prestador no aplica a CRA 825/2017" de
+   * "datos insuficientes para evaluar". El admin debe contactar a
+   * soporte si NO_APLICA.
+   */
+  readonly validarAmbito?: (
+    prestador: PrestadorAmbitoInfo,
+    fecha: string,
+  ) => ResultadoAmbito;
 }
 
 // ── Constantes del dominio ──────────────────────────────────────────────────
@@ -197,10 +215,83 @@ function calcularVigencia5Anios(ahora: Date): { desde: string; hasta: string } {
  * los repositorios ya estan enlazados a la misma conexion y sus queries
  * participan en la transaccion activa.
  *
+ * ## Gate de ámbito tarifario (Fase 2, task 4.4 GREEN)
+ *
+ * Antes de crear el Prestador, invoca `validarAmbito()` contra los
+ * datos del input. Reglas (decision 2 del design §"Architecture
+ * Decisions" + design §"Data Flow"):
+ *
+ *   - `APLICA` (Subtítulo 1 o 2): el bootstrap continúa.
+ *   - `NO_APLICA`: el bootstrap ABORTA con error claro que distingue
+ *     "prestador no aplica a CRA 825/2017" de "datos inválidos". El
+ *     admin debe contactar a soporte — NO podemos continuar porque
+ *     las facturas que se emitan no tendrían un Subtítulo tarifario
+ *     aplicable.
+ *   - `INDETERMINADO`: el bootstrap ABORTA con mensaje "datos
+ *     insuficientes para evaluar el ámbito". El admin debe
+ *     completar `cantidad_suscriptores` antes de continuar.
+ *
+ * El gate se evalúa ANTES de cualquier escritura (no crea prestador
+ * ni abre transacción si el gate falla). Si pasa, la transacción
+ * SQLite envuelve las 4 inserciones como antes.
+ *
  * @throws El error original del repositorio que falle. SQLite revierte
  *         automaticamente todas las escrituras de la transaccion.
+ * @throws `Error(MENSAJES_ERROR_BOOTSTRAP.AMBITO_NO_APLICA)` si el
+ *         gate retorna NO_APLICA.
+ * @throws `Error(MENSAJES_ERROR_BOOTSTRAP.AMBITO_INDETERMINADO)` si
+ *         el gate retorna INDETERMINADO con datos insuficientes.
  */
 export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<BootstrapCompletoResultado> {
+  // ── Gate de ámbito tarifario (Fase 2, task 4.4 GREEN) ────────────────
+  //
+  // Se ejecuta ANTES de la transacción y ANTES de prestadorRepo.listar()
+  // para garantizar que no se persiste NADA si el Prestador no aplica
+  // o si los datos son insuficientes. La zona se infiere del input:
+  //   - num_suscriptores_urbanos > 0 && rurales > 0 → MIXTA
+  //   - num_suscriptores_urbanos > 0 → URBANA
+  //   - num_suscriptores_rurales > 0 → RURAL (default)
+  const inputCantidadSuscriptores =
+    deps.input.prestadorData.num_suscriptores_urbanos +
+    deps.input.prestadorData.num_suscriptores_rurales;
+  const inputZona: PrestadorAmbitoInfo['zona'] =
+    deps.input.prestadorData.num_suscriptores_urbanos > 0 &&
+    deps.input.prestadorData.num_suscriptores_rurales > 0
+      ? 'MIXTA'
+      : deps.input.prestadorData.num_suscriptores_urbanos > 0
+        ? 'URBANA'
+        : 'RURAL';
+  const fechaGate = (deps.ahora ?? (() => new Date()))().toISOString();
+  const validarAmbitoFn = deps.validarAmbito ?? validarAmbito;
+  const resultadoAmbito = validarAmbitoFn(
+    {
+      id_prestador: 0, // pre-creación; el id real se asigna al persistir
+      cantidad_suscriptores: inputCantidadSuscriptores,
+      zona: inputZona,
+    },
+    fechaGate,
+  );
+  if (resultadoAmbito.estado === 'NO_APLICA') {
+    // Distinguimos el caso "prestador no aplica a CRA 825/2017" del
+    // caso "datos insuficientes". El admin debe entender que contactar
+    // a soporte es la acción correcta (no seguir). El mensaje ES
+    // user-facing: el `Alert.alert` que lo muestra en `SetupInicial`
+    // lo lee tal cual.
+    throw new Error(
+      `Este prestador no aplica a CRA 825/2017 (estado=${resultadoAmbito.estado}; ${resultadoAmbito.evidencia}). El setup no puede continuar. Contacte a soporte.`,
+    );
+  }
+  if (resultadoAmbito.estado === 'INDETERMINADO') {
+    // Datos insuficientes para evaluar el ámbito. Por diseño, el
+    // bootstrap acepta como input solo suscriptores numéricos (no
+    // null), así que INDETERMINADO solo se dispara si el caller
+    // inyecta un mock — pero el contrato está claro: abortar.
+    throw new Error(
+      `Datos insuficientes para evaluar el ámbito tarifario (estado=${resultadoAmbito.estado}; ${resultadoAmbito.evidencia}). Configure la cantidad de suscriptores del prestador antes de continuar.`,
+    );
+  }
+  // estado === 'APLICA' → continuar.
+
   let resultado: BootstrapCompletoResultado | undefined;
 
   await deps.prestadorRepo.withTransactionAsync(async () => {
@@ -217,6 +308,14 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
     const prestador = await deps.prestadorRepo.crear(borradorPrestador);
 
     // 2. Crear acuerdo municipal con defaults L142/1994.
+    //
+    // Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.2 GREEN):
+    // el Acuerdo se crea en estado BORRADOR por default (decision 5
+    // del design §"Architecture Decisions"). El admin debe cargar
+    // `acto_administrativo_url` y promoverlo a ACTIVO antes de empezar
+    // a liquidar. Razón regulatoria: si el bootstrap promoviera a
+    // ACTIVO directamente, el prestador podría operar sin acto
+    // administrativo formal, lo que viola la Res CRA 825/2017 art. 9.
     const acuerdo = await deps.acuerdoRepo.crear({
       id_prestador: prestador.id_prestador,
       // Legacy (backward-compat)
@@ -241,6 +340,7 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       fecha_vigencia_hasta,
       acto_administrativo_url: null,
       observaciones: 'Acuerdo creado automáticamente por el wizard de setup inicial.',
+      estado: 'BORRADOR',
     });
 
     // 3. Crear parametros tarifa vinculados al acuerdo.

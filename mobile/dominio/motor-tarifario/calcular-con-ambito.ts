@@ -16,6 +16,11 @@
  * antes de liquidación como función wrapper").
  *
  * Cambio `param-tarifa-res-825-compliance-phase2` (task 2.8 GREEN).
+ *
+ * Task 4.8 (Fase 2): propaga `validacion_ambito` al metadata del
+ * `ResultadoCalculo` retornado para que `emitirFactura` lo persista
+ * en el snapshot. Sin esto, la auditoría regulatoria no podría
+ * reconstruir el Subtítulo CRA aplicado al momento del cálculo.
  */
 
 import { validarAmbito } from '../ambito-tarifario/validar-ambito';
@@ -23,6 +28,7 @@ import type {
   ParametrosTarifa,
   ResultadoCalculo,
   EntradaCalculo,
+  SnapshotValidacionAmbito,
 } from './types';
 import type {
   AcuerdoMunicipal,
@@ -35,6 +41,30 @@ const MENSAJES = {
 } as const;
 
 /**
+ * Proyecta `ResultadoAmbito` + `cantidad_suscriptores` del prestador
+ * al type `SnapshotValidacionAmbito` snake_case (spec compliance).
+ *
+ * Es un helper puro: misma entrada → misma salida. Vive aqui (no en
+ * `validar-ambito.ts`) porque es específico del contrato del snapshot,
+ * no del resultado del gate.
+ */
+function proyectarValidacionAmbitoParaSnapshot(
+  ambito: ReturnType<typeof validarAmbito>,
+  cantidadSuscriptores: number | null,
+): SnapshotValidacionAmbito {
+  return {
+    estado: ambito.estado,
+    subtitulo: ambito.subtitulo,
+    norma_aplicable: ambito.normaAplicable,
+    // `motivo` = el campo `evidencia` del ResultadoAmbito. La spec
+    // pide `motivo` (sin acentos, alcance regulatorio).
+    motivo: ambito.evidencia,
+    cantidad_suscriptores: cantidadSuscriptores,
+    fecha_verificacion: ambito.fecha_verificacion,
+  };
+}
+
+/**
  * Igual a `calcularLiquidacion` pero invoca `validarAmbito` antes.
  *
  * @param entrada            Entrada del cálculo (con `id_prestador`).
@@ -43,7 +73,10 @@ const MENSAJES = {
  * @param prestador           Información mínima del prestador para gate.
  * @param fecha_emision       ISO 8601 de la fecha del cálculo (también
  *                            puede venir en `entrada.fecha_emision`).
- * @returns                   ResultadoCalculo inmutable.
+ * @returns                   ResultadoCalculo inmutable. Su metadata
+ *                            incluye `validacion_ambito` con
+ *                            `estado='APLICA'` (gates NO_APLICA /
+ *                            INDETERMINADO throw antes).
  * @throws                     Error con clave AMBITO_* si `validarAmbito`
  *                             retorna ≠APLICA.
  */
@@ -67,5 +100,19 @@ export function calcularLiquidacionConAmbito(
   // Lazy import para evitar ciclos entre módulos (motor ↔ ambito).
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { calcularLiquidacion } = require('./motor-tarifario');
-  return calcularLiquidacion(entrada, parametros, acuerdo);
+  const resultado = calcularLiquidacion(entrada, parametros, acuerdo);
+  // Patch del resultado para incluir `validacion_ambito` en metadata.
+  // `ResultadoCalculo` es readonly (deep-frozen por el caller), pero
+  // sus campos son planos — podemos reasignar `metadata` con spread
+  // propio sin violar la inmutabilidad del resto.
+  return {
+    ...resultado,
+    metadata: {
+      ...resultado.metadata,
+      validacion_ambito: proyectarValidacionAmbitoParaSnapshot(
+        ambito,
+        prestador.cantidad_suscriptores,
+      ),
+    },
+  };
 }

@@ -62,7 +62,7 @@ function createExpoLikeDb(rawDb: Database.Database): ExpoLikeDb {
 const AHORA = new Date('2026-08-04T12:00:00.000Z');
 
 async function crearTenant(app: BootstrapApp) {
-  return bootstrapCompleto({
+  const tenant = await bootstrapCompleto({
     prestadorRepo: app.repos.prestadorRepo,
     acuerdoRepo: app.repos.acuerdoMunicipalRepo,
     parametrosRepo: app.repos.parametrosTarifaRepo,
@@ -93,6 +93,26 @@ async function crearTenant(app: BootstrapApp) {
       },
     },
   });
+  // Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.2):
+  // el bootstrap ahora crea el Acuerdo en estado BORRADOR. El motor
+  // tarifario rechaza liquidar contra Acuerdo que no esté en ACTIVO.
+  // El e2e simula el flow de producción: admin carga el acto
+  // administrativo y el sistema promueve el Acuerdo a ACTIVO antes de
+  // liquidar. Sin este UPDATE, los primeros 2 tests del describe
+  // fallan con `ACUERDO_NO_ACTIVO`.
+  await app.db.runAsync(
+    `UPDATE acuerdo_municipal SET estado = 'ACTIVO' WHERE id_acuerdo = ?`,
+    tenant.acuerdo.id_acuerdo,
+  );
+  // Releer el Acuerdo desde la DB para que el objeto retornado por
+  // el bootstrap tenga la versión ACTIVA (consistente con la realidad).
+  const acuerdoActualizado = await app.repos.acuerdoMunicipalRepo.obtenerPorId(
+    tenant.acuerdo.id_acuerdo,
+  );
+  if (acuerdoActualizado === null) {
+    throw new Error('crearTenant: Acuerdo desapareció tras UPDATE');
+  }
+  return { ...tenant, acuerdo: acuerdoActualizado };
 }
 
 async function emitirConParametros(

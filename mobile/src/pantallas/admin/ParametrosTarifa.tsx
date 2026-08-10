@@ -253,6 +253,25 @@ export default function ParametrosTarifaForm({
   const [cmt, setCmt] = useState(String(parametrosActuales?.cmt ?? 0));
   const [cmviaa, setCmviaa] = useState(String(parametrosActuales?.cmviaa ?? 0));
   const [aplicaCmviaa, setAplicaCmviaa] = useState(parametrosActuales?.aplica_cmviaa ?? false);
+  // CMAA — Costo Medio de Administración por Inversiones Ambientales
+  // Adicionales (Res CRA 907/2019 art. 13 que modifica Res CRA 825/2017
+  // art. 9). SOLO aplica al servicio de ACUEDUCTO. Default 0 si el
+  // prestador NO opta por inversiones ambientales; null backward-compat.
+  // Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.5).
+  const [cmaa, setCmaa] = useState(
+    String(parametrosActuales?.cmaa ?? 0),
+  );
+  // Documentos de soporte (Fase 2, task 4.5). Todos opcionales.
+  // Default string vacia para que el input muestre placeholder.
+  const [actoAdopcion, setActoAdopcion] = useState(
+    parametrosActuales?.acto_adopcion ?? '',
+  );
+  const [estudioCostosId, setEstudioCostosId] = useState(
+    parametrosActuales?.estudio_costos_id ?? '',
+  );
+  const [documentoSoporteUrl, setDocumentoSoporteUrl] = useState(
+    parametrosActuales?.documento_soporte_url ?? '',
+  );
   const [aguaSuministrada, setAguaSuministrada] = useState(String(parametrosActuales?.agua_suministrada_m3_anio ?? 0));
   const [ipuf, setIpuf] = useState(String(parametrosActuales?.ipuf_m3_suscriptor_mes ?? 6));
   const [suscriptoresPromedio, setSuscriptoresPromedio] = useState(String(parametrosActuales?.suscriptores_promedio ?? 0));
@@ -292,6 +311,12 @@ export default function ParametrosTarifaForm({
     setCmt(String(parametrosActuales.cmt));
     setCmviaa(String(parametrosActuales.cmviaa));
     setAplicaCmviaa(parametrosActuales.aplica_cmviaa);
+    // CMAA + 3 docs (Fase 2, task 4.5). Si el parametro persisted
+    // tiene null, el input vuelve a string vacio (default limpio).
+    setCmaa(String(parametrosActuales.cmaa ?? 0));
+    setActoAdopcion(parametrosActuales.acto_adopcion ?? '');
+    setEstudioCostosId(parametrosActuales.estudio_costos_id ?? '');
+    setDocumentoSoporteUrl(parametrosActuales.documento_soporte_url ?? '');
     setAguaSuministrada(String(parametrosActuales.agua_suministrada_m3_anio));
     setIpuf(String(parametrosActuales.ipuf_m3_suscriptor_mes));
     setSuscriptoresPromedio(String(parametrosActuales.suscriptores_promedio));
@@ -316,6 +341,11 @@ export default function ParametrosTarifaForm({
   // via try/catch (la funcion THROWS, no retorna string — D4 hallazgo
   // critico del design). Tambien valida reglas locales (suscriptores > 0
   // defensa anti division por cero, fechas invertidas).
+  //
+  // Fase 2 (task 4.5): validacion adicional de URLs (acto_adopcion y
+  // documento_soporte_url). El CMAA no lleva validacion inline: el
+  // dominio ya valida `cmaa` como numeric en el campo de tipo numeric,
+  // y el form lo trata como complemento opcional.
   const validarTodo = (): FormErrors => {
     const errors: FormErrors = {};
     const cmaNum = num(cma);
@@ -337,7 +367,30 @@ export default function ParametrosTarifaForm({
     ) {
       errors.vigenteHasta = 'Vigente hasta debe ser posterior a vigente desde';
     }
+    // Validacion de URLs (Fase 2, task 4.5). Si el campo está vacio,
+    // se permite: ambos docs son opcionales. Si el usuario escribió
+    // algo, debe ser una URL http(s) válida.
+    if (actoAdopcion.trim() !== '' && !esUrlValida(actoAdopcion.trim())) {
+      errors.actoAdopcion = 'Debe ser una URL válida (http:// o https://)';
+    }
+    if (
+      documentoSoporteUrl.trim() !== '' &&
+      !esUrlValida(documentoSoporteUrl.trim())
+    ) {
+      errors.documentoSoporteUrl = 'Debe ser una URL válida (http:// o https://)';
+    }
     return errors;
+  };
+
+  /**
+   * Helper de validacion de URL (Fase 2, task 4.5). Acepta http:// o
+   * https:// — protocolos válidos para documentos públicos (actoadministrativo
+   * URL y documento_soporte_url). Si el campo está vacío, retorna
+   * true (la validación a nivel callsite salta el chequeo).
+   */
+  const esUrlValida = (s: string): boolean => {
+    if (s === '') return true;
+    return /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(s);
   };
 
   // D2 (parametros-tarifa-impeccable-v2 Commit 2): construimos el shape
@@ -351,7 +404,11 @@ export default function ParametrosTarifaForm({
     cmi,
     cmt,
     cmviaa,
+    cmaa,
     aplicaCmviaa,
+    actoAdopcion,
+    estudioCostosId,
+    documentoSoporteUrl,
     aguaSuministrada,
     ipuf,
     suscriptoresPromedio,
@@ -480,7 +537,13 @@ export default function ParametrosTarifaForm({
   // D8 (Commit 3): scroll-to-first-error. Map de refs por campo.
   // Cada FormField con error potencial recibe `ref={getRef(key)}` para
   // que `scrollToFirstError` pueda scrollear al primero.
-  type CampoConError = 'cma' | 'suscriptores' | 'vigenteHasta';
+  // Fase 2 (task 4.5): incluye 'actoAdopcion' y 'documentoSoporteUrl'.
+  type CampoConError =
+    | 'cma'
+    | 'suscriptores'
+    | 'vigenteHasta'
+    | 'actoAdopcion'
+    | 'documentoSoporteUrl';
   const { getRef } = useFormFieldRefs<CampoConError>();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -669,6 +732,25 @@ export default function ParametrosTarifaForm({
           </View>
         )}
 
+        {/* CMAA · Costo Medio de Administración por Inversiones Ambientales
+            Adicionales (Res CRA 907/2019 art. 13 mod. Res CRA 825/2017 art. 9).
+            SOLO aplica al servicio de ACUEDUCTO. Para alcantarillado el CF
+            es solo CMA (sin CMAA). Fase 2 (task 4.5). 
+            Hint visual sobre la norma. */}
+        <View style={estilos.campo}>
+          <FormField
+            label="CMAA · Costo Medio Admin. Inversiones Ambientales Adic. ($/suscriptor/mes)"
+            value={cmaa}
+            onChangeText={setCmaa}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Solo aplica a servicio de ACUEDUCTO. Res CRA 907/2019 art. 14 (mod. art. 9 Res CRA 825/2017)."
+            testID="param-cmaa"
+          />
+        </View>
+
         {/* D2/D3 (Commit 2): ResumenCargos live preview. */}
         <ResumenCargos cargos={resumen} testID="resumen-cargos" />
       </SeccionForm>
@@ -782,6 +864,61 @@ export default function ParametrosTarifaForm({
             />
           </View>
         )}
+      </SeccionForm>
+
+      {/* Soporte documental (Fase 2, task 4.5). 3 campos opcionales
+          para auditoria regulatoria: acto_adopcion, estudio_costos_id,
+          documento_soporte_url. Todos pueden quedar vacios; si el
+          admin los completa, deben ser URLs validas (acto_adopcion +
+          documento_soporte_url) o string libre (estudio_costos_id). */}
+      <SeccionForm titulo="Soporte documental (Res CRA 825/2017 + 907/2019)" icono="description" testID="seccion-card-soporte-documental">
+        <Text style={estilos.nota}>
+          Documentos opcionales que respaldan la metodologia tarifaria aplicada. Si los completa, las URLs deben ser publicas (http/https).
+        </Text>
+        <View style={estilos.campo}>
+          <FormField
+            label="Acto administrativo de adopcion (URL, decreto/resolucion)"
+            value={actoAdopcion}
+            onChangeText={setActoAdopcion}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!guardando && !cargandoInputs}
+            keyboardType="url"
+            placeholder="https://..."
+            error={errores.actoAdopcion}
+            ref={getRef('actoAdopcion')}
+            accessibilityHint="URL del acto administrativo que adopta la metodologia tarifaria"
+            testID="param-acto-adopcion"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="ID estudio de costos (referencia externa, ej: SUI)"
+            value={estudioCostosId}
+            onChangeText={setEstudioCostosId}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!guardando && !cargandoInputs}
+            helperText="Identificador del estudio de costos en el sistema externo (SUI o similar). String libre."
+            testID="param-estudio-costos-id"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Documento soporte del estudio (URL, PDF u otro)"
+            value={documentoSoporteUrl}
+            onChangeText={setDocumentoSoporteUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!guardando && !cargandoInputs}
+            keyboardType="url"
+            placeholder="https://..."
+            error={errores.documentoSoporteUrl}
+            ref={getRef('documentoSoporteUrl')}
+            accessibilityHint="URL del documento soporte del estudio de costos"
+            testID="param-documento-soporte-url"
+          />
+        </View>
       </SeccionForm>
 
       <BotonPrimario
