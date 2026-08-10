@@ -588,11 +588,6 @@ ALTER TABLE parametros_tarifa ADD COLUMN documento_soporte_url TEXT NULL;
  * Backward-compat: data legacy queda con `estado_verificacion =
  * 'PENDIENTE'` (NOT NULL con default). Filas nuevas deben especificar
  * el estado explícitamente o aceptar el default.
- *
- * NOTA sobre `acuerdo_municipal.estado`: NO requiere migration SQL.
- * El campo se persiste via `data.estado ?? 'ACTIVO'` en el repository
- * (default conservador para legacy data). El adapter expo-sqlite lo
- * maneja en code-level, sin necesidad de ALTER TABLE.
  */
 const MIGRACION_026_SUSCRIPTOR_VERIFICACION = `
 -- Migration 026: Suscriptor verification oficial del estrato.
@@ -601,6 +596,35 @@ ALTER TABLE suscriptor ADD COLUMN estado_verificacion TEXT NOT NULL DEFAULT 'PEN
 ALTER TABLE suscriptor ADD COLUMN fuente_estrato TEXT NULL;
 ALTER TABLE suscriptor ADD COLUMN fecha_verificacion_estrato TEXT NULL;
 ALTER TABLE suscriptor ADD COLUMN soporte_estrato_url TEXT NULL;
+`;
+
+/**
+ * Migration 027_acuerdo_municipal_estado. Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/027_acuerdo_municipal_estado.sql`.
+ *
+ * Cambia `param-tarifa-res-825-compliance-phase2`. Res CRA 825/2017:
+ * agrega 1 columna aditiva a `acuerdo_municipal` para registrar el
+ * estado del ciclo de vida del Acuerdo (BORRADOR | ACTIVO | VENCIDO
+ * | DEROGADO).
+ *
+ *   - estado: TEXT NOT NULL DEFAULT 'ACTIVO' — Default conservador
+ *           para legacy data: asume acto previo cargado. Cambiar a
+ *           'BORRADOR' requiere acción admin explícita.
+ *
+ * 9na columna del change (vs 8 planificadas en el design). Inclusion
+ * necesaria: la design document decia "se hace en código", pero el
+ * adapter repo hace INSERT de la columna, lo que rompe bootstrap
+ * (crear Acuerdo) si la columna no existe en la DB. Default
+ * 'ACTIVO' cumple el racional conservador: acuerdos legacy asumen
+ * acto previo cargado y siguen siendo válidos.
+ *
+ * Idempotente: idem migration 025 (PRAGMA table_info + ALTER manual).
+ * Backward-compat: data legacy queda con `estado = 'ACTIVO'`.
+ */
+const MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO = `
+-- Migration 027: Acuerdo municipal estado del ciclo de vida.
+-- Res CRA 825/2017 — default 'ACTIVO' para legacy data.
+ALTER TABLE acuerdo_municipal ADD COLUMN estado TEXT NOT NULL DEFAULT 'ACTIVO';
 `;
 
 const MIGRACIONES: readonly Migracion[] = [
@@ -630,6 +654,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 24, nombre: '024_no_op_calle_drop', sql: MIGRACION_024_NO_OP_CALLE_DROP },
   { version: 25, nombre: '025_parametros_tarifa_cmaa_docs', sql: MIGRACION_025_PARAMETROS_TARIFA_CMAA_DOCS },
   { version: 26, nombre: '026_suscriptor_verificacion', sql: MIGRACION_026_SUSCRIPTOR_VERIFICACION },
+  { version: 27, nombre: '027_acuerdo_municipal_estado', sql: MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO },
 ];
 
 
@@ -707,17 +732,25 @@ export async function aplicarMigracionesAsync(
       continue;
     }
 
-    // Migration 025 + 026 (param-tarifa-res-825-compliance-phase2):
-    // mismas 4 columnas aditivas en `parametros_tarifa` y `suscriptor`
-    // respectivamente. El helper `aplicarMigration020IdempotenteExpo`
+    // Migration 025 + 026 + 027 (param-tarifa-res-825-compliance-phase2):
+    // columnas aditivas en `parametros_tarifa` (025), `suscriptor` (026)
+    // y `acuerdo_municipal` (027). El helper `aplicarMigration020IdempotenteExpo`
     // esta hardcoded para `factura`, asi que para mantener paridad
     // con el patron de la 017 usamos PRAGMA table_info inline.
-    // Las migrations 025/026 NO son destructivas (todas NULLables
-    // excepto estado_verificacion que tiene DEFAULT 'PENDIENTE'), asi
+    // Las migrations 025/026/027 NO son destructivas (todas NULLables
+    // excepto estado_verificacion/estado que tienen DEFAULT), asi
     // que data legacy queda naturalmente backward-compat.
-    if (migracion.version === 25 || migracion.version === 26) {
+    if (
+      migracion.version === 25 ||
+      migracion.version === 26 ||
+      migracion.version === 27
+    ) {
       const tabla =
-        migracion.version === 25 ? 'parametros_tarifa' : 'suscriptor';
+        migracion.version === 25
+          ? 'parametros_tarifa'
+          : migracion.version === 26
+          ? 'suscriptor'
+          : 'acuerdo_municipal';
       const columnasEsperadas = await db.getAllAsync<{ name: string }>(
         `PRAGMA table_info(${tabla})`,
       );
