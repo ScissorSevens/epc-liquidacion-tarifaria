@@ -29,6 +29,10 @@ import { buildBorradorLocal, type FormValues } from '../../../src/pantallas/admi
 const formCompleto: FormValues = {
   periodo: '2026',
   anioBase: '2016',
+  // Phase 3 task 3.4 (GREEN): 3 inputs editables de Indexación IPC.
+  anioDestino: '2026',
+  factorIpc: '1.6234',
+  ipufIndice: '1.0',
   cma: '12000000',
   cmo: '800',
   cmi: '200',

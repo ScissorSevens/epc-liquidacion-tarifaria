@@ -43,6 +43,15 @@ import { COMPONENTES_TARIFARIOS } from '../../../dominio/parametros-tarifa/calcu
 export interface FormValues {
   readonly periodo: string;
   readonly anioBase: string;
+  // Phase 3 task 3.4 (GREEN): 3 inputs editables de Indexación IPC
+  // (Res CRA 825/2017 Art. 11). Futan los inputs en el screen admin
+  // para que el prestador pueda override manual del factor calculado.
+  /** Año destino para el cálculo del factor IPC (Art. 11). */
+  readonly anioDestino: string;
+  /** Factor de indexación IPC persistido (Art. 11). Default 1.0. */
+  readonly factorIpc: string;
+  /** IPUF indice multiplicador (Art. 7). Default 1.0. */
+  readonly ipufIndice: string;
   readonly cma: string;
   readonly cmo: string;
   readonly cmi: string;
@@ -203,10 +212,11 @@ export function buildBorradorLocal(
     // que sincronización implicita que podria fallar silenciosamente.
     aplica_minimo_vital: false,
     m3_gratis_minimo_vital: 0,
-    // ipuf_indice: 1.0 = sin ajuste (Res CRA 825 Art. 7 — fase 1
-    // compliance). En produccion se calcula via calcularFactorIpc().
-    ipuf_indice: 1.0,
-    factor_indexacion_ipc: 1.0,
+    // ipuf_indice: multiplicador para actualizar precios sin re-emitir
+    // metodología (Res CRA 825 Art. 7). Phase 3 task 3.4 (GREEN):
+    // editable desde el form (líneas más abajo).
+    // factor_indexacion_ipc: Res CRA 825/2017 Art. 11. Phase 3 task
+    // 3.4 (GREEN): editable desde el form (líneas más abajo).
     componentes_aplicables: form.aplicaCmviaa
       ? [...COMPONENTES_TARIFARIOS]
       : componentesSinCmviaa,
@@ -219,7 +229,26 @@ export function buildBorradorLocal(
     // anio_destino_indexacion: Res CRA 825/2017 Art. 11. NULL por
     // backward-compat (legacy data sin destino seteado). En fase 3
     // task 3.3 se agrega input editable en el screen.
-    anio_destino_indexacion: null,
+    //
+    // Phase 3 task 3.4 (GREEN): ahora es editable y se propaga
+    // desde el form. Parseamos el string del input; si NaN/empty o
+    // ≤ 2000, cae a null (legacy / inválido). El admin puede
+    // override manual del factor calculado via `factorIpc`.
+    anio_destino_indexacion:
+      Number.isFinite(parseInt(form.anioDestino, 10)) && parseInt(form.anioDestino, 10) > 2000
+        ? parseInt(form.anioDestino, 10)
+        : null,
+    // Phase 3 task 3.4 (GREEN): factor_indexacion_ipc ahora editable
+    // desde el form. La función pura `calcularFactorIpc(anioBase,
+    // anioDestino)` sigue disponible para el cálculo automático
+    // (no usado en buildBorrador — el admin controla el valor).
+    factor_indexacion_ipc: Number.isFinite(parseFloat(form.factorIpc)) && parseFloat(form.factorIpc) > 0
+      ? parseFloat(form.factorIpc)
+      : 1.0,
+    // Phase 3 task 3.4 (GREEN): ipuf_indice editable.
+    ipuf_indice: Number.isFinite(parseFloat(form.ipufIndice)) && parseFloat(form.ipufIndice) > 0
+      ? parseFloat(form.ipufIndice)
+      : 1.0,
     // cargo_fijo_resultante + cargo_consumo_resultante se recalculan via
     // calcularCargos() en guardar() / useMemo. Acá los dejamos en 0
     // como placeholders (la factoría pura los ignora).

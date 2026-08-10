@@ -50,6 +50,7 @@ import {
   buildBorradorLocal,
   type FormValues,
 } from './parametros-tarifa-build-borrador';
+import { calcularFactorIpc } from '../../../dominio/parametros-tarifa/ipc';
 
 /**
  * Icono del botón Guardar segun plataforma.
@@ -247,7 +248,27 @@ export default function ParametrosTarifaForm({
 
   const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
   // anio_base: Res CRA 825/2017 Art. 7. Default 2016 (normativo).
+  // Phase 3 task 3.4 (GREEN): ahora es editable para permitir override
+  // del admin (cambios normativos). Validación > 2000.
   const [anioBase, setAnioBase] = useState(String(parametrosActuales?.anio_base ?? 2016));
+  // anio_destino_indexacion: Res CRA 825/2017 Art. 11. Default al
+  // periodo tarifario vigente. Phase 3 task 3.4 (GREEN): input
+  // editable. Permite override del admin para indexar contra otro año.
+  const [anioDestino, setAnioDestino] = useState(
+    String(parametrosActuales?.anio_destino_indexacion ?? parametrosActuales?.periodo ?? periodoDefault()),
+  );
+  // factor_indexacion_ipc: Res CRA 825/2017 Art. 11. Default 1.0 (sin
+  // indexación). Phase 3 task 3.4 (GREEN): input editable. El admin
+  // puede override manual; si no, se calcula via `calcularFactorIpc()`.
+  const [factorIpc, setFactorIpc] = useState(
+    String(parametrosActuales?.factor_indexacion_ipc ?? 1.0),
+  );
+  // ipuf_indice: multiplicador para actualizar precios sin re-emitir
+  // metodología (Res CRA 825 Art. 7). Default 1.0. Phase 3 task 3.4
+  // (GREEN): input editable para que el admin ajuste por IPC/IPC local.
+  const [ipufIndice, setIpufIndice] = useState(
+    String(parametrosActuales?.ipuf_indice ?? 1.0),
+  );
   const [cma, setCma] = useState(String(parametrosActuales?.cma ?? 0));
   const [cmo, setCmo] = useState(String(parametrosActuales?.cmo ?? 0));
   const [cmi, setCmi] = useState(String(parametrosActuales?.cmi ?? 0));
@@ -338,6 +359,14 @@ export default function ParametrosTarifaForm({
     setAguaSuministrada(String(parametrosActuales.agua_suministrada_m3_anio));
     setIpuf(String(parametrosActuales.ipuf_m3_suscriptor_mes));
     setSuscriptoresPromedio(String(parametrosActuales.suscriptores_promedio));
+    // Phase 3 task 3.4 (GREEN): re-hidratar los 3 inputs nuevos de IPC.
+    // `anio_destino_indexacion` es `number | null` en el type — si
+    // null (legacy data), caemos al periodo tarifario vigente.
+    setAnioDestino(
+      String(parametrosActuales.anio_destino_indexacion ?? parametrosActuales.periodo),
+    );
+    setFactorIpc(String(parametrosActuales.factor_indexacion_ipc ?? 1.0));
+    setIpufIndice(String(parametrosActuales.ipuf_indice ?? 1.0));
     setVigenteDesde(parametrosActuales.vigente_desde.slice(0, 10));
     setVigenteHasta(parametrosActuales.vigente_hasta.slice(0, 10));
     setAltitud(String(parametrosActuales.altitud_msnm ?? 0));
@@ -406,6 +435,25 @@ export default function ParametrosTarifaForm({
     ) {
       errors.documentoSoporteUrl = 'Debe ser una URL válida (http:// o https://)';
     }
+    // Phase 3 task 3.4 (GREEN): validación inline de Indexación IPC
+    // (Res CRA 825/2017 Art. 11). Años > 2000 (sanity), factor > 0
+    // (multiplicador no puede ser 0 ni negativo).
+    const anioBaseNum = entero(anioBase);
+    const anioDestinoNum = entero(anioDestino);
+    const factorIpcNum = parseFloat(factorIpc);
+    const ipufIndiceNum = parseFloat(ipufIndice);
+    if (anioBaseNum <= 2000) {
+      errors.anioBase = 'Anio base debe ser > 2000';
+    }
+    if (anioDestinoNum <= 2000) {
+      errors.anioDestino = 'Anio destino debe ser > 2000';
+    }
+    if (Number.isNaN(factorIpcNum) || factorIpcNum <= 0) {
+      errors.factorIpc = 'Factor IPC debe ser > 0';
+    }
+    if (Number.isNaN(ipufIndiceNum) || ipufIndiceNum <= 0) {
+      errors.ipufIndice = 'IPUF indice debe ser > 0';
+    }
     return errors;
   };
 
@@ -426,6 +474,10 @@ export default function ParametrosTarifaForm({
   const formValues: FormValues = {
     periodo,
     anioBase,
+    // Phase 3 task 3.4 (GREEN): 3 inputs editables de Indexación IPC.
+    anioDestino,
+    factorIpc,
+    ipufIndice,
     cma,
     cmo,
     cmi,
@@ -583,7 +635,13 @@ export default function ParametrosTarifaForm({
     | 'suscriptores'
     | 'vigenteHasta'
     | 'actoAdopcion'
-    | 'documentoSoporteUrl';
+    | 'documentoSoporteUrl'
+    // Phase 3 task 3.4 (GREEN): 4 inputs nuevos de Indexación IPC
+    // que pueden disparar error inline.
+    | 'anioBase'
+    | 'anioDestino'
+    | 'factorIpc'
+    | 'ipufIndice';
   const { getRef } = useFormFieldRefs<CampoConError>();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -670,6 +728,82 @@ export default function ParametrosTarifaForm({
             testID="param-vigente-hasta"
           />
         </View>
+      </SeccionForm>
+
+      <SeccionForm titulo="Indexación IPC (Art. 11 Res CRA 825/2017)" icono="trending-up" testID="seccion-card-ipc">
+        <Text style={estilos.nota}>
+          Factor de indexación IPC para actualizar precios sin re-emitir la metodología tarifaria. El admin puede
+          tipear el factor manualmente o tomar el factor calculado automáticamente a partir de los años base y destino.
+        </Text>
+        <View style={estilos.campo}>
+          <FormField
+            label="Anio base IPC (Res CRA 825 Art. 7, default 2016)"
+            value={anioBase}
+            onChangeText={setAnioBase}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Norma CRA 825: anio_base=2016 (default). Año de referencia para la tabla IPC del DANE."
+            error={errores.anioBase}
+            ref={getRef('anioBase')}
+            testID="param-anio-base-ipc"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Anio destino (indexación)"
+            value={anioDestino}
+            onChangeText={setAnioDestino}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Año al que se quiere indexar. Default = periodo tarifario vigente."
+            error={errores.anioDestino}
+            ref={getRef('anioDestino')}
+            testID="param-anio-destino"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="Factor de indexación IPC (override manual)"
+            value={factorIpc}
+            onChangeText={setFactorIpc}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Default 1.0 (sin indexación). El admin puede override manual sobre el factor calculado."
+            error={errores.factorIpc}
+            ref={getRef('factorIpc')}
+            testID="param-factor-ipc"
+          />
+        </View>
+        <View style={estilos.campo}>
+          <FormField
+            label="IPUF indice (multiplicador de precios)"
+            value={ipufIndice}
+            onChangeText={setIpufIndice}
+            keyboardType="numeric"
+            editable={!guardando && !cargandoInputs}
+            selectable
+            tabularNums
+            helperText="Multiplicador del IPUF (Res CRA 825 Art. 7). Default 1.0 (sin ajuste)."
+            error={errores.ipufIndice}
+            ref={getRef('ipufIndice')}
+            testID="param-ipuf-indice"
+          />
+        </View>
+        {/* Preview live del factor IPC calculado. Se actualiza conforme
+            el admin modifica anioBase y anioDestino. Estilo secondary
+            (mismo patron que param-altitud-preview). */}
+        <Text
+          style={estilos.previewAltitud}
+          testID="param-ipc-preview"
+        >
+          {`Factor IPC calculado: ${calcularFactorIpc(entero(anioBase), entero(anioDestino)).toFixed(4)} (IPC ${entero(anioDestino)} / IPC ${entero(anioBase)})`}
+        </Text>
       </SeccionForm>
 
       <SeccionForm titulo="Costos medios (estudio de costos del prestador)" icono="calculate" testID="seccion-card-cma">

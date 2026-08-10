@@ -185,6 +185,10 @@ describe('ParametrosTarifa UPSERT — vigente_desde format mismatch (bug stale-s
     const formValues: FormValues = {
       periodo: String(paramsLeidos!.periodo),
       anioBase: String(paramsLeidos!.anio_base),
+      // Phase 3 task 3.4 (GREEN): 3 inputs editables de Indexación IPC.
+      anioDestino: String(paramsLeidos!.anio_destino_indexacion ?? paramsLeidos!.periodo),
+      factorIpc: String(paramsLeidos!.factor_indexacion_ipc),
+      ipufIndice: String(paramsLeidos!.ipuf_indice),
       cma: String(cmaNuevo),
       cmo: String(paramsLeidos!.cmo),
       cmi: String(paramsLeidos!.cmi),

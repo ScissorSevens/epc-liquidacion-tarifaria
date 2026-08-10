@@ -1161,7 +1161,7 @@ fireEvent.press(back);
     it('T-PT-GUARDAR-5 prefill con `parametrosActuales` propaga los cargos existentes al form', async () => {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByDisplayValue } = renderConSafeArea(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1172,8 +1172,11 @@ fireEvent.press(back);
       );
 
       // El periodo pre-rellenado debe aparecer en el form.
+      // Phase 3 task 3.4 (GREEN): usamos `param-periodo` testID
+      // especifico porque ahora `param-anio-destino` también
+      // muestra "2026" por el default del periodo.
       await waitFor(() => {
-        expect(getByDisplayValue('2026')).toBeTruthy();
+        expect(getByTestId('param-periodo').props.value).toBe('2026');
       });
     });
   });
@@ -2688,10 +2691,11 @@ fireEvent.press(back);
         path.join(__dirname, '../../../dominio/parametros-tarifa/types.ts'),
         'utf8',
       );
-      // Hay un bloque @deprecated que menciona `aplica_minimo_vital`.
-      expect(source).toMatch(/@deprecated[\s\S]{0,400}aplica_minimo_vital/);
-      // Hay un bloque @deprecated que menciona `m3_gratis_minimo_vital`.
-      expect(source).toMatch(/@deprecated[\s\S]{0,400}m3_gratis_minimo_vital/);
+      // Hay un bloque @deprecated en el JSDoc del campo `aplica_minimo_vital`.
+      // El JSDoc puede ser extenso (200-800 chars) — usamos tolerancia amplia.
+      expect(source).toMatch(/@deprecated[\s\S]{0,1000}aplica_minimo_vital/);
+      // Hay un bloque @deprecated en el JSDoc del campo `m3_gratis_minimo_vital`.
+      expect(source).toMatch(/@deprecated[\s\S]{0,1000}m3_gratis_minimo_vital/);
     });
   });
 
