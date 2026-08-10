@@ -64,7 +64,10 @@ export interface ParametrosTarifa {
   readonly ipuf_m3_suscriptor_mes: number;
   /**
    * Suscriptores promedio mensual facturados año base (N). Insumo para
-   * CF = CMA/N y ASP = AS - IPUF*12*N.
+   * ASP = AS - IPUF*12*N y validaciones regulatorias (CMOG mínimo,
+   * consumo básico por altitud). NO participa en el cálculo del CF:
+   * desde `param-tarifa-res-825-compliance-phase2` (GAP-1), CF = cma + cmaa
+   * directamente (cma es $/suscriptor/mes normativo, no CA anual).
    */
   readonly suscriptores_promedio: number;
   /**

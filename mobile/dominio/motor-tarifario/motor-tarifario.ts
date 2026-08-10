@@ -8,10 +8,14 @@
  * argumentos.
  *
  * Fórmulas (art. 9 y art. 10 Res 825/2017 + art. 14 Res 907/2019):
- *   CFac         = CMAac / Nac                            (art. 9)
+ *   CFac         = cargo_fijo_resultante pre-calculado    (ver mobile/dominio/parametros-tarifa/calcular.ts)
+ *                  NO se recalcula en runtime — preserva auditoría histórica.
+ *                  Decisión `param-tarifa-res-825-compliance-phase2` (GAP-1):
+ *                  CF = cma + cmaa (sin dividir por N), donde cma es $/suscriptor/mes.
  *   ASPac        = max(ASac - IPUF * 12 * Nac, 1)         (art. 17, 19)
- *   CCac_unit    = (CMOac + CMIac + CMTac) / ASPac
- *                  + (aplica_cmviaa ? cmviaa : 0)         (art. 10 mod 907/2019)
+ *                  (sigue siendo parámetro, pero el motor usa cargo_consumo_resultante pre-calculado)
+ *   CCac_unit    = cargo_consumo_resultante pre-calculado (ver mobile/dominio/parametros-tarifa/calcular.ts)
+ *                  = (CMOac + CMIac + CMTac) / ASPac + (aplica_cmviaa ? cmviaa : 0)  (art. 10 mod 907/2019)
  *   CCac_total   = CCac_unit * consumo_efectivo_m3
  *   consumo_ef   = aplica_minimo_vital && residencial
  *                  ? max(0, consumo - m3_gratis)
