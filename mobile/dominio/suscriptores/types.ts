@@ -35,6 +35,30 @@ export interface Suscriptor {
   readonly id_prestador: number;
   /** Categoría de uso (Q10 spec). NOT NULL DEFAULT 'residencial' legacy. */
   readonly categoria_uso: CategoriaUso;
+  /**
+   * Estado de verificación oficial del estrato (Resolución CRA 825/2017
+   * + L142/1994). Solo E1-E3 residencial requiere VERIFICADO para
+   * recibir subsidio. Default 'PENDIENTE' para legacy (conservador: NO
+   * subsidia hasta que el admin cargue fuente+soporte).
+   *
+   * Transiciones:
+   *   PENDIENTE — creado sin verificación oficial.
+   *   VERIFICADO — admin cargó fuente_estrato + soporte_estrato_url + fecha.
+   *   RECHAZADO — estrato impugnado por el admin (default conservador: NO subsidia).
+   *
+   * Fase 2 (`param-tarifa-res-825-compliance-phase2`).
+   *
+   * OPCIONAL en TS para backward-compat con tests legacy. La persistencia
+   * rellena con `'PENDIENTE'` cuando el campo falta (ver migracion SQL
+   * con `DEFAULT 'PENDIENTE'`).
+   */
+  readonly estado_verificacion?: 'PENDIENTE' | 'VERIFICADO' | 'RECHAZADO';
+  /** Fuente del estrato: 'DANE 2025', 'Acto administrativo X', etc. Requerido para VERIFICADO. OPCIONAL. */
+  readonly fuente_estrato?: string | null;
+  /** ISO 8601 fecha de verificación. NULL hasta que se verifique. OPCIONAL. */
+  readonly fecha_verificacion_estrato?: string | null;
+  /** URL del documento soporte (PDF del acto, screenshot DANE, etc.). NULL hasta que se verifique. OPCIONAL. */
+  readonly soporte_estrato_url?: string | null;
 }
 
 /**

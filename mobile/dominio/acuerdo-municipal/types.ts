@@ -98,6 +98,27 @@ export interface AcuerdoMunicipal {
   readonly fecha_vigencia_hasta: string;
   readonly acto_administrativo_url: string | null;
   readonly observaciones: string | null;
+  /**
+   * Estado del ciclo de vida del Acuerdo. Transiciones:
+   *   BORRADOR — creado por bootstrap, sin acto administrativo cargado.
+   *   ACTIVO   — admin cargó `acto_administrativo_url` y aprobó.
+   *   VENCIDO  — `fecha_vigencia_hasta < hoy` (transición implícita).
+   *   DEROGADO — admin lo derogó explícitamente.
+   *
+   * El motor tarifario SOLO aplica factores del Acuerdo si está en ACTIVO.
+   * Para cualquier otro estado, usa topes L142/1994 art. 99.6 como
+   * fallback explícito (ver `motor-tarifario.ts:calcularLiquidacion`).
+   *
+   * Backward-compat: Acuerdo legacy tiene `estado = 'ACTIVO'` por
+   * default (asume acto previo cargado).
+   *
+   * Fase 2 (`param-tarifa-res-825-compliance-phase2`).
+   *
+   * OPCIONAL en TS para backward-compat con tests legacy. La persistencia
+   * rellena con `'ACTIVO'` para Acuerdo legacy (asume acto previo cargado)
+   * y con `'BORRADOR'` para Acuerdo creado por bootstrap nuevo.
+   */
+  readonly estado?: 'BORRADOR' | 'ACTIVO' | 'VENCIDO' | 'DEROGADO';
   readonly created_at: string;
 }
 

@@ -23,6 +23,18 @@ export interface EntradaCalculo {
   readonly consumo_m3: number;
   readonly estrato: Estrato;
   readonly categoria_uso: CategoriaUso;
+  /**
+   * Estado de verificación oficial del estrato del suscriptor.
+   * Default 'VERIFICADO' para compatibilidad con callers existentes
+   * (la verificación normalmente la hace el caller aguas arriba y solo
+   * las entradas verificadas llegan al motor).
+   *
+   * Si 'PENDIENTE' o 'RECHAZADO' en E1-E3 residencial, el motor aplica
+   * factor 0 con metadata `motivo_no_subsidio: '...'`.
+   *
+   * Fase 2 (`param-tarifa-res-825-compliance-phase2`).
+   */
+  readonly estado_verificacion?: 'PENDIENTE' | 'VERIFICADO' | 'RECHAZADO';
 }
 
 /**
