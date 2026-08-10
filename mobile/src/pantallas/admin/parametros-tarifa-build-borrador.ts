@@ -65,6 +65,18 @@ export interface FormValues {
 export interface BorradorCtx {
   readonly id_prestador: number;
   readonly id_acuerdo: number;
+  /**
+   * `vigente_desde` original leído del repo (full ISO con tiempo, ej:
+   * `'2026-08-10T18:30:00.000Z'`). Si el `form.vigenteDesde` coincide
+   * con `vigenteDesdePersistido.slice(0, 10)`, el usuario NO editó la
+   * fecha y el helper preserva el formato original. Esto evita que el
+   * UPSERT del repo (triple clave `id_prestador, periodo, vigente_desde`)
+   * genere fila duplicada cuando el bootstrap guardó con full ISO y el
+   * screen convierte a date-only. Ver `parametros-tarifa-upsert-stale.e2e.test.ts`.
+   *
+   * Opcional: si NO se provee, se usa `form.vigenteDesde` tal cual.
+   */
+  readonly vigenteDesdePersistido?: string | null;
 }
 
 /** Parsea un string a number; NaN/empty → 0. */
@@ -106,6 +118,40 @@ export function buildBorradorLocal(
   ctx: BorradorCtx,
 ): ParametrosTarifaBorrador {
   const componentesSinCmviaa = COMPONENTES_TARIFARIOS.filter((c) => c !== 'CMVIAA');
+
+  // Fix bug stale-state (T-PARAM-STALE-PERSIST):
+  //
+  // El bootstrap (`bootstrap-completo.ts:201`) crea la fila inicial
+  // con `vigente_desde = ahora.toISOString()` → full ISO con tiempo
+  // (ej: `'2026-08-10T18:30:00.000Z'`). La pantalla, al hidratar el
+  // form, hace `.slice(0, 10)` → date-only (`'2026-08-10'`).
+  //
+  // El UPSERT del repo usa la triple clave
+  // `(id_prestador, periodo, vigente_desde)`. Si guardamos con
+  // date-only pero la DB tiene full ISO, el UPSERT NO MATCHEA →
+  // INSERT nueva fila → 2 filas en DB → `buscarVigente ORDER BY
+  // vigente_desde DESC LIMIT 1` devuelve la vieja del bootstrap →
+  // form muestra el valor viejo, no el recién guardado.
+  //
+  // Solución: si el `ctx.vigenteDesdePersistido` está disponible
+  // (es decir, leímos una fila del repo antes) Y el `form.vigenteDesde`
+  // coincide con `vigenteDesdePersistido.slice(0, 10)` (el usuario
+  // NO editó la fecha), preservar el formato original.
+  //
+  // Si el usuario SÍ editó la fecha (caso raro, sería crear un nuevo
+  // periodo), usamos el valor del form tal cual. El form muestra
+  // date-only; el repo interpreta eso como una fecha distinta
+  // (no match con la fila existente) → INSERT nuevo. Eso es el
+  // comportamiento esperado al cambiar de periodo tarifario.
+  let vigente_desde: string = form.vigenteDesde;
+  if (
+    ctx.vigenteDesdePersistido !== undefined &&
+    ctx.vigenteDesdePersistido !== null &&
+    form.vigenteDesde === ctx.vigenteDesdePersistido.slice(0, 10)
+  ) {
+    vigente_desde = ctx.vigenteDesdePersistido;
+  }
+
   return {
     id_prestador: ctx.id_prestador,
     id_acuerdo: ctx.id_acuerdo,
@@ -141,7 +187,7 @@ export function buildBorradorLocal(
       ? [...COMPONENTES_TARIFARIOS]
       : componentesSinCmviaa,
     minimo_vital: null,
-    vigente_desde: form.vigenteDesde,
+    vigente_desde,
     vigente_hasta: form.vigenteHasta,
     // altitud_msnm: Res CRA 750/2016 compliance. 0 = default a nivel
     // del mar → limite 16 m3/mes (el mas conservador).

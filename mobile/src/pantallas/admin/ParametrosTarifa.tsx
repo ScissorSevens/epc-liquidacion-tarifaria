@@ -430,6 +430,7 @@ export default function ParametrosTarifaForm({
       const borrador = buildBorradorLocal(formValues, {
         id_prestador,
         id_acuerdo,
+        vigenteDesdePersistido: parametrosActuales?.vigente_desde,
       });
       return calcularCargos({
         ...borrador,
@@ -450,6 +451,7 @@ export default function ParametrosTarifaForm({
     suscriptoresPromedio,
     id_prestador,
     id_acuerdo,
+    parametrosActuales,
   ]);
 
   const guardar = async () => {
@@ -473,9 +475,14 @@ export default function ParametrosTarifaForm({
       // state local (parametros-tarifa-build-borrador.ts). Reemplaza
       // el builder inline previo (~30 lineas) que NO reusaba entre
       // `guardar()` y el `useMemo` del ResumenCargos.
+      //
+      // `vigenteDesdePersistido` se pasa para que el helper preserve el
+      // formato original de `vigente_desde` cuando el usuario NO editó
+      // el campo (ver T-PARAM-STALE-PERSIST).
       const borrador = buildBorradorLocal(formValues, {
         id_prestador,
         id_acuerdo,
+        vigenteDesdePersistido: parametrosActuales?.vigente_desde,
       });
       const cargos = calcularCargos({
         ...borrador,
