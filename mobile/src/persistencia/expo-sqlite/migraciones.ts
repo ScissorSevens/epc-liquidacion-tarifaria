@@ -517,6 +517,92 @@ const MIGRACION_024_NO_OP_CALLE_DROP = `
 -- El adapter expo-sqlite correspondiente dejara de mapearla.
 `;
 
+/**
+ * Migration 025_parametros_tarifa_cmaa_docs. Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/025_parametros_tarifa_cmaa_docs.sql`.
+ *
+ * Cambia `param-tarifa-res-825-compliance-phase2`. Res CRA 825/2017
+ * + Res CRA 907/2019 art. 31.B (CMAA): agrega 4 columnas aditivas
+ * a `parametros_tarifa` para soportar el CMAA y la trazabilidad
+ * documental del estudio de costos y el acto administrativo.
+ *
+ *   - cmaa: CMAA — Costo Medio de Administración por Inversiones
+ *           Ambientales Adicionales (Res CRA 907/2019 art. 31.B).
+ *           REAL NULL — Default 0 si el prestador no opta por
+ *           inversiones ambientales.
+ *   - acto_adopcion: URL o referencia del acto administrativo que
+ *           adoptó la metodología tarifaria. TEXT NULL — Requerido
+ *           para que `AcuerdoMunicipal.estado` pase a 'ACTIVO'.
+ *           Default NULL para legacy (se asume acto previo cargado).
+ *   - estudio_costos_id: ID del estudio de costos del prestador
+ *           (referencia externa, ej: SUI). TEXT NULL — Default NULL.
+ *   - documento_soporte_url: URL del documento soporte del estudio
+ *           de costos (PDF, etc.). TEXT NULL — Default NULL.
+ *
+ * Idempotente: SQLite < 3.35 NO soporta `ALTER TABLE ... ADD COLUMN
+ * IF NOT EXISTS`. Usamos el patron de `aplicarMigracionesAsync`
+ * (PRAGMA table_info + ALTER manual) para mantener paridad con las
+ * migrations 017 (operarios.password_hash) y 020 (factura compliance).
+ * La aplicacion corre el ALTER solo si la columna NO existe.
+ *
+ * Backward-compat: todas las 4 columnas son NULLables, asi que data
+ * legacy queda con NULL por default. No hay riesgo de violar
+ * constraints NOT NULL.
+ */
+const MIGRACION_025_PARAMETROS_TARIFA_CMAA_DOCS = `
+-- Migration 025: ParametrosTarifa compliance fase 2 (cmaa + docs).
+-- Res CRA 907/2019 art. 31.B (CMAA) + trazabilidad documental.
+ALTER TABLE parametros_tarifa ADD COLUMN cmaa REAL NULL;
+ALTER TABLE parametros_tarifa ADD COLUMN acto_adopcion TEXT NULL;
+ALTER TABLE parametros_tarifa ADD COLUMN estudio_costos_id TEXT NULL;
+ALTER TABLE parametros_tarifa ADD COLUMN documento_soporte_url TEXT NULL;
+`;
+
+/**
+ * Migration 026_suscriptor_verificacion. Espejo verbatim de
+ * `mobile/dominio/persistencia/sqlite/migrations/026_suscriptor_verificacion.sql`.
+ *
+ * Cambia `param-tarifa-res-825-compliance-phase2`. Res CRA 825/2017
+ * + L142/1994: agrega 4 columnas aditivas a `suscriptor` para
+ * registrar la verificación oficial del estrato (precondición de
+ * subsidios residenciales E1-E3).
+ *
+ *   - estado_verificacion: 'PENDIENTE' | 'VERIFICADO' | 'RECHAZADO'.
+ *           TEXT NOT NULL DEFAULT 'PENDIENTE' — Default conservador
+ *           para legacy data: NO subsidia hasta que el admin cargue
+ *           fuente + soporte. Crítico para la regulatory gate del
+ *           motor tarifario (Phase 2.11-2.14).
+ *   - fuente_estrato: TEXT NULL — Fuente del estrato (DANE, acto
+ *           administrativo, etc.). Requerido para VERIFICADO.
+ *   - fecha_verificacion_estrato: TEXT NULL — ISO 8601 fecha de
+ *           verificación. NULL hasta que se verifique.
+ *   - soporte_estrato_url: TEXT NULL — URL del documento soporte
+ *           (PDF del acto, screenshot DANE, etc.).
+ *
+ * Idempotente: idem migration 025 (PRAGMA table_info + ALTER manual).
+ *   - estado_verificacion: ALTER conditional; si la columna ya
+ *     existe, no ejecuta (la fila legacy ya tiene 'PENDIENTE' via
+ *     default).
+ *   - Los otros 3 son NULLables — no hay riesgo de constraint.
+ *
+ * Backward-compat: data legacy queda con `estado_verificacion =
+ * 'PENDIENTE'` (NOT NULL con default). Filas nuevas deben especificar
+ * el estado explícitamente o aceptar el default.
+ *
+ * NOTA sobre `acuerdo_municipal.estado`: NO requiere migration SQL.
+ * El campo se persiste via `data.estado ?? 'ACTIVO'` en el repository
+ * (default conservador para legacy data). El adapter expo-sqlite lo
+ * maneja en code-level, sin necesidad de ALTER TABLE.
+ */
+const MIGRACION_026_SUSCRIPTOR_VERIFICACION = `
+-- Migration 026: Suscriptor verification oficial del estrato.
+-- Res CRA 825/2017 + L142/1994 — regulatory gate subsidios E1-E3.
+ALTER TABLE suscriptor ADD COLUMN estado_verificacion TEXT NOT NULL DEFAULT 'PENDIENTE';
+ALTER TABLE suscriptor ADD COLUMN fuente_estrato TEXT NULL;
+ALTER TABLE suscriptor ADD COLUMN fecha_verificacion_estrato TEXT NULL;
+ALTER TABLE suscriptor ADD COLUMN soporte_estrato_url TEXT NULL;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -542,6 +628,8 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 22, nombre: '022_prestador_aps', sql: MIGRACION_022_PRESTADOR_APS },
   { version: 23, nombre: '023_parametros_tarifa_anio_base', sql: MIGRACION_023_PARAMETROS_TARIFA_ANIO_BASE },
   { version: 24, nombre: '024_no_op_calle_drop', sql: MIGRACION_024_NO_OP_CALLE_DROP },
+  { version: 25, nombre: '025_parametros_tarifa_cmaa_docs', sql: MIGRACION_025_PARAMETROS_TARIFA_CMAA_DOCS },
+  { version: 26, nombre: '026_suscriptor_verificacion', sql: MIGRACION_026_SUSCRIPTOR_VERIFICACION },
 ];
 
 
@@ -610,6 +698,55 @@ export async function aplicarMigracionesAsync(
     // PRAGMA table_info. Misma logica que el runner Node.
     if (migracion.version === 20) {
       await aplicarMigration020IdempotenteExpo(db, migracion.sql);
+      await db.runAsync(
+        'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
+        migracion.version,
+        migracion.nombre,
+        new Date().toISOString(),
+      );
+      continue;
+    }
+
+    // Migration 025 + 026 (param-tarifa-res-825-compliance-phase2):
+    // mismas 4 columnas aditivas en `parametros_tarifa` y `suscriptor`
+    // respectivamente. El helper `aplicarMigration020IdempotenteExpo`
+    // esta hardcoded para `factura`, asi que para mantener paridad
+    // con el patron de la 017 usamos PRAGMA table_info inline.
+    // Las migrations 025/026 NO son destructivas (todas NULLables
+    // excepto estado_verificacion que tiene DEFAULT 'PENDIENTE'), asi
+    // que data legacy queda naturalmente backward-compat.
+    if (migracion.version === 25 || migracion.version === 26) {
+      const tabla =
+        migracion.version === 25 ? 'parametros_tarifa' : 'suscriptor';
+      const columnasEsperadas = await db.getAllAsync<{ name: string }>(
+        `PRAGMA table_info(${tabla})`,
+      );
+      const nombresExistentes = new Set(columnasEsperadas.map((c) => c.name));
+      // Parsear el SQL de la migration para extraer las columnas a
+      // agregar (misma regex que el helper de factura).
+      const reAlter = new RegExp(
+        `ALTER\\s+TABLE\\s+${tabla}\\s+ADD\\s+COLUMN\\s+([A-Za-z_][A-Za-z0-9_]*)`,
+        'gi',
+      );
+      const columnasA_Agregar: string[] = [];
+      let match: RegExpExecArray | null;
+      while ((match = reAlter.exec(migracion.sql)) !== null) {
+        columnasA_Agregar.push(match[1]);
+      }
+      for (const columna of columnasA_Agregar) {
+        if (nombresExistentes.has(columna)) continue;
+        // Reconstruimos el ALTER desde la columna, respetando el
+        // DEFAULT si lo trae. Usamos el SQL literal del script que
+        // contiene "ADD COLUMN <nombre> <tipo> [DEFAULT ...]".
+        const reColumna = new RegExp(
+          `ALTER\\s+TABLE\\s+${tabla}\\s+ADD\\s+COLUMN\\s+${columna}\\b[^;]*`,
+          'i',
+        );
+        const sentencia = migracion.sql.match(reColumna)?.[0];
+        if (sentencia) {
+          await db.execAsync(sentencia + ';');
+        }
+      }
       await db.runAsync(
         'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
         migracion.version,
