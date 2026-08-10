@@ -165,12 +165,23 @@ declare global {
 (global as { __goBackMock?: jest.Mock }).__goBackMock = jest.fn();
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
+  const ReactNative = require('react');
   return {
     ...actual,
     useNavigation: () => ({
       navigate: jest.fn(),
       goBack: (global as { __goBackMock?: jest.Mock }).__goBackMock ?? jest.fn(),
     }),
+    // parametros-stale-state-fix: useFocusEffect requiere NavigationContainer.
+    // Para tests sin container, lo sustituimos por un useEffect que corre
+    // una sola vez al mount (mismo comportamiento que el original cuando
+    // la pantalla está focused al inicio, que es el caso del test).
+    useFocusEffect: (cb: () => unknown) => {
+      ReactNative.useEffect(() => {
+        const cleanup = cb();
+        return typeof cleanup === 'function' ? cleanup : undefined;
+      }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    },
   };
 });
 

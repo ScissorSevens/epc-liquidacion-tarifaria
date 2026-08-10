@@ -101,12 +101,22 @@ jest.mock('../../src/theme/skeletal-tokens', () => ({
 // que este test de integracion no rompa por NavigationContainer faltante.
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
+  const ReactNative = require('react');
   return {
     ...actual,
     useNavigation: () => ({
       navigate: jest.fn(),
       goBack: jest.fn(),
     }),
+    // parametros-stale-state-fix: ParametrosTarifaForm ahora usa
+    // useFocusEffect para re-hidratar al volver a la pantalla. Stub para
+    // que el test no requiera NavigationContainer real.
+    useFocusEffect: (cb: () => unknown) => {
+      ReactNative.useEffect(() => {
+        const cleanup = cb();
+        return typeof cleanup === 'function' ? cleanup : undefined;
+      }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    },
   };
 });
 
