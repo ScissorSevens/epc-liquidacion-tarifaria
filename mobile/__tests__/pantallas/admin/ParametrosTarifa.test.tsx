@@ -2499,4 +2499,137 @@ fireEvent.press(back);
     });
   });
 
+  // ─────────────────────────────────────────────────────────────────
+  // Phase 2 task 2.3 (RED) — Toggle `aplica_cmaa` en pantalla.
+  //
+  // Res CRA 907/2019 art. 13 (mod. Res CRA 825/2017 art. 9): el CMAA
+  // (Costo Medio de Administración por Inversiones Ambientales
+  // Adicionales) requiere un FLAG EXPLICITO en el form admin. Antes
+  // de Phase 2, el motor inferia `aplica_cmaa = cmaa > 0`, lo que
+  // permitia que un admin que setea `cmaa = 0` por error apague el
+  // CMAA sin warning.
+  //
+  // Contratos:
+  //   T-CMAA-UI-1: switch ON  → input cmaa editable
+  //   T-CMAA-UI-2: switch OFF → input cmaa deshabilitado (defensa UX)
+  //   T-CMAA-UI-3: persistencia — switch ON + cmaa=5000 → guardado
+  //                en DB con flag=true y cmaa=5000
+  //
+  // Decision B/B/B: el flag es la fuente de verdad. El input se
+  // renderiza siempre (el form muestra "0" como default) pero se
+  // bloquea cuando el flag esta OFF para evitar confusion del admin.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-CMAA-UI: toggle `aplica_cmaa` en pantalla (Phase 2 task 2.3)', () => {
+    it('T-CMAA-UI-1 switch `aplicaCmaa` ON habilita el input `param-cmaa`', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByLabelText, getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El input CMAA existe (el form lo renderiza siempre) pero
+      // arranca deshabilitado porque el flag es false por default.
+      const inputCmaaInicial = getByTestId('param-cmaa');
+      expect(inputCmaaInicial.props.editable).toBe(false);
+
+      // Activamos el switch via accessibilityLabel.
+      await act(async () => {
+        fireEvent(
+          getByLabelText('Aplicar CMAA (Res 907/2019 art. 13)'),
+          'valueChange',
+          true,
+        );
+      });
+
+      // Tras activar el switch, el input CMAA debe estar habilitado.
+      await waitFor(() => {
+        expect(getByTestId('param-cmaa').props.editable).toBe(true);
+      });
+    });
+
+    it('T-CMAA-UI-2 switch OFF mantiene el input `param-cmaa` deshabilitado', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El input CMAA arranca deshabilitado (flag false por default).
+      expect(getByTestId('param-cmaa').props.editable).toBe(false);
+      // El input permanece deshabilitado aunque el usuario
+      // interactue con el form (defensa UX: no se puede tipear un
+      // valor monetario si el flag conceptual esta apagado).
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cmaa'), '5000');
+      });
+      // El editable permanece en false.
+      expect(getByTestId('param-cmaa').props.editable).toBe(false);
+    });
+
+    it('T-CMAA-UI-3 switch ON + cmaa=5000 persiste en DB con flag=true y cmaa=5000', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByLabelText, getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Inputs base validos (la validacion inline requiere CMA/CMO/N
+      // minimos).
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+        // Activamos CMAA via switch.
+        fireEvent(
+          getByLabelText('Aplicar CMAA (Res 907/2019 art. 13)'),
+          'valueChange',
+          true,
+        );
+      });
+      // Esperamos a que el input CMAA quede habilitado (es async por
+      // el state update de React).
+      await waitFor(() => {
+        expect(getByTestId('param-cmaa').props.editable).toBe(true);
+      });
+      // Tipeamos el valor monetario del CMAA.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cmaa'), '5000');
+      });
+      // Click en guardar.
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // El repo.guardar fue invocado con flag=true y cmaa=5000.
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+      const arg = repo.guardar.mock.calls[0]![0] as {
+        aplica_cmaa: boolean;
+        cmaa: number;
+      };
+      expect(arg.aplica_cmaa).toBe(true);
+      expect(arg.cmaa).toBe(5000);
+    });
+  });
+
 });
