@@ -52,13 +52,21 @@ function baseParametros(overrides: Partial<ParametrosTarifa> = {}): ParametrosTa
 
 describe('calcularCargos — Res CRA 825/2017 art. 9-10 + 907/2019 art. 14', () => {
   /**
-   * Si TODOS los componentes relevantes están activos, el cargo fijo
-   * es `cma / suscriptores_promedio` (formula normativa).
+   * Decisión param-tarifa-res-825-compliance-phase2: el campo `cma` de
+   * ParametrosTarifa representa el CMA normativo en $/suscriptor/mes
+   * (NO el CA anual). Por lo tanto, el CF es directamente `cma` sin
+   * dividir por suscriptores_promedio. `suscriptores_promedio` se
+   * mantiene en el modelo para uso en otras validaciones (CMOG
+   * mínimo, MSNM, etc.) pero NO participa en el cálculo del CF.
+   *
+   * Alineado con art. 9 Res CRA 825/2017 (mod. Res 907/2019 art. 13):
+   *   CF acueducto = CMA (sin dividir cuando CMA es mensual).
+   *   CF alcantarillado = CMA (idéntico).
    */
-  it('cargo_fijo_resultante = cma / suscriptores_promedio', () => {
+  it('cargo_fijo_resultante = cma (sin dividir) cuando CMA está activo', () => {
     const p = baseParametros({ cma: 12_000_000, suscriptores_promedio: 1000 });
     const { cargo_fijo } = calcularCargos(p);
-    expect(cargo_fijo).toBe(12_000);
+    expect(cargo_fijo).toBe(12_000_000);
   });
 
   /**
