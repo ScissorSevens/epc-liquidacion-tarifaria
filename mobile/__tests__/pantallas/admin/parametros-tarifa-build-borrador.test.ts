@@ -36,6 +36,10 @@ const formCompleto: FormValues = {
   cmviaa: '500',
   cmaa: '1500',
   aplicaCmviaa: true,
+  // Phase 2 task 2.4 (GREEN): flag explicito CMAA. Default false
+  // para data legacy pre-Phase 2; aqui lo activamos para verificar
+  // que el buildBorradorLocal propaga el flag y el valor numerico.
+  aplicaCmaa: true,
   actoAdopcion: 'https://example.com/decreto-042-2024',
   estudioCostosId: 'SUI-2024-EST-001',
   documentoSoporteUrl: 'https://example.com/estudio-costos.pdf',

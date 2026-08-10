@@ -48,6 +48,14 @@ export interface FormValues {
   readonly cmviaa: string;
   readonly cmaa: string;
   readonly aplicaCmviaa: boolean;
+  /**
+   * Flag explicito: el prestador OPTA por inversiones ambientales
+   * adicionales (Res CRA 907/2019 art. 13). Si false, el motor NO
+   * computa CMAA aunque `cmaa > 0`.
+   *
+   * Phase 2 task 2.4 (`param-tarifa-residuales-cra-825` GREEN).
+   */
+  readonly aplicaCmaa: boolean;
   readonly actoAdopcion: string;
   readonly estudioCostosId: string;
   readonly documentoSoporteUrl: string;
@@ -166,7 +174,14 @@ export function buildBorradorLocal(
     // por Inversiones Ambientales Adicionales. Se persiste como
     // number (0 = sin inversiones). Si el campo del form está vacío,
     // caemos a 0 (no null) para que el motor siempre vea un number.
-    cmaa: num(form.cmaa),
+    //
+    // Phase 2 task 2.4 (GREEN): el flag `aplicaCmaa` MANDA sobre el
+    // valor numerico. Si flag=false, sobrescribimos con 0 (decision
+    // B/B/B: el flag es la fuente de verdad, no el monto).
+    cmaa: form.aplicaCmaa ? num(form.cmaa) : 0,
+    // Flag explicito persistido (Phase 2 task 2.4 GREEN). Default
+    // false en data legacy (Phase 1 no tenia este campo).
+    aplica_cmaa: form.aplicaCmaa,
     aplica_cmviaa: form.aplicaCmviaa,
     // 3 docs de soporte (Fase 2, task 4.7 GREEN). '' → null para
     // mantener la convención de la columna SQLite (TEXT NULL por

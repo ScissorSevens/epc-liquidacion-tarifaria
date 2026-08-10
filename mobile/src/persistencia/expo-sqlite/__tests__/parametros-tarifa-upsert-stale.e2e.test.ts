@@ -192,6 +192,10 @@ describe('ParametrosTarifa UPSERT — vigente_desde format mismatch (bug stale-s
       cmviaa: String(paramsLeidos!.cmviaa),
       cmaa: String(paramsLeidos!.cmaa ?? 0),
       aplicaCmviaa: paramsLeidos!.aplica_cmviaa,
+      // Phase 2 task 2.4 (GREEN): flag explicito CMAA. Default false
+      // para data legacy pre-Phase 2 (el campo es opcional en el
+      // domain type ParametrosTarifa).
+      aplicaCmaa: paramsLeidos!.aplica_cmaa ?? false,
       actoAdopcion: paramsLeidos!.acto_adopcion ?? '',
       estudioCostosId: paramsLeidos!.estudio_costos_id ?? '',
       documentoSoporteUrl: paramsLeidos!.documento_soporte_url ?? '',

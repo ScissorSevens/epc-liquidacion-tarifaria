@@ -262,6 +262,15 @@ export default function ParametrosTarifaForm({
   const [cmaa, setCmaa] = useState(
     String(parametrosActuales?.cmaa ?? 0),
   );
+  // Flag explicito `aplica_cmaa` (Phase 2 task 2.4 GREEN). Antes de
+  // Phase 2 el CMAA se inferia de `cmaa > 0`, lo que permitia que un
+  // admin que setea `cmaa = 0` por error apague el CMAA sin warning.
+  // El flag es la fuente de verdad: si es false, el buildBorradorLocal
+  // sobrescribe `cmaa` con 0 (motor NO computa CMAA). Si es true,
+  // se respeta el valor numerico del input.
+  const [aplicaCmaa, setAplicaCmaa] = useState(
+    parametrosActuales?.aplica_cmaa ?? false,
+  );
   // Documentos de soporte (Fase 2, task 4.5). Todos opcionales.
   // Default string vacia para que el input muestre placeholder.
   const [actoAdopcion, setActoAdopcion] = useState(
@@ -315,6 +324,10 @@ export default function ParametrosTarifaForm({
     // CMAA + 3 docs (Fase 2, task 4.5). Si el parametro persisted
     // tiene null, el input vuelve a string vacio (default limpio).
     setCmaa(String(parametrosActuales.cmaa ?? 0));
+    // Phase 2 task 2.4 (GREEN): flag explicito `aplica_cmaa`. Si el
+    // parametro persisted no tiene el flag (legacy data pre-Phase 2),
+    // caemos a false (no aplica CMAA).
+    setAplicaCmaa(parametrosActuales.aplica_cmaa ?? false);
     setActoAdopcion(parametrosActuales.acto_adopcion ?? '');
     setEstudioCostosId(parametrosActuales.estudio_costos_id ?? '');
     setDocumentoSoporteUrl(parametrosActuales.documento_soporte_url ?? '');
@@ -418,6 +431,8 @@ export default function ParametrosTarifaForm({
     cmviaa,
     cmaa,
     aplicaCmviaa,
+    // Phase 2 task 2.4 (GREEN): flag explicito para CMAA.
+    aplicaCmaa,
     actoAdopcion,
     estudioCostosId,
     documentoSoporteUrl,
@@ -460,6 +475,11 @@ export default function ParametrosTarifaForm({
     cmt,
     cmviaa,
     aplicaCmviaa,
+    // Phase 2 task 2.4 (GREEN): aplicaCmaa tambien afecta el calculo
+    // del cargo fijo (CF = cma + cmaa cuando flag=true). Sin este dep,
+    // togglear el switch no actualiza el live preview del resumen.
+    aplicaCmaa,
+    cmaa,
     suscriptoresPromedio,
     id_prestador,
     id_acuerdo,
@@ -757,18 +777,50 @@ export default function ParametrosTarifaForm({
         {/* CMAA · Costo Medio de Administración por Inversiones Ambientales
             Adicionales (Res CRA 907/2019 art. 13 mod. Res CRA 825/2017 art. 9).
             SOLO aplica al servicio de ACUEDUCTO. Para alcantarillado el CF
-            es solo CMA (sin CMAA). Fase 2 (task 4.5). 
-            Hint visual sobre la norma. */}
+            es solo CMA (sin CMAA). Fase 2 (task 4.5).
+
+            Phase 2 task 2.4 (GREEN): flag explicito `aplicaCmaa` que
+            MANDA sobre el valor numerico. Si el admin NO toggle, el
+            input CMAA se renderiza deshabilitado (defensa UX: no se
+            puede tipear un monto si el opt-in conceptual esta apagado).
+            Mismo patron que el switch CMVIAA de arriba. */}
+        <View style={estilos.campoFila}>
+          <MaterialIcons
+            name="eco"
+            size={24}
+            color={COLORS.primary}
+            style={estilos.switchFilaIcono}
+            accessibilityElementsHidden
+          />
+          <View style={estilos.switchFilaText}>
+            <Text style={estilos.switchFilaLabel}>Aplicar CMAA (Res 907/2019 art. 13)</Text>
+          </View>
+          <Switch
+            value={aplicaCmaa}
+            onValueChange={(v) => {
+              if (Platform.OS !== 'web') {
+                void Haptics.selectionAsync();
+              }
+              setAplicaCmaa(v);
+            }}
+            disabled={guardando || cargandoInputs}
+            accessibilityLabel="Aplicar CMAA (Res 907/2019 art. 13)"
+            testID="switch-cmaa"
+          />
+        </View>
         <View style={estilos.campo}>
           <FormField
             label="CMAA · Costo Medio Admin. Inversiones Ambientales Adic. ($/suscriptor/mes)"
             value={cmaa}
             onChangeText={setCmaa}
             keyboardType="numeric"
-            editable={!guardando && !cargandoInputs}
-            selectable
+            // Phase 2 task 2.4: input deshabilitado si flag apagado.
+            // Si flag ON, el input se habilita pero sigue sujeto a
+            // !guardando && !cargandoInputs como el resto del form.
+            editable={!guardando && !cargandoInputs && aplicaCmaa}
+            selectable={aplicaCmaa}
             tabularNums
-            helperText="Solo aplica a servicio de ACUEDUCTO. Res CRA 907/2019 art. 14 (mod. art. 9 Res CRA 825/2017)."
+            helperText="Solo aplica a servicio de ACUEDUCTO. Res CRA 907/2019 art. 14 (mod. art. 9 Res CRA 825/2017). El flag de arriba debe estar activo."
             testID="param-cmaa"
           />
         </View>
