@@ -193,6 +193,27 @@ export function calcularLiquidacion(
     throw new Error('consumo_m3 no puede ser negativo');
   }
 
+  // Gate `acuerdo.estado` — solo ACTIVO aplica factores del Acuerdo.
+  // Cambio `param-tarifa-res-825-compliance-phase2` (task 2.10 GREEN).
+  //
+  // Backward-compat: Acuerdo legacy del 04-08 NO seteaba `estado`
+  // (era opcional). El check SKIP si el campo NO está definido
+  // explícitamente, asumiendo ACTIVO. Esto evita romper los 40 callers
+  // que no setean el campo.
+  //
+  // Si el campo está definido y ≠ 'ACTIVO' (BORRADOR, VENCIDO,
+  // DEROGADO), el motor lanza error. La capa de aplicación
+  // (`emitirFactura`) debe capturar este error, registrar el
+  // incidente en metadata y decidir si degrada a warning (usa
+  // topes L142) o bloquea (factor 0) — alineado con guía §10.1.
+  if (acuerdo !== null && acuerdo.estado !== undefined && acuerdo.estado !== 'ACTIVO') {
+    throw new Error(
+      `ACUERDO_NO_ACTIVO: el Acuerdo Municipal está en estado '${acuerdo.estado}' (id_acuerdo=${acuerdo.id_acuerdo}). ` +
+        `Solo AcuerdoMunicipal.estado='ACTIVO' aplica factores de subsidio/contribución. ` +
+        `Active el Acuerdo cargando acto_administrativo_url antes de liquidar.`,
+    );
+  }
+
   // 2. Cargo Fijo (Art. 9 Res CRA 825/2017)
   //    Usa cargo_fijo_resultante PRE-CALCULADO al guardar (calcular.ts:101).
   //    Si recalculáramos CMA/N acá, cualquier modificación retroactiva de
