@@ -630,6 +630,31 @@ const MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO = `
 ALTER TABLE acuerdo_municipal ADD COLUMN estado TEXT NOT NULL DEFAULT 'ACTIVO';
 `;
 
+/**
+ * Migration 028_parametros_tarifa_altitud. Espejo verbatim (en
+ * construccion) de la migration aditiva planificada en
+ * `param-tarifa-residuales-cra-825` Phase 1 task 1.4 (GREEN).
+ *
+ * Res CRA 750/2016 art. 3: la altitud del prestador (msnm)
+ * determina el límite de consumo básico (11/13/16 m³/mes). El campo
+ * `altitud_msnm` vive en el domain type desde
+ * `compliance-cra-825-subsidios-bloques` pero NO se persistía en
+ * SQLite (migration 025 no la incluye). Esta migration lo agrega.
+ *
+ *   - altitud_msnm: INTEGER NULL — Default NULL para legacy data
+ *           (el motor usa el límite default de 16 m³/mes como
+ *           fallback conservador cuando altitud es desconocida).
+ *
+ * Idempotente: idem migration 025 (PRAGMA table_info + ALTER manual
+ * via helper `aplicarMigrationAditivaIdempotenteExpo`). Backward-
+ * compat: data legacy queda con `altitud_msnm = NULL`.
+ */
+const MIGRACION_028_PARAMETROS_ALTITUD = `
+-- Migration 028: ParametrosTarifa.altitud_msnm persiste (Res CRA 750/2016).
+-- Cambio param-tarifa-residuales-cra-825 Phase 1 task 1.4 GREEN.
+ALTER TABLE parametros_tarifa ADD COLUMN altitud_msnm INTEGER NULL;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -658,6 +683,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 25, nombre: '025_parametros_tarifa_cmaa_docs', sql: MIGRACION_025_PARAMETROS_TARIFA_CMAA_DOCS },
   { version: 26, nombre: '026_suscriptor_verificacion', sql: MIGRACION_026_SUSCRIPTOR_VERIFICACION },
   { version: 27, nombre: '027_acuerdo_municipal_estado', sql: MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO },
+  { version: 28, nombre: '028_parametros_tarifa_altitud', sql: MIGRACION_028_PARAMETROS_ALTITUD },
 ];
 
 
@@ -743,10 +769,15 @@ export async function aplicarMigracionesAsync(
     // Las migrations 025/026/027 NO son destructivas (todas NULLables
     // excepto estado_verificacion/estado que tienen DEFAULT), asi que
     // data legacy queda naturalmente backward-compat.
+    //
+    // Migration 028 (`param-tarifa-residuales-cra-825` Phase 1 task 1.4):
+    // misma semántica aditiva — `altitud_msnm INTEGER NULL`. Inclusion
+    // en este dispatch preserva el patron uniforme.
     if (
       migracion.version === 25 ||
       migracion.version === 26 ||
-      migracion.version === 27
+      migracion.version === 27 ||
+      migracion.version === 28
     ) {
       await aplicarMigrationAditivaIdempotenteExpo(db, migracion.sql);
       await db.runAsync(
