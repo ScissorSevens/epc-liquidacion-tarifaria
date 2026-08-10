@@ -33,7 +33,10 @@
 import { calcularLiquidacionConAmbito } from '../../motor-tarifario/calcular-con-ambito';
 import { calcularLiquidacion } from '../../motor-tarifario/motor-tarifario';
 import { emitirFactura } from '../factura';
-import { Liquidacion, ParametrosTarifa, AcuerdoMunicipal, relojFijo } from '../types';
+import { relojFijo } from '../types';
+import type { Liquidacion } from '../../calculo/types';
+import type { ParametrosTarifa } from '../../parametros-tarifa/types';
+import type { AcuerdoMunicipal } from '../../acuerdo-municipal/types';
 import type { Hasher, IdGenerator } from '../../shared/ports';
 import { calcularHash } from '../../calculo/calculo';
 import type { Suscriptor } from '../../suscriptores/types';
