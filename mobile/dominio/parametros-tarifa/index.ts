@@ -4,6 +4,6 @@ export type { MinimoVital, MinimoVitalBorrador, FiltrosListarMinimoVital, Minimo
 export { MENSAJES_ERROR_MINIMO_VITAL } from './minimo-vital';
 export { calcularCargos, COMPONENTES_TARIFARIOS } from './calcular';
 export type { CargosResultantes, ComponenteTarifa } from './calcular';
-export { validarCmaMinimo, CMA_MINIMO_ACUEDUCTO, CMA_MINIMO_ALCANTARILLADO } from './validaciones';
+export { validarCmaMinimo, CMA_MINIMO_ACUEDUCTO, CMA_MINIMO_ALCANTARILLADO, validarCmogMinimo, CMOG_MINIMO_ACUEDUCTO, CMOG_MINIMO_ALCANTARILLADO } from './validaciones';
 export type { Servicio } from './validaciones';
 export { calcularFactorIpc, IPC_VALORES } from './ipc';

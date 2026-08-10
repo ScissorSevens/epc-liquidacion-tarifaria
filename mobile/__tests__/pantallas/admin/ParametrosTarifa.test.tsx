@@ -233,7 +233,7 @@ const parametrosFixture: ParametrosTarifa = {
   id_acuerdo: 100,
   periodo: 2026,
   cma: 12_345_678,
-  cmo: 450,
+  cmo: 500,
   cmi: 120,
   cmt: 80,
   cmviaa: 0,
@@ -245,7 +245,7 @@ const parametrosFixture: ParametrosTarifa = {
   m3_gratis_minimo_vital: 0,
   ipuf_indice: 1.0,
   cargo_fijo_resultante: 12_345_678,
-  cargo_consumo_resultante: 450 + 120 + 80,
+  cargo_consumo_resultante: 500 + 120 + 80,
   componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
   minimo_vital: null,
   vigente_desde: '2025-01-01',
@@ -1237,7 +1237,7 @@ fireEvent.press(back);
       await waitFor(() => {
         expect(getByTestId('param-cma').props.value).toBe('12345678');
       });
-      expect(getByTestId('param-cmo').props.value).toBe('450');
+      expect(getByTestId('param-cmo').props.value).toBe('500');
       expect(getByTestId('param-periodo').props.value).toBe('2026');
       // Suscriptores: 350
       expect(getByTestId('param-suscriptores').props.value).toBe('350');
@@ -2037,7 +2037,7 @@ fireEvent.press(back);
         cma: 77_777_777,
         suscriptores_promedio: 350,
         cargo_fijo_resultante: 77_777_777,
-        cargo_consumo_resultante: 450 + 120 + 80,
+        cargo_consumo_resultante: 500 + 120 + 80,
       };
       repo.guardar.mockResolvedValueOnce(nuevosParams);
       repo.buscarVigente.mockResolvedValueOnce(null);
@@ -2072,7 +2072,7 @@ fireEvent.press(back);
       const arg = setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
       // El payload guardado incluye los cargos pre-calculados.
       expect(arg.cargo_fijo_resultante).toBe(77_777_777);
-      expect(arg.cargo_consumo_resultante).toBe(450 + 120 + 80);
+      expect(arg.cargo_consumo_resultante).toBe(500 + 120 + 80);
       expect(arg.cma).toBe(77_777_777);
       stateSpy.mockRestore();
     });
@@ -2148,7 +2148,7 @@ fireEvent.press(back);
       expect(getByTestId('param-vigente-desde').props.value).toBe('2025-01-01');
       expect(getByTestId('param-vigente-hasta').props.value).toBe('2029-12-31');
       expect(getByTestId('param-cma').props.value).toBe('12345678');
-      expect(getByTestId('param-cmo').props.value).toBe('450');
+      expect(getByTestId('param-cmo').props.value).toBe('500');
       expect(getByTestId('param-cmi').props.value).toBe('120');
       expect(getByTestId('param-cmt').props.value).toBe('80');
       expect(getByTestId('param-agua').props.value).toBe('50000');

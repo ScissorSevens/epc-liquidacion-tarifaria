@@ -40,6 +40,7 @@ import {
   CMA_MINIMO_ALCANTARILLADO,
   calcularCargos,
   validarCmaMinimo,
+  validarCmogMinimo,
   type ParametrosTarifa,
   type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
@@ -349,11 +350,22 @@ export default function ParametrosTarifaForm({
   const validarTodo = (): FormErrors => {
     const errors: FormErrors = {};
     const cmaNum = num(cma);
+    const cmoNum = num(cmo);
     // Res CRA 825/2017 Art. 15: validarCmaMinimo THROWs si CMA < minimo.
     try {
       validarCmaMinimo(cmaNum, 'acueducto');
     } catch (e) {
       errors.cma = (e as Error).message;
+    }
+    // Res CRA 825/2017 Art. 18: validarCmogMinimo THROWs si CMOG < minimo.
+    // Cambio `param-tarifa-residuales-cra-825` Phase 1 task 1.2 (GREEN).
+    // Servicio hardcoded a 'acueducto' (Hallazgo #6 deferred — la app
+    // solo cubre acueducto por ahora). La division acueducto/alcantarillado
+    // es mejora futura.
+    try {
+      validarCmogMinimo(cmoNum, 'acueducto');
+    } catch (e) {
+      errors.cmo = (e as Error).message;
     }
     // Suscriptores debe ser > 0 (defensa anti division por cero).
     if (entero(suscriptoresPromedio) <= 0) {
@@ -547,6 +559,7 @@ export default function ParametrosTarifaForm({
   // Fase 2 (task 4.5): incluye 'actoAdopcion' y 'documentoSoporteUrl'.
   type CampoConError =
     | 'cma'
+    | 'cmo'
     | 'suscriptores'
     | 'vigenteHasta'
     | 'actoAdopcion'
@@ -670,6 +683,8 @@ export default function ParametrosTarifaForm({
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
+            error={errores.cmo}
+            ref={getRef('cmo')}
             testID="param-cmo"
           />
         </View>
