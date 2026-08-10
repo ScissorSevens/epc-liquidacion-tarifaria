@@ -2267,6 +2267,115 @@ fireEvent.press(back);
   });
 
   // ─────────────────────────────────────────────────────────────────
+  // T-CMOG: validación inline del CMOG mínimo normativo (Res CRA 825
+  // Art. 18) en `validarTodo()`.
+  //
+  // Cambio `param-tarifa-residuales-cra-825` Phase 1 task 1.1 (RED).
+  // El dominio ya tiene `validarCmogMinimo(cmo, servicio)` desde
+  // `param-tarifa-res-825-compliance-phase2` task 2.6. Falta invocarlo
+  // desde el screen para bloquear el "Guardar" si el CMOG está por
+  // debajo del mínimo normativo.
+  //
+  // Minimos normativos:
+  //   - acueducto:    $467/m³  (CMOG_MINIMO_ACUEDUCTO)
+  //   - alcantarillado: $169/m³ (CMOG_MINIMO_ALCANTARILLADO)
+  //
+  // El servicio se hardcodea en 'acueducto' por ahora (Hallazgo #6
+  // deferred a futuro: la app solo cubre acueducto).
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-CMOG: validación CMOG mínimo normativo inline (Res CRA 825 Art. 18)', () => {
+    // Helper: arma inputs válidos para todas las validaciones excepto
+    // CMOG. CMA = 12_000_000 (>= 2890), N = 300 (> 0), IPUF 6, etc.
+    // El único input que el caller controla es `param-cmo` via
+    // `cmoValue`.
+    async function renderYSetCmo(cmoValue: string) {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const result = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Inputs válidos para todas las validaciones EXCEPTO CMOG.
+      await act(async () => {
+        fireEvent.changeText(result.getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(result.getByTestId('param-cmi'), '200');
+        fireEvent.changeText(result.getByTestId('param-cmt'), '100');
+        fireEvent.changeText(result.getByTestId('param-suscriptores'), '300');
+        // El CMO es lo que controla el caller (debe ser lo unico
+        // que dispara la validacion CMOG).
+        fireEvent.changeText(result.getByTestId('param-cmo'), cmoValue);
+      });
+      return { ...result, repo };
+    }
+
+    it('T-CMOG-1: cmo = $0 (bajo mínimo $467) bloquea guardar + muestra error inline', async () => {
+      const { getByTestId, queryByText, repo } = await renderYSetCmo('0');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // El repo NO se invoca (la validación inline bloquea el guardado).
+      expect(repo.guardar).not.toHaveBeenCalled();
+      // El error inline de CMOG aparece en el árbol.
+      await waitFor(() => {
+        expect(queryByText(/CMOG.*normativo/i)).toBeTruthy();
+      });
+    });
+
+    it('T-CMOG-2: cmo = $100 (bajo mínimo $467) bloquea guardar + muestra error inline', async () => {
+      const { getByTestId, queryByText, repo } = await renderYSetCmo('100');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      expect(repo.guardar).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(queryByText(/CMOG.*normativo/i)).toBeTruthy();
+      });
+    });
+
+    it('T-CMOG-3: cmo = $500 (sobre mínimo $467 acueducto) permite guardar', async () => {
+      const { getByTestId, repo } = await renderYSetCmo('500');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('T-CMOG-4: cmo = $1000 (sobre mínimo $467 acueducto) permite guardar', async () => {
+      const { getByTestId, repo } = await renderYSetCmo('1000');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('T-CMOG-5: el screen importa `validarCmogMinimo` del dominio (no hardcoded)', () => {
+      // Regression guard: el screen debe invocar `validarCmogMinimo()`
+      // del dominio. La implementación NO debe usar una comparación
+      // inline hardcoded contra 467 (constante congelada del dominio).
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // Importación del dominio.
+      expect(source).toMatch(/validarCmogMinimo/);
+      // Invocación dentro de un try/catch (mismo patrón que validarCmaMinimo).
+      expect(source).toMatch(/try\s*\{[^}]*validarCmogMinimo/s);
+      // Servicio hardcoded a 'acueducto' (Hallazgo #6 deferred).
+      expect(source).toMatch(/validarCmogMinimo\s*\(\s*[^,]+,\s*['"]acueducto['"]/);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
   // T-PARAM-STALE: param stale after navigation (parametros-stale-state-fix)
   //
   // Bug reportado por operario:
