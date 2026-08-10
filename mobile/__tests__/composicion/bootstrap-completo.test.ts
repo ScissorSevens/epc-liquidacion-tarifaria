@@ -798,7 +798,7 @@ describe('bootstrapCompleto()', () => {
      * Mock de `validarAmbito` que retorna NO_APLICA. El bootstrap
      * debe abortar con un mensaje que mencione la causa regulatoria.
      */
-    function ambitoNoAplicaMock(): ReturnType<typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito> {
+    function ambitoNoAplicaMock(): typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito {
       return ((prestador: import('../../dominio/ambito-tarifario/types').PrestadorAmbitoInfo, fecha: string) => ({
         estado: 'NO_APLICA' as const,
         subtitulo: null,
@@ -812,7 +812,7 @@ describe('bootstrapCompleto()', () => {
      * Mock de `validarAmbito` que retorna INDETERMINADO. El bootstrap
      * debe abortar con un mensaje que mencione "datos insuficientes".
      */
-    function ambitoIndeterminadoMock(): ReturnType<typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito> {
+    function ambitoIndeterminadoMock(): typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito {
       return ((prestador: import('../../dominio/ambito-tarifario/types').PrestadorAmbitoInfo, fecha: string) => ({
         estado: 'INDETERMINADO' as const,
         subtitulo: null,
@@ -826,7 +826,7 @@ describe('bootstrapCompleto()', () => {
      * Mock de `validarAmbito` que retorna APLICA Subtítulo 2. El bootstrap
      * debe continuar normalmente.
      */
-    function ambitoAplicaMock(): ReturnType<typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito> {
+    function ambitoAplicaMock(): typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito {
       return ((prestador: import('../../dominio/ambito-tarifario/types').PrestadorAmbitoInfo, fecha: string) => ({
         estado: 'APLICA' as const,
         subtitulo: 2 as const,

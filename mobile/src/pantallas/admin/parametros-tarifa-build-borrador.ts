@@ -29,6 +29,14 @@ import { COMPONENTES_TARIFARIOS } from '../../../dominio/parametros-tarifa/calcu
 /**
  * Shape del state local del screen ParametrosTarifa.
  * Refleja los 15 useState del componente (periodo, anioBase, cma, ...).
+ *
+ * Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.5+4.7):
+ * incluye 4 campos adicionales de soporte documental / CMAA:
+ *   - cmaa: Costo Medio de Administración por Inversiones Ambientales
+ *     Adicionales (Res CRA 907/2019 art. 13 mod. Res CRA 825/2017 art. 9).
+ *   - actoAdopcion: URL del acto administrativo de adopción.
+ *   - estudioCostosId: ID del estudio de costos (referencia externa).
+ *   - documentoSoporteUrl: URL del documento soporte del estudio.
  */
 export interface FormValues {
   readonly periodo: string;
@@ -38,7 +46,11 @@ export interface FormValues {
   readonly cmi: string;
   readonly cmt: string;
   readonly cmviaa: string;
+  readonly cmaa: string;
   readonly aplicaCmviaa: boolean;
+  readonly actoAdopcion: string;
+  readonly estudioCostosId: string;
+  readonly documentoSoporteUrl: string;
   readonly aguaSuministrada: string;
   readonly ipuf: string;
   readonly suscriptoresPromedio: string;

@@ -43,7 +43,7 @@ import type { Sesion } from './constantes';
 import { obtenerOCrearDeviceId } from './device-id';
 import type { Hasher, IdGenerator } from '../../dominio/shared/ports';
 import { validarAmbito } from '../../dominio/ambito-tarifario/validar-ambito';
-import type { EstadoAmbito, PrestadorAmbitoInfo } from '../../dominio/ambito-tarifario/types';
+import type { PrestadorAmbitoInfo, ResultadoAmbito } from '../../dominio/ambito-tarifario/types';
 
 /** Prestador con acceso a la transaccion de la conexion SQLite compartida. */
 export interface PrestadorRepoPort {
@@ -117,7 +117,7 @@ export interface BootstrapCompletoDeps {
   readonly validarAmbito?: (
     prestador: PrestadorAmbitoInfo,
     fecha: string,
-  ) => { estado: EstadoAmbito; subtitulo: 1 | 2 | null; normaAplicable: string | null; evidencia: string; fecha_verificacion: string };
+  ) => ResultadoAmbito;
 }
 
 // ── Constantes del dominio ──────────────────────────────────────────────────
