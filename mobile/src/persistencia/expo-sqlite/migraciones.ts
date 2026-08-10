@@ -655,6 +655,32 @@ const MIGRACION_028_PARAMETROS_ALTITUD = `
 ALTER TABLE parametros_tarifa ADD COLUMN altitud_msnm INTEGER NULL;
 `;
 
+/**
+ * Migration 028b_parametros_tarifa_anio_destino. Espejo de la
+ * segunda migration aditiva del change `param-tarifa-residuales-cra-825`
+ * Phase 1 task 1.6 (GREEN).
+ *
+ * Res CRA 825/2017 Art. 11: factor de indexacion IPC =
+ *   factor = IPC[anio_destino_indexacion] / IPC[anio_base].
+ *
+ * El campo `anio_base` ya existe desde la migration 023. Faltaba el
+ * `anio_destino_indexacion` (el año al que se quiere indexar la
+ * metodologia). Sin este campo, el factor IPC no es calculable y el
+ * admin no puede ajustar la indexacion.
+ *
+ *   - anio_destino_indexacion: INTEGER NULL — Default NULL para
+ *           legacy data (el admin debe setearlo via pantalla).
+ *
+ * Idempotente: idem migration 028 (helper aditivo).
+ * Backward-compat: data legacy queda con `anio_destino_indexacion = NULL`.
+ */
+const MIGRACION_028B_PARAMETROS_ANIO_DESTINO = `
+-- Migration 028b: ParametrosTarifa.anio_destino_indexacion persiste
+-- (Res CRA 825/2017 Art. 11, formula IPC[destino] / IPC[base]).
+-- Cambio param-tarifa-residuales-cra-825 Phase 1 task 1.6 GREEN.
+ALTER TABLE parametros_tarifa ADD COLUMN anio_destino_indexacion INTEGER NULL;
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -684,6 +710,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 26, nombre: '026_suscriptor_verificacion', sql: MIGRACION_026_SUSCRIPTOR_VERIFICACION },
   { version: 27, nombre: '027_acuerdo_municipal_estado', sql: MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO },
   { version: 28, nombre: '028_parametros_tarifa_altitud', sql: MIGRACION_028_PARAMETROS_ALTITUD },
+  { version: 29, nombre: '028b_parametros_tarifa_anio_destino', sql: MIGRACION_028B_PARAMETROS_ANIO_DESTINO },
 ];
 
 
@@ -770,14 +797,16 @@ export async function aplicarMigracionesAsync(
     // excepto estado_verificacion/estado que tienen DEFAULT), asi que
     // data legacy queda naturalmente backward-compat.
     //
-    // Migration 028 (`param-tarifa-residuales-cra-825` Phase 1 task 1.4):
-    // misma semántica aditiva — `altitud_msnm INTEGER NULL`. Inclusion
-    // en este dispatch preserva el patron uniforme.
+    // Migration 028 + 028b (`param-tarifa-residuales-cra-825` Phase 1
+    // tasks 1.4 + 1.6): misma semántica aditiva — `altitud_msnm`
+    // (Res CRA 750/2016) y `anio_destino_indexacion` (Res CRA 825
+    // Art. 11). Inclusion en este dispatch preserva el patron uniforme.
     if (
       migracion.version === 25 ||
       migracion.version === 26 ||
       migracion.version === 27 ||
-      migracion.version === 28
+      migracion.version === 28 ||
+      migracion.version === 29
     ) {
       await aplicarMigrationAditivaIdempotenteExpo(db, migracion.sql);
       await db.runAsync(

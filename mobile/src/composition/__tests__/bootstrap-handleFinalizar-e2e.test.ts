@@ -191,11 +191,13 @@ describe('E2E handleFinalizar — reproduce el path SQL real del device', () => 
       // (24 previas + 3 de param-tarifa-res-825-compliance-phase2:
       //  025 parametros_tarifa.cmaa + docs,
       //  026 suscriptor.verification,
-      //  027 acuerdo_municipal.estado).
+      //  027 acuerdo_municipal.estado,
+      //  028 parametros_tarifa.altitud_msnm (param-tarifa-residuales-cra-825),
+      //  028b parametros_tarifa.anio_destino_indexacion (idem).
       const aplicadas = db
         .prepare('SELECT version FROM __migraciones_aplicadas ORDER BY version')
         .all() as Array<{ version: number }>;
-      expect(aplicadas.length).toBe(27);
+      expect(aplicadas.length).toBe(29);
     });
   }, 30000);
 

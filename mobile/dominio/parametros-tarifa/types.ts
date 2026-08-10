@@ -147,6 +147,17 @@ export interface ParametrosTarifa {
    */
   readonly factor_indexacion_ipc: number;
   /**
+   * Año destino para el cálculo del factor IPC (Res CRA 825/2017
+   * Art. 11). El factor se calcula como
+   * `IPC_VALORES[anio_destino] / IPC_VALORES[anio_base]`.
+   *
+   * OPTIONAL por backward-compat con data legacy. `null` = sin
+   * indexación configurada (factor permanece en 1.0).
+   *
+   * Phase 1 (`param-tarifa-residuales-cra-825` task 1.6).
+   */
+  readonly anio_destino_indexacion?: number | null;
+  /**
    * Altitud del prestador sobre el nivel del mar (msnm). Determina
    * el límite de consumo básico conforme a Res CRA 750/2016:
    *   altitud > 2.000 → 11 m³/mes

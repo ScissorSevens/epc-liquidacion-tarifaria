@@ -128,7 +128,7 @@ const paramsViejos: ParametrosTarifa = {
   id_acuerdo: 100,
   periodo: 2026,
   cma: 12_000_000,
-  cmo: 450,
+  cmo: 500,
   cmi: 120,
   cmt: 80,
   cmviaa: 0,
@@ -141,7 +141,7 @@ const paramsViejos: ParametrosTarifa = {
   ipuf_indice: 1.0,
   // CMA / N → cargo fijo resultante = 12_000_000 / 1000 = 12_000.
   cargo_fijo_resultante: 12_000,
-  cargo_consumo_resultante: 450 + 120 + 80,
+  cargo_consumo_resultante: 500 + 120 + 80,
   componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
   minimo_vital: null,
   vigente_desde: '2025-01-01',

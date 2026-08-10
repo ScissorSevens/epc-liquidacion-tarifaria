@@ -192,6 +192,10 @@ export function buildBorradorLocal(
     // altitud_msnm: Res CRA 750/2016 compliance. 0 = default a nivel
     // del mar → limite 16 m3/mes (el mas conservador).
     altitud_msnm: entero(form.altitud),
+    // anio_destino_indexacion: Res CRA 825/2017 Art. 11. NULL por
+    // backward-compat (legacy data sin destino seteado). En fase 3
+    // task 3.3 se agrega input editable en el screen.
+    anio_destino_indexacion: null,
     // cargo_fijo_resultante + cargo_consumo_resultante se recalculan via
     // calcularCargos() en guardar() / useMemo. Acá los dejamos en 0
     // como placeholders (la factoría pura los ignora).
