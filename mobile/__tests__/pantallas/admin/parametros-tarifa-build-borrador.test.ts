@@ -42,6 +42,7 @@ const formCompleto: FormValues = {
   m3Gratis: '0',
   vigenteDesde: '2025-01-01',
   vigenteHasta: '2029-12-31',
+  altitud: '2600',
 };
 
 const ctx = { id_prestador: 7, id_acuerdo: 100 };
