@@ -52,6 +52,12 @@ interface SuscriptorRow {
   readonly categoria_uso: Suscriptor['categoria_uso'];
   readonly estado: string;
   readonly created_at: string;
+  // Phase 3.4: 4 campos de verificación oficial del estrato.
+  // Default conservador 'PENDIENTE' para legacy data (DB migration 026).
+  readonly estado_verificacion: string;
+  readonly fuente_estrato: string | null;
+  readonly fecha_verificacion_estrato: string | null;
+  readonly soporte_estrato_url: string | null;
 }
 
 function fromRow(row: SuscriptorRow): Suscriptor {
@@ -67,6 +73,11 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     id_prestador: row.id_prestador,
     categoria_uso: row.categoria_uso,
     estado: row.estado as Suscriptor['estado'],
+    // Phase 3.4: estado_verificacion es NOT NULL con default 'PENDIENTE'
+    // en la DB (migration 026), siempre presente en la fila. Los otros 3
+    // campos son opcionales: se omiten del objeto cuando son NULL para
+    // mantener consistencia con el patron de email/telefono (spread).
+    estado_verificacion: row.estado_verificacion as Suscriptor['estado_verificacion'],
     created_at: row.created_at,
     ...(row.email !== null && { email: row.email }),
     ...(row.telefono !== null && { telefono: row.telefono }),
@@ -76,6 +87,15 @@ function fromRow(row: SuscriptorRow): Suscriptor {
     }),
     ...(row.numero_catastral !== null && {
       numero_catastral: row.numero_catastral,
+    }),
+    ...(row.fuente_estrato !== null && {
+      fuente_estrato: row.fuente_estrato,
+    }),
+    ...(row.fecha_verificacion_estrato !== null && {
+      fecha_verificacion_estrato: row.fecha_verificacion_estrato,
+    }),
+    ...(row.soporte_estrato_url !== null && {
+      soporte_estrato_url: row.soporte_estrato_url,
     }),
   };
   return sus;
@@ -127,6 +147,13 @@ const COLUMNAS_ACTUALIZABLES: ReadonlyArray<keyof SuscriptorRow> = [
   'categoria_uso',
   'id_prestador',
   'estado',
+  // Phase 3.4: 4 campos de verificación oficial del estrato.
+  // El admin los actualiza desde la UI de Suscriptores cuando
+  // verifica el estrato con su fuente y soporte documental.
+  'estado_verificacion',
+  'fuente_estrato',
+  'fecha_verificacion_estrato',
+  'soporte_estrato_url',
 ];
 
 function toSqlValue(
