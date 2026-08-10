@@ -38,12 +38,28 @@ export function validarAmbito(
   fecha: string,
 ): ResultadoAmbito {
   // Caso 1: sin dato de suscriptores → INDETERMINADO.
+  // IMPORTANTE: chequear `=== null` ANTES que `<= 0` porque en JS
+  // `null <= 0` es `true` (null se convierte a 0 en comparación numérica)
+  // y NO queremos capturar null en este branch.
   if (prestador.cantidad_suscriptores === null) {
     return {
       estado: 'INDETERMINADO',
       subtitulo: null,
       normaAplicable: null,
       evidencia: `cantidad_suscriptores_indefinida para prestador ${prestador.id_prestador} zona ${prestador.zona}`,
+      fecha_verificacion: fecha,
+    };
+  }
+
+  // Caso 0: cantidad inválida (≤ 0 explícito, NO null porque null se
+  // manejó arriba) → NO_APLICA. Un prestador con 0 suscriptores o
+  // valor negativo NO puede recibir liquidación.
+  if (prestador.cantidad_suscriptores <= 0) {
+    return {
+      estado: 'NO_APLICA',
+      subtitulo: null,
+      normaAplicable: null,
+      evidencia: `cantidad_suscriptores inválida (${prestador.cantidad_suscriptores}) para prestador ${prestador.id_prestador}`,
       fecha_verificacion: fecha,
     };
   }
