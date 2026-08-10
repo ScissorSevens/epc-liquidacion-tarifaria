@@ -772,4 +772,187 @@ describe('bootstrapCompleto()', () => {
       expect(state.parametros.size).toBe(0);
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────
+  // T-ACM-AMB-GATE — Fase 2 (param-tarifa-res-825-compliance-phase2, task 4.3 RED).
+  //
+  // El bootstrap debe invocar `validarAmbito()` antes de crear
+  // cualquier entidad. Si el ámbito NO_APLICA (ej: suscriptores <= 0)
+  // o INDETERMINADO con datos insuficientes, el bootstrap ABORTA con
+  // un mensaje CLARO que distingue "prestador no aplica a CRA 825/2017"
+  // de "datos insuficientes para evaluar" — el admin debe entender
+  // qué decisión tomar.
+  //
+  // Segun design §"Architecture Decisions" (Decision 2): gate estricto,
+  // throw duro. Razón regulatoria: la liquidación posterior aplicaría
+  // factores tarifarios solo si el prestador está dentro del ámbito
+  // de la CRA 825/2017. Si el bootstrap continúa sin gate, el admin
+  // podría operar fuera del régimen tarifario aplicable.
+  //
+  // RED phase: el bootstrap actual no invoca `validarAmbito`. Estos
+  // tests fallan porque o bien NO se lanza el error esperado, o bien
+  // el mensaje no distingue las dos causas.
+  // ───────────────────────────────────────────────────────────────────
+  describe('T-ACM-AMB-GATE: gate de ámbito tarifario antes de crear entidades', () => {
+    /**
+     * Mock de `validarAmbito` que retorna NO_APLICA. El bootstrap
+     * debe abortar con un mensaje que mencione la causa regulatoria.
+     */
+    function ambitoNoAplicaMock(): ReturnType<typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito> {
+      return ((prestador: import('../../dominio/ambito-tarifario/types').PrestadorAmbitoInfo, fecha: string) => ({
+        estado: 'NO_APLICA' as const,
+        subtitulo: null,
+        normaAplicable: null,
+        evidencia: `cantidad_suscriptores inválida (${prestador.cantidad_suscriptores}) para prestador ${prestador.id_prestador}`,
+        fecha_verificacion: fecha,
+      })) as never;
+    }
+
+    /**
+     * Mock de `validarAmbito` que retorna INDETERMINADO. El bootstrap
+     * debe abortar con un mensaje que mencione "datos insuficientes".
+     */
+    function ambitoIndeterminadoMock(): ReturnType<typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito> {
+      return ((prestador: import('../../dominio/ambito-tarifario/types').PrestadorAmbitoInfo, fecha: string) => ({
+        estado: 'INDETERMINADO' as const,
+        subtitulo: null,
+        normaAplicable: null,
+        evidencia: `cantidad_suscriptores_indefinida para prestador ${prestador.id_prestador} zona ${prestador.zona}`,
+        fecha_verificacion: fecha,
+      })) as never;
+    }
+
+    /**
+     * Mock de `validarAmbito` que retorna APLICA Subtítulo 2. El bootstrap
+     * debe continuar normalmente.
+     */
+    function ambitoAplicaMock(): ReturnType<typeof import('../../dominio/ambito-tarifario/validar-ambito').validarAmbito> {
+      return ((prestador: import('../../dominio/ambito-tarifario/types').PrestadorAmbitoInfo, fecha: string) => ({
+        estado: 'APLICA' as const,
+        subtitulo: 2 as const,
+        normaAplicable: 'CRA_825_2017',
+        evidencia: `${prestador.cantidad_suscriptores} suscriptores, zona ${prestador.zona} (≤5000 o rural) — Subtítulo 2 metodología CRA 825/2017`,
+        fecha_verificacion: fecha,
+      })) as never;
+    }
+
+    it('T-ACM-AMB-GATE-1 bootstrap ABORTA con mensaje claro si validarAmbito retorna NO_APLICA', async () => {
+      await expect(
+        bootstrapCompleto({
+          prestadorRepo: deps.prestadorRepo,
+          acuerdoRepo: deps.acuerdoRepo,
+          parametrosRepo: deps.parametrosRepo,
+          operarioRepo: deps.operarioRepo,
+          hasher: deps.hasher,
+          idGenerator: deps.idGenerator,
+          input: buildInputValido(),
+          // Gate inyectado: simulamos NO_APLICA.
+          validarAmbito: ambitoNoAplicaMock(),
+        }),
+      ).rejects.toThrow(/no aplica a CRA 825|ámbito no aplica|NO_APLICA/i);
+
+      // El bootstrap NO debe haber persistido NADA.
+      expect(state.prestadores.size).toBe(0);
+      expect(state.acuerdos.size).toBe(0);
+      expect(state.parametros.size).toBe(0);
+      expect(state.operarios.size).toBe(0);
+    });
+
+    it('T-ACM-AMB-GATE-2 el mensaje de NO_APLICA menciona "prestador" + "CRA 825" para que el admin sepa qué contactar a soporte', async () => {
+      const mensaje = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+        validarAmbito: ambitoNoAplicaMock(),
+      }).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e.message : String(e)),
+      );
+
+      // El mensaje debe distinguir "prestador no aplica" de "datos inválidos".
+      // El admin debe entender que debe contactar a soporte (no puede
+      // seguir).
+      expect(mensaje).toBeTruthy();
+      expect(mensaje).toMatch(/prestador/i);
+      expect(mensaje).toMatch(/CRA\s*825/i);
+      expect(mensaje).toMatch(/soporte|contactar/i);
+      // NO debe confundirse con "datos inválidos" o "validar".
+      expect(mensaje).not.toMatch(/datos insuficientes para evaluar/i);
+    });
+
+    it('T-ACM-AMB-GATE-3 bootstrap ABORTA con mensaje "datos insuficientes" si validarAmbito retorna INDETERMINADO', async () => {
+      await expect(
+        bootstrapCompleto({
+          prestadorRepo: deps.prestadorRepo,
+          acuerdoRepo: deps.acuerdoRepo,
+          parametrosRepo: deps.parametrosRepo,
+          operarioRepo: deps.operarioRepo,
+          hasher: deps.hasher,
+          idGenerator: deps.idGenerator,
+          input: buildInputValido(),
+          validarAmbito: ambitoIndeterminadoMock(),
+        }),
+      ).rejects.toThrow(/datos insuficientes|indeterminado/i);
+
+      // El bootstrap NO debe haber persistido NADA.
+      expect(state.prestadores.size).toBe(0);
+      expect(state.acuerdos.size).toBe(0);
+      expect(state.parametros.size).toBe(0);
+      expect(state.operarios.size).toBe(0);
+    });
+
+    it('T-ACM-AMB-GATE-4 bootstrap continúa normal si validarAmbito retorna APLICA', async () => {
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+        validarAmbito: ambitoAplicaMock(),
+      });
+
+      // El bootstrap completa: las 4 entidades persistidas.
+      expect(resultado.prestador).toBeDefined();
+      expect(resultado.acuerdo).toBeDefined();
+      expect(resultado.parametros).toBeDefined();
+      expect(resultado.operario).toBeDefined();
+      expect(state.prestadores.size).toBe(1);
+      expect(state.acuerdos.size).toBe(1);
+      expect(state.parametros.size).toBe(1);
+      expect(state.operarios.size).toBe(1);
+    });
+
+    it('T-ACM-AMB-GATE-5 el gate se invoca ANTES de prestadorRepo.crear (sin huérfanos si NO_APLICA)', async () => {
+      // Reiniciamos el state para aislar el tracking.
+      state = buildRepoState();
+      const repos = buildRepos(state);
+      deps = {
+        ...repos,
+        hasher: buildHasher(),
+        idGenerator: buildIdGenerator(),
+      };
+
+      await expect(
+        bootstrapCompleto({
+          prestadorRepo: deps.prestadorRepo,
+          acuerdoRepo: deps.acuerdoRepo,
+          parametrosRepo: deps.parametrosRepo,
+          operarioRepo: deps.operarioRepo,
+          hasher: deps.hasher,
+          idGenerator: deps.idGenerator,
+          input: buildInputValido(),
+          validarAmbito: ambitoNoAplicaMock(),
+        }),
+      ).rejects.toThrow();
+
+      // prestadorRepo.crear NUNCA se invocó.
+      expect(deps.prestadorRepo.listar).toHaveBeenCalledTimes(0);
+    });
+  });
 });
