@@ -247,7 +247,39 @@ export function calcularLiquidacion(
 
   // 5. Factor de subsidio/contribución según categoría + estrato + Acuerdo
   const factorResult = calcularFactor(entrada.estrato, entrada.categoria_uso, acuerdo);
-  const factor = factorResult.factor;
+  let factor = factorResult.factor;
+
+  // Gate `estado_verificacion` — solo PENDIENTE en esta iteración (task 2.12 GREEN).
+  // Cambio `param-tarifa-res-825-compliance-phase2` (task 2.12 GREEN).
+  //
+  // Regulación (Resolución CRA 825/2017 + L142/1994 art. 99.6): un
+  // suscriptor residencial E1-E3 SOLO recibe subsidio si el prestador
+  // verificó oficialmente su estrato. Sin verificación, se cobra CF+CC
+  // plenos (factor 0) y se registra el motivo regulatorio en metadata.
+  //
+  // Alcance:
+  //   - E1-E3 residencial (o especial, alias) → gate aplica.
+  //   - E4 neutro, E5/E6 contribuciones → NO gate (la contribución no
+  //     depende de verificación oficial del estrato).
+  //   - Comercial/industrial/oficial → NO gate (no subsidian anyway).
+  //
+  // Backward-compat: si `estado_verificacion` no está definido en la
+  // entrada (callers legacy del motor), se asume VERIFICADO — no rompe
+  // los 40 callers que no setean el campo.
+  let motivoNoSubsidio: string | null = null;
+  const verificacion: 'PENDIENTE' | 'VERIFICADO' | 'RECHAZADO' =
+    entrada.estado_verificacion ?? 'VERIFICADO';
+  const requiereSubsidio =
+    (entrada.categoria_uso === 'residencial' || entrada.categoria_uso === 'especial') &&
+    entrada.estrato >= 1 &&
+    entrada.estrato <= 3;
+
+  if (requiereSubsidio && verificacion === 'PENDIENTE') {
+    motivoNoSubsidio = 'suscripcion_pendiente_verificacion';
+    // Override factor para que todos los cálculos downstream (subsidio
+    // legacy, contribución, factor_reportado) queden en 0.
+    factor = 0;
+  }
 
   // 6. Aplicar subsidio por bloques (Res CRA 825/2017 compliance).
   //    - Si el Acuerdo tiene los 3 porcentajes nuevos (cf/basico/excedente):
@@ -274,18 +306,24 @@ export function calcularLiquidacion(
       let factorBasico = 0;
       let factorExcedente = 0;
 
-      if (entrada.estrato === 1) {
-        factorCf = acuerdo?.factor_subsidio_e1_cf ?? 0;
-        factorBasico = acuerdo?.factor_subsidio_e1_basico ?? 0;
-        factorExcedente = acuerdo?.factor_subsidio_e1_excedente ?? 0;
-      } else if (entrada.estrato === 2) {
-        factorCf = acuerdo?.factor_subsidio_e2_cf ?? 0;
-        factorBasico = acuerdo?.factor_subsidio_e2_basico ?? 0;
-        factorExcedente = acuerdo?.factor_subsidio_e2_excedente ?? 0;
-      } else if (entrada.estrato === 3) {
-        factorCf = acuerdo?.factor_subsidio_e3_cf ?? 0;
-        factorBasico = acuerdo?.factor_subsidio_e3_basico ?? 0;
-        factorExcedente = acuerdo?.factor_subsidio_e3_excedente ?? 0;
+      // Gate verificación: si PENDIENTE/RECHAZADO, NO leemos del
+      // Acuerdo — los 3 porcentajes quedan en 0 y el subsidio total
+      // queda en 0. Cambio `param-tarifa-res-825-compliance-phase2`
+      // (tasks 2.12/2.14 GREEN).
+      if (motivoNoSubsidio === null) {
+        if (entrada.estrato === 1) {
+          factorCf = acuerdo?.factor_subsidio_e1_cf ?? 0;
+          factorBasico = acuerdo?.factor_subsidio_e1_basico ?? 0;
+          factorExcedente = acuerdo?.factor_subsidio_e1_excedente ?? 0;
+        } else if (entrada.estrato === 2) {
+          factorCf = acuerdo?.factor_subsidio_e2_cf ?? 0;
+          factorBasico = acuerdo?.factor_subsidio_e2_basico ?? 0;
+          factorExcedente = acuerdo?.factor_subsidio_e2_excedente ?? 0;
+        } else if (entrada.estrato === 3) {
+          factorCf = acuerdo?.factor_subsidio_e3_cf ?? 0;
+          factorBasico = acuerdo?.factor_subsidio_e3_basico ?? 0;
+          factorExcedente = acuerdo?.factor_subsidio_e3_excedente ?? 0;
+        }
       }
       // E4/E5/E6: 3 porcentajes subsidiables no aplican (E4=neutro,
       // E5/E6 son contribuciones).
@@ -359,6 +397,7 @@ export function calcularLiquidacion(
     cmviaa_aplicado: parametros.aplica_cmviaa && parametros.cmviaa > 0,
     minimo_vital_aplicado: consumoEfectivo !== entrada.consumo_m3,
     factor_capeado: factorResult.capeado,
+    motivo_no_subsidio: motivoNoSubsidio,
     version_motor: '825-907-v2', // bump: subsidios por bloques
     calculo_timestamp: new Date().toISOString(),
   };

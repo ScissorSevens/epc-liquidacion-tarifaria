@@ -61,6 +61,24 @@ export interface MetadataCalculo {
   readonly cmviaa_aplicado: boolean;
   readonly minimo_vital_aplicado: boolean;
   readonly factor_capeado: boolean;
+  /**
+   * Motivo regulatorio por el cual NO se aplicó subsidio aunque
+   * categoría/estrato lo permitirían. Populated solo cuando el motor
+   * bloquea el subsidio por gates regulatorios (verificación oficial
+   * del estrato, etc.).
+   *
+   * Valores:
+   *   - `'suscripcion_pendiente_verificacion'` — admin aún no verificó
+   *     el estrato del suscriptor (Resolución CRA 825/2017 + L142/1994).
+   *   - `'suscripcion_rechazada'` — admin rechazó el estrato del
+   *     suscriptor (impugnación regulatoria).
+   *
+   * `null` cuando el subsidio aplicó normalmente (o cuando el suscriptor
+   * no calificaba para subsidio por estrato/categoría de todos modos).
+   *
+   * Fase 2 (`param-tarifa-res-825-compliance-phase2`, tasks 2.12/2.14).
+   */
+  readonly motivo_no_subsidio?: string | null;
   readonly version_motor: string;
   readonly calculo_timestamp: string;  // ISO 8601
 }
