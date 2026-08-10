@@ -74,13 +74,22 @@ export interface ParametrosTarifa {
    * Flag: mínimo vital activo para este prestador. Default false
    * (825/2017 no obliga, ver Q9 spec).
    *
-   * NOTA: este flag se conserva por backward-compat con data legacy.
-   * La fuente de verdad del mínimo vital es la tabla relacionada
-   * `minimo_vital` (ver `minimo_vital: MinimoVital | null`). Si
-   * `minimo_vital !== null`, hay mínimo vital configurado.
+   * @deprecated Decisión B/B/B Phase 3 task 3.2: la fuente de verdad
+   * del mínimo vital es la tabla separada `minimo_vital` (ver
+   * `minimo_vital: MinimoVital | null`). El form admin
+   * `ParametrosTarifa` ya NO captura este flag (Opción A: eliminar
+   * del form). Se conserva en el type + DB por backward-compat con
+   * data legacy pre-Phase 3. NO usar como fuente de verdad en código
+   * nuevo. Sera reemplazado por el módulo admin `MinimoVital` futuro.
    */
   readonly aplica_minimo_vital: boolean;
-  /** m³ gratis por mínimo vital. Default 0 (desactiva aunque flag=true). */
+  /**
+   * m³ gratis por mínimo vital. Default 0 (desactiva aunque flag=true).
+   *
+   * @deprecated Decisión B/B/B Phase 3 task 3.2: la fuente de verdad
+   * es la tabla `minimo_vital`. Se conserva en el type + DB por
+   * backward-compat con data legacy. NO usar en código nuevo.
+   */
   readonly m3_gratis_minimo_vital: number;
   /**
    * Índice de Precios al Usuario Final. Multiplicador periódico para

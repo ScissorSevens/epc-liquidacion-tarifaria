@@ -330,7 +330,7 @@ describe('ParametrosTarifaForm', () => {
       expect(getByText('Periodo y vigencia')).toBeTruthy();
       expect(getByText('Costos medios (estudio de costos del prestador)')).toBeTruthy();
       expect(getByText('Agua y suscriptores (insumo ASP = AS - IPUF×12×N)')).toBeTruthy();
-      expect(getByText('Mínimo vital (Decreto 776/2025 — opcional)')).toBeTruthy();
+      // Phase 3 task 3.2 (GREEN): sección "Mínimo vital" eliminada del form.
       // Botón guardar presente.
       expect(getByText('Guardar Parámetros')).toBeTruthy();
     });
@@ -446,20 +446,9 @@ fireEvent.press(back);
       expect(UNSAFE_getByProps({ testID: 'seccion-card-agua' })).toBeTruthy();
     });
 
-    it('T-IMPC-MIG-4 existe seccion-card-minimo-vital', () => {
-      const repo = crearRepoFake();
-      const acuerdoRepo = crearAcuerdoRepoFake();
-      const { UNSAFE_getByProps } = renderConSafeArea(
-        <ParametrosTarifaForm
-          id_prestador={7}
-          id_acuerdo={100}
-          parametrosActuales={parametrosFixture}
-          repo={repo}
-          acuerdoRepo={acuerdoRepo}
-        />,
-      );
-      expect(UNSAFE_getByProps({ testID: 'seccion-card-minimo-vital' })).toBeTruthy();
-    });
+    // Phase 3 task 3.2 (GREEN): T-IMPC-MIG-4 (seccion-card-minimo-vital)
+    // se ELIMINA — la sección de mínimo vital ya no existe en el form
+    // (Opción A: la fuente de verdad es la tabla `minimo_vital`).
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -1468,10 +1457,12 @@ fireEvent.press(back);
       // numérico SIEMPRE renderizado y verificamos que su style efectivo
       // tiene minHeight/height ≥ 44 (WCAG 2.5.5).
       //
-      // `param-cmviaa` y `param-m3gratis` son CONDICIONALES
-      // (renderizan solo si aplica_cmviaa=true o aplica_minimo_vital=true).
-      // En el fixture ambos flags son false → no se renderizan. Los
-      // cubrimos con un render separado que fuerza ambos toggles activos.
+      // `param-cmviaa` es CONDICIONAL (renderiza solo si aplica_cmviaa=true).
+      // En el fixture el flag es false → no se renderiza. Lo cubrimos
+      // con un render separado que fuerza el toggle activo.
+      //
+      // Phase 3 task 3.2 (GREEN): `param-m3gratis` se ELIMINA del form
+      // (Opción A: el form ya no captura mínimo vital).
       const { getByTestId, getByLabelText } = renderEstable();
       const testIdsSiempreRenderizados = [
         'param-periodo',
@@ -1496,23 +1487,19 @@ fireEvent.press(back);
         const alto = estilo.minHeight ?? estilo.height ?? 0;
         expect(alto).toBeGreaterThanOrEqual(44);
       }
-      // Activamos los toggles para que los inputs condicionales
-      // rendericen y podamos auditarlos.
+      // Activamos el toggle CMVIAA para que el input condicional
+      // renderice y podamos auditarlos.
       fireEvent(getByLabelText('Aplicar costo medio variable de inversión ambiental'), 'valueChange', true);
-      fireEvent(getByLabelText('Aplicar mínimo vital'), 'valueChange', true);
       await waitFor(() => {
         expect(getByTestId('param-cmviaa')).toBeTruthy();
       });
-      expect(getByTestId('param-m3gratis')).toBeTruthy();
-      for (const id of ['param-cmviaa', 'param-m3gratis']) {
-        const input = getByTestId(id);
-        const estilo = StyleSheet.flatten(input.props.style) as {
-          minHeight?: number;
-          height?: number;
-        };
-        const alto = estilo.minHeight ?? estilo.height ?? 0;
-        expect(alto).toBeGreaterThanOrEqual(44);
-      }
+      const input = getByTestId('param-cmviaa');
+      const estilo = StyleSheet.flatten(input.props.style) as {
+        minHeight?: number;
+        height?: number;
+      };
+      const alto = estilo.minHeight ?? estilo.height ?? 0;
+      expect(alto).toBeGreaterThanOrEqual(44);
     });
 
     it('T-CRAFT-3 el campoFila (fila del Switch) tiene minHeight ≥ 48 (WCAG 2.5.5)', async () => {
@@ -2199,12 +2186,12 @@ fireEvent.press(back);
       expect(getByText('Parámetros Tarifarios')).toBeTruthy();
       // El subtitulo menciona el id_prestador.
       expect(getByText(/Prestador #7/)).toBeTruthy();
-      // Las 4 secciones del form deben estar presentes (orden
-      // logico: Periodo → Costos → Agua → Minimo vital).
+      // Las secciones del form deben estar presentes (orden
+      // logico: Periodo → Costos → Agua → Altitud → Soporte doc).
+      // Phase 3 task 3.2 (GREEN): "Mínimo vital" se ELIMINA del form.
       expect(getByText('Periodo y vigencia')).toBeTruthy();
       expect(getByText('Costos medios (estudio de costos del prestador)')).toBeTruthy();
       expect(getByText('Agua y suscriptores (insumo ASP = AS - IPUF×12×N)')).toBeTruthy();
-      expect(getByText('Mínimo vital (Decreto 776/2025 — opcional)')).toBeTruthy();
       // El CTA guardar debe estar presente.
       expect(getByTestId('param-guardar')).toBeTruthy();
     });
@@ -2255,14 +2242,15 @@ fireEvent.press(back);
       }
     });
 
-    it('T-A11Y-2 los Switches (CMVIAA y minimo vital) tienen accessibilityLabel definido', () => {
+    it('T-A11Y-2 los Switches (CMVIAA y CMAA) tienen accessibilityLabel definido', () => {
+      // Phase 3 task 3.2 (GREEN): el switch de "Aplicar mínimo vital"
+      // se ELIMINÓ del form (Opción A). El test ahora valida CMVIAA
+      // y CMAA (los 2 switches restantes con accessibilityLabel).
       const { getByLabelText } = renderConDatos();
-      // El Switch CMVIAA tiene accessibilityLabel explicito (lo
-      // pasamos en el callsite). Mismo patron para minimo vital.
       const switchCmviaa = getByLabelText('Aplicar costo medio variable de inversión ambiental');
       expect(switchCmviaa).toBeTruthy();
-      const switchMinimoVital = getByLabelText('Aplicar mínimo vital');
-      expect(switchMinimoVital).toBeTruthy();
+      const switchCmaa = getByLabelText('Aplicar CMAA (Res 907/2019 art. 13)');
+      expect(switchCmaa).toBeTruthy();
     });
   });
 

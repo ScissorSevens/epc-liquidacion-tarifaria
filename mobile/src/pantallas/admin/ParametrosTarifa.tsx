@@ -285,8 +285,12 @@ export default function ParametrosTarifaForm({
   const [aguaSuministrada, setAguaSuministrada] = useState(String(parametrosActuales?.agua_suministrada_m3_anio ?? 0));
   const [ipuf, setIpuf] = useState(String(parametrosActuales?.ipuf_m3_suscriptor_mes ?? 6));
   const [suscriptoresPromedio, setSuscriptoresPromedio] = useState(String(parametrosActuales?.suscriptores_promedio ?? 0));
-  const [aplicaMinimoVital, setAplicaMinimoVital] = useState(parametrosActuales?.aplica_minimo_vital ?? false);
-  const [m3Gratis, setM3Gratis] = useState(String(parametrosActuales?.m3_gratis_minimo_vital ?? 0));
+  // Phase 3 task 3.2 (GREEN) — Opción A: la captura de
+  // `aplicaMinimoVital` + `m3Gratis` se ELIMINÓ del form. La fuente
+  // de verdad del mínimo vital es la tabla `minimo_vital` (futuro
+  // módulo admin). Las columnas en `parametros_tarifa` se mantienen
+  // por backward-compat pero el buildBorradorLocal las hardcodea
+  // a `false` / `0` (ver parametros-tarifa-build-borrador.ts).
   const [vigenteDesde, setVigenteDesde] = useState(
     parametrosActuales?.vigente_desde?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
   );
@@ -334,8 +338,6 @@ export default function ParametrosTarifaForm({
     setAguaSuministrada(String(parametrosActuales.agua_suministrada_m3_anio));
     setIpuf(String(parametrosActuales.ipuf_m3_suscriptor_mes));
     setSuscriptoresPromedio(String(parametrosActuales.suscriptores_promedio));
-    setAplicaMinimoVital(parametrosActuales.aplica_minimo_vital);
-    setM3Gratis(String(parametrosActuales.m3_gratis_minimo_vital));
     setVigenteDesde(parametrosActuales.vigente_desde.slice(0, 10));
     setVigenteHasta(parametrosActuales.vigente_hasta.slice(0, 10));
     setAltitud(String(parametrosActuales.altitud_msnm ?? 0));
@@ -439,8 +441,6 @@ export default function ParametrosTarifaForm({
     aguaSuministrada,
     ipuf,
     suscriptoresPromedio,
-    aplicaMinimoVital,
-    m3Gratis,
     vigenteDesde,
     vigenteHasta,
     altitud,
@@ -895,49 +895,6 @@ export default function ParametrosTarifaForm({
         >
           {`Limite de consumo basico: ${limiteConsumoBasicoMensual(num(altitud))} m3/mes (altitud ${num(altitud)} msnm)`}
         </Text>
-      </SeccionForm>
-
-      <SeccionForm titulo="Mínimo vital (Decreto 776/2025 — opcional)" icono="shield" testID="seccion-card-minimo-vital">
-        <View style={estilos.campoFila}>
-          <MaterialIcons
-            name="shield"
-            size={24}
-            color={COLORS.primary}
-            style={estilos.switchFilaIcono}
-            accessibilityElementsHidden
-          />
-          <View style={estilos.switchFilaText}>
-            <Text style={estilos.switchFilaLabel}>Activar mínimo vital (Decreto 776/2025)</Text>
-          </View>
-          <Switch
-            value={aplicaMinimoVital}
-            onValueChange={(v) => {
-              // D5 (Commit 4): Haptics.selectionAsync en onValueChange de
-              // switches (feedback sutil para iOS + Android).
-              if (Platform.OS !== 'web') {
-                void Haptics.selectionAsync();
-              }
-              setAplicaMinimoVital(v);
-            }}
-            disabled={guardando || cargandoInputs}
-            accessibilityLabel="Aplicar mínimo vital"
-            testID="switch-minimo-vital"
-          />
-        </View>
-        {aplicaMinimoVital && (
-          <View style={estilos.campo}>
-            <FormField
-              label="M³ gratis al inicio del periodo"
-              value={m3Gratis}
-              onChangeText={setM3Gratis}
-              keyboardType="numeric"
-              editable={!guardando && !cargandoInputs}
-              selectable
-              tabularNums
-              testID="param-m3gratis"
-            />
-          </View>
-        )}
       </SeccionForm>
 
       {/* Soporte documental (Fase 2, task 4.5). 3 campos opcionales

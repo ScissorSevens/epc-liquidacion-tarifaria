@@ -19,8 +19,10 @@
 //   - `aplica_cmviaa=false` → CMVIAA se quita de `componentes_aplicables`
 //     y su valor se fuerza a 0 (calcularCargos lo trata igual, pero
 //     persistir el valor explicito evita sorpresas en auditoria).
-//   - `aplica_minimo_vital=false` → `m3_gratis_minimo_vital=0` por
-//     consistencia.
+//   - `aplica_minimo_vital` SIEMPRE se hardcodea a `false` (Phase 3
+//     task 3.2 GREEN, Opción A). La fuente de verdad del mínimo vital
+//     es la tabla separada `minimo_vital`; el form ya no captura esos
+//     campos. Se mantienen en el type + DB por backward-compat.
 //   - Strings del form se parsean a number. Strings vacios / NaN → 0.
 
 import type { ParametrosTarifaBorrador } from '../../../dominio/parametros-tarifa/types';
@@ -62,8 +64,6 @@ export interface FormValues {
   readonly aguaSuministrada: string;
   readonly ipuf: string;
   readonly suscriptoresPromedio: string;
-  readonly aplicaMinimoVital: boolean;
-  readonly m3Gratis: string;
   readonly vigenteDesde: string;
   readonly vigenteHasta: string;
   readonly altitud: string;
@@ -192,8 +192,17 @@ export function buildBorradorLocal(
     agua_suministrada_m3_anio: num(form.aguaSuministrada),
     ipuf_m3_suscriptor_mes: num(form.ipuf),
     suscriptores_promedio: entero(form.suscriptoresPromedio),
-    aplica_minimo_vital: form.aplicaMinimoVital,
-    m3_gratis_minimo_vital: form.aplicaMinimoVital ? entero(form.m3Gratis) : 0,
+    // Phase 3 task 3.2 (GREEN) — Opción A: la fuente de verdad del
+    // mínimo vital es la tabla `minimo_vital` (ver
+    // dominio/parametros-tarifa/minimo-vital.ts). El form ya no
+    // captura `aplicaMinimoVital` ni `m3Gratis` (inputs eliminados en
+    // `ParametrosTarifa.tsx`). Mantenemos las columnas en el
+    // `parametros_tarifa` por backward-compat con data legacy, pero
+    // se hardcodean a `false` / `0` porque NO son user-driven.
+    // Decisión B/B/B: romper backward-compat explicito es mas limpio
+    // que sincronización implicita que podria fallar silenciosamente.
+    aplica_minimo_vital: false,
+    m3_gratis_minimo_vital: 0,
     // ipuf_indice: 1.0 = sin ajuste (Res CRA 825 Art. 7 — fase 1
     // compliance). En produccion se calcula via calcularFactorIpc().
     ipuf_indice: 1.0,

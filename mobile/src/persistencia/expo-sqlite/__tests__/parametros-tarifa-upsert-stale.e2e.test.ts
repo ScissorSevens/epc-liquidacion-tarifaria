@@ -202,8 +202,10 @@ describe('ParametrosTarifa UPSERT — vigente_desde format mismatch (bug stale-s
       aguaSuministrada: String(paramsLeidos!.agua_suministrada_m3_anio),
       ipuf: String(paramsLeidos!.ipuf_m3_suscriptor_mes),
       suscriptoresPromedio: String(paramsLeidos!.suscriptores_promedio),
-      aplicaMinimoVital: paramsLeidos!.aplica_minimo_vital,
-      m3Gratis: String(paramsLeidos!.m3_gratis_minimo_vital),
+      // Phase 3 task 3.2 (GREEN) — Opción A: `aplicaMinimoVital` y
+      // `m3Gratis` se ELIMINARON del FormValues. El buildBorradorLocal
+      // los hardcodea a `false`/`0` (la fuente de verdad del mínimo
+      // vital es la tabla separada `minimo_vital`).
       vigenteDesde: vigente_desdeFormValue, // date-only como lo ve el form
       vigenteHasta: paramsLeidos!.vigente_hasta.slice(0, 10),
       altitud: String(paramsLeidos!.altitud_msnm ?? 0),
