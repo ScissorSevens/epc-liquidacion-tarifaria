@@ -50,9 +50,9 @@ describe('ParametrosTarifa — altitud_msnm (Res CRA 750/2016)', () => {
 
   it('altitud_msnm es opcional (backward-compat con data legacy)', () => {
     // El campo puede no estar presente: legacy data y llamadas sin
-    // altitud seteada deben compilar y funcionar.
+    // altitud seteada deben compilar y funcionar. altitud_msnm es
+    // optional con valor por defecto `undefined`.
     const legacy: ParametrosTarifa = { ...PARAMETROS_BASE };
-    // @ts-expect-error: confirmamos que NO existe la prop cuando no se setea
     expect(legacy.altitud_msnm).toBeUndefined();
   });
 });
