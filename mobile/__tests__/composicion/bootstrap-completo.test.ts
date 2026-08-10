@@ -178,6 +178,12 @@ function buildRepos(state: RepoState) {
           fecha_vigencia_hasta: data.fecha_vigencia_hasta,
           acto_administrativo_url: data.acto_administrativo_url,
           observaciones: data.observaciones,
+          // Fase 2 (`param-tarifa-res-825-compliance-phase2`): el bootstrap
+          // crea el Acuerdo en estado BORRADOR por default (decision 5 del
+          // design). El admin debe cargar el acto_administrativo_url y
+          // promoverlo a ACTIVO antes de empezar a liquidar. Reproducimos
+          // el campo para que los tests puedan asertar el estado.
+          ...(data.estado !== undefined ? { estado: data.estado } : {}),
           created_at: new Date().toISOString(),
         };
         state.acuerdos.set(id, a);
@@ -465,6 +471,41 @@ describe('bootstrapCompleto()', () => {
 
       expect(resultado.operario.email).toBe('');
       expect(Array.from(state.operarios.values())).toEqual([resultado.operario]);
+    });
+
+    // ── T-ACM-BORRADOR-1 — Fase 2 (param-tarifa-res-825-compliance-phase2,
+    // task 4.1 RED): el bootstrap DEBE crear el Acuerdo en estado
+    // 'BORRADOR' por default. Razón regulatoria: el admin debe cargar
+    // el acto_administrativo_url antes de que el Acuerdo pase a ACTIVO
+    // (decision 5 del design §"Architecture Decisions"). El bootstrap
+    // NO debe promover el Acuerdo a ACTIVO automáticamente — eso sería
+    // riesgoso porque el prestador podría operar sin acto formal.
+    //
+    // RED phase: el bootstrap actualmente NO setea `estado` en el
+    // payload que pasa a `acuerdoRepo.crear(...)`. La implementación
+    // verde (task 4.2) agregará `estado: 'BORRADOR'`. Este test
+    // falla en RED porque el Acuerdo persistido no tiene `estado`.
+    it('T-ACM-BORRADOR-1 crea el Acuerdo Municipal con estado=BORRADOR por default', async () => {
+      const resultado = await bootstrapCompleto({
+        prestadorRepo: deps.prestadorRepo,
+        acuerdoRepo: deps.acuerdoRepo,
+        parametrosRepo: deps.parametrosRepo,
+        operarioRepo: deps.operarioRepo,
+        hasher: deps.hasher,
+        idGenerator: deps.idGenerator,
+        input: buildInputValido(),
+      });
+
+      // El Acuerdo persistido debe estar en BORRADOR, NO en ACTIVO.
+      // Distinguimos "el bootstrap no setea el campo" vs "lo setea
+      // mal" verificando el valor LITERAL (no solo presencia).
+      expect(resultado.acuerdo.estado).toBe('BORRADOR');
+      // Triangulacion: el Acuerdo persistido en el repo (no solo el
+      // retornado) debe tener el mismo estado. Esto evita que un
+      // return-only fix tape un bug donde el repo no recibe el campo.
+      const acuerdoPersistido = Array.from(state.acuerdos.values())[0];
+      expect(acuerdoPersistido).toBeDefined();
+      expect(acuerdoPersistido?.estado).toBe('BORRADOR');
     });
 
     it('BC1.7 construye sesion con idPrestador del prestador y expiresAt ~24h', async () => {
