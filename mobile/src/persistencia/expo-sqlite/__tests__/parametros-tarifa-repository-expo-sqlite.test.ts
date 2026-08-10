@@ -58,6 +58,10 @@ function buildRow(overrides: Partial<ParametrosTarifaRow> = {}): ParametrosTarif
     created_at: '2026-07-28T00:00:00.000Z',
     anio_base: 2016,
     factor_indexacion_ipc: 1.0,
+    cmaa: null,
+    acto_adopcion: null,
+    estudio_costos_id: null,
+    documento_soporte_url: null,
     ...overrides,
   };
 }
@@ -87,6 +91,10 @@ interface ParametrosTarifaRow {
   readonly created_at: string;
   readonly anio_base: number;
   readonly factor_indexacion_ipc: number;
+  readonly cmaa: number | null;
+  readonly acto_adopcion: string | null;
+  readonly estudio_costos_id: string | null;
+  readonly documento_soporte_url: string | null;
 }
 
 interface DbFakes {
@@ -328,5 +336,121 @@ describe('crearParametrosTarifaRepositoryExpoSqlite.guardar() — UPSERT', () =>
     // El DO UPDATE SET los propaga.
     expect(sql).toMatch(/anio_base\s*=\s*excluded\.anio_base/i);
     expect(sql).toMatch(/factor_indexacion_ipc\s*=\s*excluded\.factor_indexacion_ipc/i);
+  });
+
+  // ── Phase 3.1 RED: round-trip cmaa + acto_adopcion + estudio_costos_id + documento_soporte_url ──
+  it('T-GUARDAR-CMA-1: persiste cmaa (CMAA art. 31.B Res CRA 907/2019) en UPSERT', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(50, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 50,
+      cmaa: 250_000,
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(buildBorrador({ cmaa: 250_000 }));
+
+    expect(resultado.cmaa).toBe(250_000);
+    const sql: string = runAsync.mock.calls[0][0];
+    // El INSERT incluye cmaa.
+    expect(sql).toMatch(/cmaa/i);
+    // El DO UPDATE SET propaga cmaa.
+    expect(sql).toMatch(/cmaa\s*=\s*excluded\.cmaa/i);
+  });
+
+  it('T-GUARDAR-CMA-2: persiste acto_adopcion (URL del acto administrativo) en UPSERT', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(51, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 51,
+      acto_adopcion: 'Decreto 042 de 2024 alcaldia de Cáqueza',
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(
+      buildBorrador({ acto_adopcion: 'Decreto 042 de 2024 alcaldia de Cáqueza' }),
+    );
+
+    expect(resultado.acto_adopcion).toBe('Decreto 042 de 2024 alcaldia de Cáqueza');
+    const sql: string = runAsync.mock.calls[0][0];
+    expect(sql).toMatch(/acto_adopcion/i);
+    expect(sql).toMatch(/acto_adopcion\s*=\s*excluded\.acto_adopcion/i);
+  });
+
+  it('T-GUARDAR-CMA-3: persiste estudio_costos_id (referencia externa SUI) en UPSERT', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(52, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 52,
+      estudio_costos_id: 'SUI-EC-2024-0042',
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(
+      buildBorrador({ estudio_costos_id: 'SUI-EC-2024-0042' }),
+    );
+
+    expect(resultado.estudio_costos_id).toBe('SUI-EC-2024-0042');
+    const sql: string = runAsync.mock.calls[0][0];
+    expect(sql).toMatch(/estudio_costos_id/i);
+    expect(sql).toMatch(/estudio_costos_id\s*=\s*excluded\.estudio_costos_id/i);
+  });
+
+  it('T-GUARDAR-CMA-4: persiste documento_soporte_url (PDF del estudio) en UPSERT', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(53, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 53,
+      documento_soporte_url: 'https://docs.epc.local/estudios/2024-0042.pdf',
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(
+      buildBorrador({ documento_soporte_url: 'https://docs.epc.local/estudios/2024-0042.pdf' }),
+    );
+
+    expect(resultado.documento_soporte_url).toBe('https://docs.epc.local/estudios/2024-0042.pdf');
+    const sql: string = runAsync.mock.calls[0][0];
+    expect(sql).toMatch(/documento_soporte_url/i);
+    expect(sql).toMatch(/documento_soporte_url\s*=\s*excluded\.documento_soporte_url/i);
+  });
+
+  it('T-GUARDAR-CMA-5: round-trip completo con los 4 campos nuevos (cmaa + 3 docs)', async () => {
+    const runAsync = mockearRunAsyncQueHaceUpsert(54, 1);
+    const filaPersistida = buildRow({
+      id_parametros: 54,
+      cmaa: 375_500,
+      acto_adopcion: 'Resolución 017 de 2025',
+      estudio_costos_id: 'SUI-EC-2025-0001',
+      documento_soporte_url: 'https://docs.epc.local/estudios/2025-0001.pdf',
+    });
+    const getFirstAsync = jest.fn().mockResolvedValue(filaPersistida);
+    const db = buildDb({ runAsync, getFirstAsync });
+    const repo = crearParametrosTarifaRepositoryExpoSqlite(db);
+
+    const resultado = await repo.guardar(
+      buildBorrador({
+        cmaa: 375_500,
+        acto_adopcion: 'Resolución 017 de 2025',
+        estudio_costos_id: 'SUI-EC-2025-0001',
+        documento_soporte_url: 'https://docs.epc.local/estudios/2025-0001.pdf',
+      }),
+    );
+
+    // Los 4 campos vienen de la fila persistida (round-trip).
+    expect(resultado.cmaa).toBe(375_500);
+    expect(resultado.acto_adopcion).toBe('Resolución 017 de 2025');
+    expect(resultado.estudio_costos_id).toBe('SUI-EC-2025-0001');
+    expect(resultado.documento_soporte_url).toBe('https://docs.epc.local/estudios/2025-0001.pdf');
+    // El SQL incluye los 4 nombres (case-insensitive).
+    const sql: string = runAsync.mock.calls[0][0];
+    expect(sql).toMatch(/cmaa/i);
+    expect(sql).toMatch(/acto_adopcion/i);
+    expect(sql).toMatch(/estudio_costos_id/i);
+    expect(sql).toMatch(/documento_soporte_url/i);
   });
 });
