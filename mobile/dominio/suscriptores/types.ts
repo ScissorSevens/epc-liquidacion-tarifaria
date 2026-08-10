@@ -92,6 +92,10 @@ export type ActualizarSuscriptorInput = Partial<
     | 'aplica_subsidio'
     | 'id_prestador'
     | 'categoria_uso'
+    | 'estado_verificacion'
+    | 'fuente_estrato'
+    | 'fecha_verificacion_estrato'
+    | 'soporte_estrato_url'
   >
 >;
 

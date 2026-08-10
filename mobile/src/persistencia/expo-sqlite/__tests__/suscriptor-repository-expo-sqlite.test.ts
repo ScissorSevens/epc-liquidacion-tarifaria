@@ -30,6 +30,12 @@ interface SuscriptorRowFixture {
   readonly categoria_uso: Suscriptor['categoria_uso'];
   readonly estado: string;
   readonly created_at: string;
+  // Phase 3.3: 4 campos de verificación oficial del estrato.
+  // Default conservador 'PENDIENTE' para legacy data.
+  readonly estado_verificacion: string;
+  readonly fuente_estrato: string | null;
+  readonly fecha_verificacion_estrato: string | null;
+  readonly soporte_estrato_url: string | null;
 }
 
 function buildRow(overrides: Partial<SuscriptorRowFixture> = {}): SuscriptorRowFixture {
@@ -51,6 +57,10 @@ function buildRow(overrides: Partial<SuscriptorRowFixture> = {}): SuscriptorRowF
     categoria_uso: 'residencial',
     estado: 'activo',
     created_at: '2026-07-16T12:00:00.000Z',
+    estado_verificacion: 'PENDIENTE',
+    fuente_estrato: null,
+    fecha_verificacion_estrato: null,
+    soporte_estrato_url: null,
     ...overrides,
   };
 }
@@ -74,6 +84,10 @@ function expectedSuscriptor(row: SuscriptorRowFixture): Suscriptor {
     categoria_uso: row.categoria_uso,
     estado: row.estado as Suscriptor['estado'],
     created_at: row.created_at,
+    estado_verificacion: row.estado_verificacion as Suscriptor['estado_verificacion'],
+    fuente_estrato: row.fuente_estrato ?? undefined,
+    fecha_verificacion_estrato: row.fecha_verificacion_estrato ?? undefined,
+    soporte_estrato_url: row.soporte_estrato_url ?? undefined,
   };
 }
 
@@ -223,5 +237,104 @@ describe('crearSuscriptorRepositoryExpoSqlite.actualizar()', () => {
     expect(encontrado).toEqual(expectedSuscriptor(original));
     expect(encontrado).not.toHaveProperty('email');
     expect(encontrado).not.toHaveProperty('telefono');
+  });
+
+  // ── Phase 3.3 RED: round-trip 4 campos verificación oficial del estrato ──
+  // Default conservador 'PENDIENTE' para legacy data. La admin debe
+  // cargar VERIFICADO + fuente + fecha + soporte para que el motor
+  // liquide subsidio residencial (regulatory gate).
+  it('T-SUS-VER-1: suscriptor legacy se lee con estado_verificacion=PENDIENTE por default', async () => {
+    const legacy = buildRow({
+      estado_verificacion: 'PENDIENTE',
+      fuente_estrato: null,
+      fecha_verificacion_estrato: null,
+      soporte_estrato_url: null,
+    });
+    const { db } = buildDb(legacy);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    const encontrado = await repo.buscarPorId(legacy.id_suscriptor);
+    expect(encontrado).not.toBeNull();
+
+    expect(encontrado?.estado_verificacion).toBe('PENDIENTE');
+    expect(encontrado?.fuente_estrato ?? null).toBeNull();
+    expect(encontrado?.fecha_verificacion_estrato ?? null).toBeNull();
+    expect(encontrado?.soporte_estrato_url ?? null).toBeNull();
+  });
+
+  it('T-SUS-VER-2: actualizar() persiste los 4 campos (VERIFICADO + fuente + fecha + soporte)', async () => {
+    const original = buildRow({ estado_verificacion: 'PENDIENTE' });
+    const { db, runAsync } = buildDb(original);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    const actualizado = await repo.actualizar(original.id_suscriptor, {
+      estado_verificacion: 'VERIFICADO',
+      fuente_estrato: 'DANE 2025',
+      fecha_verificacion_estrato: '2026-08-10',
+      soporte_estrato_url: 'https://docs.epc.local/soportes/estrato-0007.pdf',
+    });
+
+    expect(actualizado.estado_verificacion).toBe('VERIFICADO');
+    expect(actualizado.fuente_estrato).toBe('DANE 2025');
+    expect(actualizado.fecha_verificacion_estrato).toBe('2026-08-10');
+    expect(actualizado.soporte_estrato_url).toBe('https://docs.epc.local/soportes/estrato-0007.pdf');
+    // El UPDATE emite los 4 campos en el SET clause.
+    const sql: string = runAsync.mock.calls[0][0];
+    expect(sql).toMatch(/estado_verificacion\s*=\s*\?/i);
+    expect(sql).toMatch(/fuente_estrato\s*=\s*\?/i);
+    expect(sql).toMatch(/fecha_verificacion_estrato\s*=\s*\?/i);
+    expect(sql).toMatch(/soporte_estrato_url\s*=\s*\?/i);
+  });
+
+  it('T-SUS-VER-3: rechazar estrato (RECHAZADO) persiste estado_verificacion=RECHAZADO', async () => {
+    const original = buildRow({ estado_verificacion: 'PENDIENTE' });
+    const { db } = buildDb(original);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    const actualizado = await repo.actualizar(original.id_suscriptor, {
+      estado_verificacion: 'RECHAZADO',
+      fuente_estrato: 'Impugnación alcaldía Q2 2026',
+    });
+
+    expect(actualizado.estado_verificacion).toBe('RECHAZADO');
+    expect(actualizado.fuente_estrato).toBe('Impugnación alcaldía Q2 2026');
+    // Defaults de soporte_estrato_url y fecha: siguen NULL.
+    expect(actualizado.soporte_estrato_url ?? null).toBeNull();
+    expect(actualizado.fecha_verificacion_estrato ?? null).toBeNull();
+  });
+
+  it('T-SUS-VER-4: campos de verificación están en la whitelist de actualizar()', async () => {
+    const original = buildRow();
+    const { db, runAsync } = buildDb(original);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    await repo.actualizar(original.id_suscriptor, {
+      estado_verificacion: 'VERIFICADO',
+    });
+
+    // Sí emite UPDATE (no se filtra como whitelist miss).
+    expect(runAsync).toHaveBeenCalledTimes(1);
+    const sql: string = runAsync.mock.calls[0][0];
+    expect(sql).toMatch(/UPDATE\s+suscriptor\s+SET/i);
+    expect(sql).toMatch(/estado_verificacion/);
+  });
+
+  it('T-SUS-VER-5: buscarPorId() retorna los 4 campos completos cuando están poblados', async () => {
+    const verificado = buildRow({
+      estado_verificacion: 'VERIFICADO',
+      fuente_estrato: 'Acto administrativo 042 de 2024',
+      fecha_verificacion_estrato: '2024-06-15',
+      soporte_estrato_url: 'https://docs.epc.local/actos/042-2024.pdf',
+    });
+    const { db } = buildDb(verificado);
+    const repo = crearSuscriptorRepositoryExpoSqlite(db);
+
+    const encontrado = await repo.buscarPorId(verificado.id_suscriptor);
+    expect(encontrado).not.toBeNull();
+
+    expect(encontrado?.estado_verificacion).toBe('VERIFICADO');
+    expect(encontrado?.fuente_estrato).toBe('Acto administrativo 042 de 2024');
+    expect(encontrado?.fecha_verificacion_estrato).toBe('2024-06-15');
+    expect(encontrado?.soporte_estrato_url).toBe('https://docs.epc.local/actos/042-2024.pdf');
   });
 });
