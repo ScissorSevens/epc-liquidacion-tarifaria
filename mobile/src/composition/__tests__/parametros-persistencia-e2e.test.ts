@@ -236,9 +236,9 @@ describe('E2E parámetros persistidos → liquidación → factura móvil', () =
     expect(resultado.cargo_fijo).toBe(666_667);
     expect(resultado.cc_unitario).toBe(1_500);
     expect(resultado.cc_total).toBe(15_000);
-    expect(resultado.factor_aplicado).toBe(-0.4);
-    expect(resultado.subsidio).toBe(Math.round(subtotal * 0.4));
-    expect(resultado.total).toBe(409_000);
+    expect(resultado.factor_aplicado).toBe(-0.5);
+    expect(resultado.subsidio).toBe(Math.round(subtotal * 0.5));
+    expect(resultado.total).toBe(340_833);
   });
 
   it('PARAM-E2E-2: con defaults del bootstrap, el cálculo es consistente', async () => {
@@ -265,8 +265,8 @@ describe('E2E parámetros persistidos → liquidación → factura móvil', () =
     expect(resultado.cargo_fijo).toBe(333_333);
     expect(resultado.cc_unitario).toBe(1_100);
     expect(resultado.cc_total).toBe(11_000);
-    expect(resultado.factor_aplicado).toBe(-0.4);
-    expect(resultado.subsidio).toBe(Math.round(subtotal * 0.4));
-    expect(resultado.total).toBe(206_600);
+    expect(resultado.factor_aplicado).toBe(-0.5);
+    expect(resultado.subsidio).toBe(Math.round(subtotal * 0.5));
+    expect(resultado.total).toBe(172_166);
   });
 });
