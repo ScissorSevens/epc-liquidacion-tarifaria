@@ -681,6 +681,45 @@ const MIGRACION_028B_PARAMETROS_ANIO_DESTINO = `
 ALTER TABLE parametros_tarifa ADD COLUMN anio_destino_indexacion INTEGER NULL;
 `;
 
+/**
+ * Migration 030_parametros_tarifa_aplica_cmaa. Espejo de la
+ * migration aditiva del change `param-tarifa-residuales-cra-825`
+ * Phase 2 task 2.2 (GREEN).
+ *
+ * Res CRA 907/2019 art. 13 (modifica Res CRA 825/2017 art. 9): el
+ * CMAA (Costo Medio de Administración por Inversiones Ambientales
+ * Adicionales) requiere un FLAG EXPLICITO que determine si el prestador
+ * opta por estas inversiones. Antes de esta migration, el campo `cmaa`
+ * se inferia de `cmaa > 0`, lo que permitia que un admin que setea
+ * `cmaa = 0` por error apague el CMAA sin warning.
+ *
+ * Fix: columna SQL `aplica_cmaa` con flag binario explicito:
+ *
+ *   - aplica_cmaa: INTEGER NOT NULL DEFAULT 0 CHECK (aplica_cmaa IN (0, 1))
+ *           — Default 0 (conservador): data legacy NO aplica CMAA hasta
+ *           que el admin active el toggle explicitamente.
+ *           El CHECK garantiza que solo se persistan 0 o 1, nunca otro
+ *           valor.
+ *
+ * Decision B/B/B: el flag manda sobre el valor numerico. Si flag=false,
+ * el buildBorradorLocal sobrescribe `cmaa` con 0. Si flag=true y
+ * `cmaa=null` (legacy), se guarda OK (cmaa permanece null) y el admin
+ * puede editar el valor en la pantalla.
+ *
+ * Idempotente: idem migration 028/028b (helper aditivo). El DEFAULT 0 +
+ * NOT NULL cubren data legacy automaticamente.
+ *
+ * Backward-compat: data legacy queda con `aplica_cmaa = 0` y el CMAA
+ * NO se computa (mismo comportamiento que antes — el flag explicito
+ * solo agrega precision al opt-in).
+ */
+const MIGRACION_030_PARAMETROS_APLICA_CMAA = `
+-- Migration 030: ParametrosTarifa.aplica_cmaa flag explicito (Res 907/2019 art. 13).
+-- Cambio param-tarifa-residuales-cra-825 Phase 2 task 2.2 GREEN.
+ALTER TABLE parametros_tarifa ADD COLUMN aplica_cmaa INTEGER NOT NULL DEFAULT 0
+  CHECK (aplica_cmaa IN (0, 1));
+`;
+
 const MIGRACIONES: readonly Migracion[] = [
   { version: 1, nombre: '001_factura', sql: MIGRACION_001_FACTURA },
   { version: 2, nombre: '002_lectura', sql: MIGRACION_002_LECTURA },
@@ -711,6 +750,7 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 27, nombre: '027_acuerdo_municipal_estado', sql: MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO },
   { version: 28, nombre: '028_parametros_tarifa_altitud', sql: MIGRACION_028_PARAMETROS_ALTITUD },
   { version: 29, nombre: '028b_parametros_tarifa_anio_destino', sql: MIGRACION_028B_PARAMETROS_ANIO_DESTINO },
+  { version: 30, nombre: '030_parametros_tarifa_aplica_cmaa', sql: MIGRACION_030_PARAMETROS_APLICA_CMAA },
 ];
 
 
@@ -801,12 +841,18 @@ export async function aplicarMigracionesAsync(
     // tasks 1.4 + 1.6): misma semántica aditiva — `altitud_msnm`
     // (Res CRA 750/2016) y `anio_destino_indexacion` (Res CRA 825
     // Art. 11). Inclusion en este dispatch preserva el patron uniforme.
+    //
+    // Migration 030 (`param-tarifa-residuales-cra-825` Phase 2 task 2.2):
+    // flag explicito `aplica_cmaa` (Res CRA 907/2019 art. 13). Misma
+    // semantica aditiva (NOT NULL DEFAULT 0 con CHECK), asi que pasa
+    // por el mismo helper idempotente.
     if (
       migracion.version === 25 ||
       migracion.version === 26 ||
       migracion.version === 27 ||
       migracion.version === 28 ||
-      migracion.version === 29
+      migracion.version === 29 ||
+      migracion.version === 30
     ) {
       await aplicarMigrationAditivaIdempotenteExpo(db, migracion.sql);
       await db.runAsync(

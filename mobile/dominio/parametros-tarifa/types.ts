@@ -198,6 +198,23 @@ export interface ParametrosTarifa {
   readonly estudio_costos_id?: string | null;
   /** URL del documento soporte del estudio de costos (PDF, etc.). */
   readonly documento_soporte_url?: string | null;
+  /**
+   * Flag explicito: el prestador OPTA por inversiones ambientales
+   * adicionales (Res CRA 907/2019 art. 13, mod. Res CRA 825/2017 art. 9).
+   * Si `true`, el CMAA se computa en el cargo fijo resultante. Si `false`
+   * (default), el CMAA NO se computa aunque `cmaa > 0`.
+   *
+   * Decision B/B/B: el flag es la fuente de verdad del opt-in. Antes
+   * de Phase 2 se inferia de `cmaa > 0`, lo que permitia que un admin
+   * que setea `cmaa = 0` por error apague el CMAA sin warning. Con el
+   * flag explicito, el comportamiento es opt-in consciente.
+   *
+   * OPTIONAL por backward-compat con data legacy (Phase 2 task 2.2 GREEN).
+   * `undefined` se trata como `false` (no aplica CMAA).
+   *
+   * Phase 2 (`param-tarifa-residuales-cra-825` task 2.2).
+   */
+  readonly aplica_cmaa?: boolean;
 }
 
 export type ParametrosTarifaBorrador = Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>;

@@ -187,17 +187,19 @@ describe('E2E handleFinalizar — reproduce el path SQL real del device', () => 
       expect(nombres).toContain('concepto_otro_valor');
       expect(nombres).toContain('minimo_vital');
 
-      // Verificamos que las 27 migrations quedaron registradas
+      // Verificamos que las migrations quedaron registradas
       // (24 previas + 3 de param-tarifa-res-825-compliance-phase2:
       //  025 parametros_tarifa.cmaa + docs,
       //  026 suscriptor.verification,
       //  027 acuerdo_municipal.estado,
       //  028 parametros_tarifa.altitud_msnm (param-tarifa-residuales-cra-825),
-      //  028b parametros_tarifa.anio_destino_indexacion (idem).
+      //  028b parametros_tarifa.anio_destino_indexacion (idem),
+      //  030 parametros_tarifa.aplica_cmaa (param-tarifa-residuales-cra-825
+      //     Phase 2 task 2.2 GREEN, Res CRA 907/2019 art. 13).
       const aplicadas = db
         .prepare('SELECT version FROM __migraciones_aplicadas ORDER BY version')
         .all() as Array<{ version: number }>;
-      expect(aplicadas.length).toBe(29);
+      expect(aplicadas.length).toBe(30);
     });
   }, 30000);
 

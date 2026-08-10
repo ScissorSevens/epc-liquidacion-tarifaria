@@ -59,6 +59,7 @@ function buildRow(overrides: Partial<ParametrosTarifaRow> = {}): ParametrosTarif
     anio_base: 2016,
     factor_indexacion_ipc: 1.0,
     cmaa: null,
+    aplica_cmaa: 0,
     acto_adopcion: null,
     estudio_costos_id: null,
     documento_soporte_url: null,
@@ -92,6 +93,7 @@ interface ParametrosTarifaRow {
   readonly anio_base: number;
   readonly factor_indexacion_ipc: number;
   readonly cmaa: number | null;
+  readonly aplica_cmaa: number;
   readonly acto_adopcion: string | null;
   readonly estudio_costos_id: string | null;
   readonly documento_soporte_url: string | null;
