@@ -2632,4 +2632,194 @@ fireEvent.press(back);
     });
   });
 
+  // ─────────────────────────────────────────────────────────────────
+  // Phase 3 task 3.1 (RED): tests contractuales para Opción A del
+  // Hallazgo #5. La fuente de verdad del mínimo vital es la tabla
+  // separada `minimo_vital` (futuro módulo admin). El form NO debe
+  // capturar `aplicaMinimoVital` ni `m3Gratis` porque:
+  //   (1) La pantalla persiste esos campos en `parametros_tarifa`
+  //       pero la tabla `minimo_vital` (fuente de verdad) queda
+  //       SIEMPRE vacía → el motor nunca aplica el mínimo vital
+  //       aunque el admin haya activado el flag.
+  //   (2) La duplicación entre el form y la tabla hermana es
+  //       confusa para el operador.
+  //
+  // Decisión B/B/B: Opción A. El form elimina esos inputs. La
+  // columna `aplica_minimo_vital` queda en `parametros_tarifa` por
+  // backward-compat pero se hardcodea a `false` en el buildBorrador
+  // (no es user-driven). Type-level: `@deprecated` en JSDoc.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-MIN-VITAL: Opción A — campos minimo vital removidos del form (Phase 3 task 3.1)', () => {
+    it('T-MIN-VITAL-1: la sección Mínimo vital NO se renderiza en el form (sin inputs aplicaMinimoVital ni m3Gratis)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { queryByTestId, queryByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+
+      // Esperar a que el form esté estable.
+      await waitFor(() => {
+        expect(queryByTestId('param-cma')).toBeTruthy();
+      });
+
+      // La sección ya no debe existir.
+      expect(queryByTestId('seccion-card-minimo-vital')).toBeNull();
+      // El switch de minimo vital NO debe existir.
+      expect(queryByTestId('switch-minimo-vital')).toBeNull();
+      // El input m3gratis NO debe existir.
+      expect(queryByTestId('param-m3gratis')).toBeNull();
+      // El label del titulo de la sección no debe renderizarse.
+      expect(queryByText(/Mínimo vital/i)).toBeNull();
+    });
+
+    it('T-MIN-VITAL-2: buildBorradorLocal NO propaga form.aplicaMinimoVital ni form.m3Gratis al output', () => {
+      // Regression guard: el helper NO debe leer `form.aplicaMinimoVital`
+      // ni `form.m3Gratis`. Si los lee, alguien podria reintroducir
+      // los inputs en el form sin advertir la duplicación con la tabla
+      // `minimo_vital` (fuente de verdad).
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/parametros-tarifa-build-borrador.ts'),
+        'utf8',
+      );
+      // El output NO debe referenciar `form.aplicaMinimoVital` ni `form.m3Gratis`.
+      expect(source).not.toMatch(/form\.aplicaMinimoVital/);
+      expect(source).not.toMatch(/form\.m3Gratis/);
+    });
+
+    it('T-MIN-VITAL-3: types.ts marca aplica_minimo_vital y m3_gratis_minimo_vital como @deprecated', () => {
+      // Decisión B/B/B: mantener los campos en el type por backward-compat
+      // (data legacy pre-Option A), pero marcarlos como @deprecated para
+      // que un dev futuro vea que NO son la fuente de verdad.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../dominio/parametros-tarifa/types.ts'),
+        'utf8',
+      );
+      // Hay un bloque @deprecated que menciona `aplica_minimo_vital`.
+      expect(source).toMatch(/@deprecated[\s\S]{0,400}aplica_minimo_vital/);
+      // Hay un bloque @deprecated que menciona `m3_gratis_minimo_vital`.
+      expect(source).toMatch(/@deprecated[\s\S]{0,400}m3_gratis_minimo_vital/);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Phase 3 task 3.3 (RED): tests contractuales para los inputs editables
+  // de Indexación IPC (Art. 11 Res CRA 825/2017). Hallazgo #3: el schema
+  // y los types tienen `factor_indexacion_ipc` e `ipuf_indice` pero el
+  // screen NO muestra inputs. El admin no puede ajustar el IPC manual.
+  //
+  // Decisión B/B/B: hacer editables `factorIndexacionIpc`, `ipufIndice`,
+  // `anioDestino` y `anioBase` (override por cambios normativos).
+  // Validación: factor > 0, anio > 2000. Preview live del factor
+  // calculado via `calcularFactorIpc(anioBase, anioDestino)`.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-IPC-UI: inputs editables de Indexación IPC (Phase 3 task 3.3)', () => {
+    it('T-IPC-UI-1: input `factorIndexacionIpc` es editable (testID `param-factor-ipc`)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El input existe y es editable (no está disabled).
+      const input = getByTestId('param-factor-ipc');
+      expect(input).toBeTruthy();
+      expect(input.props.editable).toBe(true);
+    });
+
+    it('T-IPC-UI-2: input `ipufIndice` es editable (testID `param-ipuf-indice`)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      const input = getByTestId('param-ipuf-indice');
+      expect(input).toBeTruthy();
+      expect(input.props.editable).toBe(true);
+    });
+
+    it('T-IPC-UI-3: input `anioDestino` es editable (testID `param-anio-destino`)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      const input = getByTestId('param-anio-destino');
+      expect(input).toBeTruthy();
+      expect(input.props.editable).toBe(true);
+    });
+
+    it('T-IPC-UI-4: preview live muestra `calcularFactorIpc(anioBase, anioDestino)` (testID `param-ipc-preview`)', async () => {
+      // El form debe mostrar el factor calculado con los años vigentes.
+      // factor = IPC_VALORES[anio_destino] / IPC_VALORES[anio_base].
+      // Para anio_base=2016 (1.0) y anio_destino=2026 (1.6234) → 1.6234.
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId, getByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El preview existe.
+      const preview = getByTestId('param-ipc-preview');
+      expect(preview).toBeTruthy();
+      // El texto contiene el factor calculado: 1.6234 / 1.0 = 1.6234.
+      // Buscamos un match flexible para cubrir variaciones de formato
+      // (ej "1.6234", "1.62", "1,6234").
+      expect(preview.props.children).toMatch(/1[,.]?6\d*/);
+      // El preview debe tambien mencionar el factor que tipeó el admin
+      // en `param-factor-ipc` (override posible). Verificamos que el
+      // texto del preview refleja el state actual.
+      // Para no enlazar a una implementación de formato, simplemente
+      // validamos que el preview NO está vacío y contiene numeros.
+      const texto = String(preview.props.children);
+      expect(texto.length).toBeGreaterThan(0);
+      // Para el caso base (anio_base=2016, anio_destino=2026), el preview
+      // debe contener "1.6234" o "1,6234" (IPC_VALORES[2026] / IPC_VALORES[2016]).
+      // Usamos regex flexible para cubrir locale.
+      expect(getByText(/1[,.]6234/)).toBeTruthy();
+    });
+
+    it('T-IPC-UI-5: existe sección "Indexación IPC" con testID `seccion-card-ipc`', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'seccion-card-ipc' })).toBeTruthy();
+    });
+  });
+
 });
