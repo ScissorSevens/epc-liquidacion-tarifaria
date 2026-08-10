@@ -217,6 +217,14 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
     const prestador = await deps.prestadorRepo.crear(borradorPrestador);
 
     // 2. Crear acuerdo municipal con defaults L142/1994.
+    //
+    // Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.2 GREEN):
+    // el Acuerdo se crea en estado BORRADOR por default (decision 5
+    // del design §"Architecture Decisions"). El admin debe cargar
+    // `acto_administrativo_url` y promoverlo a ACTIVO antes de empezar
+    // a liquidar. Razón regulatoria: si el bootstrap promoviera a
+    // ACTIVO directamente, el prestador podría operar sin acto
+    // administrativo formal, lo que viola la Res CRA 825/2017 art. 9.
     const acuerdo = await deps.acuerdoRepo.crear({
       id_prestador: prestador.id_prestador,
       // Legacy (backward-compat)
@@ -241,6 +249,7 @@ export async function bootstrapCompleto(deps: BootstrapCompletoDeps): Promise<Bo
       fecha_vigencia_hasta,
       acto_administrativo_url: null,
       observaciones: 'Acuerdo creado automáticamente por el wizard de setup inicial.',
+      estado: 'BORRADOR',
     });
 
     // 3. Crear parametros tarifa vinculados al acuerdo.
