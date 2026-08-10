@@ -15,12 +15,12 @@
  *   - Toggles preservados inline (no son text inputs).
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
@@ -186,27 +186,62 @@ export default function ParametrosTarifaForm({
     return () => { cancelado = true; };
   }, [acuerdoRepo, id_prestador, idAcuerdoProp]);
 
+  // parametros-stale-state-fix Commit 2 (GREEN):
+  //
+  // El ref guardea la primera hidratación del state local desde la DB
+  // para que ediciones del usuario NO se sobrescriban por re-fetches.
+  // Antes vivía debajo de este useEffect (line 238 original); se mueve
+  // ACÁ para que el `useFocusEffect` de más abajo pueda resetearlo a
+  // `false` antes de cada re-hidratación por focus.
+  const yaSincronizadoRef = useRef(false);
+
   // Cargar parámetros tarifarios vigentes para el prestador en uso.
-  useEffect(() => {
-    if (id_prestador <= 0 || repo === null) return;
-    // Si la prop `parametrosActuales` viene provista, NO fetchamos —
-    // la prop es la fuente de verdad (Stack Navigation o test).
-    if (parametrosProp !== undefined) return;
-    let cancelado = false;
-    void (async () => {
-      setCargando(true);
-      try {
-        const params = await repo.buscarVigente(id_prestador, new Date().toISOString());
-        if (!cancelado) {
-          setParametrosActuales(params);
-          setCargando(false);
+  //
+  // parametros-stale-state-fix: el fetch ahora corre dentro de
+  // `useFocusEffect` en lugar de un `useEffect` plano. Beneficios:
+  //   - En el mount inicial el comportamiento es equivalente: la pantalla
+  //     arranca focused y el callback corre.
+  //   - Cuando el operario da "Atrás" a Mi Perfil y vuelve a abrir la
+  //     pantalla, React Navigation RE-FOCUSA la pantalla → el callback
+  //     se vuelve a ejecutar → el form se re-hidrata con el último valor
+  //     persistido en la DB (en lugar de quedar con los valores default
+  //     del `useState(... ?? 0)` inicial).
+  //   - El cleanup (cancelado=true) corre cuando la pantalla pierde focus
+  //     o se desmonta, evitando state updates sobre componentes
+  //     desmontados.
+  //
+  // El reset de `yaSincronizadoRef.current = false` ANTES de
+  // `setParametrosActuales` garantiza que el sync effect (line 239) re-
+  // hidrate los inputs locales con los datos frescos del repo en cada
+  // focus. Sin este reset, el one-shot guard saltaría la re-hidratación
+  // y el form quedaría con los valores viejos (los del primer mount).
+  useFocusEffect(
+    useCallback(() => {
+      if (id_prestador <= 0 || repo === null) return;
+      // Si la prop `parametrosActuales` viene provista, NO fetchamos —
+      // la prop es la fuente de verdad (Stack Navigation o test).
+      if (parametrosProp !== undefined) return;
+      let cancelado = false;
+      void (async () => {
+        setCargando(true);
+        try {
+          const params = await repo.buscarVigente(id_prestador, new Date().toISOString());
+          if (!cancelado) {
+            // Reset one-shot guard ANTES de propagar al state local para
+            // que el sync effect re-hidrate los inputs con datos frescos.
+            yaSincronizadoRef.current = false;
+            setParametrosActuales(params);
+            setCargando(false);
+          }
+        } catch {
+          if (!cancelado) setCargando(false);
         }
-      } catch {
-        if (!cancelado) setCargando(false);
-      }
-    })();
-    return () => { cancelado = true; };
-  }, [repo, id_prestador, parametrosProp]);
+      })();
+      return () => {
+        cancelado = true;
+      };
+    }, [repo, id_prestador, parametrosProp]),
+  );
 
   const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
   // anio_base: Res CRA 825/2017 Art. 7. Default 2016 (normativo).
@@ -235,7 +270,11 @@ export default function ParametrosTarifaForm({
   // edición del usuario). El ref guardea la primera hidratación para
   // que un re-fetch posterior (mismos datos) no pise lo que el
   // operador tipeó. Ver scenario T-SYNC-1/T-SYNC-2.
-  const yaSincronizadoRef = useRef(false);
+  //
+  // parametros-stale-state-fix: el `yaSincronizadoRef` se DECLARA arriba
+  // (antes del useFocusEffect) para que el callback de focus pueda
+  // resetearlo a `false` antes de cada re-fetch por focus, garantizando
+  // que el sync re-hidrate el form con datos frescos.
   useEffect(() => {
     if (parametrosActuales === null) return;
     if (yaSincronizadoRef.current) return;

@@ -165,12 +165,23 @@ declare global {
 (global as { __goBackMock?: jest.Mock }).__goBackMock = jest.fn();
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
+  const ReactNative = require('react');
   return {
     ...actual,
     useNavigation: () => ({
       navigate: jest.fn(),
       goBack: (global as { __goBackMock?: jest.Mock }).__goBackMock ?? jest.fn(),
     }),
+    // parametros-stale-state-fix: useFocusEffect requiere NavigationContainer.
+    // Para tests sin container, lo sustituimos por un useEffect que corre
+    // una sola vez al mount (mismo comportamiento que el original cuando
+    // la pantalla está focused al inicio, que es el caso del test).
+    useFocusEffect: (cb: () => unknown) => {
+      ReactNative.useEffect(() => {
+        const cleanup = cb();
+        return typeof cleanup === 'function' ? cleanup : undefined;
+      }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    },
   };
 });
 
@@ -2250,6 +2261,130 @@ fireEvent.press(back);
       expect(switchCmviaa).toBeTruthy();
       const switchMinimoVital = getByLabelText('Aplicar mínimo vital');
       expect(switchMinimoVital).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // T-PARAM-STALE: param stale after navigation (parametros-stale-state-fix)
+  //
+  // Bug reportado por operario:
+  //   1. Operario entra a Parámetros Tarifarios.
+  //   2. Cambia un valor (ej: cma 5.000.000 → 4.000.000).
+  //   3. Toca "Guardar" → se persiste en SQLite.
+  //   4. Si navega a otra pantalla vía bottom tab y vuelve → ve OK.
+  //   5. Si da "Atrás" (va a Mi Perfil) y vuelve a abrir parámetros →
+  //      ve el valor por default (5.000.000), NO el recién guardado.
+  //
+  // Causa raíz sospechada: el screen usa `useState(defaults)` para los
+  // inputs y depende de `useEffect([repo, id_prestador, parametrosProp])`
+  // para hidratar desde la DB. En el re-mount tras back, ese effect
+  // puede no ejecutarse a tiempo (o el ref `yaSincronizadoRef` puede
+  // haber quedado en `true` por un re-render previo), dejando el form
+  // con los valores default del state inicial.
+  //
+  // RED phase (parametros-stale-state-fix Commit 1): estos tests
+  // describen el comportamiento esperado. El test T-PARAM-STALE-2
+  // simula el flujo completo: edit + save + unmount + remount.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-PARAM-STALE: param stale after navigation back+return', () => {
+    /**
+     * T-PARAM-STALE-1: al montar SIN prop `parametrosActuales`, el form
+     * debe mostrar los valores que el repo retorna, NO los defaults del
+     * state inicial (que serían '0' o el último valor cacheado).
+     */
+    it('T-PARAM-STALE-1: al montar sin prop, el form muestra el valor del repo (no defaults)', async () => {
+      const paramsReales: ParametrosTarifa = {
+        ...parametrosFixture,
+        cma: 4_000_000,
+        cargo_fijo_resultante: 4_000_000 / 350,
+      };
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(paramsReales);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          // SIN prop `parametrosActuales` — el repo es la única fuente de verdad.
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Tras el fetch inicial, el form debe mostrar cma=4.000.000.
+      // Si el state local se quedó con el default '0' (useState(...?? 0))
+      // o con un valor stale cacheado, este test falla.
+      await waitFor(() => {
+        expect(getByTestId('param-cma').props.value).toBe('4000000');
+      });
+    });
+
+    /**
+     * T-PARAM-STALE-2: tras editar + guardar + back + return, el form
+     * debe mostrar el último valor persistido en DB (4.000.000), NO los
+     * defaults originales (5.000.000).
+     *
+     * Simula el bug exacto reportado por el operario:
+     *   - mount inicial → repo retorna cma=5.000.000
+     *   - user edita a 4.000.000 + click Guardar
+     *   - unmount (back a MiPerfil)
+     *   - remount (vuelve a abrir ParametrosTarifa) → repo retorna 4.000.000
+     *   - assert: form muestra 4.000.000
+     */
+    it('T-PARAM-STALE-2: tras guardar + unmount + remount, el form muestra el último valor persistido', async () => {
+      const paramsViejos: ParametrosTarifa = {
+        ...parametrosFixture,
+        cma: 5_000_000,
+        cargo_fijo_resultante: 5_000_000 / 350,
+      };
+      const paramsNuevos: ParametrosTarifa = {
+        ...parametrosFixture,
+        cma: 4_000_000,
+        cargo_fijo_resultante: 4_000_000 / 350,
+      };
+      const repo = crearRepoFake();
+      // Primer mount: el repo retorna el valor original (5M).
+      repo.buscarVigente.mockResolvedValueOnce(paramsViejos);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const primera = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      await waitFor(() => {
+        expect(primera.getByTestId('param-cma').props.value).toBe('5000000');
+      });
+      // User edita cma a 4M.
+      await act(async () => {
+        fireEvent.changeText(primera.getByTestId('param-cma'), '4000000');
+      });
+      // User guarda — repo.guardar resuelve con paramsNuevos (4M).
+      repo.guardar.mockResolvedValueOnce(paramsNuevos);
+      await act(async () => {
+        fireEvent.press(primera.getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+      // Back → unmount del screen.
+      primera.unmount();
+      // Vuelve a abrir ParametrosTarifa → nuevo mount. Repo retorna 4M.
+      repo.buscarVigente.mockResolvedValueOnce(paramsNuevos);
+      const segunda = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El form debe mostrar el valor recién guardado (4M).
+      // Falla si el state local quedó stale con 5M (default) o '0'.
+      await waitFor(() => {
+        expect(segunda.getByTestId('param-cma').props.value).toBe('4000000');
+      });
     });
   });
 
