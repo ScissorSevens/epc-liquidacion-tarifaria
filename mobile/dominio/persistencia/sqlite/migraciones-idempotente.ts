@@ -196,3 +196,125 @@ export const __testing = {
   extraerAlterColumnasFactura,
   leerColumnasFacturaNode,
 };
+
+/**
+ * Helper generico idempotente para migrations ADITIVAS (SOLO
+ * `ALTER TABLE ... ADD COLUMN`). Aplica a migrations como 025/026/027
+ * del change `param-tarifa-res-825-compliance-phase2` donde el script es
+ * un conjunto plano de `ALTER TABLE <tabla> ADD COLUMN <col> <tipo> [DEFAULT ...]`
+ * sin CREATE INDEX ni logica mixta.
+ *
+ * Estrategia:
+ *  1. Parsea el SQL para extraer todos los pares (tabla, columna, sentencia).
+ *  2. Para cada tabla mencionada, lee las columnas actuales via
+ *     `PRAGMA table_info(<tabla>)`.
+ *  3. Ejecuta SOLO los ALTERs cuya columna NO exista ya en la tabla.
+ *
+ * A diferencia de `aplicarMigration020Idempotente{Node,Expo}` (que esta
+ * hardcoded para `factura` y hardcodea `TEXT` como tipo), este helper
+ * **preserva la sentencia literal** del script — incluyendo tipo
+ * (REAL, INTEGER, TEXT) y DEFAULT. Esto importa porque 025/026/027 tienen:
+ *
+ *   - 025: `cmaa REAL NULL` (cmaa es REAL, no TEXT)
+ *   - 026: `estado_verificacion TEXT NOT NULL DEFAULT 'PENDIENTE'`
+ *   - 027: `estado TEXT NOT NULL DEFAULT 'ACTIVO'`
+ *
+ * Si el script NO contiene ALTERs (caso raro, e.g. una migration futura
+ * que sea solo CREATE INDEX o CREATE TABLE), se ejecuta el script tal
+ * cual via `db.exec()` — fallback seguro.
+ *
+ * Tests: `mobile/__tests__/persistencia/migration-aditiva-025-026-027.test.ts`.
+ */
+interface AlterExtraido {
+  readonly tabla: string;
+  readonly columna: string;
+  readonly sentencia: string;
+}
+
+/**
+ * Parsea un script SQL y devuelve todos los pares (tabla, columna,
+ * sentencia literal) de `ALTER TABLE ... ADD COLUMN ...`. Case-insensitive,
+ * tolerante a espacios arbitrarios. NO captura DEFAULTs adentro de la
+ * sentencia — los preserva tal cual vienen en el script original.
+ */
+function extraerAlterColumnasAditivas(sql: string): readonly AlterExtraido[] {
+  const alters: AlterExtraido[] = [];
+  const re = /ALTER\s+TABLE\s+([A-Za-z_][A-Za-z0-9_]*)\s+ADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)\b[^;]*/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(sql)) !== null) {
+    alters.push({
+      tabla: m[1],
+      columna: m[2],
+      // Trim para normalizar whitespace leading/trailing.
+      sentencia: m[0].trim(),
+    });
+  }
+  return alters;
+}
+
+/**
+ * Variante sync para el adapter better-sqlite3 (Node). Misma logica que
+ * la version Expo pero usando `prepare`/`exec` sincronicos.
+ */
+export function aplicarMigrationAditivaIdempotenteNode(
+  db: DatabaseType,
+  sql: string,
+): void {
+  const alters = extraerAlterColumnasAditivas(sql);
+  if (alters.length === 0) {
+    // No hay ALTERs aditivos: ejecutar el script tal cual.
+    db.exec(sql);
+    return;
+  }
+
+  // Cachear `PRAGMA table_info(<tabla>)` por tabla — un mismo script
+  // puede tocar varias columnas de la misma tabla y queremos evitar
+  // N queries redundantes.
+  const columnasActuales = new Map<string, ReadonlySet<string>>();
+  for (const { tabla } of alters) {
+    if (columnasActuales.has(tabla)) continue;
+    const rows = db.prepare(`PRAGMA table_info(${tabla})`).all() as ColumnaInfo[];
+    columnasActuales.set(tabla, new Set(rows.map((r) => r.name)));
+  }
+
+  for (const { tabla, columna, sentencia } of alters) {
+    const set = columnasActuales.get(tabla);
+    if (!set || set.has(columna)) continue; // columna ya existe: skip
+    db.exec(sentencia + ';');
+  }
+}
+
+/**
+ * Variante async para el adapter expo-sqlite (mobile). Misma logica que
+ * la version Node pero usando `getAllAsync` (expo-sqlite expone PRAGMA
+ * via queries SELECT) y `execAsync` para los ALTERs.
+ *
+ * Uso desde `mobile/src/persistencia/expo-sqlite/migraciones.ts` para
+ * migrations 025/026/027 (y futuras migrations puramente aditivas).
+ */
+export async function aplicarMigrationAditivaIdempotenteExpo(
+  db: SQLite.SQLiteDatabase,
+  sql: string,
+): Promise<void> {
+  const alters = extraerAlterColumnasAditivas(sql);
+  if (alters.length === 0) {
+    // No hay ALTERs aditivos: ejecutar el script tal cual.
+    await db.execAsync(sql);
+    return;
+  }
+
+  const columnasActuales = new Map<string, ReadonlySet<string>>();
+  for (const { tabla } of alters) {
+    if (columnasActuales.has(tabla)) continue;
+    const rows = await db.getAllAsync<ColumnaInfo>(
+      `PRAGMA table_info(${tabla})`,
+    );
+    columnasActuales.set(tabla, new Set(rows.map((r) => r.name)));
+  }
+
+  for (const { tabla, columna, sentencia } of alters) {
+    const set = columnasActuales.get(tabla);
+    if (!set || set.has(columna)) continue; // columna ya existe: skip
+    await db.execAsync(sentencia + ';');
+  }
+}

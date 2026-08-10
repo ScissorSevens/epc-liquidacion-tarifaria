@@ -16,7 +16,10 @@
  */
 
 import type * as SQLite from 'expo-sqlite';
-import { aplicarMigration020IdempotenteExpo } from '../../../dominio/persistencia/sqlite/migraciones-idempotente';
+import {
+  aplicarMigration020IdempotenteExpo,
+  aplicarMigrationAditivaIdempotenteExpo,
+} from '../../../dominio/persistencia/sqlite/migraciones-idempotente';
 
 interface Migracion {
   readonly version: number;
@@ -733,53 +736,19 @@ export async function aplicarMigracionesAsync(
     }
 
     // Migration 025 + 026 + 027 (param-tarifa-res-825-compliance-phase2):
-    // columnas aditivas en `parametros_tarifa` (025), `suscriptor` (026)
-    // y `acuerdo_municipal` (027). El helper `aplicarMigration020IdempotenteExpo`
-    // esta hardcoded para `factura`, asi que para mantener paridad
-    // con el patron de la 017 usamos PRAGMA table_info inline.
+    // columnas aditivas puras (solo `ALTER TABLE ... ADD COLUMN ...`).
+    // El helper `aplicarMigrationAditivaIdempotenteExpo` consulta
+    // `PRAGMA table_info` por tabla y ejecuta solo los ALTERs cuya
+    // columna NO exista, preservando tipo + DEFAULT del script original.
     // Las migrations 025/026/027 NO son destructivas (todas NULLables
-    // excepto estado_verificacion/estado que tienen DEFAULT), asi
-    // que data legacy queda naturalmente backward-compat.
+    // excepto estado_verificacion/estado que tienen DEFAULT), asi que
+    // data legacy queda naturalmente backward-compat.
     if (
       migracion.version === 25 ||
       migracion.version === 26 ||
       migracion.version === 27
     ) {
-      const tabla =
-        migracion.version === 25
-          ? 'parametros_tarifa'
-          : migracion.version === 26
-          ? 'suscriptor'
-          : 'acuerdo_municipal';
-      const columnasEsperadas = await db.getAllAsync<{ name: string }>(
-        `PRAGMA table_info(${tabla})`,
-      );
-      const nombresExistentes = new Set(columnasEsperadas.map((c) => c.name));
-      // Parsear el SQL de la migration para extraer las columnas a
-      // agregar (misma regex que el helper de factura).
-      const reAlter = new RegExp(
-        `ALTER\\s+TABLE\\s+${tabla}\\s+ADD\\s+COLUMN\\s+([A-Za-z_][A-Za-z0-9_]*)`,
-        'gi',
-      );
-      const columnasA_Agregar: string[] = [];
-      let match: RegExpExecArray | null;
-      while ((match = reAlter.exec(migracion.sql)) !== null) {
-        columnasA_Agregar.push(match[1]);
-      }
-      for (const columna of columnasA_Agregar) {
-        if (nombresExistentes.has(columna)) continue;
-        // Reconstruimos el ALTER desde la columna, respetando el
-        // DEFAULT si lo trae. Usamos el SQL literal del script que
-        // contiene "ADD COLUMN <nombre> <tipo> [DEFAULT ...]".
-        const reColumna = new RegExp(
-          `ALTER\\s+TABLE\\s+${tabla}\\s+ADD\\s+COLUMN\\s+${columna}\\b[^;]*`,
-          'i',
-        );
-        const sentencia = migracion.sql.match(reColumna)?.[0];
-        if (sentencia) {
-          await db.execAsync(sentencia + ';');
-        }
-      }
+      await aplicarMigrationAditivaIdempotenteExpo(db, migracion.sql);
       await db.runAsync(
         'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
         migracion.version,

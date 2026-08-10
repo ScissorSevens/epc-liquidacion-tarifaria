@@ -249,16 +249,30 @@ ALTER TABLE t1 ADD COLUMN c REAL;
   it('expo-sqlite: el helper se invoca desde migraciones.ts sin duplicar logica inline', () => {
     // Regression guard: despues del refactor, la logica inline para 025/026/027
     // NO debe seguir en migraciones.ts — debe haber UNA llamada al helper.
+    // El dispatch `if (version === 25 || ...)` SI puede quedar (es el dispatch
+    // que selecciona el helper); lo que debe desaparecer es la logica interna
+    // (PRAGMA + regex + ALTER).
     const expo = readFileSync(EXPO_MIGRACIONES, 'utf-8');
 
     // El helper debe estar importado
     expect(expo).toMatch(/aplicarMigrationAditivaIdempotenteExpo/);
 
-    // El bloque inline de 025/026/027 NO debe seguir presente (regex captura el if + cuerpo).
-    // Antes del refactor: ~55 lineas con PRAGMA + regex + ALTER. Despues: debe ser <= 5 lineas.
-    const bloqueInlineMatch = expo.match(
-      /if\s*\(\s*migracion\.version\s*===\s*25[\s\S]*?\}\s*\}/,
+    // 1. NO debe quedar el `PRAGMA table_info(${tabla})` inline con interpolacion
+    //    (ahora encapsulado en el helper).
+    expect(expo).not.toMatch(/PRAGMA\s+table_info\(\$\{tabla\}\)/);
+
+    // 2. NO debe quedar el regex inline `ALTER\\s+TABLE\\s+${tabla}\\s+ADD\\s+COLUMN\\s+`
+    //    con interpolacion de la variable `tabla`. El helper usa un regex similar
+    //    pero en un modulo separado (migraciones-idempotente.ts).
+    expect(expo).not.toMatch(/ALTER\\\\s\+TABLE\\\\s\+\$\{tabla\}/);
+
+    // 3. El cuerpo del dispatch (entre `{` y `}`) debe invocar al helper.
+    //    Aceptamos que haya lineas de codigo entre la llamada al helper y el cierre
+    //    del bloque (comentarios, `db.runAsync` para registrar la migracion, etc).
+    const dispatchMatch = expo.match(
+      /if\s*\(\s*migracion\.version\s*===\s*25[\s\S]*?\n\s*\}\s*\n/,
     );
-    expect(bloqueInlineMatch).toBeNull();
+    expect(dispatchMatch).not.toBeNull();
+    expect(dispatchMatch![0]).toMatch(/aplicarMigrationAditivaIdempotenteExpo/);
   });
 });
