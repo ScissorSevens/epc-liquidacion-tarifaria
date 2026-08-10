@@ -5,7 +5,8 @@
  */
 
 import type { AcuerdoMunicipal, ParametrosTarifa, EntradaCalculo } from '../types';
-import type { CategoriaUso } from '../categorias-uso';
+import type { CategoriaUso } from '../../categorias-uso';
+import type { PrestadorAmbitoInfo } from '../../ambito-tarifario/types';
 
 const PARAMETROS_BASE: ParametrosTarifa = {
   id_parametros: 1,
@@ -71,5 +72,7 @@ function entradaBaseConFecha(overrides: Partial<EntradaCalculo> = {}): EntradaCo
   };
 }
 
-export { PARAMETROS_BASE, ACUERDO_BASE, entradaBaseConFecha as entradaBase, type Prestador };
-import type { PrestadorAmbitoInfo as Prestador } from '../../ambito-tarifario/types';
+// `Prestador` es alias del tipo del módulo ambito-tarifario (puro).
+export type Prestador = PrestadorAmbitoInfo;
+
+export { PARAMETROS_BASE, ACUERDO_BASE, entradaBaseConFecha as entradaBase };

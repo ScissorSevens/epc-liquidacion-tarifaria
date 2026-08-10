@@ -19,17 +19,12 @@ import {
 describe('calcularLiquidacionConAmbito — gate previo al motor', () => {
   const FECHA_EMISION = '2026-08-10T10:00:00Z';
 
-  it('T-AMB-1: lanza error si prestador retorna NO_APLICA', () => {
+  it('T-AMB-1: lanza error si prestador retorna NO_APLICA (cantidad ≤ 0)', () => {
     const prestadorNO_APLICA = {
       id_prestador: 99,
-      cantidad_suscriptores: 12000,
+      cantidad_suscriptores: 0, // inválido → NO_APLICA
       zona: 'URBANA' as const,
     };
-    // NOTA: este prestador con >5000 URBANOS cae en Subtítulo 1
-    // (norma CRA 1032/2026). El sistema actual (Subtítulo 2 con
-    // metodología CRA 825) lo trata como NO_APLICA si no migró.
-    // El test valida la integración de gate; el contenido de la
-    // evaluación es responsabilidad de `validar-ambito.test.ts`.
     expect(() =>
       calcularLiquidacionConAmbito(
         { ...entradaBase({ id_prestador: 99 }), fecha_emision: FECHA_EMISION },

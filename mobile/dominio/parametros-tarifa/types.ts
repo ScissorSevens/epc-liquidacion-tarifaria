@@ -245,4 +245,7 @@ export const MENSAJES_ERROR_PARAMETROS = {
   // Res CRA 825/2017 Art. 15: el CMA no puede ser menor al mínimo
   // normativo del servicio. Cambio `param-tarifa-res-825-compliance-phase1`.
   CMA_BAJO_MINIMO: 'CMA no puede ser menor al mínimo normativo de la Res CRA 825 Art. 15',
+  // Res CRA 825/2017 Art. 18: el CMOG no puede ser menor al mínimo
+  // normativo del servicio. Cambio `param-tarifa-res-825-compliance-phase2`.
+  CMOG_BAJO_MINIMO: 'CMOG no puede ser menor al mínimo normativo de la Res CRA 825 Art. 18',
 } as const;

@@ -81,7 +81,6 @@ async function crearTenant(app: BootstrapApp) {
         segmento: 2,
         num_suscriptores_urbanos: 0,
         num_suscriptores_rurales: 15,
-        telefono: '3001234567',
         contacto: null,
         estado: 'activo',
         aps: null,

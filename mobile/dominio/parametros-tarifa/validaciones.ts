@@ -27,6 +27,20 @@ import { MENSAJES_ERROR_PARAMETROS } from './types';
 export const CMA_MINIMO_ACUEDUCTO = 2890;
 export const CMA_MINIMO_ALCANTARILLADO = 2069;
 
+/**
+ * CMOG mínimo normativo por servicio, en COP de diciembre 2016 por m³
+ * (Res CRA 825/2017 Art. 18).
+ *
+ * Constantes congeladas: cambiarlas es un cambio regulatorio,
+ * NO de código. Cambio `param-tarifa-res-825-compliance-phase2`.
+ *
+ * NOTA: estos valores son el TOPE MÍNIMO del CMOG (la parte general
+ * del CMO). El proyecto también valida CMOP (CMO particular) cuando
+ * exista el campo correspondiente — fuera de scope de este change.
+ */
+export const CMOG_MINIMO_ACUEDUCTO = 467;
+export const CMOG_MINIMO_ALCANTARILLADO = 169;
+
 /** Tipo de servicio para validación de CMA. */
 export type Servicio = 'acueducto' | 'alcantarillado';
 
@@ -51,6 +65,34 @@ export function validarCmaMinimo(cma: number, servicio: Servicio): void {
   if (cma < minimo) {
     throw new Error(
       `CMA_BAJO_MINIMO: ${MENSAJES_ERROR_PARAMETROS.CMA_BAJO_MINIMO} (mínimo ${servicio}: $${minimo})`,
+    );
+  }
+}
+
+/**
+ * Valida que el CMOG sea al menos el mínimo normativo para `servicio`.
+ *
+ * Regla Res CRA 825/2017 Art. 18 (mod. Res 907/2019): el CMOG (Costo
+ * Medio de Operación General) NO puede ser menor a los topes mínimos
+ * en COP/m³ de diciembre 2016:
+ *   - acueducto: $467/m³
+ *   - alcantarillado: $169/m³
+ *
+ * Misma convención que `validarCmaMinimo`: lanza `Error` con la clave
+ * `MENSAJES_ERROR_PARAMETROS.CMOG_BAJO_MINIMO` si el CMOG es menor.
+ *
+ * Cambio `param-tarifa-res-825-compliance-phase2` (task 2.6 GREEN).
+ *
+ * @param cmog CMOG propuesto (COP/m³, dic-2016).
+ * @param servicio Servicio al que aplica el CMOG.
+ * @throws Error si cmog < mínimo del servicio.
+ */
+export function validarCmogMinimo(cmog: number, servicio: Servicio): void {
+  const minimo =
+    servicio === 'acueducto' ? CMOG_MINIMO_ACUEDUCTO : CMOG_MINIMO_ALCANTARILLADO;
+  if (cmog < minimo) {
+    throw new Error(
+      `CMOG_BAJO_MINIMO: ${MENSAJES_ERROR_PARAMETROS.CMOG_BAJO_MINIMO} (mínimo ${servicio}: $${minimo}/m³)`,
     );
   }
 }
