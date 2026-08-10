@@ -575,4 +575,159 @@ describe('crearParametrosTarifaRepositoryExpoSqlite.guardar() — UPSERT', () =>
       }
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 1 task 1.5 (RED) — Migration 028b + calcularFactorIpc.
+  //
+  // Res CRA 825/2017 Art. 11: formula de indexacion IPC
+  //   factor = IPC[anio_destino] / IPC[anio_base].
+  // El campo `anio_destino_indexacion` debe persistirse para que el
+  // motor pueda calcular el factor sin asumir `anio_destino = anio_base`.
+  //
+  // RED: T-IPC-DEST-0 verifica que la constante
+  // `MIGRACION_028B_PARAMETROS_ANIO_DESTINO` exista en `migraciones.ts`.
+  // Como NO existe aun, este test falla.
+  //
+  // T-IPC-CALC-*: triangulacion sobre `calcularFactorIpc` del dominio.
+  // La funcion ya existe (cambio `param-tarifa-res-825-compliance-phase1`)
+  // y esta testeada en `dominio/parametros-tarifa/__tests__/ipc.test.ts`.
+  // Aqui agregamos 3 tests adicionales en el archivo del repo para
+  // mantener paridad con el task description (cubren los 3 escenarios
+  // canonicos del Art. 11: mismo anio, destino > base, destino < base).
+  // ─────────────────────────────────────────────────────────────────────
+  describe('Phase 1 task 1.5 — anio_destino_indexacion persiste + calcularFactorIpc', () => {
+    // SQL esperado de la migration 028b (task 1.6 GREEN).
+    const SQL_MIGRACION_028B_ANIO_DESTINO = `
+      ALTER TABLE parametros_tarifa ADD COLUMN anio_destino_indexacion INTEGER NULL;
+    `;
+
+    // Schema base reducido (reuso del describe anterior via funcion local).
+    const SQL_SCHEMA_PARAMETROS_BASE_2 = `
+      CREATE TABLE parametros_tarifa (
+        id_parametros INTEGER PRIMARY KEY,
+        id_prestador  INTEGER NOT NULL,
+        id_acuerdo    INTEGER NOT NULL,
+        periodo       INTEGER NOT NULL,
+        cma           REAL    NOT NULL,
+        cmo           REAL    NOT NULL,
+        cmi           REAL    NOT NULL,
+        cmt           REAL    NOT NULL,
+        anio_base     INTEGER NOT NULL DEFAULT 2016
+      );
+    `;
+
+    function buildDbConSchemaBase2(): import('node:sqlite').DatabaseSync {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
+      const db = new DatabaseSync(':memory:');
+      db.exec(SQL_SCHEMA_PARAMETROS_BASE_2);
+      return db;
+    }
+
+    it('T-IPC-DEST-0: la constante MIGRACION_028B_PARAMETROS_ANIO_DESTINO existe en migraciones.ts', () => {
+      // RED puro: la constante NO existe en el codigo de produccion
+      // todavia. Este test falla hasta que la task 1.6 GREEN la cree.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require('path') as typeof import('path');
+      const ruta = path.join(__dirname, '..', 'migraciones.ts');
+      const source = fs.readFileSync(ruta, 'utf8');
+      expect(source).toMatch(/MIGRACION_028B_PARAMETROS_ANIO_DESTINO/);
+    });
+
+    it('T-IPC-DEST-1: round-trip anio_destino_indexacion=2026 con factor IPC[2026]/IPC[2016]', () => {
+      const db = buildDbConSchemaBase2();
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { aplicarMigrationAditivaIdempotenteNode } = require('../../../../dominio/persistencia/sqlite/migraciones-idempotente');
+        aplicarMigrationAditivaIdempotenteNode(db, SQL_MIGRACION_028B_ANIO_DESTINO);
+
+        // PRAGMA table_info confirma la nueva columna.
+        const cols = db.prepare("PRAGMA table_info(parametros_tarifa)").all() as Array<{
+          name: string;
+          type: string;
+          notnull: 0 | 1;
+        }>;
+        const col = cols.find((c) => c.name === 'anio_destino_indexacion');
+        expect(col).toBeDefined();
+        expect(col!.type).toMatch(/INTEGER/i);
+        expect(col!.notnull).toBe(0);
+
+        // INSERT con anio_destino = 2026 (factor IPC[2026]/IPC[2016] = 1.6234).
+        db.prepare(
+          `INSERT INTO parametros_tarifa
+            (id_parametros, id_prestador, id_acuerdo, periodo, cma, cmo, cmi, cmt,
+             anio_base, anio_destino_indexacion)
+           VALUES (1, 7, 100, 2026, 12000000, 500, 200, 100, 2016, 2026)`,
+        ).run();
+
+        const row = db.prepare(
+          `SELECT anio_base, anio_destino_indexacion
+           FROM parametros_tarifa WHERE id_parametros = 1`,
+        ).get() as { anio_base: number; anio_destino_indexacion: number | null };
+        expect(row.anio_base).toBe(2016);
+        expect(row.anio_destino_indexacion).toBe(2026);
+
+        // El factor calculado por el dominio debe matchear el esperado.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { calcularFactorIpc } = require('../../../../dominio/parametros-tarifa/ipc');
+        const factor = calcularFactorIpc(row.anio_base, row.anio_destino_indexacion);
+        expect(factor).toBeCloseTo(1.6234, 2);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('T-IPC-DEST-2: round-trip anio_destino_indexacion=NULL preserva data legacy', () => {
+      const db = buildDbConSchemaBase2();
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { aplicarMigrationAditivaIdempotenteNode } = require('../../../../dominio/persistencia/sqlite/migraciones-idempotente');
+        aplicarMigrationAditivaIdempotenteNode(db, SQL_MIGRACION_028B_ANIO_DESTINO);
+
+        // INSERT sin anio_destino (legacy data, NULL es valido).
+        db.prepare(
+          `INSERT INTO parametros_tarifa
+            (id_parametros, id_prestador, id_acuerdo, periodo, cma, cmo, cmi, cmt,
+             anio_base, anio_destino_indexacion)
+           VALUES (2, 7, 100, 2026, 12000000, 500, 200, 100, 2016, NULL)`,
+        ).run();
+
+        const row = db.prepare(
+          "SELECT anio_destino_indexacion FROM parametros_tarifa WHERE id_parametros = 2",
+        ).get() as { anio_destino_indexacion: number | null };
+        expect(row.anio_destino_indexacion).toBeNull();
+      } finally {
+        db.close();
+      }
+    });
+
+    // Triangulacion: tests del dominio `calcularFactorIpc` para
+    // mantener paridad con task 1.5 del change. La funcion ya existe
+    // y esta testeada en `dominio/parametros-tarifa/__tests__/ipc.test.ts`
+    // (T-IPC-3, T-IPC-6, T-IPC-7). Estos tests adicionales viven en el
+    // archivo del repo como regression guard contractual.
+    it('T-IPC-CALC-1: calcularFactorIpc mismo anio retorna 1.0', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { calcularFactorIpc } = require('../../../../dominio/parametros-tarifa/ipc');
+      expect(calcularFactorIpc(2016, 2016)).toBe(1.0);
+      expect(calcularFactorIpc(2020, 2020)).toBe(1.0);
+      expect(calcularFactorIpc(2026, 2026)).toBe(1.0);
+    });
+
+    it('T-IPC-CALC-2: calcularFactorIpc destino > base retorna > 1.0 (acumulacion)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { calcularFactorIpc } = require('../../../../dominio/parametros-tarifa/ipc');
+      expect(calcularFactorIpc(2016, 2026)).toBeGreaterThan(1.0);
+      expect(calcularFactorIpc(2016, 2020)).toBeGreaterThan(1.0);
+    });
+
+    it('T-IPC-CALC-3: calcularFactorIpc destino < base retorna < 1.0 (deflacion)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { calcularFactorIpc } = require('../../../../dominio/parametros-tarifa/ipc');
+      expect(calcularFactorIpc(2026, 2016)).toBeLessThan(1.0);
+      expect(calcularFactorIpc(2020, 2016)).toBeLessThan(1.0);
+    });
+  });
 });
