@@ -249,13 +249,15 @@ export function calcularLiquidacion(
   const factorResult = calcularFactor(entrada.estrato, entrada.categoria_uso, acuerdo);
   let factor = factorResult.factor;
 
-  // Gate `estado_verificacion` — solo PENDIENTE en esta iteración (task 2.12 GREEN).
-  // Cambio `param-tarifa-res-825-compliance-phase2` (task 2.12 GREEN).
+  // Gate `estado_verificacion` — PENDIENTE/RECHAZADO + E1-E3 residencial
+  // aplican factor 0 (regulatorio: no subsidiar sin verificación oficial).
+  // Cambio `param-tarifa-res-825-compliance-phase2` (tasks 2.12 / 2.14 GREEN).
   //
   // Regulación (Resolución CRA 825/2017 + L142/1994 art. 99.6): un
   // suscriptor residencial E1-E3 SOLO recibe subsidio si el prestador
-  // verificó oficialmente su estrato. Sin verificación, se cobra CF+CC
-  // plenos (factor 0) y se registra el motivo regulatorio en metadata.
+  // verificó oficialmente su estrato. Sin verificación (PENDIENTE) o
+  // con verificación rechazada (RECHAZADO), se cobra CF+CC plenos
+  // (factor 0) y se registra el motivo regulatorio en metadata.
   //
   // Alcance:
   //   - E1-E3 residencial (o especial, alias) → gate aplica.
@@ -274,8 +276,11 @@ export function calcularLiquidacion(
     entrada.estrato >= 1 &&
     entrada.estrato <= 3;
 
-  if (requiereSubsidio && verificacion === 'PENDIENTE') {
-    motivoNoSubsidio = 'suscripcion_pendiente_verificacion';
+  if (requiereSubsidio && (verificacion === 'PENDIENTE' || verificacion === 'RECHAZADO')) {
+    motivoNoSubsidio =
+      verificacion === 'PENDIENTE'
+        ? 'suscripcion_pendiente_verificacion'
+        : 'suscripcion_rechazada';
     // Override factor para que todos los cálculos downstream (subsidio
     // legacy, contribución, factor_reportado) queden en 0.
     factor = 0;
