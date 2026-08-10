@@ -130,6 +130,22 @@ export function calcularFactor(
  * ASP (denominador) corrige el agua total a nivel prestador por pérdidas
  * estándar IPUF=6 m³/suscriptor/mes × 12 meses × N suscriptores
  * (art. 17, 19 Res 825/2017). NO multiplica el consumo individual.
+ *
+ * @deprecated Mantener por dos razones regulatorias/operativas (Decisión 6
+ *   del design `param-tarifa-res-825-compliance-phase2`):
+ *
+ *   1. **Rompe tests**: 2 tests de `motor-tarifario.test.ts:423-443`
+ *      verifican esta función directamente. Eliminarla rompe la suite.
+ *
+ *   2. **Auditoría histórica**: el motor principal usa
+ *      `parametros.cargo_consumo_resultante` PRE-CALCULADO al guardar
+ *      (ver `motor-tarifario.ts:217-228` y `calcular.ts`). Esta función
+ *      queda como referencia legacy del cálculo "live" original; reescribirla
+ *      o cambiar su firma alteraría el cálculo histórico documentado en
+ *      commits previos.
+ *
+ *   En código NUEVO, usar `calcularLiquidacion` que ya consume el CC
+ *   pre-calculado. NO eliminar esta función ni cambiar su firma.
  */
 export function calcularCCUnitario(parametros: ParametrosTarifa): number {
   if (!parametros.suscriptores_promedio || parametros.suscriptores_promedio <= 0) {
