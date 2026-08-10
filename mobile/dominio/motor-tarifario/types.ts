@@ -10,8 +10,45 @@
 import type { CategoriaUso } from '../categorias-uso';
 import type { AcuerdoMunicipal } from '../acuerdo-municipal';
 import type { ParametrosTarifa } from '../parametros-tarifa';
+import type {
+  EstadoAmbito,
+  SubtituloCRA,
+} from '../ambito-tarifario/types';
 
 export type Estrato = 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * Snapshot persistido del resultado de `validarAmbito()` para
+ * trazabilidad regulatoria (Res CRA 825/2017 + Res CRA 1032/2026).
+ *
+ * Decisión 4 del design `param-tarifa-res-825-compliance-phase2`:
+ * "Snapshot en tabla `factura.validacion_ambito` → Auditoría completa
+ * (regulatoria)". Este type modela la forma snake_case que el spec
+ * exige en el snapshot (Res CRA 825/2017 + 1032/2026 art. 2.1.2.1.1.1).
+ *
+ * Diferencias con `ResultadoAmbito` del módulo `ambito-tarifario`:
+ *   - `norma_aplicable` (snake_case) vs `normaAplicable` (camelCase).
+ *   - `motivo` (sin acentos, alcance regulatorio) vs `evidencia` (literal
+ *     del motor). Se proyectan del mismo string fuente.
+ *   - `cantidad_suscriptores`: dato DEL prestador (no parte del
+ *     `ResultadoAmbito`), se incluye acá para auditoría regulatoria
+ *     porque la norma exige saber "cuántos suscriptores tenía el
+ *     prestador al momento de la liquidación".
+ *
+ * Se popula en `calcularLiquidacionConAmbito` (wrapper que llama
+ * `validarAmbito` antes del motor puro) y se propaga al snapshot de
+ * `emitirFactura` via `metadata.validacion_ambito`.
+ *
+ * Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.8).
+ */
+export interface SnapshotValidacionAmbito {
+  readonly estado: EstadoAmbito;
+  readonly subtitulo: SubtituloCRA | null;
+  readonly norma_aplicable: string | null;
+  readonly motivo: string;
+  readonly cantidad_suscriptores: number | null;
+  readonly fecha_verificacion: string;
+}
 
 /**
  * Entrada al motor. Trae TODO el contexto multi-tenant inline: el
@@ -81,6 +118,19 @@ export interface MetadataCalculo {
   readonly motivo_no_subsidio?: string | null;
   readonly version_motor: string;
   readonly calculo_timestamp: string;  // ISO 8601
+  /**
+   * Snapshot de `validarAmbito()` (Res CRA 825/2017 + 1032/2026).
+   * Solo se popula cuando el caller usa `calcularLiquidacionConAmbito`
+   * (wrapper que invoca `validarAmbito` antes del motor puro). En
+   * `calcularLiquidacion` puro, este campo es `undefined` para
+   * backward-compat con los 40 callers legacy.
+   *
+   * Decisión 4 del design `param-tarifa-res-825-compliance-phase2`:
+   * se persiste al snapshot de la Factura para auditoría regulatoria.
+   *
+   * Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.8).
+   */
+  readonly validacion_ambito?: SnapshotValidacionAmbito;
 }
 
 /**
