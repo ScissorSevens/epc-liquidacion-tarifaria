@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import PeriodoPicker from '../components/PeriodoPicker';
+import PeriodoPicker from '../componentes/PeriodoPicker';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   Image,
