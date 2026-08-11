@@ -473,7 +473,7 @@ fireEvent.press(back);
       });
       const ids = [
         'param-periodo',
-        'param-anio-base',
+        'param-anio-base-ipc',
         'param-vigente-desde',
         'param-vigente-hasta',
         'param-cma',
@@ -1469,7 +1469,7 @@ fireEvent.press(back);
       const { getByTestId, getByLabelText } = renderEstable();
       const testIdsSiempreRenderizados = [
         'param-periodo',
-        'param-anio-base',
+        'param-anio-base-ipc',
         'param-vigente-desde',
         'param-vigente-hasta',
         'param-cma',
@@ -2134,7 +2134,7 @@ fireEvent.press(back);
       await waitFor(() => {
         expect(getByTestId('param-periodo').props.value).toBe('2026');
       });
-      expect(getByTestId('param-anio-base').props.value).toBe('2016');
+      expect(getByTestId('param-anio-base-ipc').props.value).toBe('2016');
       expect(getByTestId('param-vigente-desde').props.value).toBe('2025-01-01');
       expect(getByTestId('param-vigente-hasta').props.value).toBe('2029-12-31');
       expect(getByTestId('param-cma').props.value).toBe('12345678');
@@ -2221,7 +2221,7 @@ fireEvent.press(back);
       // los 13 testIDs que cubren todos los FormFields numéricos.
       const testIds = [
         'param-periodo',
-        'param-anio-base',
+        'param-anio-base-ipc',
         'param-vigente-desde',
         'param-vigente-hasta',
         'param-cma',

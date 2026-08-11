@@ -689,19 +689,16 @@ export default function ParametrosTarifaForm({
             testID="param-periodo"
           />
         </View>
-        <View style={estilos.campo}>
-          <FormField
-            label="Anio base IPC (Res CRA 825 Art. 7, default 2016)"
-            value={anioBase}
-            onChangeText={setAnioBase}
-            keyboardType="numeric"
-            editable={!guardando && !cargandoInputs}
-            selectable
-            tabularNums
-            helperText="Norma CRA 825: anio_base=2016 (default). Override posible."
-            testID="param-anio-base"
-          />
-        </View>
+        {/* Cleanup C-1/A-2 (verify-report `param-tarifa-residuales-cra-825`):
+            El input `anio_base` estaba duplicado en dos FormFields (uno
+            en "Periodo y vigencia" + otro en "Indexación IPC") bindeando
+            el mismo state. UX confusa: editar uno actualizaba el otro y
+            el error inline solo aparecía en el segundo. Decisión B/B/B:
+            mantener el de la sección IPC por agrupación conceptual
+            (anio_base + anio_destino + factor + ipuf_indice viven juntos).
+            El input de "Periodo y vigencia" se elimina. El label del
+            sobreviviente ya aclara "Año de referencia para la tabla IPC
+            del DANE", coherente con la sección. */}
         <View style={estilos.campo}>
           <FormField
             label="Vigente desde (YYYY-MM-DD)"
