@@ -25,6 +25,21 @@ interface Migracion {
   readonly version: number;
   readonly nombre: string;
   readonly sql: string;
+  /**
+   * Modo de ejecucion que determina como `aplicarMigracionesAsync` la
+   * procesa. Cleanup A-1 (verify-report `param-tarifa-residuales-cra-825`):
+   * evita la lista hardcoded de versiones (que crecia con cada migration
+   * aditiva nueva) y centraliza el dispatch por tipo.
+   *
+   *   - `'normal'` (default): se ejecuta `db.execAsync(sql)` directo.
+   *     Cubre CREATE TABLE / CREATE INDEX / ALTER no-aditivo.
+   *   - `'aditiva'`: PRAGMA table_info + ALTER por columna (helper
+   *     `aplicarMigrationAditivaIdempotenteExpo`). Necesario porque
+   *     expo-sqlite < 3.35 no soporta `ALTER TABLE ADD COLUMN IF NOT EXISTS`.
+   *   - `'compliance-1038'`: migration 020 con patron especifico
+   *     (CREATE INDEX despues de ALTER, envoltura `IF NOT EXISTS`).
+   */
+  readonly kind?: 'normal' | 'aditiva' | 'compliance-1038';
 }
 
 const MIGRACION_001_FACTURA = `
@@ -740,17 +755,17 @@ const MIGRACIONES: readonly Migracion[] = [
   { version: 17, nombre: '017_operario_password_hash', sql: MIGRACION_017_OPERARIO_PASSWORD_HASH },
   { version: 18, nombre: '018_suscriptor_email_telefono', sql: MIGRACION_018_SUSCRIPTOR_EMAIL_TELEFONO },
   { version: 19, nombre: '019_parametros_tarifa_completo', sql: MIGRACION_019_PARAMETROS_TARIFA_COMPLETO },
-  { version: 20, nombre: '020_factura_compliance_1038', sql: MIGRACION_020_FACTURA_COMPLIANCE_1038 },
+  { version: 20, nombre: '020_factura_compliance_1038', sql: MIGRACION_020_FACTURA_COMPLIANCE_1038, kind: 'compliance-1038' },
   { version: 21, nombre: '021_concepto_otro_valor', sql: MIGRACION_021_CONCEPTO_OTRO_VALOR },
   { version: 22, nombre: '022_prestador_aps', sql: MIGRACION_022_PRESTADOR_APS },
   { version: 23, nombre: '023_parametros_tarifa_anio_base', sql: MIGRACION_023_PARAMETROS_TARIFA_ANIO_BASE },
   { version: 24, nombre: '024_no_op_calle_drop', sql: MIGRACION_024_NO_OP_CALLE_DROP },
-  { version: 25, nombre: '025_parametros_tarifa_cmaa_docs', sql: MIGRACION_025_PARAMETROS_TARIFA_CMAA_DOCS },
-  { version: 26, nombre: '026_suscriptor_verificacion', sql: MIGRACION_026_SUSCRIPTOR_VERIFICACION },
-  { version: 27, nombre: '027_acuerdo_municipal_estado', sql: MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO },
-  { version: 28, nombre: '028_parametros_tarifa_altitud', sql: MIGRACION_028_PARAMETROS_ALTITUD },
-  { version: 29, nombre: '028b_parametros_tarifa_anio_destino', sql: MIGRACION_028B_PARAMETROS_ANIO_DESTINO },
-  { version: 30, nombre: '030_parametros_tarifa_aplica_cmaa', sql: MIGRACION_030_PARAMETROS_APLICA_CMAA },
+  { version: 25, nombre: '025_parametros_tarifa_cmaa_docs', sql: MIGRACION_025_PARAMETROS_TARIFA_CMAA_DOCS, kind: 'aditiva' },
+  { version: 26, nombre: '026_suscriptor_verificacion', sql: MIGRACION_026_SUSCRIPTOR_VERIFICACION, kind: 'aditiva' },
+  { version: 27, nombre: '027_acuerdo_municipal_estado', sql: MIGRACION_027_ACUERDO_MUNICIPAL_ESTADO, kind: 'aditiva' },
+  { version: 28, nombre: '028_parametros_tarifa_altitud', sql: MIGRACION_028_PARAMETROS_ALTITUD, kind: 'aditiva' },
+  { version: 29, nombre: '028b_parametros_tarifa_anio_destino', sql: MIGRACION_028B_PARAMETROS_ANIO_DESTINO, kind: 'aditiva' },
+  { version: 30, nombre: '030_parametros_tarifa_aplica_cmaa', sql: MIGRACION_030_PARAMETROS_APLICA_CMAA, kind: 'aditiva' },
 ];
 
 
@@ -817,7 +832,12 @@ export async function aplicarMigracionesAsync(
     // restaurada parcialmente (user_version atras del schema) el ALTER
     // tira "duplicate column". Usamos el helper idempotente basado en
     // PRAGMA table_info. Misma logica que el runner Node.
-    if (migracion.version === 20) {
+    //
+    // Cleanup A-1 (verify-report `param-tarifa-residuales-cra-825`):
+    // dispatch via `kind` field en lugar de version === 20 hardcoded.
+    // Futuras migrations con `kind: 'compliance-1038'` caen aca sin
+    // editar este if.
+    if (migracion.kind === 'compliance-1038') {
       await aplicarMigration020IdempotenteExpo(db, migracion.sql);
       await db.runAsync(
         'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
@@ -837,23 +857,17 @@ export async function aplicarMigracionesAsync(
     // excepto estado_verificacion/estado que tienen DEFAULT), asi que
     // data legacy queda naturalmente backward-compat.
     //
-    // Migration 028 + 028b (`param-tarifa-residuales-cra-825` Phase 1
-    // tasks 1.4 + 1.6): misma semántica aditiva — `altitud_msnm`
-    // (Res CRA 750/2016) y `anio_destino_indexacion` (Res CRA 825
-    // Art. 11). Inclusion en este dispatch preserva el patron uniforme.
+    // Migrations aditivas (025-030): columnas aditivas puras en
+    // `parametros_tarifa`, `suscriptor`, `acuerdo_municipal`. El helper
+    // `aplicarMigrationAditivaIdempotenteExpo` consulta PRAGMA
+    // table_info y solo agrega las columnas ausentes (SQLite < 3.35 no
+    // soporta `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
     //
-    // Migration 030 (`param-tarifa-residuales-cra-825` Phase 2 task 2.2):
-    // flag explicito `aplica_cmaa` (Res CRA 907/2019 art. 13). Misma
-    // semantica aditiva (NOT NULL DEFAULT 0 con CHECK), asi que pasa
-    // por el mismo helper idempotente.
-    if (
-      migracion.version === 25 ||
-      migracion.version === 26 ||
-      migracion.version === 27 ||
-      migracion.version === 28 ||
-      migracion.version === 29 ||
-      migracion.version === 30
-    ) {
+    // Cleanup A-1 (verify-report `param-tarifa-residuales-cra-825`):
+    // dispatch via `kind` field en lugar de lista hardcoded de versiones.
+    // Cualquier migration futura aditiva solo necesita `kind: 'aditiva'`
+    // sin editar este if. La lista crece sin tocar el dispatch.
+    if (migracion.kind === 'aditiva') {
       await aplicarMigrationAditivaIdempotenteExpo(db, migracion.sql);
       await db.runAsync(
         'INSERT INTO __migraciones_aplicadas (version, nombre, aplicada_en) VALUES (?, ?, ?)',
