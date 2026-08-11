@@ -169,6 +169,11 @@ export function buildBorradorLocal(
     vigente_desde = ctx.vigenteDesdePersistido;
   }
 
+  // Cleanup C-2/P-1 (verify-report `param-tarifa-residuales-cra-825`):
+  // cacheamos el parseInt del anio destino una sola vez para evitar
+  // invocarlo 3 veces en la ternaria de `anio_destino_indexacion`.
+  const anioDestinoNum = parseInt(form.anioDestino, 10);
+
   return {
     id_prestador: ctx.id_prestador,
     id_acuerdo: ctx.id_acuerdo,
@@ -234,9 +239,14 @@ export function buildBorradorLocal(
     // desde el form. Parseamos el string del input; si NaN/empty o
     // ≤ 2000, cae a null (legacy / inválido). El admin puede
     // override manual del factor calculado via `factorIpc`.
+    //
+    // Cleanup C-2/P-1 (verify-report `param-tarifa-residuales-cra-825`):
+    // cacheamos el parseInt en una variable local antes del return (no
+    // se puede declarar dentro de un object literal). Micro-perf +
+    // ruido visual (mas legible que invocarlo 3 veces en la ternaria).
     anio_destino_indexacion:
-      Number.isFinite(parseInt(form.anioDestino, 10)) && parseInt(form.anioDestino, 10) > 2000
-        ? parseInt(form.anioDestino, 10)
+      Number.isFinite(anioDestinoNum) && anioDestinoNum > 2000
+        ? anioDestinoNum
         : null,
     // Phase 3 task 3.4 (GREEN): factor_indexacion_ipc ahora editable
     // desde el form. La función pura `calcularFactorIpc(anioBase,
