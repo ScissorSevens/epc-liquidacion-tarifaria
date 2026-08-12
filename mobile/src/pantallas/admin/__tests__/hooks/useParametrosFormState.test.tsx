@@ -1,7 +1,7 @@
 // mobile/src/pantallas/admin/__tests__/hooks/useParametrosFormState.test.tsx
 //
 // Tests contractuales del hook `useParametrosFormState` — encapsula los
-// 18 useState + useFocusEffect + validators + guardar del screen
+// 18 useState + validators + guardar del screen
 // ParametrosTarifa (parametros-tarifa-screen-decomposition Phase 1
 // task 1.3 — GREEN).
 //
@@ -27,14 +27,15 @@
 //   GREEN → implementacion en useParametrosFormState.ts. Tests pasan.
 //
 // Estrategia de mocks:
-//   - useFocusEffect se sustituye por useEffect (mismo patron que en
-//     ParametrosTarifa.test.tsx) para evitar la dependencia de
-//     NavigationContainer.
 //   - expo-haptics: mockeado inline para no invocar la native API.
 //   - Alert.alert: espiado via jest.spyOn para verificar el titulo.
 //   - useWorkspace: no se importa en el hook (el hook solo encapsula
 //     state + validators + persistencia local; la propagacion al store
 //     queda en el caller ParametrosTarifa.tsx).
+//
+// NOTA: el mock de useFocusEffect (que en F1 cleanup removimos del hook
+// junto con su uso real) ya no es necesario. Si se reactiva el focus
+// effect en el hook, restaurar este mock.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -55,23 +56,6 @@ jest.mock('expo-haptics', () => ({
     Heavy: 'heavy',
   },
 }));
-
-// Sustituir useFocusEffect por useEffect para que el hook funcione en
-// tests sin NavigationContainer. El callback se ejecuta en mount +
-// cuando cambian las deps (mismo patron que ParametrosTarifa.test.tsx).
-jest.mock('@react-navigation/native', () => {
-  const actual = jest.requireActual('@react-navigation/native');
-  const ReactNative = require('react');
-  return {
-    ...actual,
-    useFocusEffect: (cb: () => unknown) => {
-      ReactNative.useEffect(() => {
-        const cleanup = cb();
-        return typeof cleanup === 'function' ? cleanup : undefined;
-      }, []); // eslint-disable-line react-hooks/exhaustive-deps
-    },
-  };
-});
 
 // ParametrosTarifa fixture valido (subset de los campos que el hook
 // necesita para hidratar el state local).

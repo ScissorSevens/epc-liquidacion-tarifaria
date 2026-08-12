@@ -1,6 +1,6 @@
 /**
  * Hook `useParametrosFormState` — encapsula los 18 useState +
- * useFocusEffect + validators + guardar del screen admin
+ * validators + guardar del screen admin
  * `ParametrosTarifa` (Decompose Phase 1 task 1.3).
  *
  * POR QUE ESTE HOOK EXISTE:
@@ -50,7 +50,6 @@ import {
 } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect } from '@react-navigation/native';
 
 import {
   validarCmaMinimo,
@@ -307,60 +306,19 @@ export function useParametrosFormState(
   const cargandoInputs = repo === null || cargando;
 
   // ──────────────────────────────────────────────────────────────────
-  // parametros-stale-state-fix: el fetch ahora corre dentro de
-  // `useFocusEffect` en lugar de un `useEffect` plano. Beneficios:
-  //   - En el mount inicial el comportamiento es equivalente: la pantalla
-  //     arranca focused y el callback corre.
-  //   - Cuando el operario da "Atrás" a Mi Perfil y vuelve a abrir la
-  //     pantalla, React Navigation RE-FOCUSA la pantalla → el callback
-  //     se vuelve a ejecutar → el form se re-hidrata con el último valor
-  //     persistido en la DB (en lugar de quedar con los valores default
-  //     del `useState(... ?? 0)` inicial).
-  //   - El cleanup (cancelado=true) corre cuando la pantalla pierde focus
-  //     o se desmonta, evitando state updates sobre componentes
-  //     desmontados.
-  //
-  // El reset de `yaSincronizadoRef.current = false` ANTES de
-  // `setParametrosActuales` garantiza que el sync effect re-hidrate los
-  // inputs locales con los datos frescos del repo en cada focus. Sin este
-  // reset, el one-shot guard saltaría la re-hidratación y el form quedaría
-  // con los valores viejos (los del primer mount).
-  //
-  // En el hook, NO tenemos state `parametrosActuales` interno (la prop
-  // ES la fuente de verdad). Por eso el useFocusEffect no necesita
-  // actualizar state local — solo dispara `onRefetch` que el caller
-  // (screen) usa para re-fetch del repo. PERO el hook necesita saber
-  // cuando el operario refoca la pantalla para resetear el one-shot
-  // guard. Mantenemos el ref reset dentro del useFocusEffect, y el
-  // sync useEffect (abajo) hidrata cuando `parametrosActuales` cambia.
-  //
-  // ADVERTENCIA: el hook NO dispara el fetch — eso lo hace el caller
-  // (screen) via `getBootstrap().repos.parametrosTarifaRepo.buscarVigente()`.
-  // El hook solo mantiene el ref guard. El refetch + re-pasar la prop
-  // `parametrosActuales` es responsabilidad del screen.
-  useFocusEffect(
-    useCallback(() => {
-      // No-op real: el ref guard se resetea cuando el screen refetchea
-      // y re-pasa `parametrosActuales`. Mantenemos este useFocusEffect
-      // para preservar el patrón del screen original (permite re-hidratar
-      // cuando React Navigation refocusa).
-      return () => {
-        // Cleanup (no state local que reset — el caller maneja refetch).
-      };
-    }, []),
-  );
-
-  // ──────────────────────────────────────────────────────────────────
   // Hidratar el state local cuando `parametrosActuales` cambia
   // externamente. Solo sincroniza en la transición null → valor
   // (evita sobrescribir edición del usuario). El ref guardea la
   // primera hidratación para que un re-fetch posterior (mismos datos)
   // no pise lo que el operador tipeó. Ver scenario T-SYNC-1/T-SYNC-2.
   //
-  // parametros-stale-state-fix: el `yaSincronizadoRef` se DECLARA arriba
-  // (antes del useFocusEffect) para que el callback de focus pueda
-  // resetearlo a `false` antes de cada re-fetch por focus, garantizando
-  // que el sync re-hidrate el form con datos frescos.
+  // NOTA: el `useFocusEffect` que originalmente acompañaba a este sync
+  // (parametros-stale-state-fix) fue removido en el F1 cleanup del
+  // verify-report de `parametros-tarifa-screen-decomposition`: era
+  // no-op real (solo reseteaba un ref que el screen ya resetea cuando
+  // refetchea). El fetch + re-pasar `parametrosActuales` sigue siendo
+  // responsabilidad del caller (screen), via `useFocusEffect` en
+  // `ParametrosTarifa.tsx`.
   useEffect(() => {
     if (parametrosActuales === null) return;
     if (yaSincronizadoRef.current) return;
