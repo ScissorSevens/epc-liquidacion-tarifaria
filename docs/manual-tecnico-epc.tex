@@ -29,6 +29,11 @@
 \usepackage{titlesec}
 \usepackage{multirow}
 \usepackage{caption}
+\usepackage{ragged2e}
+
+% Column type para tablas: ragged-right con ancho fijo
+% Previene que LaTeX hyphen palabra por palabra en columnas estrechas
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
 
 % Configuracion de hyperref (sin colores chillones)
 \hypersetup{
@@ -189,13 +194,13 @@ El sistema es una solucion full-stack para prestadores rurales de acueducto en C
 \begin{table}[h]
 \centering
 \caption{Tipos de usuario del sistema}
-\begin{tabularx}{\textwidth}{lXl}
+\begin{tabularx}{\textwidth}{L{3.5cm} L{4.5cm} X}
 \toprule
 \textbf{Tipo} & \textbf{Rol} & \textbf{Pantallas principales} \\
 \midrule
 Operario de campo & Captura lecturas y fotografias en dispositivos Android & RutaDeHoy, CapturarLectura, DetalleSuscriptor \\
-Administrador & Configura parametros tarifarios, gestiona operarios & ParametrosTarifa, Admin Operarios \\
-Supervisor & Consulta dashboard, valida datos & Dashboard web \\
+Administrador & Configura parametros tarifarios y gestiona operarios & ParametrosTarifa, Admin Operarios \\
+Supervisor & Consulta dashboard y valida datos & Dashboard web \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -217,23 +222,23 @@ Supervisor & Consulta dashboard, valida datos & Dashboard web \\
 \begin{table}[h]
 \centering
 \caption{Stack tecnologico por capa}
-\begin{tabularx}{\textwidth}{lX}
+\begin{tabularx}{\textwidth}{L{5cm} X}
 \toprule
 \textbf{Capa} & \textbf{Tecnologia} \\
 \midrule
 Lenguaje nucleo & TypeScript 5/6 strict \\
 Workspaces & npm workspaces (monorepo) \\
 Dominio puro & TypeScript + Jest 30 + ts-jest 29 \\
-Mobile & React Native 0.81 + Expo SDK 54 + React 19.1 + expo-router 6 + expo-sqlite 16 \\
+Mobile & React Native 0.81, Expo SDK 54, React 19.1, expo-router 6, expo-sqlite 16 \\
 Estado mobile & Zustand 5 \\
 UI mobile & react-native-paper 5 \\
-Hardware mobile & expo-camera, react-native-ble-plx (Bluetooth impresion) \\
-Backend & .NET 8 + ASP.NET Core Minimal API + EF Core 8 \\
+Hardware mobile & expo-camera, react-native-ble-plx (Bluetooth para impresion) \\
+Backend & .NET 8, ASP.NET Core Minimal API, EF Core 8 \\
 Base de datos servidor & PostgreSQL 16 \\
 Base de datos local mobile & SQLite (expo-sqlite) \\
 Base de datos local backend & better-sqlite3 (Node.js, en tests) \\
-Dashboard & HTML5 + Vanilla JS + bcrypt.js (cliente) \\
-Especificacion & OpenSpec + Engram (memoria persistente) \\
+Dashboard & HTML5 + Vanilla JS + bcrypt.js (en cliente) \\
+Especificacion & OpenSpec + Engram (memoria persistente cross-session) \\
 Testing mobile & jest-expo + @testing-library/react-native \\
 \bottomrule
 \end{tabularx}
@@ -329,19 +334,19 @@ El dominio es TypeScript puro, sin dependencias de framework. Puede ejecutarse e
 \begin{table}[h]
 \centering
 \caption{Modulos del dominio}
-\begin{tabularx}{\textwidth}{lX}
+\begin{tabularx}{\textwidth}{L{4.5cm} X}
 \toprule
 \textbf{Modulo} & \textbf{Responsabilidad} \\
 \midrule
 \texttt{motor-tarifario/} & Calculo CRA: CF, CC, subsidios, validaciones \\
-\texttt{parametros-tarifa/} & Dominio ParametrosTarifa + flag \texttt{aplica\_cmaa} + IPC editable \\
-\texttt{acuerdo-municipal/} & AcuerdoMunicipal + estado ciclo de vida \\
-\texttt{suscriptores/} & Suscriptores + verificacion de estrato \\
+\texttt{parametros-tarifa/} & Dominio ParametrosTarifa con flag \texttt{aplica\_cmaa} e IPC editable \\
+\texttt{acuerdo-municipal/} & AcuerdoMunicipal y estado del ciclo de vida \\
+\texttt{suscriptores/} & Suscriptores y verificacion de estrato \\
 \texttt{medidores/} & Medidores \\
 \texttt{lecturas/} & Lecturas \\
-\texttt{operarios/} & Operarios (admin + campo) \\
+\texttt{operarios/} & Operarios (admin y campo) \\
 \texttt{prestadores/} & Prestadores (multi-tenant) \\
-\texttt{factura/} & Factura + snapshot \texttt{validacion\_ambito} \\
+\texttt{factura/} & Factura y snapshot \texttt{validacion\_ambito} \\
 \texttt{importacion/} & Importacion masiva desde CSV \\
 \texttt{sincronizacion/} & Cola de sincronizacion offline \\
 \texttt{captura-lecturas/} & Caso de uso: capturar lectura \\
@@ -352,7 +357,7 @@ El dominio es TypeScript puro, sin dependencias de framework. Puede ejecutarse e
 \texttt{categorias-uso/} & Categorias (residencial, comercial, etc.) \\
 \texttt{periodos/} & Periodos de facturacion \\
 \texttt{componentes/} & Componentes auxiliares \\
-\texttt{shared/} & Utilidades compartidas + ports \\
+\texttt{shared/} & Utilidades compartidas y ports \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -411,14 +416,14 @@ Secciones: Operarios (CRUD + vincular dispositivo), Suscriptores (consulta), Lec
 \begin{table}[h]
 \centering
 \caption{Normativa CRA aplicada al sistema}
-\begin{tabularx}{\textwidth}{lXl}
+\begin{tabularx}{\textwidth}{L{3cm} L{3.5cm} X}
 \toprule
 \textbf{Norma} & \textbf{Aplica a} & \textbf{Alcance en el sistema} \\
 \midrule
-Res CRA 825/2017 & Prestadores rurales <5000 suscriptores & Base normativa: formula CF, CC, subsidios E1-E3, contribuciones E5-E6, CMOG minimo \\
-Res CRA 907/2019 & Modifica arts. 9 y 10 de la 825 & Introduce CMAA (inversiones ambientales) + CMVIAA \\
+Res CRA 825/2017 & Prestadores rurales con menos de 5.000 suscriptores & Base normativa: formula CF, CC, subsidios E1-E3, contribuciones E5-E6, CMOG minimo \\
+Res CRA 907/2019 & Modifica los articulos 9 y 10 de la 825 & Introduce CMAA (inversiones ambientales) y CMVIAA \\
 Res CRA 750/2016 & Consumo basico por altitud & Limite basico varia con altitud\_msnm del prestador \\
-Ley 142/1994 art. 99.6 & Topes subsidios & E1 [-60\%], E2 [-50\%], E3 [-40\%], E5 [+50\%], E6 [+60\%] \\
+Ley 142/1994 art. 99.6 & Topes de subsidios y contribuciones & Estrato 1 [-60\%], 2 [-50\%], 3 [-40\%], 5 [+50\%], 6 [+60\%] \\
 Res CRA 881/2019 & Inversiones ambientales & Adiciona articulos sobre inversiones \\
 \bottomrule
 \end{tabularx}
@@ -437,19 +442,19 @@ calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo
 \begin{table}[h]
 \centering
 \caption{Campos de EntradaCalculo}
-\begin{tabularx}{\textwidth}{lXl}
+\begin{tabularx}{\textwidth}{L{4.5cm} L{2.5cm} X}
 \toprule
 \textbf{Campo} & \textbf{Tipo} & \textbf{Descripcion} \\
 \midrule
-\texttt{lecturaAnterior} & number & Lectura del periodo anterior (m\textsuperscript{3}) \\
-\texttt{lecturaActual} & number & Lectura del periodo actual (m\textsuperscript{3}) \\
+\texttt{lecturaAnterior} & number & Lectura del periodo anterior, en metros cubicos \\
+\texttt{lecturaActual} & number & Lectura del periodo actual, en metros cubicos \\
 \texttt{estrato} & Estrato (1-6) & Estrato socioeconomico del suscriptor \\
-\texttt{aplicaSubsidio} & boolean & Si aplica el factor de subsidio/contribucion \\
+\texttt{aplicaSubsidio} & boolean & Si aplica el factor de subsidio o contribucion \\
 \texttt{periodo} & \{mes, anio\} & Periodo de facturacion \\
-\texttt{parametros.cargoFijo} & number & CF mensual en pesos (puede ser 0) \\
-\texttt{parametros.precioM3} & number & Precio del m\textsuperscript{3} en bloque basico \\
-\texttt{parametros.precioM3Excedente} & number & Precio del m\textsuperscript{3} en bloque excedente \\
-\texttt{parametros.consumoBasico} & number & Limite del bloque basico (default: 20 m\textsuperscript{3}) \\
+\texttt{parametros.cargoFijo} & number & CF mensual en pesos (puede ser 0 por minimo vital) \\
+\texttt{parametros.precioM3} & number & Precio del metro cubico en bloque basico \\
+\texttt{parametros.precioM3Excedente} & number & Precio del metro cubico en bloque excedente \\
+\texttt{parametros.consumoBasico} & number & Limite del bloque basico (default: 20 metros cubicos) \\
 \texttt{parametros.aplicaCmaa} & boolean & Opt-in para CMAA (inversiones ambientales) \\
 \bottomrule
 \end{tabularx}
@@ -505,13 +510,13 @@ Resultado del gap analysis + 3 fases de implementacion:
 \begin{table}[h]
 \centering
 \caption{Fases del compliance CRA 825}
-\begin{tabularx}{\textwidth}{llXc}
+\begin{tabularx}{\textwidth}{L{2.5cm} L{4.5cm} X c}
 \toprule
 \textbf{Fase} & \textbf{Change} & \textbf{Gaps cerrados} & \textbf{Estado} \\
 \midrule
 1 (julio 2026) & param-tarifa-res-825-compliance-phase1 & CMA minimo, IPC, anio base 2016, campo aps & Archivado \\
 2 (agosto 2026) & param-tarifa-res-825-compliance-phase2 & Formula CF corregida, CMAA, validarAmbito, validarCmogMinimo, Acuerdo.estado, estado\_verificacion, 3 campos docs, @deprecated calcularCCUnitario & Archivado \\
-3 (agosto 2026) & param-tarifa-residuales-cra-825 & Flag \texttt{aplica\_cmaa} (opt-in explicito), inputs IPC editables, unificacion minimo vital Opcion A, migracion 030 aditiva idempotente, refactor num()/entero() a utils, validarTodo() modulo puro & Archivado \\
+3 (agosto 2026) & param-tarifa-residuales-cra-825 & Flag \texttt{aplica\_cmaa} (opt-in explicito), inputs IPC editables, unificacion minimo vital Opcion A, migracion 030 aditiva idempotente, refactors a modulos puros & Archivado \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -534,7 +539,7 @@ Resultado del gap analysis + 3 fases de implementacion:
 \begin{table}[h]
 \centering
 \caption{Gaps diferidos}
-\begin{tabularx}{\textwidth}{lXc}
+\begin{tabularx}{\textwidth}{L{4.5cm} L{3.5cm} X c}
 \toprule
 \textbf{Gap} & \textbf{Cambio futuro} & \textbf{Razon del diferimiento} \\
 \midrule
@@ -621,11 +626,11 @@ GAP-10: Contrato de salida del agente IA §12 & agente-validacion-cra-825 & Depe
 \begin{table}[h]
 \centering
 \caption{Estado por componente del sistema}
-\begin{tabularx}{\textwidth}{lXc}
+\begin{tabularx}{\textwidth}{L{5cm} X c}
 \toprule
 \textbf{Componente} & \textbf{Estado} & \textbf{Verde?} \\
 \midrule
-Dominio (TypeScript compartido) & Completo + compliance CRA 825 cerrado & Si \\
+Dominio (TypeScript compartido) & Completo, compliance CRA 825 cerrado & Si \\
 Mobile (Expo + React Native) & MVP funcional con compliance cerrado & Parcial \\
 Backend (.NET 8) & MVP funcional, sin deploy productivo & Parcial \\
 Dashboard web & MVP funcional & Si \\
@@ -640,17 +645,17 @@ Type check & \texttt{tsc --noEmit} sin errores & Si \\
 \begin{table}[h]
 \centering
 \caption{Metricas finales del proyecto}
-\begin{tabularx}{\textwidth}{lX}
+\begin{tabularx}{\textwidth}{L{5cm} X}
 \toprule
 \textbf{Metrica} & \textbf{Valor} \\
 \midrule
 Tests automatizados & 2123 verde (171 suites) \\
 Archivos del dominio & repartidos en \texttt{mobile/src/} (modulos por dominio) \\
 Pantallas mobile & \texttt{mobile/src/pantallas/} \\
-Persistencia local & SQLite (\texttt{expo-sqlite} + \texttt{better-sqlite3} en tests) \\
+Persistencia local & SQLite (\texttt{expo-sqlite} y \texttt{better-sqlite3} en tests) \\
 Persistencia servidor & PostgreSQL 16 \\
 Sync & manual desde pantalla Sync, protocolo idempotente con \texttt{sync\_registros} \\
-Branches & \texttt{main} + \texttt{desarrollo} + \texttt{merge-desarrollo} (cleanup pendiente) \\
+Branches & \texttt{main}, \texttt{desarrollo} y \texttt{merge-desarrollo} (cleanup pendiente) \\
 SDDs archivados & 22+ en \texttt{openspec/changes/archive/} \\
 \bottomrule
 \end{tabularx}
