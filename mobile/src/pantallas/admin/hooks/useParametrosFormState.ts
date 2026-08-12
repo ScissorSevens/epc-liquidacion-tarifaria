@@ -145,17 +145,7 @@ export interface UseParametrosFormStateReturn {
 /** Default de año tarifario (periodo vigente actual). */
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
 
-/** Helper: parsea un string a number; NaN/empty → 0. */
-const num = (s: string): number => {
-  const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
-};
-
-/** Helper: parsea un string a integer; NaN/empty → 0. */
-const entero = (s: string): number => {
-  const n = parseInt(s, 10);
-  return isNaN(n) ? 0 : n;
-};
+import { parseNum as num, parseEntero as entero } from '../utils/parse-numeric';
 
 /**
  * Helper de validacion de URL (Fase 2, task 4.5). Acepta http:// o

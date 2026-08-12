@@ -42,11 +42,7 @@ export interface ParametrosTarifaIPCProps {
   readonly getRef: (key: CampoConErrorSeccion) => RefObject<RNView | null>;
 }
 
-/** Helper: parsea un string a integer; NaN/empty → 0. */
-function entero(s: string): number {
-  const n = parseInt(s, 10);
-  return isNaN(n) ? 0 : n;
-}
+import { parseEntero as entero } from '../utils/parse-numeric';
 
 /**
  * Subcomponente presentational puro. Recibe el `formState` del hook +

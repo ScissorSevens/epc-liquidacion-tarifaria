@@ -93,20 +93,10 @@ export interface BorradorCtx {
    *
    * Opcional: si NO se provee, se usa `form.vigenteDesde` tal cual.
    */
-  readonly vigenteDesdePersistido?: string | null;
+   readonly vigenteDesdePersistido?: string | null;
 }
 
-/** Parsea un string a number; NaN/empty → 0. */
-function num(s: string): number {
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** Parsea un string a integer; NaN/empty → 0. */
-function entero(s: string): number {
-  const n = parseInt(s, 10);
-  return Number.isFinite(n) ? n : 0;
-}
+import { parseNum as num, parseEntero as entero } from './utils/parse-numeric';
 
 /**
  * Helper de string → number|null. Convierte '' a null (para los docs

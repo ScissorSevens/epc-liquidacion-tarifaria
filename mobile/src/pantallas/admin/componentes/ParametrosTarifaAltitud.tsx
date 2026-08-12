@@ -29,11 +29,7 @@ export interface ParametrosTarifaAltitudProps {
   readonly guardando: boolean;
 }
 
-/** Helper: parsea un string a number; NaN/empty → 0. */
-function num(s: string): number {
-  const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
-}
+import { parseNum as num } from '../utils/parse-numeric';
 
 /**
  * Subcomponente presentational puro. Recibe el `formState` del hook +
