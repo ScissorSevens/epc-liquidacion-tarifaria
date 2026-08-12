@@ -6,10 +6,10 @@
     "mobile"
   ],
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "npm test --workspace=mobile -- --coverage --silent && jest --coverage",
-    "test:all": "npm test --workspace=mobile && jest"
+    "test": "npm test --workspace=mobile",
+    "test:watch": "npm test --workspace=mobile -- --watch",
+    "test:coverage": "npm test --workspace=mobile -- --coverage",
+    "test:all": "npm test --workspace=mobile"
   },
   "keywords": [
     "epc",
