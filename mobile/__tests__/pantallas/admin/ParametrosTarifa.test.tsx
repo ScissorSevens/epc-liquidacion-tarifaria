@@ -2814,4 +2814,85 @@ fireEvent.press(back);
     });
   });
 
+  // ─────────────────────────────────────────────────────────────
+  // T-DECOMPOSE-1: integration test del hook useParametrosFormState
+  //
+  // parametros-tarifa-screen-decomposition Phase 1 task 1.4 (RED):
+  // verifica que el screen consume `useParametrosFormState` (no los 18
+  // useState inline). El test es estructural: lee el source y verifica
+  // que el import + invocación del hook reemplazaron al state disperso.
+  //
+  // RED  → screen todavía tiene los 18 useState inline + NO importa
+  //        el hook. El test reporta que el hook NO está en uso.
+  // GREEN → screen llama `const formState = useParametrosFormState({...})`
+  //        y los 18 useState inline se eliminaron.
+  //
+  // Por qué estructural (lee el source) y no behavioral (render + spy):
+  //   - El hook está IMPLEMENTADO pero todavía NO USADO por el screen.
+  //     Un test que solo verifique "render OK + testIDs OK" seguiría
+  //     verde aunque el hook no se use (el comportamiento del screen
+  //     es idéntico).
+  //   - El contrato del decompose es "el screen consume el hook". Solo
+  //     un check estructural del source lo puede verificar.
+  //   - Patron ya usado en T-IMPC-13 (mismo archivo, lee source de
+  //     ParametrosTarifa.tsx y verifica que importa `validarCmaMinimo`).
+  // ─────────────────────────────────────────────────────────────
+  describe('T-DECOMPOSE: useParametrosFormState hook integration', () => {
+    it('T-DECOMPOSE-1 el screen importa `useParametrosFormState` del hook', () => {
+      // El screen debe importar el hook desde `./hooks/useParametrosFormState`.
+      // Mientras el screen tenga los 18 useState inline (pre-Phase 1 task 1.5),
+      // este test falla (RED).
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(
+        /import\s*\{[^}]*useParametrosFormState[^}]*\}\s*from\s*['"]\.\/hooks\/useParametrosFormState['"]/,
+      );
+    });
+
+    it('T-DECOMPOSE-2 el screen invoca el hook dentro del componente', () => {
+      // El screen debe invocar el hook (no solo importarlo). La firma
+      // esperada es `const formState = useParametrosFormState({...})`.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(/useParametrosFormState\s*\(\s*\{/);
+    });
+
+    it('T-DECOMPOSE-3 el screen NO tiene los 18 useState inline del form', () => {
+      // Mientras el screen mantenga los 18 useState inline (pre-Phase 1
+      // task 1.5), el conteo de `useState(...)` literales excede el
+      // umbral esperado (después del hook solo quedan los internos del
+      // componente). El conteo actual pre-hook: 25 useState (18 inputs +
+      // 7 internos). Post-hook esperado: ≤ 7 useState (los internos:
+      // repo, acuerdoRepo, id_acuerdo, parametrosActuales, cargando,
+      // errores, guardando). Asumimos ≤ 10 para tolerar ajustes.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // Contar `useState(` en el cuerpo del screen (excluyendo imports).
+      const matches = source.match(/useState\s*\(/g) ?? [];
+      // Post-hook: el screen conserva ~7 useState internos
+      // (repo, acuerdoRepo, id_acuerdo, parametrosActuales, cargando,
+      // errores, guardando). Permitimos hasta 10 para tolerar marginales.
+      expect(matches.length).toBeLessThanOrEqual(10);
+    });
+
+    it('T-DECOMPOSE-4 los inputs del form se bindean via `formState.values` + `formState.setters`', () => {
+      // El render debe usar `formState.values.periodo`, `formState.setters.setCma`, etc.
+      // Antes del decompose: `value={periodo}` + `onChangeText={setCma}` directo.
+      // Después: `value={formState.values.periodo}` + `onChangeText={formState.setters.setCma}`.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // El binding debe pasar por `formState.values` y `formState.setters`.
+      expect(source).toMatch(/formState\.values\./);
+      expect(source).toMatch(/formState\.setters\./);
+    });
+  });
+
 });
