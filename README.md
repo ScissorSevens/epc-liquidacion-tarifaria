@@ -2,7 +2,7 @@
 
 Sistema full-stack para prestadores rurales de agua potable vinculados a **Empresas Públicas de Cundinamarca (EPC)**. Automatiza la captura de lecturas de medidores en campo (modo offline) y el cálculo de liquidaciones tarifarias según normativa CRA vigente para prestadores rurales con menos de 5.000 suscriptores.
 
-> **Estado (agosto 2026):** cumplimiento Res CRA 825/2017 + Res CRA 907/2019 + Res CRA 750/2016. 1952 tests verde, 0 CRITICAL en code review.
+> **Estado (agosto 2026):** cumplimiento Res CRA 825/2017 + Res CRA 907/2019 + Res CRA 750/2016. 2123 tests verde (171 suites), 0 errores `tsc --noEmit`, 8/10 gaps CRA 825 cerrados (2 diferidos a cambios futuros).
 
 ---
 
@@ -87,26 +87,22 @@ sistema/
 
 | Suite | Runner | Estado |
 |---|---|---|
-| Dominio TypeScript (`src/`) | Jest + ts-jest 29 | 1952/1952 verde, 161 suites |
+| Mobile workspace (Expo + dominio compartido) | jest-expo (preset) | 2123/2123 verde, 171 suites |
 | Type check | `npx tsc --noEmit` | 0 errores |
 | Backend .NET (`backend/`) | xUnit | ver `backend/README.md` |
 
 ```bash
-# Suite completa (raíz del proyecto, workspaces)
+# Suite completa (raíz del proyecto, delega al workspace mobile)
 cd sistema
 npm test
-
-# Solo mobile
-cd sistema/mobile
-npx jest
-
-# Solo dominio (raíz)
-cd sistema
-npx jest --testPathPattern=src/
 
 # Con cobertura
 cd sistema
 npm run test:coverage
+
+# Solo mobile (acceso directo a jest)
+cd sistema/mobile
+npx jest
 
 # Type check mobile
 cd sistema/mobile
@@ -116,6 +112,8 @@ npx tsc --noEmit
 cd sistema/backend
 dotnet test
 ```
+
+> **Nota histórica (agosto 2026):** los tests de dominio (`src/`) fueron eliminados como parte del SDD `delete-legacy-src-mirror` (espejos legacy divergentes). Todo el dominio ahora vive dentro de `mobile/src/` (multi-tenant, dominio puro compartido). El comando `npm test` desde raíz delega al workspace mobile; ya no hay `jest.config.ts` raíz.
 
 ---
 
@@ -137,12 +135,13 @@ Documentación normativa completa en `Documentos/Normativa-CRA/Res-825-2017/mark
 
 ## Compliance CRA 825/2017 — estado (agosto 2026)
 
-Resultado del gap analysis + 2 fases de implementación:
+Resultado del gap analysis + 3 fases de implementación:
 
 | Fase | Change | Gaps cerrados | Estado |
 |---|---|---|---|
 | 1 (julio 2026) | `param-tarifa-res-825-compliance-phase1` | CMA mínimo, IPC, año base 2016, campo `aps` | Archivado |
 | 2 (agosto 2026) | `param-tarifa-res-825-compliance-phase2` | Fórmula CF corregida, CMAA, validarAmbito, validarCmogMinimo, Acuerdo.estado, estado_verificacion, 3 campos docs, @deprecated calcularCCUnitario | Archivado |
+| 3 (agosto 2026) | `param-tarifa-residuales-cra-825` | Flag `aplica_cmaa` (opt-in explícito), inputs IPC editables, unificación mínimo vital Opción A, migración 030 aditiva idempotente, refactor `num()`/`entero()` a utils, `validarTodo()` módulo puro | Archivado |
 
 **Diferidos explícitamente** (cambios dedicados futuros):
 - GAP-6: MetadataCalculo completo §11 (20+ campos) → `auditoria-mejorada-cra-825`
@@ -244,6 +243,10 @@ proposal → specs → design → tasks → apply → verify → archive
 
 | Fecha | Change | Descripción |
 |---|---|---|
+| 2026-08-12 | `fix(repo): delegate npm test scripts` | `npm test` desde raíz ahora delega al workspace mobile. Antes fallaba con 186 suites (post `delete-legacy-src-mirror`). |
+| 2026-08-11 | `parametros-tarifa-screen-decomposition` | Decompose de `ParametrosTarifa.tsx` 1155 → 456 líneas (-60.5%) en 9 archivos cohesivos (1 main + 1 hook + 6 subcomponentes + 1 `IconoGuardar`). 20 commits atómicos con TDD-strict. |
+| 2026-08-10 | `param-tarifa-residuales-cra-825` | Fase 3 del compliance CRA 825: 6 gaps residuales cerrados (flag `aplica_cmaa`, IPC editable, mínimo vital Opción A, refactors a módulos puros). 13 commits atómicos. |
+| 2026-08-10 | `delete-legacy-src-mirror` | Borrado de `src/` legacy (135 archivos espejo divergentes) + `jest.config.ts` raíz + ajustes de package.json raíz. CI reescrito para correr tests mobile con trigger correcto a `desarrollo`. |
 | 2026-08-10 | `param-tarifa-res-825-compliance-phase2` | Cierre de 8/10 gaps compliance CRA 825/2017 (fase 2). Ver `archive/2026-08-10-...` |
 | 2026-08-03 | `factura-preview-print-bluetooth` | Preview de factura + impresión Bluetooth |
 | 2026-08-03 | `parametros-tarifa-impeccable-v2` | Rediseño UI pantalla ParametrosTarifa |
@@ -293,8 +296,10 @@ IP WiFi del servidor dev: `192.168.40.48` (configurada en `backend/src/MediApp.A
 
 ## Documentación adicional
 
-- `DOCUMENTACION_TECNICA.md`: arquitectura detallada, decisiones técnicas, modelo de datos v1.2.
-- `MANUAL_DE_USUARIO.md`: manual para operarios de campo y administradores del prestador.
+- `docs/`: documentación técnica por área (arquitectura, setup, convenciones, estado del proyecto, testing). Generada para handoff a EPC.
+- `DOCUMENTACION_TECNICA.md`: arquitectura detallada, decisiones técnicas, modelo de datos v1.2. *(gitignored, personal)*
+- `MANUAL_DE_USUARIO.md`: manual para operarios de campo y administradores del prestador. *(gitignored, personal)*
+- `docs/manual-tecnico-epc.tex`: manual técnico formal en LaTeX para compilar a PDF (Overleaf). Contiene la versión editorial completa del handoff.
 - `openspec/`: artifacts SDD completos (proposals, specs, designs, tasks, verify-reports).
 - `.atl/skill-registry.md`: skills y convenciones del proyecto.
 - `Documentos/Normativa-CRA/`: PDFs originales y markdown de resoluciones CRA.
@@ -303,6 +308,6 @@ IP WiFi del servidor dev: `192.168.40.48` (configurada en `backend/src/MediApp.A
 
 ## Autor
 
-**Felipe Bernal Pachón** — Universidad de Cundinamarca, Ingeniería de Sistemas (2026)
+**Ikhthys Felipe Bernal Pachon** — Universidad de Cundinamarca, Ingeniería de Sistemas (2026)
 
 Trabajo de grado. Cliente piloto: EPC Cundinamarca. Caso de uso: 2-3 prestadores rurales durante 3-5 días de prueba.
