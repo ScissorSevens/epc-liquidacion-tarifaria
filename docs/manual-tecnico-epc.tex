@@ -1,0 +1,825 @@
+% ============================================================
+% Manual Tecnico - Sistema de Liquidacion Tarifaria EPC
+% Compilable a PDF con Overleaf o pdflatex
+% Autor: Ikhthys Felipe Bernal Pachon
+% Fecha: Agosto de 2026
+% ============================================================
+
+\documentclass[11pt,a4paper,oneside]{report}
+
+% Paquetes basicos
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{textcomp}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{multirow}
+\usepackage{caption}
+
+% Configuracion de hyperref (sin colores chillones)
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=blue!60!black,
+    urlcolor=blue!60!black,
+    pdftitle={Manual Tecnico - Sistema de Liquidacion Tarifaria EPC},
+    pdfauthor={Ikhthys Felipe Bernal Pachon}
+}
+
+% Configuracion de listings (codigo)
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue!60!black}\bfseries,
+    commentstyle=\color{green!50!black}\itshape,
+    stringstyle=\color{red!60!black},
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    framerule=0.5pt,
+    rulecolor=\color{black!30},
+    backgroundcolor=\color{black!3},
+    numbers=left,
+    numberstyle=\tiny\color{black!50},
+    numbersep=5pt
+}
+
+% Configuracion de titulos
+\titleformat{\chapter}[hang]{\Huge\bfseries}{\thechapter}{1em}{}
+\titleformat{\section}[hang]{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}[hang]{\large\bfseries}{\thesubsection}{1em}{}
+
+% Configuracion de headers/footers
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Manual Tecnico EPC}
+\fancyhead[R]{\small Ikhthys Felipe Bernal Pachon}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% Configuracion de tablas
+\renewcommand{\arraystretch}{1.2}
+
+% ============================================================
+% Metadatos
+% ============================================================
+
+\title{
+    \vspace{-2cm}
+    \Huge \textbf{Sistema de Liquidacion Tarifaria EPC} \\[0.5cm]
+    \LARGE \textbf{Manual Tecnico} \\[1cm]
+    \normalsize Trabajo de grado --- Ingenieria de Sistemas \\[0.3cm]
+    \normalsize Universidad de Cundinamarca \\[0.3cm]
+    \normalsize Cliente piloto: Empresas Publicas de Cundinamarca (EPC)
+}
+
+\author{
+    \Large \textbf{Ikhthys Felipe Bernal Pachon} \\[0.5cm]
+    \normalsize Ingenieria de Sistemas \\
+    \normalsize Universidad de Cundinamarca \\
+    \normalsize ikhthys.bernal@example.edu \\ % Reemplazar por email real antes de compilar
+}
+
+\date{Agosto de 2026}
+
+% ============================================================
+% Comienzo del documento
+% ============================================================
+
+\begin{document}
+
+\maketitle
+
+\thispagestyle{empty}
+
+% ============================================================
+% Resumen
+% ============================================================
+
+\begin{abstract}
+\noindent
+Este manual describe la arquitectura, implementacion y estado del Sistema de Liquidacion Tarifaria para Empresas Publicas de Cundinamarca (EPC). El sistema automatiza la captura de lecturas de medidores en campo (modo offline) y el calculo de liquidaciones tarifarias segun la metodologia CRA vigente para prestadores rurales con menos de 5.000 suscriptores.
+
+\noindent
+El proyecto fue desarrollado como trabajo de grado en Ingenieria de Sistemas de la Universidad de Cundinamarca, con cliente piloto EPC. El alcance incluye: aplicacion mobile offline-first (Expo + React Native), backend API REST (.NET 8 + PostgreSQL), dashboard web (HTML estatico), y motor tarifario con cumplimiento de la Res CRA 825/2017, Res CRA 907/2019 y Res CRA 750/2016.
+
+\noindent
+Al cierre de esta entrega, el sistema cuenta con 2.123 tests automatizados verdes, 8 de 10 gaps de compliance cerrados y una arquitectura limpia basada en dominio puro compartido entre capas.
+\end{abstract}
+
+\tableofcontents
+\listoftables
+\listoffigures
+
+\newpage
+
+% ============================================================
+% Capitulo 1: Introduccion
+% ============================================================
+
+\chapter{Introduccion}
+
+\section{Proposito del documento}
+
+Este manual tecnico esta dirigido al equipo de EPC que recibira el proyecto y a cualquier ingeniero que continue su desarrollo. Su proposito es servir como referencia completa de:
+
+\begin{itemize}[leftmargin=*]
+    \item La arquitectura del sistema y sus componentes.
+    \item El estado actual del desarrollo y los gaps pendientes.
+    \item Las decisiones arquitectonicas clave y su rationale.
+    \item El cumplimiento regulatorio CRA 825/2017 y resoluciones complementarias.
+    \item El flujo de desarrollo (SDD workflow + TDD-strict).
+    \item Los issues conocidos y los proximos pasos sugeridos.
+\end{itemize}
+
+\section{Alcance del proyecto}
+
+El Sistema de Liquidacion Tarifaria EPC automatiza:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Captura en campo:} lectura de medidores, fotografia de evidencia y verificacion de estrato socioeconomico.
+    \item \textbf{Calculo tarifario:} aplicacion de la metodologia CRA 825/2017 con factores de subsidio (estratos 1-3), contribuciones (estratos 5-6) y minimo vital.
+    \item \textbf{Sincronizacion offline-first:} cola idempotente con orden de dependencias (suscriptor $\to$ medidor $\to$ lectura $\to$ liquidacion).
+    \item \textbf{Consulta administrativa:} dashboard web para consulta de suscriptores, lecturas y liquidaciones.
+\end{enumerate}
+
+\section{Audiencia}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Equipo de EPC:} personal tecnico que operara y mantendra el sistema.
+    \item \textbf{Ingenieros de mantenimiento:} continuaran el desarrollo y abordaran los gaps pendientes.
+    \item \textbf{Auditoria CRA:} verificacion del cumplimiento normativo del sistema.
+\end{itemize}
+
+\section{Contexto institucional}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Cliente piloto:} Empresas Publicas de Cundinamarca (EPC).
+    \item \textbf{Caso de uso:} 2-3 prestadores rurales durante 3-5 dias de prueba.
+    \item \textbf{Tipo:} Trabajo de grado, Ingenieria de Sistemas, Universidad de Cundinamarca.
+    \item \textbf{Ano:} 2026.
+\end{itemize}
+
+% ============================================================
+% Capitulo 2: Vision general del sistema
+% ============================================================
+
+\chapter{Vision general del sistema}
+
+\section{Descripcion general}
+
+El sistema es una solucion full-stack para prestadores rurales de acueducto en Colombia. Su objetivo es reemplazar el calculo manual de liquidaciones tarifarias por un flujo digital que cumpla con la normativa CRA y permita la captura en campo sin depender de conectividad.
+
+\section{Usuarios principales}
+
+\begin{table}[h]
+\centering
+\caption{Tipos de usuario del sistema}
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Tipo} & \textbf{Rol} & \textbf{Pantallas principales} \\
+\midrule
+Operario de campo & Captura lecturas y fotografias en dispositivos Android & RutaDeHoy, CapturarLectura, DetalleSuscriptor \\
+Administrador & Configura parametros tarifarios, gestiona operarios & ParametrosTarifa, Admin Operarios \\
+Supervisor & Consulta dashboard, valida datos & Dashboard web \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Flujo de operacion}
+
+\begin{enumerate}[leftmargin=*]
+    \item El operario de campo abre la app mobile (sin internet) y selecciona su prestador.
+    \item Recorre la ruta del dia (lista de suscriptores asignados).
+    \item Captura lectura + fotografia del medidor en cada suscriptor.
+    \item La app calcula la liquidacion en tiempo real con la metodologia CRA.
+    \item Cuando hay WiFi disponible, el operario dispara la sincronizacion manual.
+    \item El backend .NET recibe los datos via API REST con protocolo idempotente.
+    \item El dashboard web consulta los datos para supervision administrativa.
+\end{enumerate}
+
+\section{Stack tecnologico}
+
+\begin{table}[h]
+\centering
+\caption{Stack tecnologico por capa}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Capa} & \textbf{Tecnologia} \\
+\midrule
+Lenguaje nucleo & TypeScript 5/6 strict \\
+Workspaces & npm workspaces (monorepo) \\
+Dominio puro & TypeScript + Jest 30 + ts-jest 29 \\
+Mobile & React Native 0.81 + Expo SDK 54 + React 19.1 + expo-router 6 + expo-sqlite 16 \\
+Estado mobile & Zustand 5 \\
+UI mobile & react-native-paper 5 \\
+Hardware mobile & expo-camera, react-native-ble-plx (Bluetooth impresion) \\
+Backend & .NET 8 + ASP.NET Core Minimal API + EF Core 8 \\
+Base de datos servidor & PostgreSQL 16 \\
+Base de datos local mobile & SQLite (expo-sqlite) \\
+Base de datos local backend & better-sqlite3 (Node.js, en tests) \\
+Dashboard & HTML5 + Vanilla JS + bcrypt.js (cliente) \\
+Especificacion & OpenSpec + Engram (memoria persistente) \\
+Testing mobile & jest-expo + @testing-library/react-native \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================================================
+% Capitulo 3: Arquitectura
+% ============================================================
+
+\chapter{Arquitectura del sistema}
+
+\section{Principio arquitectonico: separacion de capas estricta}
+
+El sistema aplica \textbf{separacion de capas estricta} como principio fundamental:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Dominio puro:} logica de negocio en TypeScript puro, sin dependencias de framework, plataforma ni base de datos.
+    \item \textbf{Puertos (interfaces):} contratos que el dominio expone para acceso a datos.
+    \item \textbf{Adaptadores:} implementaciones concretas de los puertos para cada plataforma.
+    \item \textbf{UI (Pantallas):} unicamente presentacion; no contiene logica de negocio.
+\end{enumerate}
+
+\textbf{Implicancia practica:} si una regla de calculo cambia, se modifica una sola vez en el dominio y se propaga automaticamente. NO se duplica logica entre capas.
+
+\section{Diagrama de componentes}
+
+\begin{figure}[h]
+\centering
+\begin{tabular}{|c|}
+\hline
+\textbf{Dispositivo movil (Android)} \\
+\hline
+Aplicacion Expo / React Native \\
+\hline
+Pantallas (UI presentacional) \\
+$\downarrow$ usa \\
+Composicion (bootstrap, DI) \\
+$\downarrow$ usa puertos del dominio \\
+Dominio puro TypeScript compartido \\
+$\downarrow$ usa interfaces de persistencia \\
+Adaptadores expo-sqlite (repositorios) \\
+$\downarrow$ usa \\
+SQLite local \\
+\hline
+\end{tabular}
+\quad
+\begin{tabular}{|c|}
+\hline
+\textbf{Servidor (red LAN)} \\
+\hline
+MediApp.Api (.NET 8 Minimal API) \\
+\hline
+/api/v1/suscriptores \\
+/api/v1/medidores \\
+/api/v1/lecturas \\
+/api/v1/liquidaciones \\
+/api/v1/operarios \\
+/health \\
+wwwroot/ (Dashboard HTML estatico) \\
+\hline
+EF Core + Npgsql \\
+$\downarrow$ \\
+PostgreSQL 16 \\
+\hline
+\end{tabular}
+
+\caption{Arquitectura de componentes del sistema}
+\end{figure}
+
+\section{Sincronizacion cliente-servidor}
+
+La comunicacion entre mobile y backend es \textbf{manual} (no push automatico). El operario la dispara desde la pantalla Sync. El protocolo es idempotente:
+
+\begin{enumerate}[leftmargin=*]
+    \item El cliente envia cada item con un \texttt{id\_cliente} unico (formato \texttt{dispositivoId:idLocal}).
+    \item El servidor valida y busca en la tabla \texttt{sync\_registros}.
+    \item Si existe, retorna 200 OK sin modificar.
+    \item Si no existe, inserta y registra, retorna 201 Created.
+\end{enumerate}
+
+Esto permite reintentar cualquier sincronizacion fallida sin riesgo de duplicados.
+
+% ============================================================
+% Capitulo 4: Componentes principales
+% ============================================================
+
+\chapter{Componentes principales}
+
+\section{Dominio puro (TypeScript compartido)}
+
+El dominio es TypeScript puro, sin dependencias de framework. Puede ejecutarse en React Native, Node.js o un navegador web. Se ubica en \texttt{mobile/src/\{modulo\}/}.
+
+\begin{table}[h]
+\centering
+\caption{Modulos del dominio}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Modulo} & \textbf{Responsabilidad} \\
+\midrule
+\texttt{motor-tarifario/} & Calculo CRA: CF, CC, subsidios, validaciones \\
+\texttt{parametros-tarifa/} & Dominio ParametrosTarifa + flag \texttt{aplica\_cmaa} + IPC editable \\
+\texttt{acuerdo-municipal/} & AcuerdoMunicipal + estado ciclo de vida \\
+\texttt{suscriptores/} & Suscriptores + verificacion de estrato \\
+\texttt{medidores/} & Medidores \\
+\texttt{lecturas/} & Lecturas \\
+\texttt{operarios/} & Operarios (admin + campo) \\
+\texttt{prestadores/} & Prestadores (multi-tenant) \\
+\texttt{factura/} & Factura + snapshot \texttt{validacion\_ambito} \\
+\texttt{importacion/} & Importacion masiva desde CSV \\
+\texttt{sincronizacion/} & Cola de sincronizacion offline \\
+\texttt{captura-lecturas/} & Caso de uso: capturar lectura \\
+\texttt{calculo/} & Calculos auxiliares \\
+\texttt{auditoria/} & Trazabilidad regulatoria \\
+\texttt{persistencia/} & Adaptadores SQLite (integration tests) \\
+\texttt{cliente-http/} & HTTP client para backend .NET \\
+\texttt{categorias-uso/} & Categorias (residencial, comercial, etc.) \\
+\texttt{periodos/} & Periodos de facturacion \\
+\texttt{componentes/} & Componentes auxiliares \\
+\texttt{shared/} & Utilidades compartidas + ports \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Aplicacion mobile (Expo + React Native)}
+
+La aplicacion mobile esta construida con Expo SDK 54 + React Native 0.81. Su estructura interna:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{pantallas/}: pantallas de la aplicacion (ParametrosTarifa, RutaDeHoy, etc.).
+    \item \texttt{persistencia/}: repositorios expo-sqlite.
+    \item \texttt{composition/}: bootstrap + inyeccion de dependencias.
+    \item \texttt{componentes/}: componentes UI presentacionales.
+    \item \texttt{hooks/}: hooks custom (useParametrosFormState, etc.).
+    \item \texttt{theme/}: tema y design tokens.
+    \item \texttt{adapters/}: adapters (Bluetooth, impresion).
+    \item \texttt{navegacion/}: navegacion + auth gate.
+\end{itemize}
+
+\paragraph{Pantallas principales:}
+RutaDeHoy, CapturarLectura, DetalleSuscriptor, ParametrosTarifa, Sincronizacion, Configuracion, SetupInicial, Login.
+
+\section{Backend (.NET 8)}
+
+El backend es una Minimal API en .NET 8 con Entity Framework Core 8 + Npgsql. Su estructura:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{Features/}: organizacion por bounded context (Operarios, Suscriptores, Medidores, Lecturas, Liquidaciones).
+    \item \texttt{Persistence/}: DbContext de EF Core + migraciones PostgreSQL.
+    \item \texttt{wwwroot/}: dashboard web HTML estatico.
+\end{itemize}
+
+\paragraph{Endpoints principales:}
+\texttt{GET /health}, \texttt{POST /api/v1/suscriptores}, \texttt{GET /api/v1/suscriptores}, \texttt{POST /api/v1/medidores}, \texttt{GET /api/v1/medidores}, \texttt{POST /api/v1/lecturas}, \texttt{GET /api/v1/lecturas}, \texttt{POST /api/v1/liquidaciones}, \texttt{GET /api/v1/liquidaciones}, \texttt{POST /api/v1/operarios}, \texttt{GET /api/v1/operarios}, \texttt{PUT /api/v1/operarios/\{id\}}, \texttt{PATCH /api/v1/operarios/vincular-dispositivo}.
+
+\section{Dashboard web}
+
+El dashboard es una SPA estatica servida directamente por el backend. Caracteristicas:
+
+\begin{itemize}[leftmargin=*]
+    \item HTML5 + CSS3 + Vanilla JavaScript (sin frameworks).
+    \item bcrypt.js cargado desde CDN para hash de contrasenas en cliente.
+    \item Fetch API para comunicacion con el backend REST.
+\end{itemize}
+
+Secciones: Operarios (CRUD + vincular dispositivo), Suscriptores (consulta), Lecturas (consulta con datos del medidor y suscriptor), Liquidaciones (consulta).
+
+% ============================================================
+% Capitulo 5: Motor tarifario CRA
+% ============================================================
+
+\chapter{Motor tarifario CRA}
+
+\section{Normativa aplicada}
+
+\begin{table}[h]
+\centering
+\caption{Normativa CRA aplicada al sistema}
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Norma} & \textbf{Aplica a} & \textbf{Alcance en el sistema} \\
+\midrule
+Res CRA 825/2017 & Prestadores rurales <5000 suscriptores & Base normativa: formula CF, CC, subsidios E1-E3, contribuciones E5-E6, CMOG minimo \\
+Res CRA 907/2019 & Modifica arts. 9 y 10 de la 825 & Introduce CMAA (inversiones ambientales) + CMVIAA \\
+Res CRA 750/2016 & Consumo basico por altitud & Limite basico varia con altitud\_msnm del prestador \\
+Ley 142/1994 art. 99.6 & Topes subsidios & E1 [-60\%], E2 [-50\%], E3 [-40\%], E5 [+50\%], E6 [+60\%] \\
+Res CRA 881/2019 & Inversiones ambientales & Adiciona articulos sobre inversiones \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{No aplica} a este proyecto: Res CRA 1032/2026 (vigente desde 24/03/2026) porque es para prestadores >5000 suscriptores urbanos.
+
+\section{Funcion principal}
+
+\begin{lstlisting}[language=Java,caption={Interfaz principal del motor},label={lst:motor}]
+calcularLiquidacion(entrada: EntradaCalculo): ResultadoCalculo
+\end{lstlisting}
+
+\section{Parametros de entrada}
+
+\begin{table}[h]
+\centering
+\caption{Campos de EntradaCalculo}
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripcion} \\
+\midrule
+\texttt{lecturaAnterior} & number & Lectura del periodo anterior (m\textsuperscript{3}) \\
+\texttt{lecturaActual} & number & Lectura del periodo actual (m\textsuperscript{3}) \\
+\texttt{estrato} & Estrato (1-6) & Estrato socioeconomico del suscriptor \\
+\texttt{aplicaSubsidio} & boolean & Si aplica el factor de subsidio/contribucion \\
+\texttt{periodo} & \{mes, anio\} & Periodo de facturacion \\
+\texttt{parametros.cargoFijo} & number & CF mensual en pesos (puede ser 0) \\
+\texttt{parametros.precioM3} & number & Precio del m\textsuperscript{3} en bloque basico \\
+\texttt{parametros.precioM3Excedente} & number & Precio del m\textsuperscript{3} en bloque excedente \\
+\texttt{parametros.consumoBasico} & number & Limite del bloque basico (default: 20 m\textsuperscript{3}) \\
+\texttt{parametros.aplicaCmaa} & boolean & Opt-in para CMAA (inversiones ambientales) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Formula de calculo}
+
+\begin{lstlisting}[caption={Formula del motor tarifario CRA},label={lst:formula}]
+consumo = lecturaActual - lecturaAnterior
+consumoBasico = min(consumo, limiteBasico)
+consumoExcedente = max(consumo - limiteBasico, 0)
+
+cargoConsumo = round(consumoBasico * precioM3)
+cargoExcedente = round(consumoExcedente * precioM3Excedente)
+cargoFijo = round(cargoFijoRaw)
+
+// Factor de estrato (CRA 825/2017):
+// E1: -60% | E2: -50% | E3: -40% | E4: 0% | E5: +50% | E6: +60%
+
+// Subsidio (E1-E3): sobre CF + cargoConsumo
+subsidio = round(|factor| * (cargoFijo + cargoConsumo))
+
+// Contribucion (E5-E6): sobre CF + consumo total
+contribucion = round(factor * (cargoFijo + cargoConsumo + cargoExcedente))
+
+// CMAA (opt-in): se agrega al total si aplicaCmaa = true
+total = cargoFijo + cargoConsumo + cargoExcedente
+        - subsidio + contribucion + cmAA
+\end{lstlisting}
+
+\section{Validaciones del motor}
+
+\begin{itemize}[leftmargin=*]
+    \item Lecturas no pueden ser negativas.
+    \item Lectura actual $\geq$ lectura anterior.
+    \item Cargo fijo $\geq$ 0 (0 es valido por minimo vital).
+    \item Precio m\textsuperscript{3} y precio m\textsuperscript{3} excedente $> 0$.
+    \item Limite consumo basico $> 0$.
+    \item Estrato entre 1 y 6 (si se provee).
+    \item Mes entre 1 y 12, anio $\geq 2000$.
+\end{itemize}
+
+% ============================================================
+% Capitulo 6: Compliance CRA 825/2017
+% ============================================================
+
+\chapter{Compliance CRA 825/2017}
+
+\section{Estado al cierre de esta entrega}
+
+Resultado del gap analysis + 3 fases de implementacion:
+
+\begin{table}[h]
+\centering
+\caption{Fases del compliance CRA 825}
+\begin{tabularx}{\textwidth}{llXc}
+\toprule
+\textbf{Fase} & \textbf{Change} & \textbf{Gaps cerrados} & \textbf{Estado} \\
+\midrule
+1 (julio 2026) & param-tarifa-res-825-compliance-phase1 & CMA minimo, IPC, anio base 2016, campo aps & Archivado \\
+2 (agosto 2026) & param-tarifa-res-825-compliance-phase2 & Formula CF corregida, CMAA, validarAmbito, validarCmogMinimo, Acuerdo.estado, estado\_verificacion, 3 campos docs, @deprecated calcularCCUnitario & Archivado \\
+3 (agosto 2026) & param-tarifa-residuales-cra-825 & Flag \texttt{aplica\_cmaa} (opt-in explicito), inputs IPC editables, unificacion minimo vital Opcion A, migracion 030 aditiva idempotente, refactor num()/entero() a utils, validarTodo() modulo puro & Archivado \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Gaps cerrados (8)}
+
+\begin{enumerate}[leftmargin=*]
+    \item CMA minimo (Costo Medio de Administracion).
+    \item IPC editable con anio base 2016.
+    \item Campo \texttt{aps} (perdidas tecnicas) en el modelo.
+    \item Formula CF corregida (Cargo Fijo recalculado).
+    \item CMAA (inversiones ambientales) con flag \texttt{aplica\_cmaa} opt-in.
+    \item Validadores \texttt{validarAmbito} y \texttt{validarCmogMinimo}.
+    \item Minimo vital unificado (Opcion A: cargo fijo puede ser 0).
+    \item Migracion aditiva idempotente para flag \texttt{aplica\_cmaa}.
+\end{enumerate}
+
+\section{Gaps diferidos explicitamente (2)}
+
+\begin{table}[h]
+\centering
+\caption{Gaps diferidos}
+\begin{tabularx}{\textwidth}{lXc}
+\toprule
+\textbf{Gap} & \textbf{Cambio futuro} & \textbf{Razon del diferimiento} \\
+\midrule
+GAP-6: MetadataCalculo completo §11 (20+ campos) & auditoria-mejorada-cra-825 & Requiere 20+ campos adicionales de trazabilidad. Cambio dedicado por scope. \\
+GAP-10: Contrato de salida del agente IA §12 & agente-validacion-cra-825 & Depende de decisiones de producto sobre integracion de IA. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Porcentaje de cumplimiento}
+
+\textbf{80\%} (8 de 10 gaps cerrados). NO dar por cerrado el compliance hasta abordar GAP-6 y GAP-10.
+
+% ============================================================
+% Capitulo 7: Decisiones arquitectonicas
+% ============================================================
+
+\chapter{Decisiones arquitectonicas clave}
+
+\section{Dominio compartido entre mobile y otros clientes}
+
+\textbf{Decision:} todo el dominio vive dentro de \texttt{mobile/src/\{modulo\}/}. NO se duplica logica en backend .NET.
+
+\textbf{Rationale:} evita drift entre lo que calcula el mobile y lo que muestra el dashboard. Si la regla cambia, cambia en un solo lugar.
+
+\textbf{Tradeoff:} el backend .NET NO tiene logica de calculo propia, solo persiste resultados que el mobile le envia.
+
+\section{Backend NO hashea contrasenas}
+
+\textbf{Decision:} el cliente (mobile con SHA-256 o dashboard con bcrypt) hashea antes del POST. El backend solo valida.
+
+\textbf{Rationale:} simplifica el backend y elimina un vector de ataque (el backend nunca ve la contrasena en claro). El cliente ya tiene el hash necesario para login offline.
+
+\textbf{Tradeoff:} el hash esta en el cliente, lo cual es un riesgo si el cliente es comprometido. Por eso el mobile usa SHA-256 y el dashboard bcrypt.
+
+\section{Mobile offline-first con sync manual}
+
+\textbf{Decision:} la captura funciona sin internet. La sincronizacion contra el backend es \textbf{manual} (el operario la dispara).
+
+\textbf{Rationale:} los prestadores rurales tienen conectividad intermitente. Asumir conexion online es poco realista.
+
+\textbf{Tradeoff:} requiere cola de sincronizacion con orden de dependencias y protocolo idempotente.
+
+\section{Multi-tenancy por \texttt{id\_prestador}}
+
+\textbf{Decision:} cada operario entra a SU prestador. Todas las tablas tienen FK \texttt{id\_prestador}.
+
+\textbf{Rationale:} permite que un mismo deployment sirva a multiples prestadores sin filtrar datos.
+
+\textbf{Tradeoff:} todas las queries deben incluir \texttt{WHERE id\_prestador = ?} (es una convencion disciplinada, no forzada por DB).
+
+\section{Tests colocados, no centralizados}
+
+\textbf{Decision:} cada modulo tiene su \texttt{\_\_tests\_\_/} adyacente, no hay un \texttt{\_\_tests\_\_/} raiz centralizado.
+
+\textbf{Rationale:} facilita encontrar los tests junto al codigo. Reduce la friccion de agregar tests.
+
+\textbf{Tradeoff:} requiere disciplina para no duplicar setup.
+
+\section{Strict TDD mode}
+
+\textbf{Decision:} cada test rojo se commitea antes del feature. Cada RED commit es atomico.
+
+\textbf{Rationale:} historial de git cuenta la historia del desarrollo. El reviewer puede ver exactamente que se probo.
+
+\textbf{Tradeoff:} mas commits por feature (tipicamente 2x: RED + GREEN). El ruido se mitiga con squash al mergear.
+
+\section{Conventional commits en ingles}
+
+\textbf{Decision:} mensajes de commit en ingles, formato conventional commits, sin \texttt{Co-Authored-By}, sin emojis.
+
+\textbf{Rationale:} permite generar changelogs automaticamente y mantener historial buscable.
+
+\textbf{Tradeoff:} requiere disciplina. El subject $\leq$ 50 caracteres fuerza a ser conciso.
+
+% ============================================================
+% Capitulo 8: Estado actual y metricas
+% ============================================================
+
+\chapter{Estado actual y metricas}
+
+\section{Estado por componente}
+
+\begin{table}[h]
+\centering
+\caption{Estado por componente del sistema}
+\begin{tabularx}{\textwidth}{lXc}
+\toprule
+\textbf{Componente} & \textbf{Estado} & \textbf{Verde?} \\
+\midrule
+Dominio (TypeScript compartido) & Completo + compliance CRA 825 cerrado & Si \\
+Mobile (Expo + React Native) & MVP funcional con compliance cerrado & Parcial \\
+Backend (.NET 8) & MVP funcional, sin deploy productivo & Parcial \\
+Dashboard web & MVP funcional & Si \\
+Tests automatizados & 2123 verde en 171 suites & Si \\
+Type check & \texttt{tsc --noEmit} sin errores & Si \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Metricas finales}
+
+\begin{table}[h]
+\centering
+\caption{Metricas finales del proyecto}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Metrica} & \textbf{Valor} \\
+\midrule
+Tests automatizados & 2123 verde (171 suites) \\
+Archivos del dominio & repartidos en \texttt{mobile/src/} (modulos por dominio) \\
+Pantallas mobile & \texttt{mobile/src/pantallas/} \\
+Persistencia local & SQLite (\texttt{expo-sqlite} + \texttt{better-sqlite3} en tests) \\
+Persistencia servidor & PostgreSQL 16 \\
+Sync & manual desde pantalla Sync, protocolo idempotente con \texttt{sync\_registros} \\
+Branches & \texttt{main} + \texttt{desarrollo} + \texttt{merge-desarrollo} (cleanup pendiente) \\
+SDDs archivados & 22+ en \texttt{openspec/changes/archive/} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================================================
+% Capitulo 9: Issues conocidos
+% ============================================================
+
+\chapter{Issues conocidos}
+
+\section{Criticos (bloquean produccion)}
+
+Ninguno al cierre de esta entrega.
+
+\section{Importantes (deben abordarse pronto)}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Token de sesion fake-token.} El token actual es \texttt{fake-token-\{timestamp\}} con expiracion hardcoded a 24 horas. NO usar como mecanismo de seguridad en produccion. Migracion a GUID generado por backend .NET con \texttt{expiresAt} validado contra PostgreSQL.
+    \item \textbf{Backend sin deploy productivo.} Esta configurado para dev local. NO hay pipeline CI/CD ni configuracion de hosting. Esta decision queda para EPC.
+\end{enumerate}
+
+\section{Menores (limpieza)}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Directorio \texttt{src/\_\_tests\_\_/} residual.} Existe en la raiz del proyecto como leftover del SDD \texttt{delete-legacy-src-mirror}. NO contiene tests activos, pero es ruido. Considerar agregar a \texttt{.gitignore} o borrar.
+    \item \textbf{Branch \texttt{merge-desarrollo} pendiente de cerrar.} Ya esta mergeada a \texttt{main}. Limpieza: \texttt{git push origin --delete merge-desarrollo}.
+    \item \textbf{SDDs activos sin cerrar.} Hay 3 SDDs abiertos en \texttt{openspec/changes/} (\texttt{eliminar-campo-calle}, \texttt{factura-compliance-fase1}, \texttt{factura-compliance-polish}). Decidir si cerrarlos o continuar trabajo.
+\end{enumerate}
+
+\section{Optimizaciones pendientes}
+
+\subsection*{Performance}
+\begin{itemize}[leftmargin=*]
+    \item Bundle size de Expo. Evaluar tree-shaking y lazy loading de pantallas no usadas.
+    \item Query N+1 en dashboard. El listado de lecturas con medidor y suscriptor podria optimizarse con JOINs eager.
+    \item Sync incremental. Actualmente la sync envia todos los pendientes. Evaluar sync incremental con cursor.
+\end{itemize}
+
+\subsection*{Code quality}
+\begin{itemize}[leftmargin=*]
+    \item ParametrosTarifa.tsx sigue en 456 lineas (post-decompose). Podria continuar decomponiendo subcomponentes grandes si crecen.
+    \item \texttt{composicion/} vs \texttt{composition/} --- naming consistente.
+    \item Migraciones SQL inline (889 lineas). Considerar extraer a archivos \texttt{.sql} separados.
+\end{itemize}
+
+\subsection*{Testing}
+\begin{itemize}[leftmargin=*]
+    \item Cobertura de UI. Tests actuales cubren dominio + repos. UI esta sub-testada.
+    \item E2E tests. No hay tests end-to-end automatizados. Considerar Detox o Maestro.
+    \item Mutation testing. Considerar Stryker para validar calidad de los tests.
+\end{itemize}
+
+% ============================================================
+% Capitulo 10: Proximos pasos
+% ============================================================
+
+\chapter{Proximos pasos sugeridos}
+
+\section{No urgentes pero recomendados}
+
+\begin{enumerate}[leftmargin=*]
+    \item Cerrar la branch \texttt{merge-desarrollo} local y remote (cleanup puro, ya mergeada a main).
+    \item Abordar GAP-6 (\texttt{auditoria-mejorada-cra-825}) y GAP-10 (\texttt{agente-validacion-cra-825}) cuando el equipo lo priorice.
+    \item Migracion del token fake-token a GUID real con expiracion validada contra PostgreSQL.
+    \item Pipeline CI/CD productivo para backend .NET (actualmente solo mobile esta automatizado).
+    \item Evaluar el SDD activo \texttt{factura-compliance-fase1} y \texttt{factura-compliance-polish} en \texttt{openspec/changes/}.
+    \item Tests E2E con Detox o Maestro.
+    \item Cobertura de UI: agregar tests de comportamiento para pantallas y subcomponentes.
+\end{enumerate}
+
+\section{Antes de hacer cualquier cambio}
+
+\begin{enumerate}[leftmargin=*]
+    \item Leer la documentacion completa (README.md + docs/).
+    \item Leer \texttt{docs/PROJECT\_STATUS.md} para entender que esta activo y que esta diferido.
+    \item Leer el proposal del cambio si vas a abrir un nuevo SDD. El flujo esta documentado en \texttt{docs/CONVENTIONS.md} seccion "SDD workflow".
+    \item Hablar con el equipo de EPC para alinear prioridades antes de proponer nuevos cambios.
+\end{enumerate}
+
+% ============================================================
+% Capitulo 11: Convenciones del proyecto
+% ============================================================
+
+\chapter{Convenciones del proyecto}
+
+\section{Idioma y estilo}
+
+\begin{itemize}[leftmargin=*]
+    \item Espanol rioplatense (voseo) en codigo, comentarios, docs y conversacion.
+    \item Ingles solo para mensajes de commit y nombres de variables/funciones publicas de API.
+\end{itemize}
+
+\section{Conventional commits}
+
+\begin{itemize}[leftmargin=*]
+    \item Mensajes en ingles, formato conventional commits (\texttt{type(scope): subject}).
+    \item Subject $\leq$ 50 caracteres.
+    \item Body solo cuando el "why" no es obvio.
+    \item Sin \texttt{Co-Authored-By}.
+    \item Sin emojis en el mensaje.
+\end{itemize}
+
+Tipos comunes: \texttt{feat}, \texttt{fix}, \texttt{refactor}, \texttt{docs}, \texttt{test}, \texttt{chore}, \texttt{perf}.
+
+\section{Branches}
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{main}: produccion, consolidada.
+    \item \texttt{desarrollo}: integracion continua.
+    \item \texttt{merge-desarrollo}: limpieza de PR.
+    \item \texttt{feat/<descripcion>}, \texttt{fix/<descripcion>}, \texttt{refactor/<descripcion>}, \texttt{docs/<descripcion>}: feature branches.
+\end{itemize}
+
+\section{SDD workflow}
+
+Para cambios sustanciales, seguir el flujo:
+
+\begin{verbatim}
+proposal -> specs -> design -> tasks -> apply -> verify -> archive
+\end{verbatim}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Proposal} (\texttt{openspec/changes/\{nombre\}/proposal.md}): intent + scope + enfoque.
+    \item \textbf{Specs} (\texttt{openspec/changes/\{nombre\}/specs/}): requisitos con Given/When/Then + RFC 2119.
+    \item \textbf{Design} (\texttt{openspec/changes/\{nombre\}/design.md}): decisiones B/B/B (Bueno/Barato/Breve) + tradeoffs.
+    \item \textbf{Tasks} (\texttt{openspec/changes/\{nombre\}/tasks.md}): checklist numerado completable por sesion.
+    \item \textbf{Apply}: implementacion con TDD-strict (cada RED commiteado antes del GREEN).
+    \item \textbf{Verify}: code review multi-axis (5 ejes: correctness, readability, architecture, security, performance).
+    \item \textbf{Archive}: move a \texttt{openspec/changes/archive/YYYY-MM-DD-\{nombre\}/}.
+\end{enumerate}
+
+\textbf{Strict TDD mode} habilitado en \texttt{openspec/config.yaml}. Cada test rojo se commitea antes del feature.
+
+% ============================================================
+% Apendices
+% ============================================================
+
+\appendix
+
+\chapter{Glosario}
+
+\begin{description}[leftmargin=*]
+    \item[EPC] Empresas Publicas de Cundinamarca.
+    \item[CRA] Comision de Regulacion de Agua Potable y Saneamiento Basico (Colombia).
+    \item[CF] Cargo Fijo. Cobro mensual fijo por la disponibilidad del servicio.
+    \item[CC] Cargo por Consumo. Cobro variable segun m\textsuperscript{3} consumidos.
+    \item[CMOG] Costo Medio Operativo General.
+    \item[CMAA] Costo Medio de Inversiones Ambientales (Res CRA 907/2019).
+    \item[IPC] Indice de Precios al Consumidor.
+    \item[ISE] Indice de Satisfaccion del Estrato.
+    \item[SDD] Spec-Driven Development. Workflow estructurado de desarrollo.
+    \item[TDD] Test-Driven Development. Desarrollo guiado por tests.
+    \item[RED/GREEN/REFACTOR] Ciclo del TDD.
+    \item[B/B/B] Bueno/Barato/Breve. Formato de decision arquitectonica.
+    \item[CRUD] Create, Read, Update, Delete.
+    \item[FK] Foreign Key.
+    \item[DI] Dependency Injection.
+    \item[DI] Dependency Injection (inyeccion de dependencias).
+\end{description}
+
+\chapter{Referencias normativas}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Res CRA 825/2017.} Por la cual se establece la metodologia tarifaria para las personas prestadoras de los servicios publicos domiciliarios de acueducto y alcantarillado con menos de 5.000 suscriptores.
+    \item \textbf{Res CRA 907/2019.} Por la cual se modifican los articulos 9 y 10 de la Res CRA 825/2017. Introduce CMAA y CMVIAA.
+    \item \textbf{Res CRA 750/2016.} Por la cual se establece el consumo basico por altitud.
+    \item \textbf{Ley 142/1994 art. 99.6.} Ley de Servicios Publicos Domiciliarios. Topes de subsidios y contribuciones.
+    \item \textbf{Res CRA 881/2019.} Inversiones ambientales. Adiciona articulos.
+\end{enumerate}
+
+\end{document}

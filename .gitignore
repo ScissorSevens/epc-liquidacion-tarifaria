@@ -18,7 +18,7 @@ mobile/dist/
 mobile/web-build/
 
 #docs
-docs/
+# docs/       # uncomment to ignore handoff documentation; kept tracked for EPC handoff
 
 #documentacion
 DOCUMENTACION_TECNICA.md
