@@ -18,13 +18,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { BotonPrimario } from '../../componentes/BotonPrimario';
 import { FormField } from '../../componentes/FormField';
 import { ResumenCargos } from '../../componentes/ResumenCargos';
+import { IconoGuardar } from './componentes/IconoGuardar';
 import {
   scrollToFirstError,
   useFormFieldRefs,
@@ -67,36 +67,11 @@ import { calcularFactorIpc } from '../../../dominio/parametros-tarifa/ipc';
  * `BotonPrimario`. En iOS es `<Image>` de expo-image; en Android es
  * `<MaterialIcons>` directo para mantener la propagacion del testID
  * (`param-guardar-icon`) que esperan los tests de regresion.
+ *
+ * Decompose Phase 1 task 1.1: el IconoGuardar ahora vive en
+ * `./componentes/IconoGuardar.tsx` (import arriba). El componente
+ * sigue siendo presentational puro — sin state, no side effects.
  */
-function IconoGuardar({
-  colorIcono,
-  testID,
-}: {
-  colorIcono: string;
-  testID?: string;
-}): React.ReactNode {
-  if (Platform.OS === 'ios') {
-    return (
-      <Image
-        source="sf:tray.and.arrow.down"
-        style={{ width: 20, height: 20, tintColor: colorIcono }}
-        tintColor={colorIcono}
-        testID={testID}
-        accessibilityLabel="Guardar parámetros"
-      />
-    );
-  }
-  // Android (y default): MaterialIcons directo.
-  return (
-    <MaterialIcons
-      name="save"
-      size={20}
-      color={colorIcono}
-      testID={testID}
-      accessibilityLabel="Guardar parámetros"
-    />
-  );
-}
 
 interface Props {
   /** Si no se provee, se toma del workspace (`useWorkspace.id_prestador_activo`). */
