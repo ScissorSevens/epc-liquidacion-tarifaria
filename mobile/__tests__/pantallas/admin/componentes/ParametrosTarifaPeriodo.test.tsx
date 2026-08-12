@@ -26,8 +26,9 @@
 //          Los 4 tests pasan.
 
 import * as React from 'react';
+import type { RefObject } from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import type { RefObject, View } from 'react-native';
+import type { View } from 'react-native';
 
 import { ParametrosTarifaPeriodo } from '../../../../src/pantallas/admin/componentes/ParametrosTarifaPeriodo';
 import type { FormValues } from '../../../../src/pantallas/admin/parametros-tarifa-build-borrador';

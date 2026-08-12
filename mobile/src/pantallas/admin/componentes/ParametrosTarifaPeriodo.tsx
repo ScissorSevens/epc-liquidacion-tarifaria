@@ -27,8 +27,8 @@
 //     placeholder queda con un `<View>` vacío equivalente a no render.
 
 import * as React from 'react';
-import { StyleSheet, View } from 'react-native';
-import type { RefObject, View as RNView } from 'react-native';
+import type { RefObject } from 'react';
+import { StyleSheet, View, type View as RNView } from 'react-native';
 
 import { FormField } from '../../../componentes/FormField';
 import { SeccionForm } from '../../../componentes/SeccionForm';
