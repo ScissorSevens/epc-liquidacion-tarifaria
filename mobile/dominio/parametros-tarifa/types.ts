@@ -74,13 +74,22 @@ export interface ParametrosTarifa {
    * Flag: mínimo vital activo para este prestador. Default false
    * (825/2017 no obliga, ver Q9 spec).
    *
-   * NOTA: este flag se conserva por backward-compat con data legacy.
-   * La fuente de verdad del mínimo vital es la tabla relacionada
-   * `minimo_vital` (ver `minimo_vital: MinimoVital | null`). Si
-   * `minimo_vital !== null`, hay mínimo vital configurado.
+   * @deprecated Decisión B/B/B Phase 3 task 3.2: la fuente de verdad
+   * del mínimo vital es la tabla separada `minimo_vital` (ver
+   * `minimo_vital: MinimoVital | null`). El form admin
+   * `ParametrosTarifa` ya NO captura este flag (Opción A: eliminar
+   * del form). Se conserva en el type + DB por backward-compat con
+   * data legacy pre-Phase 3. NO usar como fuente de verdad en código
+   * nuevo. Sera reemplazado por el módulo admin `MinimoVital` futuro.
    */
   readonly aplica_minimo_vital: boolean;
-  /** m³ gratis por mínimo vital. Default 0 (desactiva aunque flag=true). */
+  /**
+   * m³ gratis por mínimo vital. Default 0 (desactiva aunque flag=true).
+   *
+   * @deprecated Decisión B/B/B Phase 3 task 3.2: la fuente de verdad
+   * es la tabla `minimo_vital`. Se conserva en el type + DB por
+   * backward-compat con data legacy. NO usar en código nuevo.
+   */
   readonly m3_gratis_minimo_vital: number;
   /**
    * Índice de Precios al Usuario Final. Multiplicador periódico para
@@ -147,6 +156,17 @@ export interface ParametrosTarifa {
    */
   readonly factor_indexacion_ipc: number;
   /**
+   * Año destino para el cálculo del factor IPC (Res CRA 825/2017
+   * Art. 11). El factor se calcula como
+   * `IPC_VALORES[anio_destino] / IPC_VALORES[anio_base]`.
+   *
+   * OPTIONAL por backward-compat con data legacy. `null` = sin
+   * indexación configurada (factor permanece en 1.0).
+   *
+   * Phase 1 (`param-tarifa-residuales-cra-825` task 1.6).
+   */
+  readonly anio_destino_indexacion?: number | null;
+  /**
    * Altitud del prestador sobre el nivel del mar (msnm). Determina
    * el límite de consumo básico conforme a Res CRA 750/2016:
    *   altitud > 2.000 → 11 m³/mes
@@ -187,6 +207,23 @@ export interface ParametrosTarifa {
   readonly estudio_costos_id?: string | null;
   /** URL del documento soporte del estudio de costos (PDF, etc.). */
   readonly documento_soporte_url?: string | null;
+  /**
+   * Flag explicito: el prestador OPTA por inversiones ambientales
+   * adicionales (Res CRA 907/2019 art. 13, mod. Res CRA 825/2017 art. 9).
+   * Si `true`, el CMAA se computa en el cargo fijo resultante. Si `false`
+   * (default), el CMAA NO se computa aunque `cmaa > 0`.
+   *
+   * Decision B/B/B: el flag es la fuente de verdad del opt-in. Antes
+   * de Phase 2 se inferia de `cmaa > 0`, lo que permitia que un admin
+   * que setea `cmaa = 0` por error apague el CMAA sin warning. Con el
+   * flag explicito, el comportamiento es opt-in consciente.
+   *
+   * OPTIONAL por backward-compat con data legacy (Phase 2 task 2.2 GREEN).
+   * `undefined` se trata como `false` (no aplica CMAA).
+   *
+   * Phase 2 (`param-tarifa-residuales-cra-825` task 2.2).
+   */
+  readonly aplica_cmaa?: boolean;
 }
 
 export type ParametrosTarifaBorrador = Omit<ParametrosTarifa, 'id_parametros' | 'created_at'>;

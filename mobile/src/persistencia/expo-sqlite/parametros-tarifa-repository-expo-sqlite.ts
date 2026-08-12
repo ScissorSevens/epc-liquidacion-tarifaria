@@ -49,6 +49,21 @@ interface ParametrosRow {
   readonly acto_adopcion: string | null;
   readonly estudio_costos_id: string | null;
   readonly documento_soporte_url: string | null;
+  // Phase 1 task 1.4 (GREEN): altitud del prestador (Res CRA 750/2016).
+  // Migration 028 aditiva — INTEGER NULL para backward-compat con data
+  // legacy que NO tiene altitud seteada.
+  readonly altitud_msnm: number | null;
+  // Phase 1 task 1.6 (GREEN): anio destino para calculo del factor IPC
+  // (Res CRA 825/2017 Art. 11: factor = IPC[destino] / IPC[base]).
+  // Migration 028b aditiva — INTEGER NULL para backward-compat con
+  // data legacy sin destino seteado.
+  readonly anio_destino_indexacion: number | null;
+  // Phase 2 task 2.2 (GREEN): flag explicito `aplica_cmaa` (Res CRA
+  // 907/2019 art. 13). Migration 030 aditiva — INTEGER NOT NULL con
+  // CHECK (IN (0, 1)). Si 1, el prestador opto por inversiones
+  // ambientales (CMAA se computa). Si 0, NO se computa aunque el
+  // campo numerico `cmaa` tuviera valor.
+  readonly aplica_cmaa: number;
 }
 
 interface MinimoVitalRow {
@@ -123,6 +138,13 @@ function fromRow(row: ParametrosRow, minimoVital: MinimoVital | null): Parametro
     acto_adopcion: row.acto_adopcion,
     estudio_costos_id: row.estudio_costos_id,
     documento_soporte_url: row.documento_soporte_url,
+    altitud_msnm: row.altitud_msnm,
+    anio_destino_indexacion: row.anio_destino_indexacion,
+    // Phase 2 task 2.2 (GREEN): aplica_cmaa es la fuente de verdad
+    // para el CMAA. El campo numerico `cmaa` se interpreta en
+    // combinacion: si flag=false, se sobrescribe con 0 en
+    // buildBorradorLocal. Mapeamos 1/0 → boolean.
+    aplica_cmaa: row.aplica_cmaa === 1,
   };
 }
 
@@ -154,8 +176,9 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
           cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
           vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc,
-          cmaa, acto_adopcion, estudio_costos_id, documento_soporte_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          cmaa, aplica_cmaa, acto_adopcion, estudio_costos_id, documento_soporte_url,
+          altitud_msnm, anio_destino_indexacion
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
@@ -164,8 +187,10 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
         data.anio_base, data.factor_indexacion_ipc,
-        data.cmaa ?? null, data.acto_adopcion ?? null,
+        data.cmaa ?? null, data.aplica_cmaa ? 1 : 0,
+        data.acto_adopcion ?? null,
         data.estudio_costos_id ?? null, data.documento_soporte_url ?? null,
+        data.altitud_msnm ?? null, data.anio_destino_indexacion ?? null,
       );
       const id = Number(result.lastInsertRowId);
       const row = await db.getFirstAsync<ParametrosRow>(
@@ -280,8 +305,9 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           aplica_minimo_vital, m3_gratis_minimo_vital, ipuf_indice,
           cargo_fijo_resultante, cargo_consumo_resultante, componentes_aplicables,
           vigente_desde, vigente_hasta, anio_base, factor_indexacion_ipc,
-          cmaa, acto_adopcion, estudio_costos_id, documento_soporte_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          cmaa, aplica_cmaa, acto_adopcion, estudio_costos_id, documento_soporte_url,
+          altitud_msnm, anio_destino_indexacion
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id_prestador, periodo, vigente_desde) DO UPDATE SET
           id_acuerdo = excluded.id_acuerdo,
           cma = excluded.cma,
@@ -303,9 +329,12 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
           anio_base = excluded.anio_base,
           factor_indexacion_ipc = excluded.factor_indexacion_ipc,
           cmaa = excluded.cmaa,
+          aplica_cmaa = excluded.aplica_cmaa,
           acto_adopcion = excluded.acto_adopcion,
           estudio_costos_id = excluded.estudio_costos_id,
-          documento_soporte_url = excluded.documento_soporte_url`,
+          documento_soporte_url = excluded.documento_soporte_url,
+          altitud_msnm = excluded.altitud_msnm,
+          anio_destino_indexacion = excluded.anio_destino_indexacion`,
         data.id_prestador, data.id_acuerdo, data.periodo, data.cma, data.cmo, data.cmi, data.cmt,
         data.cmviaa, data.aplica_cmviaa ? 1 : 0,
         data.agua_suministrada_m3_anio, data.ipuf_m3_suscriptor_mes, data.suscriptores_promedio,
@@ -314,8 +343,10 @@ export function crearParametrosTarifaRepositoryExpoSqlite(
         JSON.stringify([...data.componentes_aplicables]),
         data.vigente_desde, data.vigente_hasta,
         data.anio_base, data.factor_indexacion_ipc,
-        data.cmaa ?? null, data.acto_adopcion ?? null,
+        data.cmaa ?? null, data.aplica_cmaa ? 1 : 0,
+        data.acto_adopcion ?? null,
         data.estudio_costos_id ?? null, data.documento_soporte_url ?? null,
+        data.altitud_msnm ?? null, data.anio_destino_indexacion ?? null,
       );
       const row = await db.getFirstAsync<ParametrosRow>(
         `SELECT * FROM parametros_tarifa
