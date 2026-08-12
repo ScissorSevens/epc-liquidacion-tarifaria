@@ -721,11 +721,19 @@ fireEvent.press(back);
       alertSpy.mockRestore();
     });
 
-    it('T-IMPC-13 validarCmaMinimo del dominio se invoca (no bypass inline)', () => {
+    it('T-IMPC-13 validarCmaMinimo del dominio se invoca via el hook (no bypass inline)', () => {
       // El screen debe importar y usar `validarCmaMinimo()` del dominio
       // para validar el CMA, NO una comparación inline `num(cma) < 2890`.
+      //
+      // Phase 1 task 1.5 (DECOMPOSE): la validación se movió al hook
+      // `useParametrosFormState`. Esta regression guard ahora verifica
+      // el HOOK source — el screen consume el hook, el hook invoca
+      // las funciones del dominio.
       const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
+        ),
         'utf8',
       );
       // Importación del dominio.
@@ -1655,11 +1663,18 @@ fireEvent.press(back);
       expect(source).not.toMatch(/COLORES_NATIVOS/);
     });
 
-    it('T-NATIVE-2 el screen usa haptics segun plataforma (Platform.OS branch)', () => {
+    it('T-NATIVE-2 el hook usa haptics segun plataforma (Platform.OS branch)', () => {
       // D5 (Commit 4): el screen distingue iOS de Android para el haptic
       // post-guardar (iOS → notificationAsync, Android → selectionAsync).
+      //
+      // Phase 1 task 1.5 (DECOMPOSE): el haptic feedback se movió al
+      // hook `useParametrosFormState.guardar()`. Esta regression guard
+      // ahora verifica el HOOK source — el screen consume el hook.
       const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
+        ),
         'utf8',
       );
       // Platform.OS === 'ios' branch presente.
@@ -2353,8 +2368,16 @@ fireEvent.press(back);
       // Regression guard: el screen debe invocar `validarCmogMinimo()`
       // del dominio. La implementación NO debe usar una comparación
       // inline hardcoded contra 467 (constante congelada del dominio).
+      //
+      // Phase 1 task 1.5 (DECOMPOSE): la validación se movió del screen
+      // al hook `useParametrosFormState`. Esta regression guard ahora
+      // verifica el HOOK source (no el screen source) — el screen
+      // consume el hook, el hook invoca las funciones del dominio.
       const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
+        ),
         'utf8',
       );
       // Importación del dominio.

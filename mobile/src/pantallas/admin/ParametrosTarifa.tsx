@@ -14,9 +14,18 @@
  *   - Validación derivada del callsite via prop error.
  *   - Toggles preservados inline (no son text inputs).
  *   - Botón guardar reemplazado por BotonPrimario (CTAs consolidados).
+ *
+ * Decompose Phase 1 task 1.5 (GREEN):
+ *   - Los 18 useState + useFocusEffect + validators + guardar inline
+ *     se REEMPLAZAN por `useParametrosFormState()` (ver ./hooks/).
+ *   - El screen queda con bootstrap + repos state + useFocusEffect
+ *     (fetch) + TopBar + SeccionForm cards + BotonPrimario.
+ *   - TODOS los testIDs y comments B/B/B se preservan verbatim.
+ *   - El screen orquesta scroll-to-first-error (UI concern que vive
+ *     en el caller, NO en el hook — proposal decision #7).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -28,7 +37,6 @@ import { IconoGuardar } from './componentes/IconoGuardar';
 import {
   scrollToFirstError,
   useFormFieldRefs,
-  type FormErrors,
 } from '../../componentes/scroll-to-first-error';
 import { SeccionForm } from '../../componentes/SeccionForm';
 import { TopBar } from '../../componentes/TopBar';
@@ -39,18 +47,14 @@ import {
   CMA_MINIMO_ACUEDUCTO,
   CMA_MINIMO_ALCANTARILLADO,
   calcularCargos,
-  validarCmaMinimo,
-  validarCmogMinimo,
   type ParametrosTarifa,
   type ParametrosTarifaRepository,
 } from '../../../dominio/parametros-tarifa';
 import { limiteConsumoBasicoMensual, LIMITES_CONSUMO_BASICO_MS3 } from '../../../dominio/motor-tarifario/consumo-basico';
 import type { AcuerdoMunicipalRepository } from '../../../dominio/acuerdo-municipal';
-import {
-  buildBorradorLocal,
-  type FormValues,
-} from './parametros-tarifa-build-borrador';
+import { buildBorradorLocal } from './parametros-tarifa-build-borrador';
 import { calcularFactorIpc } from '../../../dominio/parametros-tarifa/ipc';
+import { useParametrosFormState } from './hooks/useParametrosFormState';
 
 /**
  * Icono del botón Guardar segun plataforma.
@@ -164,15 +168,6 @@ export default function ParametrosTarifaForm({
     return () => { cancelado = true; };
   }, [acuerdoRepo, id_prestador, idAcuerdoProp]);
 
-  // parametros-stale-state-fix Commit 2 (GREEN):
-  //
-  // El ref guardea la primera hidratación del state local desde la DB
-  // para que ediciones del usuario NO se sobrescriban por re-fetches.
-  // Antes vivía debajo de este useEffect (line 238 original); se mueve
-  // ACÁ para que el `useFocusEffect` de más abajo pueda resetearlo a
-  // `false` antes de cada re-hidratación por focus.
-  const yaSincronizadoRef = useRef(false);
-
   // Cargar parámetros tarifarios vigentes para el prestador en uso.
   //
   // parametros-stale-state-fix: el fetch ahora corre dentro de
@@ -206,8 +201,8 @@ export default function ParametrosTarifaForm({
           const params = await repo.buscarVigente(id_prestador, new Date().toISOString());
           if (!cancelado) {
             // Reset one-shot guard ANTES de propagar al state local para
-            // que el sync effect re-hidrate los inputs con datos frescos.
-            yaSincronizadoRef.current = false;
+            // que el sync effect (ahora en el hook) re-hidrate los inputs
+            // con datos frescos. El hook mantiene su propio ref.
             setParametrosActuales(params);
             setCargando(false);
           }
@@ -221,132 +216,33 @@ export default function ParametrosTarifaForm({
     }, [repo, id_prestador, parametrosProp]),
   );
 
-  const [periodo, setPeriodo] = useState(String(parametrosActuales?.periodo ?? periodoDefault()));
-  // anio_base: Res CRA 825/2017 Art. 7. Default 2016 (normativo).
-  // Phase 3 task 3.4 (GREEN): ahora es editable para permitir override
-  // del admin (cambios normativos). Validación > 2000.
-  const [anioBase, setAnioBase] = useState(String(parametrosActuales?.anio_base ?? 2016));
-  // anio_destino_indexacion: Res CRA 825/2017 Art. 11. Default al
-  // periodo tarifario vigente. Phase 3 task 3.4 (GREEN): input
-  // editable. Permite override del admin para indexar contra otro año.
-  const [anioDestino, setAnioDestino] = useState(
-    String(parametrosActuales?.anio_destino_indexacion ?? parametrosActuales?.periodo ?? periodoDefault()),
-  );
-  // factor_indexacion_ipc: Res CRA 825/2017 Art. 11. Default 1.0 (sin
-  // indexación). Phase 3 task 3.4 (GREEN): input editable. El admin
-  // puede override manual; si no, se calcula via `calcularFactorIpc()`.
-  const [factorIpc, setFactorIpc] = useState(
-    String(parametrosActuales?.factor_indexacion_ipc ?? 1.0),
-  );
-  // ipuf_indice: multiplicador para actualizar precios sin re-emitir
-  // metodología (Res CRA 825 Art. 7). Default 1.0. Phase 3 task 3.4
-  // (GREEN): input editable para que el admin ajuste por IPC/IPC local.
-  const [ipufIndice, setIpufIndice] = useState(
-    String(parametrosActuales?.ipuf_indice ?? 1.0),
-  );
-  const [cma, setCma] = useState(String(parametrosActuales?.cma ?? 0));
-  const [cmo, setCmo] = useState(String(parametrosActuales?.cmo ?? 0));
-  const [cmi, setCmi] = useState(String(parametrosActuales?.cmi ?? 0));
-  const [cmt, setCmt] = useState(String(parametrosActuales?.cmt ?? 0));
-  const [cmviaa, setCmviaa] = useState(String(parametrosActuales?.cmviaa ?? 0));
-  const [aplicaCmviaa, setAplicaCmviaa] = useState(parametrosActuales?.aplica_cmviaa ?? false);
-  // CMAA — Costo Medio de Administración por Inversiones Ambientales
-  // Adicionales (Res CRA 907/2019 art. 13 que modifica Res CRA 825/2017
-  // art. 9). SOLO aplica al servicio de ACUEDUCTO. Default 0 si el
-  // prestador NO opta por inversiones ambientales; null backward-compat.
-  // Fase 2 (`param-tarifa-res-825-compliance-phase2`, task 4.5).
-  const [cmaa, setCmaa] = useState(
-    String(parametrosActuales?.cmaa ?? 0),
-  );
-  // Flag explicito `aplica_cmaa` (Phase 2 task 2.4 GREEN). Antes de
-  // Phase 2 el CMAA se inferia de `cmaa > 0`, lo que permitia que un
-  // admin que setea `cmaa = 0` por error apague el CMAA sin warning.
-  // El flag es la fuente de verdad: si es false, el buildBorradorLocal
-  // sobrescribe `cmaa` con 0 (motor NO computa CMAA). Si es true,
-  // se respeta el valor numerico del input.
-  const [aplicaCmaa, setAplicaCmaa] = useState(
-    parametrosActuales?.aplica_cmaa ?? false,
-  );
-  // Documentos de soporte (Fase 2, task 4.5). Todos opcionales.
-  // Default string vacia para que el input muestre placeholder.
-  const [actoAdopcion, setActoAdopcion] = useState(
-    parametrosActuales?.acto_adopcion ?? '',
-  );
-  const [estudioCostosId, setEstudioCostosId] = useState(
-    parametrosActuales?.estudio_costos_id ?? '',
-  );
-  const [documentoSoporteUrl, setDocumentoSoporteUrl] = useState(
-    parametrosActuales?.documento_soporte_url ?? '',
-  );
-  const [aguaSuministrada, setAguaSuministrada] = useState(String(parametrosActuales?.agua_suministrada_m3_anio ?? 0));
-  const [ipuf, setIpuf] = useState(String(parametrosActuales?.ipuf_m3_suscriptor_mes ?? 6));
-  const [suscriptoresPromedio, setSuscriptoresPromedio] = useState(String(parametrosActuales?.suscriptores_promedio ?? 0));
-  // Phase 3 task 3.2 (GREEN) — Opción A: la captura de
-  // `aplicaMinimoVital` + `m3Gratis` se ELIMINÓ del form. La fuente
-  // de verdad del mínimo vital es la tabla `minimo_vital` (futuro
-  // módulo admin). Las columnas en `parametros_tarifa` se mantienen
-  // por backward-compat pero el buildBorradorLocal las hardcodea
-  // a `false` / `0` (ver parametros-tarifa-build-borrador.ts).
-  const [vigenteDesde, setVigenteDesde] = useState(
-    parametrosActuales?.vigente_desde?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-  );
-  const [vigenteHasta, setVigenteHasta] = useState(
-    parametrosActuales?.vigente_hasta?.slice(0, 10) ?? `${Number(periodoDefault()) + 4}-12-31`,
-  );
-  // altitud_msnm: Res CRA 750/2016 compliance. Default 0 si no hay
-  // (altitud a nivel del mar → limite 16 m3/mes por fallback).
-  const [altitud, setAltitud] = useState(
-    String(parametrosActuales?.altitud_msnm ?? 0),
-  );
-  const [guardando, setGuardando] = useState(false);
-
-  // Hidratar el state local cuando parametrosActuales se carga async.
-  // Solo sincroniza en la transición null → valor (evita sobrescribir
-  // edición del usuario). El ref guardea la primera hidratación para
-  // que un re-fetch posterior (mismos datos) no pise lo que el
-  // operador tipeó. Ver scenario T-SYNC-1/T-SYNC-2.
+  // ──────────────────────────────────────────────────────────────────
+  // Hook `useParametrosFormState` — encapsula los 18 useState +
+  // validators + guardar (Decompose Phase 1 task 1.3). El hook vive en
+  // ./hooks/useParametrosFormState.ts. La firma completa y decisiones
+  // B/B/B están documentadas en el header del hook.
   //
-  // parametros-stale-state-fix: el `yaSincronizadoRef` se DECLARA arriba
-  // (antes del useFocusEffect) para que el callback de focus pueda
-  // resetearlo a `false` antes de cada re-fetch por focus, garantizando
-  // que el sync re-hidrate el form con datos frescos.
-  useEffect(() => {
-    if (parametrosActuales === null) return;
-    if (yaSincronizadoRef.current) return;
-    setPeriodo(String(parametrosActuales.periodo));
-    setAnioBase(String(parametrosActuales.anio_base));
-    setCma(String(parametrosActuales.cma));
-    setCmo(String(parametrosActuales.cmo));
-    setCmi(String(parametrosActuales.cmi));
-    setCmt(String(parametrosActuales.cmt));
-    setCmviaa(String(parametrosActuales.cmviaa));
-    setAplicaCmviaa(parametrosActuales.aplica_cmviaa);
-    // CMAA + 3 docs (Fase 2, task 4.5). Si el parametro persisted
-    // tiene null, el input vuelve a string vacio (default limpio).
-    setCmaa(String(parametrosActuales.cmaa ?? 0));
-    // Phase 2 task 2.4 (GREEN): flag explicito `aplica_cmaa`. Si el
-    // parametro persisted no tiene el flag (legacy data pre-Phase 2),
-    // caemos a false (no aplica CMAA).
-    setAplicaCmaa(parametrosActuales.aplica_cmaa ?? false);
-    setActoAdopcion(parametrosActuales.acto_adopcion ?? '');
-    setEstudioCostosId(parametrosActuales.estudio_costos_id ?? '');
-    setDocumentoSoporteUrl(parametrosActuales.documento_soporte_url ?? '');
-    setAguaSuministrada(String(parametrosActuales.agua_suministrada_m3_anio));
-    setIpuf(String(parametrosActuales.ipuf_m3_suscriptor_mes));
-    setSuscriptoresPromedio(String(parametrosActuales.suscriptores_promedio));
-    // Phase 3 task 3.4 (GREEN): re-hidratar los 3 inputs nuevos de IPC.
-    // `anio_destino_indexacion` es `number | null` en el type — si
-    // null (legacy data), caemos al periodo tarifario vigente.
-    setAnioDestino(
-      String(parametrosActuales.anio_destino_indexacion ?? parametrosActuales.periodo),
-    );
-    setFactorIpc(String(parametrosActuales.factor_indexacion_ipc ?? 1.0));
-    setIpufIndice(String(parametrosActuales.ipuf_indice ?? 1.0));
-    setVigenteDesde(parametrosActuales.vigente_desde.slice(0, 10));
-    setVigenteHasta(parametrosActuales.vigente_hasta.slice(0, 10));
-    setAltitud(String(parametrosActuales.altitud_msnm ?? 0));
-    yaSincronizadoRef.current = true;
-  }, [parametrosActuales]);
+  // El screen pasa `parametrosActuales` (de la prop o del fetch del
+  // useFocusEffect de arriba) como entrada; el hook hidrata el state
+  // interno en la transición null → valor (one-shot guard).
+  //
+  // NO destructuramos `formState` — el render usa `formState.values.X`,
+  // `formState.setters.setX`, `formState.errores.X` directo para que el
+  // data flow sea explicito y la regression guard T-DECOMPOSE-4 (que
+  // verifica el contrato "el screen consume el hook") matchee literal.
+  // ──────────────────────────────────────────────────────────────────
+  const formState = useParametrosFormState({
+    id_prestador,
+    id_acuerdo,
+    repo,
+    parametrosActuales,
+  });
+
+  // `guardando` se mantiene en el screen porque es UI concern del
+  // BotonPrimario (spinner). El hook tiene su propio setGuardando
+  // interno para evitar doble-persist; el screen solo expone este
+  // flag al BotonPrimario.
+  const [guardando, setGuardando] = useState(false);
 
   const num = (s: string): number => {
     const n = parseFloat(s);
@@ -357,122 +253,11 @@ export default function ParametrosTarifaForm({
     return isNaN(n) ? 0 : n;
   };
 
-  // D4 (Commit 3): `validarTodo()` invoca `validarCmaMinimo()` del dominio
-  // via try/catch (la funcion THROWS, no retorna string — D4 hallazgo
-  // critico del design). Tambien valida reglas locales (suscriptores > 0
-  // defensa anti division por cero, fechas invertidas).
+  // D2 (parametros-tarifa-impeccable-v2 Commit 2): el shape de FormValues
+  // ahora lo construye el hook una vez por render y lo expone en
+  // `formState.values`. El screen lo consume directo para alimentar
+  // el `useMemo` del card ResumenCargos (live preview).
   //
-  // Fase 2 (task 4.5): validacion adicional de URLs (acto_adopcion y
-  // documento_soporte_url). El CMAA no lleva validacion inline: el
-  // dominio ya valida `cmaa` como numeric en el campo de tipo numeric,
-  // y el form lo trata como complemento opcional.
-  const validarTodo = (): FormErrors => {
-    const errors: FormErrors = {};
-    const cmaNum = num(cma);
-    const cmoNum = num(cmo);
-    // Res CRA 825/2017 Art. 15: validarCmaMinimo THROWs si CMA < minimo.
-    try {
-      validarCmaMinimo(cmaNum, 'acueducto');
-    } catch (e) {
-      errors.cma = (e as Error).message;
-    }
-    // Res CRA 825/2017 Art. 18: validarCmogMinimo THROWs si CMOG < minimo.
-    // Cambio `param-tarifa-residuales-cra-825` Phase 1 task 1.2 (GREEN).
-    // Servicio hardcoded a 'acueducto' (Hallazgo #6 deferred — la app
-    // solo cubre acueducto por ahora). La division acueducto/alcantarillado
-    // es mejora futura.
-    try {
-      validarCmogMinimo(cmoNum, 'acueducto');
-    } catch (e) {
-      errors.cmo = (e as Error).message;
-    }
-    // Suscriptores debe ser > 0 (defensa anti division por cero).
-    if (entero(suscriptoresPromedio) <= 0) {
-      errors.suscriptores = 'Suscriptores debe ser > 0';
-    }
-    // Vigente desde NO puede ser posterior a vigente hasta.
-    if (
-      vigenteDesde !== '' &&
-      vigenteHasta !== '' &&
-      vigenteDesde > vigenteHasta
-    ) {
-      errors.vigenteHasta = 'Vigente hasta debe ser posterior a vigente desde';
-    }
-    // Validacion de URLs (Fase 2, task 4.5). Si el campo está vacio,
-    // se permite: ambos docs son opcionales. Si el usuario escribió
-    // algo, debe ser una URL http(s) válida.
-    if (actoAdopcion.trim() !== '' && !esUrlValida(actoAdopcion.trim())) {
-      errors.actoAdopcion = 'Debe ser una URL válida (http:// o https://)';
-    }
-    if (
-      documentoSoporteUrl.trim() !== '' &&
-      !esUrlValida(documentoSoporteUrl.trim())
-    ) {
-      errors.documentoSoporteUrl = 'Debe ser una URL válida (http:// o https://)';
-    }
-    // Phase 3 task 3.4 (GREEN): validación inline de Indexación IPC
-    // (Res CRA 825/2017 Art. 11). Años > 2000 (sanity), factor > 0
-    // (multiplicador no puede ser 0 ni negativo).
-    const anioBaseNum = entero(anioBase);
-    const anioDestinoNum = entero(anioDestino);
-    const factorIpcNum = parseFloat(factorIpc);
-    const ipufIndiceNum = parseFloat(ipufIndice);
-    if (anioBaseNum <= 2000) {
-      errors.anioBase = 'Anio base debe ser > 2000';
-    }
-    if (anioDestinoNum <= 2000) {
-      errors.anioDestino = 'Anio destino debe ser > 2000';
-    }
-    if (Number.isNaN(factorIpcNum) || factorIpcNum <= 0) {
-      errors.factorIpc = 'Factor IPC debe ser > 0';
-    }
-    if (Number.isNaN(ipufIndiceNum) || ipufIndiceNum <= 0) {
-      errors.ipufIndice = 'IPUF indice debe ser > 0';
-    }
-    return errors;
-  };
-
-  /**
-   * Helper de validacion de URL (Fase 2, task 4.5). Acepta http:// o
-   * https:// — protocolos válidos para documentos públicos (actoadministrativo
-   * URL y documento_soporte_url). Si el campo está vacío, retorna
-   * true (la validación a nivel callsite salta el chequeo).
-   */
-  const esUrlValida = (s: string): boolean => {
-    if (s === '') return true;
-    return /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(s);
-  };
-
-  // D2 (parametros-tarifa-impeccable-v2 Commit 2): construimos el shape
-  // de FormValues UNA vez por render. Reusado por `guardar()` y el
-  // `useMemo` del card ResumenCargos (live preview).
-  const formValues: FormValues = {
-    periodo,
-    anioBase,
-    // Phase 3 task 3.4 (GREEN): 3 inputs editables de Indexación IPC.
-    anioDestino,
-    factorIpc,
-    ipufIndice,
-    cma,
-    cmo,
-    cmi,
-    cmt,
-    cmviaa,
-    cmaa,
-    aplicaCmviaa,
-    // Phase 2 task 2.4 (GREEN): flag explicito para CMAA.
-    aplicaCmaa,
-    actoAdopcion,
-    estudioCostosId,
-    documentoSoporteUrl,
-    aguaSuministrada,
-    ipuf,
-    suscriptoresPromedio,
-    vigenteDesde,
-    vigenteHasta,
-    altitud,
-  };
-
   // ResumenCargos live preview: useMemo con deps acotadas a los inputs
   // que afectan el calculo. Recalcula SOLO cuando esos cambian.
   // Si suscriptores_promedio=0 (division por cero) → CF=0 pero sigue
@@ -481,7 +266,7 @@ export default function ParametrosTarifaForm({
   const resumen = useMemo(() => {
     if (id_prestador <= 0) return null;
     try {
-      const borrador = buildBorradorLocal(formValues, {
+      const borrador = buildBorradorLocal(formState.values, {
         id_prestador,
         id_acuerdo,
         vigenteDesdePersistido: parametrosActuales?.vigente_desde,
@@ -496,33 +281,45 @@ export default function ParametrosTarifaForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    cma,
-    cmo,
-    cmi,
-    cmt,
-    cmviaa,
-    aplicaCmviaa,
+    formState.values.cma,
+    formState.values.cmo,
+    formState.values.cmi,
+    formState.values.cmt,
+    formState.values.cmviaa,
+    formState.values.aplicaCmviaa,
     // Phase 2 task 2.4 (GREEN): aplicaCmaa tambien afecta el calculo
     // del cargo fijo (CF = cma + cmaa cuando flag=true). Sin este dep,
     // togglear el switch no actualiza el live preview del resumen.
-    aplicaCmaa,
-    cmaa,
-    suscriptoresPromedio,
+    formState.values.aplicaCmaa,
+    formState.values.cmaa,
+    formState.values.suscriptoresPromedio,
     id_prestador,
     id_acuerdo,
     parametrosActuales,
   ]);
 
-  const guardar = async () => {
-    if (repo === null) {
-      Alert.alert('Error', 'El repositorio aún no está listo. Esperá un instante.');
-      return;
-    }
+  // Wrapper de `formState.guardar()` que orquesta la UI concern del
+  // scroll-to-first-error (proposal decision #7: el scroll vive en el
+  // caller, NO en el hook). Pre-validamos con `formState.validarTodo()`
+  // para setear errores + scroll ANTES de que el hook intente persistir.
+  //
+  // Por que wrapper:
+  //   - `formState.guardar()` (del hook) ya hace validación interna como
+  //     safety net — si la pre-validacion del screen pasa pero la del
+  //     hook falla (caso edge: race condition), el hook NO persiste.
+  //   - El doble `validarTodo()` es idempotente (mismo input → mismo
+  //     output). Costo: ~5-10 validaciones de numeros por submit.
+  //   - El wrapper expone `setGuardando(true/false)` para el spinner
+  //     del BotonPrimario. El hook tiene su propio setGuardando
+  //     interno que NO se refleja en la UI del screen.
+  const handleGuardar = useCallback(async () => {
     // D4 (Commit 3): validación inline ANTES de persistir.
-    // Si hay errores, NO se llama repo.guardar; el state `errores`
-    // se setea para que los FormFields los muestren inline.
-    const errors = validarTodo();
-    setErrores(errors);
+    // Si hay errores, populamos formState.errores (via setErrores)
+    // y scrolleamos al primero. NO llamamos formState.guardar() en
+    // este caso — el hook tiene su propio early-return si ve errores,
+    // pero queremos el scroll-to-first-error que vive acá.
+    const errors = formState.validarTodo();
+    formState.setErrores(errors);
     if (Object.keys(errors).length > 0) {
       // D8: scroll al primer error en orden jerarquico.
       scrollToFirstError(scrollRef, errors, getRef);
@@ -530,63 +327,12 @@ export default function ParametrosTarifaForm({
     }
     setGuardando(true);
     try {
-      // D2: buildBorradorLocal() construye el shape COMPLETO desde el
-      // state local (parametros-tarifa-build-borrador.ts). Reemplaza
-      // el builder inline previo (~30 lineas) que NO reusaba entre
-      // `guardar()` y el `useMemo` del ResumenCargos.
-      //
-      // `vigenteDesdePersistido` se pasa para que el helper preserve el
-      // formato original de `vigente_desde` cuando el usuario NO editó
-      // el campo (ver T-PARAM-STALE-PERSIST).
-      const borrador = buildBorradorLocal(formValues, {
-        id_prestador,
-        id_acuerdo,
-        vigenteDesdePersistido: parametrosActuales?.vigente_desde,
-      });
-      const cargos = calcularCargos({
-        ...borrador,
-        id_parametros: 0,
-        created_at: '',
-      });
-      const persisted = await repo.guardar({
-        ...borrador,
-        cargo_fijo_resultante: cargos.cargo_fijo,
-        cargo_consumo_resultante: cargos.cargo_consumo,
-      });
-      // mi-perfil-unification-and-param-persistence Commit 2 (T-PERSIST-*):
-      // sincroniza el store Zustand con el payload que el repo aceptó. Sin
-      // esta línea, `parametros_vigentes` queda stale y la liquidación usa
-      // los valores anteriores aunque el form haya sido actualizado. El
-      // setter se invoca via getState() para garantizar que la UI refleja
-      // lo que realmente persiste el repo, no lo que el form dice.
-      useWorkspace.getState().setParametrosVigentes(persisted);
-      // Haptic feedback de exito:
-      //   iOS: notificationAsync(Success) (T-NATIVE-5 existente).
-      //   Android: selectionAsync (D5 — feedback sutil, sin notification
-      //   que es iOS-first).
-      //   Web: no-op (Platform.OS === 'web' filtrado abajo).
-      if (Platform.OS === 'ios') {
-        try {
-          await Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Success,
-          );
-        } catch {
-          // Haptics puede fallar en simulador o sin permisos — silencio.
-        }
-      } else if (Platform.OS === 'android') {
-        try {
-          await Haptics.selectionAsync();
-        } catch {
-          // Haptics puede fallar en simulador o sin permisos — silencio.
-        }
-      }
-      Alert.alert('Éxito', 'Parámetros tarifarios guardados');
-    } catch (e) {
-      Alert.alert('Error', String(e));
+      // El hook persiste + sync workspace store + haptics + Alert.
+      await formState.guardar();
     } finally {
       setGuardando(false);
     }
-  };
+  }, [formState]);
 
   // Flag global de indisponibilidad. Activo mientras el bootstrap no
   // resuelve (repo null) o la carga inicial sigue en curso (cargando).
@@ -621,8 +367,9 @@ export default function ParametrosTarifaForm({
   const scrollRef = useRef<ScrollView>(null);
 
   // Estado de errores de validación inline. Cada FormField con error
-  // potencial consume `errores.cma | suscriptores | vigenteHasta`.
-  const [errores, setErrores] = useState<FormErrors>({});
+  // potencial consume `formState.errores.cma | suscriptores | vigenteHasta`.
+  // El state de errores vive en el hook (setErrores internal) para que
+  // `validarTodo()` y `guardar()` lo puedan actualizar de forma consistente.
 
   return (
     <ScrollView
@@ -655,8 +402,8 @@ export default function ParametrosTarifaForm({
           <FormField
             label="Periodo (año tarifario, 5 años)"
             required
-            value={periodo}
-            onChangeText={setPeriodo}
+            value={formState.values.periodo}
+            onChangeText={formState.setters.setPeriodo}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
@@ -677,8 +424,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Vigente desde (YYYY-MM-DD)"
-            value={vigenteDesde}
-            onChangeText={setVigenteDesde}
+            value={formState.values.vigenteDesde}
+            onChangeText={formState.setters.setVigenteDesde}
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
@@ -689,13 +436,13 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Vigente hasta (YYYY-MM-DD)"
-            value={vigenteHasta}
-            onChangeText={setVigenteHasta}
+            value={formState.values.vigenteHasta}
+            onChangeText={formState.setters.setVigenteHasta}
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
             accessibilityHint="Fecha de fin de vigencia del periodo tarifario"
-            error={errores.vigenteHasta}
+            error={formState.errores.vigenteHasta}
             ref={getRef('vigenteHasta')}
             testID="param-vigente-hasta"
           />
@@ -710,14 +457,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Anio base IPC (Res CRA 825 Art. 7, default 2016)"
-            value={anioBase}
-            onChangeText={setAnioBase}
+            value={formState.values.anioBase}
+            onChangeText={formState.setters.setAnioBase}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
             helperText="Norma CRA 825: anio_base=2016 (default). Año de referencia para la tabla IPC del DANE."
-            error={errores.anioBase}
+            error={formState.errores.anioBase}
             ref={getRef('anioBase')}
             testID="param-anio-base-ipc"
           />
@@ -725,14 +472,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Anio destino (indexación)"
-            value={anioDestino}
-            onChangeText={setAnioDestino}
+            value={formState.values.anioDestino}
+            onChangeText={formState.setters.setAnioDestino}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
             helperText="Año al que se quiere indexar. Default = periodo tarifario vigente."
-            error={errores.anioDestino}
+            error={formState.errores.anioDestino}
             ref={getRef('anioDestino')}
             testID="param-anio-destino"
           />
@@ -740,14 +487,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Factor de indexación IPC (override manual)"
-            value={factorIpc}
-            onChangeText={setFactorIpc}
+            value={formState.values.factorIpc}
+            onChangeText={formState.setters.setFactorIpc}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
             helperText="Default 1.0 (sin indexación). El admin puede override manual sobre el factor calculado."
-            error={errores.factorIpc}
+            error={formState.errores.factorIpc}
             ref={getRef('factorIpc')}
             testID="param-factor-ipc"
           />
@@ -755,14 +502,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="IPUF indice (multiplicador de precios)"
-            value={ipufIndice}
-            onChangeText={setIpufIndice}
+            value={formState.values.ipufIndice}
+            onChangeText={formState.setters.setIpufIndice}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
             helperText="Multiplicador del IPUF (Res CRA 825 Art. 7). Default 1.0 (sin ajuste)."
-            error={errores.ipufIndice}
+            error={formState.errores.ipufIndice}
             ref={getRef('ipufIndice')}
             testID="param-ipuf-indice"
           />
@@ -774,7 +521,7 @@ export default function ParametrosTarifaForm({
           style={estilos.previewAltitud}
           testID="param-ipc-preview"
         >
-          {`Factor IPC calculado: ${calcularFactorIpc(entero(anioBase), entero(anioDestino)).toFixed(4)} (IPC ${entero(anioDestino)} / IPC ${entero(anioBase)})`}
+          {`Factor IPC calculado: ${calcularFactorIpc(entero(formState.values.anioBase), entero(formState.values.anioDestino)).toFixed(4)} (IPC ${entero(formState.values.anioDestino)} / IPC ${entero(formState.values.anioBase)})`}
         </Text>
       </SeccionForm>
 
@@ -783,33 +530,33 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="CMA · Costo Medio Administración ($/año, art. 9)"
-            value={cma}
-            onChangeText={setCma}
+            value={formState.values.cma}
+            onChangeText={formState.setters.setCma}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
-            error={errores.cma}
+            error={formState.errores.cma}
             ref={getRef('cma')}
             testID="param-cma"
           />
         </View>
         {/* El warning inline `param-cma-warning` se elimino en Commit 3.
             Ahora el error de CMA bajo el minimo normativo aparece
-            inline en el FormField via `error={errores.cma}` (FormField
+            inline en el FormField via `error={formState.errores.cma}` (FormField
             propaga su `error` a un TextInput con border rojo y texto
             debajo del campo). Migrar este test si rompe: T-DESIGN-3 o
             tests viejos que busquen `param-cma-warning` ya no aplican. */}
         <View style={estilos.campo}>
           <FormField
             label="CMO · Costo Medio Operación ($/m³)"
-            value={cmo}
-            onChangeText={setCmo}
+            value={formState.values.cmo}
+            onChangeText={formState.setters.setCmo}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
-            error={errores.cmo}
+            error={formState.errores.cmo}
             ref={getRef('cmo')}
             testID="param-cmo"
           />
@@ -817,8 +564,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="CMI · Costo Medio Inversión ($/m³)"
-            value={cmi}
-            onChangeText={setCmi}
+            value={formState.values.cmi}
+            onChangeText={formState.setters.setCmi}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
@@ -829,8 +576,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="CMT · Costo Medio Tasas Ambientales ($/m³)"
-            value={cmt}
-            onChangeText={setCmt}
+            value={formState.values.cmt}
+            onChangeText={formState.setters.setCmt}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
@@ -851,26 +598,26 @@ export default function ParametrosTarifaForm({
             <Text style={estilos.switchFilaLabel}>Activar CMVIAA (art. 14 Res 907/2019)</Text>
           </View>
           <Switch
-            value={aplicaCmviaa}
+            value={formState.values.aplicaCmviaa}
             onValueChange={(v) => {
               // D5 (Commit 4): Haptics.selectionAsync en onValueChange de
               // switches (feedback sutil para iOS + Android).
               if (Platform.OS !== 'web') {
                 void Haptics.selectionAsync();
               }
-              setAplicaCmviaa(v);
+              formState.setters.setAplicaCmviaa(v);
             }}
             disabled={guardando || cargandoInputs}
             accessibilityLabel="Aplicar costo medio variable de inversión ambiental"
             testID="switch-cmviaa"
           />
         </View>
-        {aplicaCmviaa && (
+        {formState.values.aplicaCmviaa && (
           <View style={estilos.campo}>
             <FormField
               label="CMVIAA · Costo Medio Variable Inv. Ambientales Adicionales ($/m³)"
-              value={cmviaa}
-              onChangeText={setCmviaa}
+              value={formState.values.cmviaa}
+              onChangeText={formState.setters.setCmviaa}
               keyboardType="numeric"
               editable={!guardando && !cargandoInputs}
               selectable
@@ -902,12 +649,12 @@ export default function ParametrosTarifaForm({
             <Text style={estilos.switchFilaLabel}>Aplicar CMAA (Res 907/2019 art. 13)</Text>
           </View>
           <Switch
-            value={aplicaCmaa}
+            value={formState.values.aplicaCmaa}
             onValueChange={(v) => {
               if (Platform.OS !== 'web') {
                 void Haptics.selectionAsync();
               }
-              setAplicaCmaa(v);
+              formState.setters.setAplicaCmaa(v);
             }}
             disabled={guardando || cargandoInputs}
             accessibilityLabel="Aplicar CMAA (Res 907/2019 art. 13)"
@@ -917,14 +664,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="CMAA · Costo Medio Admin. Inversiones Ambientales Adic. ($/suscriptor/mes)"
-            value={cmaa}
-            onChangeText={setCmaa}
+            value={formState.values.cmaa}
+            onChangeText={formState.setters.setCmaa}
             keyboardType="numeric"
             // Phase 2 task 2.4: input deshabilitado si flag apagado.
             // Si flag ON, el input se habilita pero sigue sujeto a
             // !guardando && !cargandoInputs como el resto del form.
-            editable={!guardando && !cargandoInputs && aplicaCmaa}
-            selectable={aplicaCmaa}
+            editable={!guardando && !cargandoInputs && formState.values.aplicaCmaa}
+            selectable={formState.values.aplicaCmaa}
             tabularNums
             helperText="Solo aplica a servicio de ACUEDUCTO. Res CRA 907/2019 art. 14 (mod. art. 9 Res CRA 825/2017). El flag de arriba debe estar activo."
             testID="param-cmaa"
@@ -939,8 +686,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Agua Suministrada año base (m³/año)"
-            value={aguaSuministrada}
-            onChangeText={setAguaSuministrada}
+            value={formState.values.aguaSuministrada}
+            onChangeText={formState.setters.setAguaSuministrada}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
@@ -951,8 +698,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="IPUF (m³/suscriptor/mes, art. 5, estándar 6)"
-            value={ipuf}
-            onChangeText={setIpuf}
+            value={formState.values.ipuf}
+            onChangeText={formState.setters.setIpuf}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
@@ -964,13 +711,13 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Suscriptores promedio (N) — divisor de CF = CMA/N"
-            value={suscriptoresPromedio}
-            onChangeText={setSuscriptoresPromedio}
+            value={formState.values.suscriptoresPromedio}
+            onChangeText={formState.setters.setSuscriptoresPromedio}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
             tabularNums
-            error={errores.suscriptores}
+            error={formState.errores.suscriptores}
             ref={getRef('suscriptores')}
             testID="param-suscriptores"
           />
@@ -985,8 +732,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Altitud del prestador (msnm)"
-            value={altitud}
-            onChangeText={setAltitud}
+            value={formState.values.altitud}
+            onChangeText={formState.setters.setAltitud}
             keyboardType="numeric"
             editable={!guardando && !cargandoInputs}
             selectable
@@ -999,7 +746,7 @@ export default function ParametrosTarifaForm({
           style={estilos.previewAltitud}
           testID="param-altitud-preview"
         >
-          {`Limite de consumo basico: ${limiteConsumoBasicoMensual(num(altitud))} m3/mes (altitud ${num(altitud)} msnm)`}
+          {`Limite de consumo basico: ${limiteConsumoBasicoMensual(num(formState.values.altitud))} m3/mes (altitud ${num(formState.values.altitud)} msnm)`}
         </Text>
       </SeccionForm>
 
@@ -1015,14 +762,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Acto administrativo de adopcion (URL, decreto/resolucion)"
-            value={actoAdopcion}
-            onChangeText={setActoAdopcion}
+            value={formState.values.actoAdopcion}
+            onChangeText={formState.setters.setActoAdopcion}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!guardando && !cargandoInputs}
             keyboardType="url"
             placeholder="https://..."
-            error={errores.actoAdopcion}
+            error={formState.errores.actoAdopcion}
             ref={getRef('actoAdopcion')}
             accessibilityHint="URL del acto administrativo que adopta la metodologia tarifaria"
             testID="param-acto-adopcion"
@@ -1031,8 +778,8 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="ID estudio de costos (referencia externa, ej: SUI)"
-            value={estudioCostosId}
-            onChangeText={setEstudioCostosId}
+            value={formState.values.estudioCostosId}
+            onChangeText={formState.setters.setEstudioCostosId}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!guardando && !cargandoInputs}
@@ -1043,14 +790,14 @@ export default function ParametrosTarifaForm({
         <View style={estilos.campo}>
           <FormField
             label="Documento soporte del estudio (URL, PDF u otro)"
-            value={documentoSoporteUrl}
-            onChangeText={setDocumentoSoporteUrl}
+            value={formState.values.documentoSoporteUrl}
+            onChangeText={formState.setters.setDocumentoSoporteUrl}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!guardando && !cargandoInputs}
             keyboardType="url"
             placeholder="https://..."
-            error={errores.documentoSoporteUrl}
+            error={formState.errores.documentoSoporteUrl}
             ref={getRef('documentoSoporteUrl')}
             accessibilityHint="URL del documento soporte del estudio de costos"
             testID="param-documento-soporte-url"
@@ -1064,7 +811,7 @@ export default function ParametrosTarifaForm({
         icono="save"
         iconoComponente={<IconoGuardar colorIcono={COLORS.onPrimary} testID="param-guardar-icon" />}
         tono="azul"
-        onPress={guardar}
+        onPress={handleGuardar}
         disabled={cargandoInputs}
         cargando={guardando}
         testID="param-guardar"
