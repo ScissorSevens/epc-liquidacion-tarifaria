@@ -6,6 +6,10 @@ coverage/
 # SDD artifacts 
 .atl/
 openspec/
+.agents/
+.claude/    
+skills-lock.json
+
 
 # Mobile (Expo) — defensa en profundidad, mobile/.gitignore ya cubre lo suyo
 mobile/node_modules/
