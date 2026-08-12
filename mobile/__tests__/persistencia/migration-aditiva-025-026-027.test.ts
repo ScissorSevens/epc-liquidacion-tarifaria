@@ -267,10 +267,12 @@ ALTER TABLE t1 ADD COLUMN c REAL;
     expect(expo).not.toMatch(/ALTER\\\\s\+TABLE\\\\s\+\$\{tabla\}/);
 
     // 3. El cuerpo del dispatch (entre `{` y `}`) debe invocar al helper.
-    //    Aceptamos que haya lineas de codigo entre la llamada al helper y el cierre
-    //    del bloque (comentarios, `db.runAsync` para registrar la migracion, etc).
+    //    Cleanup A-1 (post-archive `param-tarifa-residuales-cra-825`):
+    //    el dispatch ahora usa `migracion.kind === 'aditiva'` en lugar
+    //    de la lista hardcoded de versiones (25 || 26 || ...). Verificamos
+    //    el nuevo patron.
     const dispatchMatch = expo.match(
-      /if\s*\(\s*migracion\.version\s*===\s*25[\s\S]*?\n\s*\}\s*\n/,
+      /if\s*\(\s*migracion\.kind\s*===\s*['"]aditiva['"][\s\S]*?\n\s*\}\s*\n/,
     );
     expect(dispatchMatch).not.toBeNull();
     expect(dispatchMatch![0]).toMatch(/aplicarMigrationAditivaIdempotenteExpo/);

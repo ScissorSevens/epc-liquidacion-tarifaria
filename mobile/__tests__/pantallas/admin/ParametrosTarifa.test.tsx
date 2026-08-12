@@ -233,7 +233,7 @@ const parametrosFixture: ParametrosTarifa = {
   id_acuerdo: 100,
   periodo: 2026,
   cma: 12_345_678,
-  cmo: 450,
+  cmo: 500,
   cmi: 120,
   cmt: 80,
   cmviaa: 0,
@@ -245,7 +245,7 @@ const parametrosFixture: ParametrosTarifa = {
   m3_gratis_minimo_vital: 0,
   ipuf_indice: 1.0,
   cargo_fijo_resultante: 12_345_678,
-  cargo_consumo_resultante: 450 + 120 + 80,
+  cargo_consumo_resultante: 500 + 120 + 80,
   componentes_aplicables: ['CMA', 'CMO', 'CMI', 'CMT', 'CMVIAA'],
   minimo_vital: null,
   vigente_desde: '2025-01-01',
@@ -330,7 +330,7 @@ describe('ParametrosTarifaForm', () => {
       expect(getByText('Periodo y vigencia')).toBeTruthy();
       expect(getByText('Costos medios (estudio de costos del prestador)')).toBeTruthy();
       expect(getByText('Agua y suscriptores (insumo ASP = AS - IPUF×12×N)')).toBeTruthy();
-      expect(getByText('Mínimo vital (Decreto 776/2025 — opcional)')).toBeTruthy();
+      // Phase 3 task 3.2 (GREEN): sección "Mínimo vital" eliminada del form.
       // Botón guardar presente.
       expect(getByText('Guardar Parámetros')).toBeTruthy();
     });
@@ -446,20 +446,9 @@ fireEvent.press(back);
       expect(UNSAFE_getByProps({ testID: 'seccion-card-agua' })).toBeTruthy();
     });
 
-    it('T-IMPC-MIG-4 existe seccion-card-minimo-vital', () => {
-      const repo = crearRepoFake();
-      const acuerdoRepo = crearAcuerdoRepoFake();
-      const { UNSAFE_getByProps } = renderConSafeArea(
-        <ParametrosTarifaForm
-          id_prestador={7}
-          id_acuerdo={100}
-          parametrosActuales={parametrosFixture}
-          repo={repo}
-          acuerdoRepo={acuerdoRepo}
-        />,
-      );
-      expect(UNSAFE_getByProps({ testID: 'seccion-card-minimo-vital' })).toBeTruthy();
-    });
+    // Phase 3 task 3.2 (GREEN): T-IMPC-MIG-4 (seccion-card-minimo-vital)
+    // se ELIMINA — la sección de mínimo vital ya no existe en el form
+    // (Opción A: la fuente de verdad es la tabla `minimo_vital`).
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -484,7 +473,7 @@ fireEvent.press(back);
       });
       const ids = [
         'param-periodo',
-        'param-anio-base',
+        'param-anio-base-ipc',
         'param-vigente-desde',
         'param-vigente-hasta',
         'param-cma',
@@ -732,17 +721,37 @@ fireEvent.press(back);
       alertSpy.mockRestore();
     });
 
-    it('T-IMPC-13 validarCmaMinimo del dominio se invoca (no bypass inline)', () => {
+    it('T-IMPC-13 validarCmaMinimo del dominio se invoca via el hook (no bypass inline)', () => {
       // El screen debe importar y usar `validarCmaMinimo()` del dominio
       // para validar el CMA, NO una comparación inline `num(cma) < 2890`.
-      const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+      //
+      // Phase 1 task 1.5 (DECOMPOSE): la validación se movió al hook
+      // `useParametrosFormState`. Esta regression guard verifica el HOOK
+      // + el módulo puro de validación (cleanup F3 del verify-report de
+      // `parametros-tarifa-screen-decomposition`: la validación se
+      // extrajo a `utils/validar-parametros-form.ts` como módulo puro
+      // testeable, y el hook lo invoca por delegación).
+      const sourceHook = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
+        ),
         'utf8',
       );
-      // Importación del dominio.
-      expect(source).toMatch(/validarCmaMinimo/);
-      // Invocación dentro de un try/catch (D4 hallazgo critico).
-      expect(source).toMatch(/try\s*\{[^}]*validarCmaMinimo/s);
+      const sourcePure = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/utils/validar-parametros-form.ts',
+        ),
+        'utf8',
+      );
+      // El hook importa el modulo puro de validacion.
+      expect(sourceHook).toMatch(/validarParametrosForm/);
+      // El modulo puro importa validarCmaMinimo del dominio.
+      expect(sourcePure).toMatch(/validarCmaMinimo/);
+      // Invocacion dentro de un try/catch (D4 hallazgo critico, ahora
+      // en el modulo puro).
+      expect(sourcePure).toMatch(/try\s*\{[^}]*validarCmaMinimo/s);
     });
   });
 
@@ -1172,7 +1181,7 @@ fireEvent.press(back);
     it('T-PT-GUARDAR-5 prefill con `parametrosActuales` propaga los cargos existentes al form', async () => {
       const repo = crearRepoFake();
       const acuerdoRepo = crearAcuerdoRepoFake(100);
-      const { getByDisplayValue } = renderConSafeArea(
+      const { getByTestId } = renderConSafeArea(
         <ParametrosTarifaForm
           id_prestador={7}
           id_acuerdo={100}
@@ -1183,8 +1192,11 @@ fireEvent.press(back);
       );
 
       // El periodo pre-rellenado debe aparecer en el form.
+      // Phase 3 task 3.4 (GREEN): usamos `param-periodo` testID
+      // especifico porque ahora `param-anio-destino` también
+      // muestra "2026" por el default del periodo.
       await waitFor(() => {
-        expect(getByDisplayValue('2026')).toBeTruthy();
+        expect(getByTestId('param-periodo').props.value).toBe('2026');
       });
     });
   });
@@ -1237,7 +1249,7 @@ fireEvent.press(back);
       await waitFor(() => {
         expect(getByTestId('param-cma').props.value).toBe('12345678');
       });
-      expect(getByTestId('param-cmo').props.value).toBe('450');
+      expect(getByTestId('param-cmo').props.value).toBe('500');
       expect(getByTestId('param-periodo').props.value).toBe('2026');
       // Suscriptores: 350
       expect(getByTestId('param-suscriptores').props.value).toBe('350');
@@ -1468,14 +1480,16 @@ fireEvent.press(back);
       // numérico SIEMPRE renderizado y verificamos que su style efectivo
       // tiene minHeight/height ≥ 44 (WCAG 2.5.5).
       //
-      // `param-cmviaa` y `param-m3gratis` son CONDICIONALES
-      // (renderizan solo si aplica_cmviaa=true o aplica_minimo_vital=true).
-      // En el fixture ambos flags son false → no se renderizan. Los
-      // cubrimos con un render separado que fuerza ambos toggles activos.
+      // `param-cmviaa` es CONDICIONAL (renderiza solo si aplica_cmviaa=true).
+      // En el fixture el flag es false → no se renderiza. Lo cubrimos
+      // con un render separado que fuerza el toggle activo.
+      //
+      // Phase 3 task 3.2 (GREEN): `param-m3gratis` se ELIMINA del form
+      // (Opción A: el form ya no captura mínimo vital).
       const { getByTestId, getByLabelText } = renderEstable();
       const testIdsSiempreRenderizados = [
         'param-periodo',
-        'param-anio-base',
+        'param-anio-base-ipc',
         'param-vigente-desde',
         'param-vigente-hasta',
         'param-cma',
@@ -1496,23 +1510,19 @@ fireEvent.press(back);
         const alto = estilo.minHeight ?? estilo.height ?? 0;
         expect(alto).toBeGreaterThanOrEqual(44);
       }
-      // Activamos los toggles para que los inputs condicionales
-      // rendericen y podamos auditarlos.
+      // Activamos el toggle CMVIAA para que el input condicional
+      // renderice y podamos auditarlos.
       fireEvent(getByLabelText('Aplicar costo medio variable de inversión ambiental'), 'valueChange', true);
-      fireEvent(getByLabelText('Aplicar mínimo vital'), 'valueChange', true);
       await waitFor(() => {
         expect(getByTestId('param-cmviaa')).toBeTruthy();
       });
-      expect(getByTestId('param-m3gratis')).toBeTruthy();
-      for (const id of ['param-cmviaa', 'param-m3gratis']) {
-        const input = getByTestId(id);
-        const estilo = StyleSheet.flatten(input.props.style) as {
-          minHeight?: number;
-          height?: number;
-        };
-        const alto = estilo.minHeight ?? estilo.height ?? 0;
-        expect(alto).toBeGreaterThanOrEqual(44);
-      }
+      const input = getByTestId('param-cmviaa');
+      const estilo = StyleSheet.flatten(input.props.style) as {
+        minHeight?: number;
+        height?: number;
+      };
+      const alto = estilo.minHeight ?? estilo.height ?? 0;
+      expect(alto).toBeGreaterThanOrEqual(44);
     });
 
     it('T-CRAFT-3 el campoFila (fila del Switch) tiene minHeight ≥ 48 (WCAG 2.5.5)', async () => {
@@ -1530,10 +1540,18 @@ fireEvent.press(back);
       const filas = UNSAFE_getAllByProps({ accessibilityLabel: switchCmviaa.props.accessibilityLabel });
       expect(filas.length).toBeGreaterThanOrEqual(1);
       // La fila tiene flexDirection row + justifyContent space-between
-      // + minHeight. Lo verificamos en el source del screen para no
-      // depender del tree-walking.
+      // + minHeight.
+      //
+      // Decompose Phase 2 task 2.7 (REFACTOR): el bloque `campoFila`
+      // se movió del screen a `ParametrosTarifaCostos.tsx` (subcomponente
+      // que agrupa los 2 switches CMVIAA + CMAA). Esta regression guard
+      // ahora verifica el SUBCOMPONENTE source — el screen consume
+      // el subcomponente, el subcomponente tiene el style block.
       const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/componentes/ParametrosTarifaCostos.tsx',
+        ),
         'utf8',
       );
       const bloque = source.match(/campoFila:\s*\{([\s\S]*?)\n\s*\},?/);
@@ -1608,22 +1626,77 @@ fireEvent.press(back);
       // Verificamos que el SCREEN mencione `selectable` en su codigo.
       // La implementación real vive en FormField (que recibe `selectable`
       // como prop y lo forwarda al TextInput).
-      const source = fs.readFileSync(
+      //
+      // Decompose Phase 2 task 2.7 (REFACTOR): los FormField numéricos
+      // se movieron del screen a los 6 subcomponentes. Esta regression
+      // guard ahora verifica el SCREEN O CUALQUIER SUBCOMPONENTE — el
+      // screen consume los subcomponentes, los subcomponentes tienen
+      // los FormField numéricos con `selectable`.
+      const screenSource = fs.readFileSync(
         path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
         'utf8',
       );
-      expect(source).toMatch(/selectable/);
+      const subComponentes = [
+        'componentes/ParametrosTarifaPeriodo.tsx',
+        'componentes/ParametrosTarifaCostos.tsx',
+        'componentes/ParametrosTarifaAgua.tsx',
+        'componentes/ParametrosTarifaAltitud.tsx',
+        'componentes/ParametrosTarifaSoporte.tsx',
+        'componentes/ParametrosTarifaIPC.tsx',
+      ];
+      const fuenteTiene: string[] = [];
+      if (/selectable/.test(screenSource)) {
+        fuenteTiene.push('ParametrosTarifa.tsx');
+      }
+      for (const sub of subComponentes) {
+        const src = fs.readFileSync(
+          path.join(__dirname, `../../../src/pantallas/admin/${sub}`),
+          'utf8',
+        );
+        if (/selectable/.test(src)) {
+          fuenteTiene.push(sub);
+        }
+      }
+      // Debe existir en al menos 1 fuente (screen o subcomponentes).
+      expect(fuenteTiene.length).toBeGreaterThanOrEqual(1);
     });
 
     it('T-CRAFT-8 el source del screen pide FormField con soporte de fontVariant tabular-nums', async () => {
       // El screen debe pasar tabular-nums (o fontVariant que lo
       // produzca) en los inputs numéricos. Verificamos que el codigo
       // del screen mencione `tabularNums` o `fontVariant` como prop.
-      const source = fs.readFileSync(
+      //
+      // Decompose Phase 2 task 2.7 (REFACTOR): los FormField numéricos
+      // con tabularNums se movieron del screen a los 6 subcomponentes.
+      // Esta regression guard ahora verifica el SCREEN O CUALQUIER
+      // SUBCOMPONENTE.
+      const screenSource = fs.readFileSync(
         path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
         'utf8',
       );
-      expect(source).toMatch(/tabularNums|tabular-nums/);
+      const subComponentes = [
+        'componentes/ParametrosTarifaPeriodo.tsx',
+        'componentes/ParametrosTarifaCostos.tsx',
+        'componentes/ParametrosTarifaAgua.tsx',
+        'componentes/ParametrosTarifaAltitud.tsx',
+        'componentes/ParametrosTarifaSoporte.tsx',
+        'componentes/ParametrosTarifaIPC.tsx',
+      ];
+      const fuenteTiene: string[] = [];
+      if (/tabularNums|tabular-nums|fontVariant/.test(screenSource)) {
+        fuenteTiene.push('ParametrosTarifa.tsx');
+      }
+      for (const sub of subComponentes) {
+        const src = fs.readFileSync(
+          path.join(__dirname, `../../../src/pantallas/admin/${sub}`),
+          'utf8',
+        );
+        if (/tabularNums|tabular-nums|fontVariant/.test(src)) {
+          fuenteTiene.push(sub);
+        }
+      }
+      // Debe existir en al menos 1 fuente (screen o subcomponentes).
+      expect(fuenteTiene.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -1665,11 +1738,18 @@ fireEvent.press(back);
       expect(source).not.toMatch(/COLORES_NATIVOS/);
     });
 
-    it('T-NATIVE-2 el screen usa haptics segun plataforma (Platform.OS branch)', () => {
+    it('T-NATIVE-2 el hook usa haptics segun plataforma (Platform.OS branch)', () => {
       // D5 (Commit 4): el screen distingue iOS de Android para el haptic
       // post-guardar (iOS → notificationAsync, Android → selectionAsync).
+      //
+      // Phase 1 task 1.5 (DECOMPOSE): el haptic feedback se movió al
+      // hook `useParametrosFormState.guardar()`. Esta regression guard
+      // ahora verifica el HOOK source — el screen consume el hook.
       const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
+        ),
         'utf8',
       );
       // Platform.OS === 'ios' branch presente.
@@ -1856,7 +1936,16 @@ fireEvent.press(back);
      * fila para confirmar que el wrapper respeta el target size.
      */
     it('T-DESIGN-5: Pressable y campoFila tienen minHeight >= 44 (WCAG 2.5.5)', () => {
-      const source = readSource();
+      // Decompose Phase 2 task 2.7 (REFACTOR): el bloque `campoFila`
+      // se movió del screen a `ParametrosTarifaCostos.tsx`. Esta
+      // regression guard ahora verifica el SUBCOMPONENTE source.
+      const source = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/componentes/ParametrosTarifaCostos.tsx',
+        ),
+        'utf8',
+      );
       // El bloque campoFila (fila del Switch) tiene minHeight explicito.
       const campoFilaBloque = source.match(/campoFila:\s*\{([\s\S]*?)\n\s*\},?/);
       expect(campoFilaBloque).not.toBeNull();
@@ -1867,8 +1956,13 @@ fireEvent.press(back);
       heights.forEach((h) => {
         expect(h).toBeGreaterThanOrEqual(44);
       });
-      // El botón guardar (BotonPrimario) usa height 56 nativo >= 44.
-      expect(source).toMatch(/param-guardar/);
+      // El botón guardar (BotonPrimario) sigue en el screen — verificamos
+      // que el screen renderee `param-guardar`.
+      const screenSource = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(screenSource).toMatch(/param-guardar/);
     });
 
     /**
@@ -2037,7 +2131,7 @@ fireEvent.press(back);
         cma: 77_777_777,
         suscriptores_promedio: 350,
         cargo_fijo_resultante: 77_777_777,
-        cargo_consumo_resultante: 450 + 120 + 80,
+        cargo_consumo_resultante: 500 + 120 + 80,
       };
       repo.guardar.mockResolvedValueOnce(nuevosParams);
       repo.buscarVigente.mockResolvedValueOnce(null);
@@ -2072,7 +2166,7 @@ fireEvent.press(back);
       const arg = setParametrosVigentes.mock.calls[0]![0] as ParametrosTarifa;
       // El payload guardado incluye los cargos pre-calculados.
       expect(arg.cargo_fijo_resultante).toBe(77_777_777);
-      expect(arg.cargo_consumo_resultante).toBe(450 + 120 + 80);
+      expect(arg.cargo_consumo_resultante).toBe(500 + 120 + 80);
       expect(arg.cma).toBe(77_777_777);
       stateSpy.mockRestore();
     });
@@ -2144,11 +2238,11 @@ fireEvent.press(back);
       await waitFor(() => {
         expect(getByTestId('param-periodo').props.value).toBe('2026');
       });
-      expect(getByTestId('param-anio-base').props.value).toBe('2016');
+      expect(getByTestId('param-anio-base-ipc').props.value).toBe('2016');
       expect(getByTestId('param-vigente-desde').props.value).toBe('2025-01-01');
       expect(getByTestId('param-vigente-hasta').props.value).toBe('2029-12-31');
       expect(getByTestId('param-cma').props.value).toBe('12345678');
-      expect(getByTestId('param-cmo').props.value).toBe('450');
+      expect(getByTestId('param-cmo').props.value).toBe('500');
       expect(getByTestId('param-cmi').props.value).toBe('120');
       expect(getByTestId('param-cmt').props.value).toBe('80');
       expect(getByTestId('param-agua').props.value).toBe('50000');
@@ -2199,12 +2293,12 @@ fireEvent.press(back);
       expect(getByText('Parámetros Tarifarios')).toBeTruthy();
       // El subtitulo menciona el id_prestador.
       expect(getByText(/Prestador #7/)).toBeTruthy();
-      // Las 4 secciones del form deben estar presentes (orden
-      // logico: Periodo → Costos → Agua → Minimo vital).
+      // Las secciones del form deben estar presentes (orden
+      // logico: Periodo → Costos → Agua → Altitud → Soporte doc).
+      // Phase 3 task 3.2 (GREEN): "Mínimo vital" se ELIMINA del form.
       expect(getByText('Periodo y vigencia')).toBeTruthy();
       expect(getByText('Costos medios (estudio de costos del prestador)')).toBeTruthy();
       expect(getByText('Agua y suscriptores (insumo ASP = AS - IPUF×12×N)')).toBeTruthy();
-      expect(getByText('Mínimo vital (Decreto 776/2025 — opcional)')).toBeTruthy();
       // El CTA guardar debe estar presente.
       expect(getByTestId('param-guardar')).toBeTruthy();
     });
@@ -2231,7 +2325,7 @@ fireEvent.press(back);
       // los 13 testIDs que cubren todos los FormFields numéricos.
       const testIds = [
         'param-periodo',
-        'param-anio-base',
+        'param-anio-base-ipc',
         'param-vigente-desde',
         'param-vigente-hasta',
         'param-cma',
@@ -2255,14 +2349,142 @@ fireEvent.press(back);
       }
     });
 
-    it('T-A11Y-2 los Switches (CMVIAA y minimo vital) tienen accessibilityLabel definido', () => {
+    it('T-A11Y-2 los Switches (CMVIAA y CMAA) tienen accessibilityLabel definido', () => {
+      // Phase 3 task 3.2 (GREEN): el switch de "Aplicar mínimo vital"
+      // se ELIMINÓ del form (Opción A). El test ahora valida CMVIAA
+      // y CMAA (los 2 switches restantes con accessibilityLabel).
       const { getByLabelText } = renderConDatos();
-      // El Switch CMVIAA tiene accessibilityLabel explicito (lo
-      // pasamos en el callsite). Mismo patron para minimo vital.
       const switchCmviaa = getByLabelText('Aplicar costo medio variable de inversión ambiental');
       expect(switchCmviaa).toBeTruthy();
-      const switchMinimoVital = getByLabelText('Aplicar mínimo vital');
-      expect(switchMinimoVital).toBeTruthy();
+      const switchCmaa = getByLabelText('Aplicar CMAA (Res 907/2019 art. 13)');
+      expect(switchCmaa).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // T-CMOG: validación inline del CMOG mínimo normativo (Res CRA 825
+  // Art. 18) en `validarTodo()`.
+  //
+  // Cambio `param-tarifa-residuales-cra-825` Phase 1 task 1.1 (RED).
+  // El dominio ya tiene `validarCmogMinimo(cmo, servicio)` desde
+  // `param-tarifa-res-825-compliance-phase2` task 2.6. Falta invocarlo
+  // desde el screen para bloquear el "Guardar" si el CMOG está por
+  // debajo del mínimo normativo.
+  //
+  // Minimos normativos:
+  //   - acueducto:    $467/m³  (CMOG_MINIMO_ACUEDUCTO)
+  //   - alcantarillado: $169/m³ (CMOG_MINIMO_ALCANTARILLADO)
+  //
+  // El servicio se hardcodea en 'acueducto' por ahora (Hallazgo #6
+  // deferred a futuro: la app solo cubre acueducto).
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-CMOG: validación CMOG mínimo normativo inline (Res CRA 825 Art. 18)', () => {
+    // Helper: arma inputs válidos para todas las validaciones excepto
+    // CMOG. CMA = 12_000_000 (>= 2890), N = 300 (> 0), IPUF 6, etc.
+    // El único input que el caller controla es `param-cmo` via
+    // `cmoValue`.
+    async function renderYSetCmo(cmoValue: string) {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const result = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Inputs válidos para todas las validaciones EXCEPTO CMOG.
+      await act(async () => {
+        fireEvent.changeText(result.getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(result.getByTestId('param-cmi'), '200');
+        fireEvent.changeText(result.getByTestId('param-cmt'), '100');
+        fireEvent.changeText(result.getByTestId('param-suscriptores'), '300');
+        // El CMO es lo que controla el caller (debe ser lo unico
+        // que dispara la validacion CMOG).
+        fireEvent.changeText(result.getByTestId('param-cmo'), cmoValue);
+      });
+      return { ...result, repo };
+    }
+
+    it('T-CMOG-1: cmo = $0 (bajo mínimo $467) bloquea guardar + muestra error inline', async () => {
+      const { getByTestId, queryByText, repo } = await renderYSetCmo('0');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // El repo NO se invoca (la validación inline bloquea el guardado).
+      expect(repo.guardar).not.toHaveBeenCalled();
+      // El error inline de CMOG aparece en el árbol.
+      await waitFor(() => {
+        expect(queryByText(/CMOG.*normativo/i)).toBeTruthy();
+      });
+    });
+
+    it('T-CMOG-2: cmo = $100 (bajo mínimo $467) bloquea guardar + muestra error inline', async () => {
+      const { getByTestId, queryByText, repo } = await renderYSetCmo('100');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      expect(repo.guardar).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(queryByText(/CMOG.*normativo/i)).toBeTruthy();
+      });
+    });
+
+    it('T-CMOG-3: cmo = $500 (sobre mínimo $467 acueducto) permite guardar', async () => {
+      const { getByTestId, repo } = await renderYSetCmo('500');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('T-CMOG-4: cmo = $1000 (sobre mínimo $467 acueducto) permite guardar', async () => {
+      const { getByTestId, repo } = await renderYSetCmo('1000');
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('T-CMOG-5: el screen importa `validarCmogMinimo` del dominio (no hardcoded)', () => {
+      // Regression guard: el screen debe invocar `validarCmogMinimo()`
+      // del dominio. La implementación NO debe usar una comparación
+      // inline hardcoded contra 467 (constante congelada del dominio).
+      //
+      // Phase 1 task 1.5 (DECOMPOSE): la validación se movió al hook
+      // `useParametrosFormState`. Cleanup F3 (verify-report): se
+      // extrajo a modulo puro `utils/validar-parametros-form.ts`.
+      // Esta regression guard verifica ambos archivos: el hook
+      // (delegacion) + el modulo puro (invocacion del dominio).
+      const sourceHook = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
+        ),
+        'utf8',
+      );
+      const sourcePure = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/utils/validar-parametros-form.ts',
+        ),
+        'utf8',
+      );
+      // El hook importa el modulo puro.
+      expect(sourceHook).toMatch(/validarParametrosForm/);
+      // El modulo puro importa validarCmogMinimo del dominio.
+      expect(sourcePure).toMatch(/validarCmogMinimo/);
+      // Invocacion dentro de un try/catch (mismo patron que validarCmaMinimo).
+      expect(sourcePure).toMatch(/try\s*\{[^}]*validarCmogMinimo/s);
+      // Servicio hardcoded a 'acueducto' (Hallazgo #6 deferred).
+      expect(sourcePure).toMatch(/validarCmogMinimo\s*\(\s*[^,]+,\s*['"]acueducto['"]/);
     });
   });
 
@@ -2387,6 +2609,411 @@ fireEvent.press(back);
       await waitFor(() => {
         expect(segunda.getByTestId('param-cma').props.value).toBe('4000000');
       });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Phase 2 task 2.3 (RED) — Toggle `aplica_cmaa` en pantalla.
+  //
+  // Res CRA 907/2019 art. 13 (mod. Res CRA 825/2017 art. 9): el CMAA
+  // (Costo Medio de Administración por Inversiones Ambientales
+  // Adicionales) requiere un FLAG EXPLICITO en el form admin. Antes
+  // de Phase 2, el motor inferia `aplica_cmaa = cmaa > 0`, lo que
+  // permitia que un admin que setea `cmaa = 0` por error apague el
+  // CMAA sin warning.
+  //
+  // Contratos:
+  //   T-CMAA-UI-1: switch ON  → input cmaa editable
+  //   T-CMAA-UI-2: switch OFF → input cmaa deshabilitado (defensa UX)
+  //   T-CMAA-UI-3: persistencia — switch ON + cmaa=5000 → guardado
+  //                en DB con flag=true y cmaa=5000
+  //
+  // Decision B/B/B: el flag es la fuente de verdad. El input se
+  // renderiza siempre (el form muestra "0" como default) pero se
+  // bloquea cuando el flag esta OFF para evitar confusion del admin.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-CMAA-UI: toggle `aplica_cmaa` en pantalla (Phase 2 task 2.3)', () => {
+    it('T-CMAA-UI-1 switch `aplicaCmaa` ON habilita el input `param-cmaa`', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByLabelText, getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El input CMAA existe (el form lo renderiza siempre) pero
+      // arranca deshabilitado porque el flag es false por default.
+      const inputCmaaInicial = getByTestId('param-cmaa');
+      expect(inputCmaaInicial.props.editable).toBe(false);
+
+      // Activamos el switch via accessibilityLabel.
+      await act(async () => {
+        fireEvent(
+          getByLabelText('Aplicar CMAA (Res 907/2019 art. 13)'),
+          'valueChange',
+          true,
+        );
+      });
+
+      // Tras activar el switch, el input CMAA debe estar habilitado.
+      await waitFor(() => {
+        expect(getByTestId('param-cmaa').props.editable).toBe(true);
+      });
+    });
+
+    it('T-CMAA-UI-2 switch OFF mantiene el input `param-cmaa` deshabilitado', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El input CMAA arranca deshabilitado (flag false por default).
+      expect(getByTestId('param-cmaa').props.editable).toBe(false);
+      // El input permanece deshabilitado aunque el usuario
+      // interactue con el form (defensa UX: no se puede tipear un
+      // valor monetario si el flag conceptual esta apagado).
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cmaa'), '5000');
+      });
+      // El editable permanece en false.
+      expect(getByTestId('param-cmaa').props.editable).toBe(false);
+    });
+
+    it('T-CMAA-UI-3 switch ON + cmaa=5000 persiste en DB con flag=true y cmaa=5000', async () => {
+      const repo = crearRepoFake();
+      repo.buscarVigente.mockResolvedValueOnce(null);
+      const acuerdoRepo = crearAcuerdoRepoFake(100);
+      const { getByLabelText, getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={null}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // Inputs base validos (la validacion inline requiere CMA/CMO/N
+      // minimos).
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cma'), '12000000');
+        fireEvent.changeText(getByTestId('param-cmo'), '500');
+        fireEvent.changeText(getByTestId('param-cmi'), '200');
+        fireEvent.changeText(getByTestId('param-cmt'), '100');
+        fireEvent.changeText(getByTestId('param-suscriptores'), '300');
+        // Activamos CMAA via switch.
+        fireEvent(
+          getByLabelText('Aplicar CMAA (Res 907/2019 art. 13)'),
+          'valueChange',
+          true,
+        );
+      });
+      // Esperamos a que el input CMAA quede habilitado (es async por
+      // el state update de React).
+      await waitFor(() => {
+        expect(getByTestId('param-cmaa').props.editable).toBe(true);
+      });
+      // Tipeamos el valor monetario del CMAA.
+      await act(async () => {
+        fireEvent.changeText(getByTestId('param-cmaa'), '5000');
+      });
+      // Click en guardar.
+      await act(async () => {
+        fireEvent.press(getByTestId('param-guardar'));
+      });
+      // El repo.guardar fue invocado con flag=true y cmaa=5000.
+      await waitFor(() => {
+        expect(repo.guardar).toHaveBeenCalledTimes(1);
+      });
+      const arg = repo.guardar.mock.calls[0]![0] as {
+        aplica_cmaa: boolean;
+        cmaa: number;
+      };
+      expect(arg.aplica_cmaa).toBe(true);
+      expect(arg.cmaa).toBe(5000);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Phase 3 task 3.1 (RED): tests contractuales para Opción A del
+  // Hallazgo #5. La fuente de verdad del mínimo vital es la tabla
+  // separada `minimo_vital` (futuro módulo admin). El form NO debe
+  // capturar `aplicaMinimoVital` ni `m3Gratis` porque:
+  //   (1) La pantalla persiste esos campos en `parametros_tarifa`
+  //       pero la tabla `minimo_vital` (fuente de verdad) queda
+  //       SIEMPRE vacía → el motor nunca aplica el mínimo vital
+  //       aunque el admin haya activado el flag.
+  //   (2) La duplicación entre el form y la tabla hermana es
+  //       confusa para el operador.
+  //
+  // Decisión B/B/B: Opción A. El form elimina esos inputs. La
+  // columna `aplica_minimo_vital` queda en `parametros_tarifa` por
+  // backward-compat pero se hardcodea a `false` en el buildBorrador
+  // (no es user-driven). Type-level: `@deprecated` en JSDoc.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-MIN-VITAL: Opción A — campos minimo vital removidos del form (Phase 3 task 3.1)', () => {
+    it('T-MIN-VITAL-1: la sección Mínimo vital NO se renderiza en el form (sin inputs aplicaMinimoVital ni m3Gratis)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { queryByTestId, queryByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+
+      // Esperar a que el form esté estable.
+      await waitFor(() => {
+        expect(queryByTestId('param-cma')).toBeTruthy();
+      });
+
+      // La sección ya no debe existir.
+      expect(queryByTestId('seccion-card-minimo-vital')).toBeNull();
+      // El switch de minimo vital NO debe existir.
+      expect(queryByTestId('switch-minimo-vital')).toBeNull();
+      // El input m3gratis NO debe existir.
+      expect(queryByTestId('param-m3gratis')).toBeNull();
+      // El label del titulo de la sección no debe renderizarse.
+      expect(queryByText(/Mínimo vital/i)).toBeNull();
+    });
+
+    it('T-MIN-VITAL-2: buildBorradorLocal NO propaga form.aplicaMinimoVital ni form.m3Gratis al output', () => {
+      // Regression guard: el helper NO debe leer `form.aplicaMinimoVital`
+      // ni `form.m3Gratis`. Si los lee, alguien podria reintroducir
+      // los inputs en el form sin advertir la duplicación con la tabla
+      // `minimo_vital` (fuente de verdad).
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/parametros-tarifa-build-borrador.ts'),
+        'utf8',
+      );
+      // El output NO debe referenciar `form.aplicaMinimoVital` ni `form.m3Gratis`.
+      expect(source).not.toMatch(/form\.aplicaMinimoVital/);
+      expect(source).not.toMatch(/form\.m3Gratis/);
+    });
+
+    it('T-MIN-VITAL-3: types.ts marca aplica_minimo_vital y m3_gratis_minimo_vital como @deprecated', () => {
+      // Decisión B/B/B: mantener los campos en el type por backward-compat
+      // (data legacy pre-Option A), pero marcarlos como @deprecated para
+      // que un dev futuro vea que NO son la fuente de verdad.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../dominio/parametros-tarifa/types.ts'),
+        'utf8',
+      );
+      // Hay un bloque @deprecated en el JSDoc del campo `aplica_minimo_vital`.
+      // El JSDoc puede ser extenso (200-800 chars) — usamos tolerancia amplia.
+      expect(source).toMatch(/@deprecated[\s\S]{0,1000}aplica_minimo_vital/);
+      // Hay un bloque @deprecated en el JSDoc del campo `m3_gratis_minimo_vital`.
+      expect(source).toMatch(/@deprecated[\s\S]{0,1000}m3_gratis_minimo_vital/);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Phase 3 task 3.3 (RED): tests contractuales para los inputs editables
+  // de Indexación IPC (Art. 11 Res CRA 825/2017). Hallazgo #3: el schema
+  // y los types tienen `factor_indexacion_ipc` e `ipuf_indice` pero el
+  // screen NO muestra inputs. El admin no puede ajustar el IPC manual.
+  //
+  // Decisión B/B/B: hacer editables `factorIndexacionIpc`, `ipufIndice`,
+  // `anioDestino` y `anioBase` (override por cambios normativos).
+  // Validación: factor > 0, anio > 2000. Preview live del factor
+  // calculado via `calcularFactorIpc(anioBase, anioDestino)`.
+  // ─────────────────────────────────────────────────────────────────
+  describe('T-IPC-UI: inputs editables de Indexación IPC (Phase 3 task 3.3)', () => {
+    it('T-IPC-UI-1: input `factorIndexacionIpc` es editable (testID `param-factor-ipc`)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El input existe y es editable (no está disabled).
+      const input = getByTestId('param-factor-ipc');
+      expect(input).toBeTruthy();
+      expect(input.props.editable).toBe(true);
+    });
+
+    it('T-IPC-UI-2: input `ipufIndice` es editable (testID `param-ipuf-indice`)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      const input = getByTestId('param-ipuf-indice');
+      expect(input).toBeTruthy();
+      expect(input.props.editable).toBe(true);
+    });
+
+    it('T-IPC-UI-3: input `anioDestino` es editable (testID `param-anio-destino`)', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      const input = getByTestId('param-anio-destino');
+      expect(input).toBeTruthy();
+      expect(input.props.editable).toBe(true);
+    });
+
+    it('T-IPC-UI-4: preview live muestra `calcularFactorIpc(anioBase, anioDestino)` (testID `param-ipc-preview`)', async () => {
+      // El form debe mostrar el factor calculado con los años vigentes.
+      // factor = IPC_VALORES[anio_destino] / IPC_VALORES[anio_base].
+      // Para anio_base=2016 (1.0) y anio_destino=2026 (1.6234) → 1.6234.
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { getByTestId, getByText } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      // El preview existe.
+      const preview = getByTestId('param-ipc-preview');
+      expect(preview).toBeTruthy();
+      // El texto contiene el factor calculado: 1.6234 / 1.0 = 1.6234.
+      // Buscamos un match flexible para cubrir variaciones de formato
+      // (ej "1.6234", "1.62", "1,6234").
+      expect(preview.props.children).toMatch(/1[,.]?6\d*/);
+      // El preview debe tambien mencionar el factor que tipeó el admin
+      // en `param-factor-ipc` (override posible). Verificamos que el
+      // texto del preview refleja el state actual.
+      // Para no enlazar a una implementación de formato, simplemente
+      // validamos que el preview NO está vacío y contiene numeros.
+      const texto = String(preview.props.children);
+      expect(texto.length).toBeGreaterThan(0);
+      // Para el caso base (anio_base=2016, anio_destino=2026), el preview
+      // debe contener "1.6234" o "1,6234" (IPC_VALORES[2026] / IPC_VALORES[2016]).
+      // Usamos regex flexible para cubrir locale.
+      expect(getByText(/1[,.]6234/)).toBeTruthy();
+    });
+
+    it('T-IPC-UI-5: existe sección "Indexación IPC" con testID `seccion-card-ipc`', async () => {
+      const repo = crearRepoFake();
+      const acuerdoRepo = crearAcuerdoRepoFake();
+      const { UNSAFE_getByProps } = renderConSafeArea(
+        <ParametrosTarifaForm
+          id_prestador={7}
+          id_acuerdo={100}
+          parametrosActuales={parametrosFixture}
+          repo={repo}
+          acuerdoRepo={acuerdoRepo}
+        />,
+      );
+      expect(UNSAFE_getByProps({ testID: 'seccion-card-ipc' })).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // T-DECOMPOSE-1: integration test del hook useParametrosFormState
+  //
+  // parametros-tarifa-screen-decomposition Phase 1 task 1.4 (RED):
+  // verifica que el screen consume `useParametrosFormState` (no los 18
+  // useState inline). El test es estructural: lee el source y verifica
+  // que el import + invocación del hook reemplazaron al state disperso.
+  //
+  // RED  → screen todavía tiene los 18 useState inline + NO importa
+  //        el hook. El test reporta que el hook NO está en uso.
+  // GREEN → screen llama `const formState = useParametrosFormState({...})`
+  //        y los 18 useState inline se eliminaron.
+  //
+  // Por qué estructural (lee el source) y no behavioral (render + spy):
+  //   - El hook está IMPLEMENTADO pero todavía NO USADO por el screen.
+  //     Un test que solo verifique "render OK + testIDs OK" seguiría
+  //     verde aunque el hook no se use (el comportamiento del screen
+  //     es idéntico).
+  //   - El contrato del decompose es "el screen consume el hook". Solo
+  //     un check estructural del source lo puede verificar.
+  //   - Patron ya usado en T-IMPC-13 (mismo archivo, lee source de
+  //     ParametrosTarifa.tsx y verifica que importa `validarCmaMinimo`).
+  // ─────────────────────────────────────────────────────────────
+  describe('T-DECOMPOSE: useParametrosFormState hook integration', () => {
+    it('T-DECOMPOSE-1 el screen importa `useParametrosFormState` del hook', () => {
+      // El screen debe importar el hook desde `./hooks/useParametrosFormState`.
+      // Mientras el screen tenga los 18 useState inline (pre-Phase 1 task 1.5),
+      // este test falla (RED).
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(
+        /import\s*\{[^}]*useParametrosFormState[^}]*\}\s*from\s*['"]\.\/hooks\/useParametrosFormState['"]/,
+      );
+    });
+
+    it('T-DECOMPOSE-2 el screen invoca el hook dentro del componente', () => {
+      // El screen debe invocar el hook (no solo importarlo). La firma
+      // esperada es `const formState = useParametrosFormState({...})`.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(source).toMatch(/useParametrosFormState\s*\(\s*\{/);
+    });
+
+    it('T-DECOMPOSE-3 el screen NO tiene los 18 useState inline del form', () => {
+      // Mientras el screen mantenga los 18 useState inline (pre-Phase 1
+      // task 1.5), el conteo de `useState(...)` literales excede el
+      // umbral esperado (después del hook solo quedan los internos del
+      // componente). El conteo actual pre-hook: 25 useState (18 inputs +
+      // 7 internos). Post-hook esperado: ≤ 7 useState (los internos:
+      // repo, acuerdoRepo, id_acuerdo, parametrosActuales, cargando,
+      // errores, guardando). Asumimos ≤ 10 para tolerar ajustes.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // Contar `useState(` en el cuerpo del screen (excluyendo imports).
+      const matches = source.match(/useState\s*\(/g) ?? [];
+      // Post-hook: el screen conserva ~7 useState internos
+      // (repo, acuerdoRepo, id_acuerdo, parametrosActuales, cargando,
+      // errores, guardando). Permitimos hasta 10 para tolerar marginales.
+      expect(matches.length).toBeLessThanOrEqual(10);
+    });
+
+    it('T-DECOMPOSE-4 los inputs del form se bindean via `formState.values` + `formState.setters`', () => {
+      // El render debe usar `formState.values.periodo`, `formState.setters.setCma`, etc.
+      // Antes del decompose: `value={periodo}` + `onChangeText={setCma}` directo.
+      // Después: `value={formState.values.periodo}` + `onChangeText={formState.setters.setCma}`.
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      // El binding debe pasar por `formState.values` y `formState.setters`.
+      expect(source).toMatch(/formState\.values\./);
+      expect(source).toMatch(/formState\.setters\./);
     });
   });
 

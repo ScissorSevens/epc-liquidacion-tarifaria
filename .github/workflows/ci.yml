@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, desarrollo]
   pull_request:
     branches: [main]
 
@@ -24,13 +24,18 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Ejecutar tests con cobertura
-        run: npm run test:coverage
+      # Mobile tests are the active suite since the legacy src/ mirror was removed
+      # (see change delete-legacy-src-mirror). Root coverage is no longer produced.
+      # `npx jest --coverage` para que mobile/coverage/ se genere y el
+      # upload de artifact pueda encontrarlo (mobile no tiene `test:coverage`
+      # script en package.json — solo `test`).
+      - name: Ejecutar tests mobile con cobertura
+        run: cd mobile && npx jest --coverage --silent
 
       - name: Subir reporte de cobertura
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: coverage-report
-          path: coverage/
+          path: mobile/coverage/
           retention-days: 30

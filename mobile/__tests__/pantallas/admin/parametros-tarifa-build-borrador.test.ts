@@ -29,6 +29,10 @@ import { buildBorradorLocal, type FormValues } from '../../../src/pantallas/admi
 const formCompleto: FormValues = {
   periodo: '2026',
   anioBase: '2016',
+  // Phase 3 task 3.4 (GREEN): 3 inputs editables de Indexación IPC.
+  anioDestino: '2026',
+  factorIpc: '1.6234',
+  ipufIndice: '1.0',
   cma: '12000000',
   cmo: '800',
   cmi: '200',
@@ -36,14 +40,20 @@ const formCompleto: FormValues = {
   cmviaa: '500',
   cmaa: '1500',
   aplicaCmviaa: true,
+  // Phase 2 task 2.4 (GREEN): flag explicito CMAA. Default false
+  // para data legacy pre-Phase 2; aqui lo activamos para verificar
+  // que el buildBorradorLocal propaga el flag y el valor numerico.
+  aplicaCmaa: true,
   actoAdopcion: 'https://example.com/decreto-042-2024',
   estudioCostosId: 'SUI-2024-EST-001',
   documentoSoporteUrl: 'https://example.com/estudio-costos.pdf',
   aguaSuministrada: '50000',
   ipuf: '6',
   suscriptoresPromedio: '300',
-  aplicaMinimoVital: false,
-  m3Gratis: '0',
+  // Phase 3 task 3.2 (GREEN) — Opción A: `aplicaMinimoVital` y
+  // `m3Gratis` se ELIMINARON del form. El type FormValues ya no
+  // los declara. La fuente de verdad del mínimo vital es la tabla
+  // `minimo_vital` (futuro módulo admin).
   vigenteDesde: '2025-01-01',
   vigenteHasta: '2029-12-31',
   altitud: '2600',
@@ -59,6 +69,10 @@ describe('buildBorradorLocal — helper extraido de guardar()', () => {
       // El shape debe satisfacer la interface ParametrosTarifa (parcial
       // para este test — sin id_parametros/created_at que se setean al
       // persistir).
+      //
+      // Phase 3 task 3.2: `aplica_minimo_vital` y `m3_gratis_minimo_vital`
+      // se mantienen en el output (backward-compat) aunque ya no son
+      // user-driven — el buildBorradorLocal los hardcodea a `false`/`0`.
       const camposEsperados: (keyof ParametrosTarifa)[] = [
         'cma',
         'cmo',
@@ -78,6 +92,15 @@ describe('buildBorradorLocal — helper extraido de guardar()', () => {
       for (const campo of camposEsperados) {
         expect(borrador).toHaveProperty(campo);
       }
+    });
+
+    it('Phase 3 task 3.2: aplica_minimo_vital y m3_gratis_minimo_vital siempre false/0 (no user-driven)', () => {
+      // T-MIN-VITAL-2 verificacion via runtime: el helper ignora
+      // completamente `aplicaMinimoVital`/`m3Gratis` (que ya no
+      // existen en FormValues). El output siempre es `false`/`0`.
+      const borrador = buildBorradorLocal(formCompleto, ctx);
+      expect(borrador.aplica_minimo_vital).toBe(false);
+      expect(borrador.m3_gratis_minimo_vital).toBe(0);
     });
 
     it('convierte strings del form a numeros en los campos numericos', () => {
@@ -143,30 +166,13 @@ describe('buildBorradorLocal — helper extraido de guardar()', () => {
     });
   });
 
-  // ── T-BB-4: filtros m3 gratis segun aplica_minimo_vital ─────────────────
-  describe('T-BB-4: aplica_minimo_vital=false excluye m3_gratis', () => {
-    it('m3_gratis_minimo_vital se mantiene en 0 cuando aplica_minimo_vital=false', () => {
-      const formSinMinimo: FormValues = {
-        ...formCompleto,
-        aplicaMinimoVital: false,
-        m3Gratis: '50',
-      };
-      const borrador = buildBorradorLocal(formSinMinimo, ctx);
-      // El input m3Gratis se ignora cuando aplica_minimo_vital=false.
-      expect(borrador.m3_gratis_minimo_vital).toBe(0);
-    });
-
-    it('m3_gratis_minimo_vital refleja el valor cuando aplica_minimo_vital=true', () => {
-      const formConMinimo: FormValues = {
-        ...formCompleto,
-        aplicaMinimoVital: true,
-        m3Gratis: '20',
-      };
-      const borrador = buildBorradorLocal(formConMinimo, ctx);
-      expect(borrador.m3_gratis_minimo_vital).toBe(20);
-      expect(borrador.aplica_minimo_vital).toBe(true);
-    });
-  });
+  // ── T-BB-4 (Phase 3 task 3.2 GREEN, Opción A): REMOVIDO ───────────────
+  // El bloque que filtraba `m3_gratis_minimo_vital` segun
+  // `aplica_minimo_vital` se eliminó porque el form ya no captura esos
+  // campos. El helper hardcodea `aplica_minimo_vital: false` y
+  // `m3_gratis_minimo_vital: 0` siempre. Reemplazado por el test
+  // "Phase 3 task 3.2: aplica_minimo_vital y m3_gratis_minimo_vital
+  // siempre false/0" en T-BB-1.
 
   // ── T-BB-5 — Fase 2 (param-tarifa-res-825-compliance-phase2, task 4.6 RED):
   // los 4 campos nuevos del screen (cmaa, acto_adopcion, estudio_costos_id,

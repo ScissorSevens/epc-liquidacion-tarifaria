@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FechaPicker from '../components/FechaPicker';
+import FechaPicker from '../componentes/FechaPicker';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
