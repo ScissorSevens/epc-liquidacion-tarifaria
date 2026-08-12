@@ -1528,10 +1528,18 @@ fireEvent.press(back);
       const filas = UNSAFE_getAllByProps({ accessibilityLabel: switchCmviaa.props.accessibilityLabel });
       expect(filas.length).toBeGreaterThanOrEqual(1);
       // La fila tiene flexDirection row + justifyContent space-between
-      // + minHeight. Lo verificamos en el source del screen para no
-      // depender del tree-walking.
+      // + minHeight.
+      //
+      // Decompose Phase 2 task 2.7 (REFACTOR): el bloque `campoFila`
+      // se movió del screen a `ParametrosTarifaCostos.tsx` (subcomponente
+      // que agrupa los 2 switches CMVIAA + CMAA). Esta regression guard
+      // ahora verifica el SUBCOMPONENTE source — el screen consume
+      // el subcomponente, el subcomponente tiene el style block.
       const source = fs.readFileSync(
-        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/componentes/ParametrosTarifaCostos.tsx',
+        ),
         'utf8',
       );
       const bloque = source.match(/campoFila:\s*\{([\s\S]*?)\n\s*\},?/);
@@ -1606,22 +1614,77 @@ fireEvent.press(back);
       // Verificamos que el SCREEN mencione `selectable` en su codigo.
       // La implementación real vive en FormField (que recibe `selectable`
       // como prop y lo forwarda al TextInput).
-      const source = fs.readFileSync(
+      //
+      // Decompose Phase 2 task 2.7 (REFACTOR): los FormField numéricos
+      // se movieron del screen a los 6 subcomponentes. Esta regression
+      // guard ahora verifica el SCREEN O CUALQUIER SUBCOMPONENTE — el
+      // screen consume los subcomponentes, los subcomponentes tienen
+      // los FormField numéricos con `selectable`.
+      const screenSource = fs.readFileSync(
         path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
         'utf8',
       );
-      expect(source).toMatch(/selectable/);
+      const subComponentes = [
+        'componentes/ParametrosTarifaPeriodo.tsx',
+        'componentes/ParametrosTarifaCostos.tsx',
+        'componentes/ParametrosTarifaAgua.tsx',
+        'componentes/ParametrosTarifaAltitud.tsx',
+        'componentes/ParametrosTarifaSoporte.tsx',
+        'componentes/ParametrosTarifaIPC.tsx',
+      ];
+      const fuenteTiene: string[] = [];
+      if (/selectable/.test(screenSource)) {
+        fuenteTiene.push('ParametrosTarifa.tsx');
+      }
+      for (const sub of subComponentes) {
+        const src = fs.readFileSync(
+          path.join(__dirname, `../../../src/pantallas/admin/${sub}`),
+          'utf8',
+        );
+        if (/selectable/.test(src)) {
+          fuenteTiene.push(sub);
+        }
+      }
+      // Debe existir en al menos 1 fuente (screen o subcomponentes).
+      expect(fuenteTiene.length).toBeGreaterThanOrEqual(1);
     });
 
     it('T-CRAFT-8 el source del screen pide FormField con soporte de fontVariant tabular-nums', async () => {
       // El screen debe pasar tabular-nums (o fontVariant que lo
       // produzca) en los inputs numéricos. Verificamos que el codigo
       // del screen mencione `tabularNums` o `fontVariant` como prop.
-      const source = fs.readFileSync(
+      //
+      // Decompose Phase 2 task 2.7 (REFACTOR): los FormField numéricos
+      // con tabularNums se movieron del screen a los 6 subcomponentes.
+      // Esta regression guard ahora verifica el SCREEN O CUALQUIER
+      // SUBCOMPONENTE.
+      const screenSource = fs.readFileSync(
         path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
         'utf8',
       );
-      expect(source).toMatch(/tabularNums|tabular-nums/);
+      const subComponentes = [
+        'componentes/ParametrosTarifaPeriodo.tsx',
+        'componentes/ParametrosTarifaCostos.tsx',
+        'componentes/ParametrosTarifaAgua.tsx',
+        'componentes/ParametrosTarifaAltitud.tsx',
+        'componentes/ParametrosTarifaSoporte.tsx',
+        'componentes/ParametrosTarifaIPC.tsx',
+      ];
+      const fuenteTiene: string[] = [];
+      if (/tabularNums|tabular-nums|fontVariant/.test(screenSource)) {
+        fuenteTiene.push('ParametrosTarifa.tsx');
+      }
+      for (const sub of subComponentes) {
+        const src = fs.readFileSync(
+          path.join(__dirname, `../../../src/pantallas/admin/${sub}`),
+          'utf8',
+        );
+        if (/tabularNums|tabular-nums|fontVariant/.test(src)) {
+          fuenteTiene.push(sub);
+        }
+      }
+      // Debe existir en al menos 1 fuente (screen o subcomponentes).
+      expect(fuenteTiene.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -1861,7 +1924,16 @@ fireEvent.press(back);
      * fila para confirmar que el wrapper respeta el target size.
      */
     it('T-DESIGN-5: Pressable y campoFila tienen minHeight >= 44 (WCAG 2.5.5)', () => {
-      const source = readSource();
+      // Decompose Phase 2 task 2.7 (REFACTOR): el bloque `campoFila`
+      // se movió del screen a `ParametrosTarifaCostos.tsx`. Esta
+      // regression guard ahora verifica el SUBCOMPONENTE source.
+      const source = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/componentes/ParametrosTarifaCostos.tsx',
+        ),
+        'utf8',
+      );
       // El bloque campoFila (fila del Switch) tiene minHeight explicito.
       const campoFilaBloque = source.match(/campoFila:\s*\{([\s\S]*?)\n\s*\},?/);
       expect(campoFilaBloque).not.toBeNull();
@@ -1872,8 +1944,13 @@ fireEvent.press(back);
       heights.forEach((h) => {
         expect(h).toBeGreaterThanOrEqual(44);
       });
-      // El botón guardar (BotonPrimario) usa height 56 nativo >= 44.
-      expect(source).toMatch(/param-guardar/);
+      // El botón guardar (BotonPrimario) sigue en el screen — verificamos
+      // que el screen renderee `param-guardar`.
+      const screenSource = fs.readFileSync(
+        path.join(__dirname, '../../../src/pantallas/admin/ParametrosTarifa.tsx'),
+        'utf8',
+      );
+      expect(screenSource).toMatch(/param-guardar/);
     });
 
     /**
