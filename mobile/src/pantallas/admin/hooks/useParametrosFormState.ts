@@ -3,6 +3,17 @@
  * validators + guardar del screen admin
  * `ParametrosTarifa` (Decompose Phase 1 task 1.3).
  *
+ * El cuerpo de la validación vive en el módulo puro
+ * `utils/validar-parametros-form.ts` (cleanup F3 del verify-report
+ * de `parametros-tarifa-screen-decomposition`). Acá solo construimos
+ * el input desde los values del form y delegamos. La razon:
+ *   1. Testeable en aislamiento (60+ unit tests en el modulo puro,
+ *      sin necesidad de renderHook ni mocks de React Navigation).
+ *   2. Reusable si en el futuro agregamos otro form similar
+ *      (ParametrosTarifaAuditoria? ParametrosTarifaBackup?).
+ *   3. El hook queda como thin wrapper de 1 linea — mas facil de
+ *      entender que 60 lineas de try/catch + if/else.
+ *
  * POR QUE ESTE HOOK EXISTE:
  *   El screen `ParametrosTarifa.tsx` tenia 1155 lineas (single-file
  *   component con 4 concerns mezclados). Este hook extrae el primer
@@ -64,6 +75,7 @@ import {
 } from '../parametros-tarifa-build-borrador';
 import type { FormErrors } from '../../../componentes/scroll-to-first-error';
 import { useWorkspace } from '../../../composicion/useWorkspace';
+import { validarParametrosForm } from '../utils/validar-parametros-form';
 
 /** Parametros del hook. */
 export interface UseParametrosFormStateParams {
@@ -146,17 +158,6 @@ export interface UseParametrosFormStateReturn {
 const periodoDefault = (): number => Number(new Date().toISOString().slice(0, 4));
 
 import { parseNum as num, parseEntero as entero } from '../utils/parse-numeric';
-
-/**
- * Helper de validacion de URL (Fase 2, task 4.5). Acepta http:// o
- * https:// — protocolos válidos para documentos públicos (actoadministrativo
- * URL y documento_soporte_url). Si el campo está vacío, retorna
- * true (la validación a nivel callsite salta el chequeo).
- */
-const esUrlValida = (s: string): boolean => {
-  if (s === '') return true;
-  return /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(s);
-};
 
 export function useParametrosFormState(
   params: UseParametrosFormStateParams,
@@ -353,96 +354,38 @@ export function useParametrosFormState(
   // ──────────────────────────────────────────────────────────────────
   // Validación pura. Sin side effects. Retorna FormErrors.
   //
-  // D4 (Commit 3): `validarTodo()` invoca `validarCmaMinimo()` del dominio
-  // via try/catch (la funcion THROWS, no retorna string — D4 hallazgo
-  // critico del design). Tambien valida reglas locales (suscriptores > 0
-  // defensa anti division por cero, fechas invertidas).
-  //
-  // Fase 2 (task 4.5): validacion adicional de URLs (acto_adopcion y
-  // documento_soporte_url). El CMAA no lleva validacion inline: el
-  // dominio ya valida `cmaa` como numeric en el campo de tipo numeric,
-  // y el form lo trata como complemento opcional.
-  //
-  // Phase 3 task 3.4 (GREEN): validación inline de Indexación IPC
-  // (Res CRA 825/2017 Art. 11). Años > 2000 (sanity), factor > 0
-  // (multiplicador no puede ser 0 ni negativo).
-  const validarTodo = useCallback((): FormErrors => {
-    const errors: FormErrors = {};
-    const cmaNum = num(cma);
-    const cmoNum = num(cmo);
-    // Res CRA 825/2017 Art. 15: validarCmaMinimo THROWs si CMA < minimo.
-    try {
-      validarCmaMinimo(cmaNum, 'acueducto');
-    } catch (e) {
-      errors.cma = (e as Error).message;
-    }
-    // Res CRA 825/2017 Art. 18: validarCmogMinimo THROWs si CMOG < minimo.
-    // Cambio `param-tarifa-residuales-cra-825` Phase 1 task 1.2 (GREEN).
-    // Servicio hardcoded a 'acueducto' (Hallazgo #6 deferred — la app
-    // solo cubre acueducto por ahora). La division acueducto/alcantarillado
-    // es mejora futura.
-    try {
-      validarCmogMinimo(cmoNum, 'acueducto');
-    } catch (e) {
-      errors.cmo = (e as Error).message;
-    }
-    // Suscriptores debe ser > 0 (defensa anti division por cero).
-    if (entero(suscriptoresPromedio) <= 0) {
-      errors.suscriptores = 'Suscriptores debe ser > 0';
-    }
-    // Vigente desde NO puede ser posterior a vigente hasta.
-    if (
-      vigenteDesde !== '' &&
-      vigenteHasta !== '' &&
-      vigenteDesde > vigenteHasta
-    ) {
-      errors.vigenteHasta = 'Vigente hasta debe ser posterior a vigente desde';
-    }
-    // Validacion de URLs (Fase 2, task 4.5). Si el campo está vacio,
-    // se permite: ambos docs son opcionales. Si el usuario escribió
-    // algo, debe ser una URL http(s) válida.
-    if (actoAdopcion.trim() !== '' && !esUrlValida(actoAdopcion.trim())) {
-      errors.actoAdopcion = 'Debe ser una URL válida (http:// o https://)';
-    }
-    if (
-      documentoSoporteUrl.trim() !== '' &&
-      !esUrlValida(documentoSoporteUrl.trim())
-    ) {
-      errors.documentoSoporteUrl = 'Debe ser una URL válida (http:// o https://)';
-    }
-    // Phase 3 task 3.4 (GREEN): validación inline de Indexación IPC
-    // (Res CRA 825/2017 Art. 11). Años > 2000 (sanity), factor > 0
-    // (multiplicador no puede ser 0 ni negativo).
-    const anioBaseNum = entero(anioBase);
-    const anioDestinoNum = entero(anioDestino);
-    const factorIpcNum = parseFloat(factorIpc);
-    const ipufIndiceNum = parseFloat(ipufIndice);
-    if (anioBaseNum <= 2000) {
-      errors.anioBase = 'Anio base debe ser > 2000';
-    }
-    if (anioDestinoNum <= 2000) {
-      errors.anioDestino = 'Anio destino debe ser > 2000';
-    }
-    if (Number.isNaN(factorIpcNum) || factorIpcNum <= 0) {
-      errors.factorIpc = 'Factor IPC debe ser > 0';
-    }
-    if (Number.isNaN(ipufIndiceNum) || ipufIndiceNum <= 0) {
-      errors.ipufIndice = 'IPUF indice debe ser > 0';
-    }
-    return errors;
-  }, [
-    cma,
-    cmo,
-    suscriptoresPromedio,
-    vigenteDesde,
-    vigenteHasta,
-    actoAdopcion,
-    documentoSoporteUrl,
-    anioBase,
-    anioDestino,
-    factorIpc,
-    ipufIndice,
-  ]);
+  // Cleanup F3: el cuerpo de la validación se extrajo a
+  // `utils/validar-parametros-form.ts` (modulo puro, 60+ unit tests
+  // en aislamiento). Acá solo construimos el input y delegamos.
+  const validarTodo = useCallback(
+    (): FormErrors =>
+      validarParametrosForm({
+        cma,
+        cmo,
+        suscriptoresPromedio,
+        vigenteDesde,
+        vigenteHasta,
+        actoAdopcion,
+        documentoSoporteUrl,
+        anioBase,
+        anioDestino,
+        factorIpc,
+        ipufIndice,
+      }),
+    [
+      cma,
+      cmo,
+      suscriptoresPromedio,
+      vigenteDesde,
+      vigenteHasta,
+      actoAdopcion,
+      documentoSoporteUrl,
+      anioBase,
+      anioDestino,
+      factorIpc,
+      ipufIndice,
+    ],
+  );
 
   // ──────────────────────────────────────────────────────────────────
   // D2 (parametros-tarifa-impeccable-v2 Commit 2): construimos el shape

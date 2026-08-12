@@ -726,20 +726,32 @@ fireEvent.press(back);
       // para validar el CMA, NO una comparación inline `num(cma) < 2890`.
       //
       // Phase 1 task 1.5 (DECOMPOSE): la validación se movió al hook
-      // `useParametrosFormState`. Esta regression guard ahora verifica
-      // el HOOK source — el screen consume el hook, el hook invoca
-      // las funciones del dominio.
-      const source = fs.readFileSync(
+      // `useParametrosFormState`. Esta regression guard verifica el HOOK
+      // + el módulo puro de validación (cleanup F3 del verify-report de
+      // `parametros-tarifa-screen-decomposition`: la validación se
+      // extrajo a `utils/validar-parametros-form.ts` como módulo puro
+      // testeable, y el hook lo invoca por delegación).
+      const sourceHook = fs.readFileSync(
         path.join(
           __dirname,
           '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
         ),
         'utf8',
       );
-      // Importación del dominio.
-      expect(source).toMatch(/validarCmaMinimo/);
-      // Invocación dentro de un try/catch (D4 hallazgo critico).
-      expect(source).toMatch(/try\s*\{[^}]*validarCmaMinimo/s);
+      const sourcePure = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/utils/validar-parametros-form.ts',
+        ),
+        'utf8',
+      );
+      // El hook importa el modulo puro de validacion.
+      expect(sourceHook).toMatch(/validarParametrosForm/);
+      // El modulo puro importa validarCmaMinimo del dominio.
+      expect(sourcePure).toMatch(/validarCmaMinimo/);
+      // Invocacion dentro de un try/catch (D4 hallazgo critico, ahora
+      // en el modulo puro).
+      expect(sourcePure).toMatch(/try\s*\{[^}]*validarCmaMinimo/s);
     });
   });
 
@@ -2446,23 +2458,33 @@ fireEvent.press(back);
       // del dominio. La implementación NO debe usar una comparación
       // inline hardcoded contra 467 (constante congelada del dominio).
       //
-      // Phase 1 task 1.5 (DECOMPOSE): la validación se movió del screen
-      // al hook `useParametrosFormState`. Esta regression guard ahora
-      // verifica el HOOK source (no el screen source) — el screen
-      // consume el hook, el hook invoca las funciones del dominio.
-      const source = fs.readFileSync(
+      // Phase 1 task 1.5 (DECOMPOSE): la validación se movió al hook
+      // `useParametrosFormState`. Cleanup F3 (verify-report): se
+      // extrajo a modulo puro `utils/validar-parametros-form.ts`.
+      // Esta regression guard verifica ambos archivos: el hook
+      // (delegacion) + el modulo puro (invocacion del dominio).
+      const sourceHook = fs.readFileSync(
         path.join(
           __dirname,
           '../../../src/pantallas/admin/hooks/useParametrosFormState.ts',
         ),
         'utf8',
       );
-      // Importación del dominio.
-      expect(source).toMatch(/validarCmogMinimo/);
-      // Invocación dentro de un try/catch (mismo patrón que validarCmaMinimo).
-      expect(source).toMatch(/try\s*\{[^}]*validarCmogMinimo/s);
+      const sourcePure = fs.readFileSync(
+        path.join(
+          __dirname,
+          '../../../src/pantallas/admin/utils/validar-parametros-form.ts',
+        ),
+        'utf8',
+      );
+      // El hook importa el modulo puro.
+      expect(sourceHook).toMatch(/validarParametrosForm/);
+      // El modulo puro importa validarCmogMinimo del dominio.
+      expect(sourcePure).toMatch(/validarCmogMinimo/);
+      // Invocacion dentro de un try/catch (mismo patron que validarCmaMinimo).
+      expect(sourcePure).toMatch(/try\s*\{[^}]*validarCmogMinimo/s);
       // Servicio hardcoded a 'acueducto' (Hallazgo #6 deferred).
-      expect(source).toMatch(/validarCmogMinimo\s*\(\s*[^,]+,\s*['"]acueducto['"]/);
+      expect(sourcePure).toMatch(/validarCmogMinimo\s*\(\s*[^,]+,\s*['"]acueducto['"]/);
     });
   });
 
